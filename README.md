@@ -226,10 +226,7 @@ tools:
 
 #### 8. Tool that uses an image
 
-This tool puuls and loads a docker image from dockerhub.
-For this example we will use the [configcat CLI](https://hub.docker.com/r/configcat/cli) , but you can use any image.
-By providing the "image" field, the agent will load the complete configcat CLI from Docker Hub, and can trigger any operations requested on configcat, against this CLI.
-Since image is provided, the "type" is not being used and can be removed. If a content is provided, it will always run as "shell".
+This tool pulls and loads a Docker image from Docker Hub. In this example, we will use the [Configcat CLI](https://hub.docker.com/r/configcat/cli) , but you can use any image. By specifying the 'image' field, the agent will load the complete ConfigCat CLI from Docker Hub and can execute any requested operations using this CLI. Since the 'image' field is provided, the 'type' field is not required and can be removed. If 'content' is provided, it will always run as a shell script.
 
 ```
 tools:
