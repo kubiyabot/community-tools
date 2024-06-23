@@ -6,15 +6,11 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Prerequisites](#prerequisites)
-- [Getting Started](#getting-started)
-    - [Building the Docker Image](#building-the-docker-image)
-    - [Running the Container](#running-the-container)
-- [Configuration](#configuration)
-    - [Dockerfile](#dockerfile)
-    - [entry.sh Script](#entrysh-script)
-    - [Tools Installed](#tools-installed)
-    - [Customizing the Agent](#customizing-the-agent)
+- [Schema](#Schema)
+- Example Configurations
+    - Databricks CLI Tool
+    - Python Script Tool
+    - Docker Container Tool
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -86,7 +82,8 @@ tools:
     volumes:
       - path: /workspace
         name: databricks-workspace
-2. Python Script Tool
+
+#### 2. Python Script Tool
 This tool runs a Python script with specified arguments and environment variables.
 ```
 
@@ -105,7 +102,9 @@ tools:
         required: false
     env:
       - "PYTHON_ENV"
-3. Docker Container Tool
+
+#### 3. Docker Container Tool
+
 This tool runs a Docker container with specified environment variables and volumes.
 ```
 
