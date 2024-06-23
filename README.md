@@ -6,11 +6,16 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Schema](#Schema)
-- Example Configurations
-    - Databricks CLI Tool
-    - Python Script Tool
-    - Docker Container Tool
+- [Schema](#schema)
+- [Example Configurations](#example-configurations)
+  - [Databricks CLI Tool](#1-databricks-cli-tool)
+  - [Python Script Tool](#2-python-script-tool)
+  - [Docker Container Tool](#3-docker-container-tool)
+  - [Tool with External Content and Dependencies](#4-tool-with-external-content-and-dependencies)
+  - [Tool with OpenAPI Specification](#5-tool-with-openapi-specification)
+  - [Tool with File and Service Specifications](#6-tool-with-file-and-service-specifications)
+  - [Tool with Git Repository](#7-tool-with-git-repository)
+  - [Tool that uses an image](#8-Tool-that-uses-an-image)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -82,10 +87,11 @@ tools:
     volumes:
       - path: /workspace
         name: databricks-workspace
+```
 
 #### 2. Python Script Tool
+
 This tool runs a Python script with specified arguments and environment variables.
-```
 
 ```
 tools:
@@ -103,10 +109,11 @@ tools:
     env:
       - "PYTHON_ENV"
 
+```
+
 #### 3. Docker Container Tool
 
 This tool runs a Docker container with specified environment variables and volumes.
-```
 
 ```
 tools:
@@ -124,9 +131,11 @@ tools:
     volumes:
       - path: /data
         name: docker-data
-4. Tool with External Content and Dependencies
-This tool fetches its script and dependencies from external URLs.
 ```
+
+#### 4. Tool with External Content and Dependencies
+
+This tool fetches its script and dependencies from external URLs.
 
 ```
 tools:
@@ -142,9 +151,11 @@ tools:
         required: true
     env:
       - "EXTERNAL_TOOL_ENV"
-5. Tool with OpenAPI Specification
-This tool uses an OpenAPI specification for its configuration.
 ```
+
+#### 5. Tool with OpenAPI Specification
+
+This tool uses an OpenAPI specification for its configuration.
 
 ```
 tools:
@@ -163,9 +174,11 @@ tools:
         required: true
     env:
       - "OPENAPI_TOOL_ENV"
-6. Tool with File and Service Specifications
-This tool includes files and services required for its operation.
 ```
+
+#### 6. Tool with File and Service Specifications
+
+This tool includes files and services required for its operation.
 
 ```
 tools:
@@ -185,9 +198,11 @@ tools:
         env:
           REDIS_PASSWORD: "password"
         exposed_port: 6379
-7. Tool with Git Repository
-This tool clones a Git repository and runs a script from it.
 ```
+
+#### 7. Tool with Git Repository
+
+This tool clones a Git repository and runs a script from it.
 
 ```
 tools:
@@ -207,4 +222,30 @@ tools:
     volumes:
       - path: /workspace
         name: git-repo-workspace
+```
+
+#### 8. Tool that uses an image
+
+This tool puuls and loads a docker image from dockerhub.
+For this example we will use the [configcat CLI](https://hub.docker.com/r/configcat/cli) , but you can use any image.
+By providing the "image" field, the agent will load the complete configcat CLI from Docker Hub, and can trigger any operations requested on configcat, against this CLI.
+Since image is provided, the "type" is not being used and can be removed. If a content is provided, it will always run as "shell".
+
+```
+tools:
+# https://configcat.github.io/cli/
+  - name: configcat_cli
+    image: configcat/cli
+    description: Run ConfigCat CLI commands
+    alias: configcat
+    content: |
+      configcat {{.command}}
+    args:
+      command:
+        description: 'The ConfigCat CLI command to run (example: settings list --config-id=<your_config_id>)'
+        required: true
+    env:
+      - "CONFIGCAT_API_USER"
+      - "CONFIGCAT_API_PASS"
+      - "CONFIGCAT_TOKEN" # Fetched from Kubiya secret
 ```
