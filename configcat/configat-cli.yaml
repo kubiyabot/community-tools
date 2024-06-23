@@ -1,0 +1,16 @@
+tools:
+# https://configcat.github.io/cli/
+  - name: configcat_cli
+    image: configcat/cli
+    description: Run ConfigCat CLI commands
+    alias: configcat
+    content: |
+      configcat {{.command}}
+    args:
+      command:
+        description: 'The ConfigCat CLI command to run (example: settings list --config-id=<your_config_id>)'
+        required: true
+    env:
+      - "CONFIGCAT_API_USER"
+      - "CONFIGCAT_API_PASS"
+      - "CONFIGCAT_TOKEN" # Fetched from Kubiya secret
