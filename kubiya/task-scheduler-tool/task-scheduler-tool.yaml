@@ -7,7 +7,7 @@ tools:
       import os
       import sys
       import requests
-      from datetime import datetime, timedelta
+      from datetime import datetime, timedelta, timezone
       from pytimeparse.timeparse import timeparse
 
       def parse_duration(duration):
@@ -18,13 +18,12 @@ tools:
           return timedelta(seconds=seconds)
 
       def calculate_schedule_time(duration):
-          now = datetime.utcnow()
+          now = datetime.now(timezone.utc)  # Get the current time in UTC with timezone
           return now + parse_duration(duration)
 
       def main(schedule_time):
           required_vars = [
-              "KUBIYA_API_KEY", "USER_ID", "SLACK_CHANNEL_ID", 
-              "TEAM_ID", "USER_EMAIL", "ORGANIZATION", "AGENT"
+              "KUBIYA_API_KEY", "SLACK_CHANNEL_ID", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "KUBIYA_AGENT_PROFILE"
           ]
           for var in required_vars:
               if var not in os.environ:
@@ -32,14 +31,12 @@ tools:
                   sys.exit(1)
 
           payload = {
-              "schedule_time": schedule_time,
-              "user_id": os.environ["USER_ID"],
+              "scheduled_time": schedule_time,
               "channel_id": os.environ["SLACK_CHANNEL_ID"],
-              "team_id": os.environ["TEAM_ID"],
-              "user_email": os.environ["USER_EMAIL"],
-              "organization_name": os.environ["ORGANIZATION"],
+              "user_email": os.environ["KUBIYA_USER_EMAIL"],
+              "organization_name": os.environ["KUBIYA_USER_ORG"],
               "task_description": "say hello",
-              "selected_agent": os.environ["AGENT"]
+              "agent": os.environ["KUBIYA_AGENT_PROFILE"]
           }
           response = requests.post(
               'https://api.kubiya.ai/api/v1/scheduled_tasks',
@@ -58,7 +55,7 @@ tools:
           duration = "{{ .execution_delay }}"
           schedule_time = calculate_schedule_time(duration)
           print(f"Scheduling task for {schedule_time}")
-          main(schedule_time.strftime("%Y-%m-%dT%H:%M:%SZ"))
+          main(schedule_time.isoformat())  # Use isoformat to include timezone info
     args:
       execution_delay:
         description: 'The delay before the task is executed (e.g., 5h for 5 hours, 30m for 30 minutes)'
@@ -68,9 +65,7 @@ tools:
       pytimeparse==1.1.8
     env:
       - "KUBIYA_API_KEY" # Fetched from Kubiya secret
-      - "USER_ID" # Fetched from Kubiya secret
       - "SLACK_CHANNEL_ID" # Fetched from Kubiya secret
-      - "TEAM_ID" # Fetched from Kubiya secret
-      - "USER_EMAIL" # Fetched from Kubiya secret
-      - "ORGANIZATION" # Fetched from Kubiya secret
-      - "AGENT" # Fetched from Kubiya secret
+      - "KUBIYA_USER_EMAIL" # Fetched from Kubiya secret
+      - "KUBIYA_USER_ORG" # Fetched from Kubiya secret
+      - "KUBIYA_AGENT_PROFILE" # Fetched from Kubiya secret
