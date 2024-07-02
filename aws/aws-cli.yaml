@@ -17,5 +17,5 @@ tools:
       - "AWS_PROFILE"
       - "AWS_DEFAULT_REGION" # OR "AWS_REGION" # TODO:: Check which one is correct
     with_files:
-      - source: /Users/shaked/.aws/credentials
+      - source: /root/.aws/credentials
         destination: /root/.aws/credentials
