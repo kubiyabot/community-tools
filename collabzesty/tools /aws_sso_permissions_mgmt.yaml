@@ -302,5 +302,5 @@ tools:
       - AWS_PROFILE # The AWS profile to use for the operation (injected automatically by Kubiya)
     # Mount the AWS credentials file in the container from the execution environment
     with_files:
-        - source: /home/appuser/.aws/credentials
+        source: /home/appuser/.aws/credentials
         destination: /root/.aws/credentials
