@@ -303,4 +303,4 @@ tools:
     # Mount the AWS credentials file in the container from the execution environment
     with_files:
         - source: /home/appuser/.aws/credentials
-            destination: /root/.aws/credentials
+        destination: /root/.aws/credentials
