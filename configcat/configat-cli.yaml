@@ -1,8 +1,7 @@
 tools:
-# https://configcat.github.io/cli/
   - name: configcat_cli
     image: configcat/cli
-    description: Run ConfigCat CLI commands  - recieves the command to run as an argument (example: configcat command='flag value show --setting-id=XXX')
+    description: Run ConfigCat CLI commands - receives the command to run as an argument (example: configcat command='flag value show --setting-id=XXX')
     alias: configcat
     content: |
       configcat {{.command}}
@@ -14,3 +13,7 @@ tools:
       - "CONFIGCAT_API_USER"
       - "CONFIGCAT_API_PASS"
       - "CONFIGCAT_TOKEN" # Fetched from Kubiya secret
+      - "CONFIGCAT_SETTING_NAME" # Setting Name for ConfigCat
+      - "CONFIGCAT_PRODUCT_ID" # Product ID for ConfigCat
+      - "CONFIGCAT_ORG_ID" # Organization ID for ConfigCat
+      - "CONFIGCAT_CONFIG_ID" # Configuration ID for ConfigCat
