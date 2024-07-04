@@ -2,7 +2,7 @@ tools:
 # https://configcat.github.io/cli/
   - name: configcat_cli
     image: configcat/cli
-    description: Run ConfigCat CLI commands  - recieves the command to run as an argument
+    description: Run ConfigCat CLI commands  - recieves the command to run as an argument (example: configcat command='flag value show --setting-id=XXX')
     alias: configcat
     content: |
       configcat {{.command}}
