@@ -2,7 +2,7 @@ tools:
 # https://configcat.github.io/cli/
   - name: configcat_cli
     image: configcat/cli
-    description: Run ConfigCat CLI commands
+    description: Run ConfigCat CLI commands  - recieves the command to run as an argument
     alias: configcat
     content: |
       configcat {{.command}}
