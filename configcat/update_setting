@@ -1,0 +1,73 @@
+tools:
+  - name: configcat_cli
+    image: configcat/cli
+    description: Run ConfigCat CLI commands - to update a setting in production
+    alias: configcat
+    content: |
+      #!/bin/bash
+
+      # Configuration
+      CONFIG_ID="${CONFIGCAT_CONFIG_ID}"
+      SETTING_NAME="{{ .setting_name }}"
+      NEW_IDENTIFIER="{{ .new_identifier }}"
+
+      if [ -z "$CONFIG_ID" ]; then
+        echo "Error: Environment variable CONFIGCAT_CONFIG_ID is not set."
+        exit 1
+      fi
+
+      if [ -z "$SETTING_NAME" ]; then
+        echo "Error: Setting name parameter is not provided."
+        exit 1
+      fi
+
+      # Fetch all settings and extract the ID for the specified setting name
+      echo "Fetching setting ID for ${SETTING_NAME}..."
+      SETTING_ID=$(configcat flag ls --config-id=${CONFIG_ID} | grep "${SETTING_NAME}" | awk '{print $1}')
+
+      if [ -z "$SETTING_ID" ]; then
+        echo "Error: Setting ID for ${SETTING_NAME} not found."
+        exit 1
+      fi
+
+      echo "Setting ID for ${SETTING_NAME} is ${SETTING_ID}"
+
+      # Fetch the current configuration for the specified setting
+      echo "Fetching current configuration for setting ID ${SETTING_ID}..."
+      CONFIG_OUTPUT=$(configcat flag value show --setting-id=${SETTING_ID})
+
+      # Extract the Production Environment section
+      PROD_ENV_START=$(echo "$CONFIG_OUTPUT" | grep -n "Production Environment" | cut -d: -f1)
+      PROD_ENV_END=$(echo "$CONFIG_OUTPUT" | grep -n "Default:" | tail -1 | cut -d: -f1)
+
+      if [ -z "$PROD_ENV_START" ] || [ -z "$PROD_ENV_END" ]; then
+        echo "Error: Production Environment section not found in the configuration."
+        exit 1
+      fi
+
+      PROD_ENV_SECTION=$(echo "$CONFIG_OUTPUT" | sed -n "${PROD_ENV_START},${PROD_ENV_END}p")
+
+      # Extract the current list of identifiers
+      CURRENT_IDENTIFIERS=$(echo "$PROD_ENV_SECTION" | grep -oP '(?<=IS ONE OF \(hashed\) ).*')
+
+      # Add the new identifier to the list
+      UPDATED_IDENTIFIERS="${CURRENT_IDENTIFIERS},${NEW_IDENTIFIER}"
+
+      # Update the setting with the new list of identifiers
+      echo "Updating setting with new identifier list..."
+      configcat flag value set --setting-id=${SETTING_ID} --environment-id=${PROD_ENV_SECTION} --value="IS ONE OF (hashed) ${UPDATED_IDENTIFIERS}"
+
+      echo "Setting updated successfully."
+
+    args:
+      setting_name:
+        description: 'The name of the setting to update'
+        required: true
+      new_identifier:
+        description: 'The new identifier to add to the "Production Environment" list'
+        required: true
+    env:
+      - "CONFIGCAT_API_USER"
+      - "CONFIGCAT_API_PASS"
+      - "CONFIGCAT_TOKEN" # Fetched from Kubiya secret
+      - "CONFIGCAT_CONFIG_ID" # Configuration ID for ConfigCat
