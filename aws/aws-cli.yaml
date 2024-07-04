@@ -10,12 +10,8 @@ tools:
       command:
         description: 'The AWS CLI command to run (example: s3 ls)'
         required: true
-      profile:
-        description: 'The AWS CLI profile to use (profiles are stored in /root/.aws/credentials)'
-        required: false
     env:
       - "AWS_PROFILE"
-      - "AWS_DEFAULT_REGION" # OR "AWS_REGION" # TODO:: Check which one is correct
     with_files:
-      - source: /root/.aws/credentials
-        destination: /root/.aws/credentials
+      - source: /home/appuser/.aws/credentials
+      destination: /root/.aws/credentials
