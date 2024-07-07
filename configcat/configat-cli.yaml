@@ -13,7 +13,6 @@ tools:
       - "CONFIGCAT_API_USER"
       - "CONFIGCAT_API_PASS"
       - "CONFIGCAT_TOKEN" # Fetched from Kubiya secret
-      - "CONFIGCAT_SETTING_NAME" # Setting Name for ConfigCat
       - "CONFIGCAT_PRODUCT_ID" # Product ID for ConfigCat
       - "CONFIGCAT_ORG_ID" # Organization ID for ConfigCat
       - "CONFIGCAT_CONFIG_ID" # Configuration ID for ConfigCat
