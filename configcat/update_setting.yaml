@@ -1,8 +1,8 @@
 tools:
-  - name: configcat_cli
+  - name: configcat_setting_update
     image: configcat/cli
-    description: Run ConfigCat CLI commands - receives the command to run as an argument
-    alias: configcat
+    description:  Allows to add a a value to a setting (CONFIGCAT_SETTING_NAME). receives the new identifier as a parameter to be added to the setting. 
+    alias: configcat-update
     content: |
       #!/bin/bash
 
