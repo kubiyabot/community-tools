@@ -51,7 +51,7 @@ tools:
           )
 
           if response.status_code < 300:
-              print(f"Webhook created successfully and has been sent to an approver.")
+              print(f"Webhook created successfully and has been sent to the Slack Channel.")
               event_response = response.json()
               webhook_url = event_response.get("webhook_url")
               if webhook_url:
