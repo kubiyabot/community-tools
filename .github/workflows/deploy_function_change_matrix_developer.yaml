@@ -9,9 +9,6 @@ on:
     paths:
       - '**/*.yaml'
       - '**/*.yml'
-    paths-ignore:
-      - '.github/**'
-      - '.git/**'
 
 jobs:
   changed-files:
