@@ -1,0 +1,77 @@
+name: Deploy changed YAML - main
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - production
+      - release-*
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+    paths-ignore:
+      - '.github/**'
+      - '.git/**'
+
+jobs:
+  changed-files:
+    name: Get changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensures we get the full history
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44.5.5
+        with:
+          json: true
+          quotepath: false
+          files: '**/*.yaml\n**/*.yml'
+          files_ignore: |
+            .github/**
+            .git/**
+
+      - name: List all changed files
+        run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
+
+      - name: Set matrix
+        id: set-matrix
+        run: |
+          echo "matrix=$(jq -nc --arg files "${{ steps.changed-files.outputs.all_changed_files }}" '{"file": $files | split("\n")}')" >> $GITHUB_OUTPUT
+
+  process-files:
+    runs-on: ubuntu-latest
+    needs: [changed-files]
+    strategy:
+      matrix: ${{ fromJSON(needs.changed-files.outputs.matrix) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up AWS CLI
+        run: pip install awscli
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::564407622114:role/github-action-role
+          aws-region: eu-west-1
+
+      - name: Convert YAML to JSON
+        id: convert-yaml
+        run: |
+          FILE_PATH="${{ matrix.file }}"
+          FILE_NAME=$(basename $FILE_PATH)
+          JSON_FILE="${FILE_NAME%.*}.json"
+          yq eval -o=json $FILE_PATH > $JSON_FILE
+          echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
+
+      - name: Upload JSON to S3
+        run: |
+          JSON_FILE="${{ env.JSON_FILE }}"
+          aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
+
