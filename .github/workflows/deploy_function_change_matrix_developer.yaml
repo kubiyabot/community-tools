@@ -27,7 +27,6 @@ jobs:
         with:
           json: true
           dir_names: false
-          # dir_names_max_depth: 1
           files: |
             **/*.yaml
             **/*.yml
@@ -54,24 +53,19 @@ jobs:
       - name: Set up AWS CLI
         run: pip install awscli
 
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v4
-      #   with:
-      #     role-to-assume: arn:aws:iam::564407622114:role/github-action-role
-      #     aws-region: eu-west-1
-
       - name: Convert YAML to JSON
         id: convert-yaml
-        run: |
-          FILE_PATH="${{ matrix.file }}"
-          FILE_NAME=$(basename $FILE_PATH)
-          JSON_FILE="${FILE_NAME%.*}.json"
-          yq eval -o=json $FILE_PATH > $JSON_FILE
-          echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
+        uses: fabasoad/data-format-converter-action@v0.2.3
+        with:
+          input: "${{ matrix.file }}"
+          from: "yaml"
+          to: "json"
 
       - name: Upload JSON to S3
         run: |
-          JSON_FILE="${{ env.JSON_FILE }}"
-          cat $JSON_FILE
-        # aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
-
+          JSON_FILE="${{ matrix.file%.*}}.json"
+          echo "Uploading $JSON_FILE to S3"
+          aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
