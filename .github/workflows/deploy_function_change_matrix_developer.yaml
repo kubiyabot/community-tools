@@ -52,11 +52,11 @@ jobs:
       - name: Set up AWS CLI
         run: pip install awscli
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::564407622114:role/github-action-role
-          aws-region: eu-west-1
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     role-to-assume: arn:aws:iam::564407622114:role/github-action-role
+      #     aws-region: eu-west-1
 
       - name: Convert YAML to JSON
         id: convert-yaml
@@ -70,5 +70,6 @@ jobs:
       - name: Upload JSON to S3
         run: |
           JSON_FILE="${{ env.JSON_FILE }}"
-          aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
+          cat $JSON_FILE
+        # aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
 
