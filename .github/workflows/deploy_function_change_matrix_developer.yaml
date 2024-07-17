@@ -26,10 +26,11 @@ jobs:
         uses: tj-actions/changed-files@v44.5.5
         with:
           json: true
-          quotepath: false
-          files_ignore: |
-            .github/**
-            .git/**
+          dir_names: false
+          # dir_names_max_depth: 1
+          files: |
+            **/*.yaml
+            **/*.yml
 
       - name: List all changed files
         run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
