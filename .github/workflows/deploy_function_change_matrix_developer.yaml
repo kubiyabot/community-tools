@@ -27,7 +27,6 @@ jobs:
         with:
           json: true
           quotepath: false
-          files: '**/*.yaml\n**/*.yml'
           files_ignore: |
             .github/**
             .git/**
