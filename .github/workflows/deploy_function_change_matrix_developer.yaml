@@ -31,6 +31,8 @@ jobs:
           files: |
             **/*.yaml
             **/*.yml
+          files_ignore: |
+            {.github,.git}/**
 
       - name: List all changed files
         run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
