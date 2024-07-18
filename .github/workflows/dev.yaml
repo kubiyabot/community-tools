@@ -64,7 +64,7 @@ jobs:
       - name: Validate JSON
         run: |
           echo "Validating ${{ matrix.changed_files }} file"
-          echo "${{ steps.convert-yaml.outputs.output }}" >> temp_file.json
+          echo '${{ steps.convert-yaml.outputs.output }}' >> temp_file.json
           jq . temp_file.json
         continue-on-error: true
 
