@@ -60,23 +60,38 @@ jobs:
           input: "${{ matrix.changed_files }}"
           from: "yaml"
           to: "json"
-      
-      - name: Set JSON file environment variable
+
+      - name: Save JSON content to temporary file
+        id: save-json
         run: |
           JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
-          echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
-        
-      - name: Validate JSON
-        run: |
-          echo "Validating ${{ matrix.changed_files }} file"
-          echo '${{ steps.convert-yaml.outputs.output }}' >> $JSON_FILE
-          jq . $JSON_FILE
-        continue-on-error: true
+          echo "{\"${{ matrix.changed_files }}\": $(cat $JSON_FILE)}" >> new_data.json
 
-      - name: Upload JSON to S3
+  update-combined-json:
+    runs-on: ubuntu-latest
+    needs: [process-files]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up AWS CLI
+        run: pip install awscli
+
+      - name: Download existing combined.json from S3
         run: |
-          echo "Uploading $JSON_FILE to S3"
-          aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
+          aws s3 cp s3://kubiya-marketplace-prod/path/to/destination/combined.json combined.json --region eu-west-1 || echo '{}' > combined.json
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Merge new data with existing combined.json
+        run: |
+          jq -s '.[0] * .[1]' combined.json new_data.json > updated_combined.json
+
+      - name: Upload updated combined.json to S3
+        run: |
+          echo "Uploading updated_combined.json to S3"
+          aws s3 cp updated_combined.json s3://kubiya-marketplace-prod/path/to/destination/combined.json --region eu-west-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
