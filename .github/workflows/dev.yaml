@@ -57,13 +57,13 @@ jobs:
         id: convert-yaml
         uses: fabasoad/data-format-converter-action@v0.2.3
         with:
-          input: "${{ matrix.file }}"
+          input: "${{ matrix.changed_files }}"
           from: "yaml"
           to: "json"
 
       - name: Upload JSON to S3
         run: |
-          JSON_FILE="${{ matrix.file}}.json"
+          JSON_FILE="${{ matrix.changed_files}}"
           echo "Uploading $JSON_FILE to S3"
           aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
         env:
