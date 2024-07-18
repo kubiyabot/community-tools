@@ -16,7 +16,7 @@ tools:
       - source: /home/appuser/.aws/credentials
       destination: /root/.aws/credentials
     metadata:
-      category: ["AWS"],
+      category: ["AWS"]
       tags: 
         -"AWS"
         -"CLI"
