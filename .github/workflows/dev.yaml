@@ -83,13 +83,14 @@ jobs:
       - name: Download existing combined.json from S3
         run: |
           aws s3 cp s3://kubiya-marketplace-prod/combined.json combined.json --region eu-west-1 || echo '{}' > combined.json
+          cat combined.json
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
 
       - name: Merge new data with existing combined.json
         run: |
-          cat combined.json | jq '.  + {"${{ matrix.changed_files }}": ${{ steps.convert-yaml.outputs.output }} }' >> updated_combined.json
+          echo combined.json | jq '.  + {"${{ matrix.changed_files }}": ${{ steps.convert-yaml.outputs.output }} }' >> updated_combined.json
 
       - name: Upload updated combined.json to S3
         run: |
