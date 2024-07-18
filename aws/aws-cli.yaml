@@ -22,3 +22,4 @@ tools:
         -"CLI"
       image_url: "https://cdn.iconscout.com/icon/free/png-256/free-amazon-aws-3521268-2944772.png"
       documentation: "https://raw.githubusercontent.com/kubiyabot/community-tools/main/aws/README.md"
+
