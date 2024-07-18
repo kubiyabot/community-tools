@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload JSON to S3
         run: |
-          JSON_FILE="${{ matrix.file%.*}}.json"
+          JSON_FILE="${{ matrix.file}}.json"
           echo "Uploading $JSON_FILE to S3"
           aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
         env:
