@@ -16,3 +16,10 @@ tools:
       - "CONFIGCAT_PRODUCT_ID" # Product ID for ConfigCat
       - "CONFIGCAT_ORG_ID" # Organization ID for ConfigCat
       - "CONFIGCAT_CONFIG_ID" # Configuration ID for ConfigCat
+    metadata:
+      category: ["ConfigCat"]
+      tags: 
+        - "ConfigCat"
+        - "CLI"
+      image_url: "https://configcat.com/images/shared/configcat-logo-cat-canvas-800.png"
+      documentation: "https://raw.githubusercontent.com/kubiyabot/community-tools/main/configcat/README.md"
