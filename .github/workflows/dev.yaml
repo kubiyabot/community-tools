@@ -93,8 +93,8 @@ jobs:
 
       - name: Upload updated combined.json to S3
         run: |
-          echo "Uploading updated_combined.json to S3"
-          aws s3 cp updated_combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
+          echo "Uploading combined.json to S3"
+          aws s3 cp combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
