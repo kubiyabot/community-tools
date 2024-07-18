@@ -14,4 +14,4 @@ tools:
       - "AWS_PROFILE"
     with_files:
       - source: /home/appuser/.aws/credentials
-      destination: /root/.aws/credentials
+        destination: /root/.aws/credentials
