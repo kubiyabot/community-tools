@@ -69,3 +69,4 @@ tools:
       - "KUBIYA_USER_EMAIL" # Fetched from Kubiya secret
       - "KUBIYA_USER_ORG" # Fetched from Kubiya secret
       - "KUBIYA_AGENT_PROFILE" # Fetched from Kubiya secret
+      
