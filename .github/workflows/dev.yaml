@@ -60,12 +60,12 @@ jobs:
           input: "${{ matrix.changed_files }}"
           from: "yaml"
           to: "json"
-
+      
       - name: Set JSON file environment variable
         run: |
-          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
           echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
-      
+        
       - name: Validate JSON
         run: |
           echo "Validating ${{ matrix.changed_files }} file"
