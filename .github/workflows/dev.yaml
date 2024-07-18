@@ -1,0 +1,59 @@
+name: Deploy changed YAML - DEV
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - production
+      - release-*
+    paths:
+      - '**/*.yaml'
+      - '**/*.yml'
+
+
+jobs:
+  process-files:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+        with:
+          fetch-depth: 0  # Ensures we get the full history
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44.5.5
+        with:
+          json: true
+          dir_names: false
+          files: |
+            **/*.yaml
+            **/*.yml
+          files_ignore: |
+            {.github,.git}/**
+
+      - name: List all changed files
+        id: list-changed-files
+        run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
+
+      - name: Convert YAML to JSON
+        id: convert-yaml
+        uses: fabasoad/data-format-converter-action@v0.2.3
+        with:
+          input: ${{ steps.changed-files.outputs.all_changed_files }}
+          from: "yaml"
+          to: "json"
+
+      - name: Upload JSON to S3
+        id: upload-to-s3
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            JSON_FILE="${file%.*}.json"
+            echo "Uploading $JSON_FILE to S3"
+            aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
+          done
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
