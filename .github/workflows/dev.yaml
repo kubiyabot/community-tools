@@ -63,10 +63,9 @@ jobs:
       
       - name: Validate JSON
         run: |
-          JSON_FILE="${{ steps.convert-yaml.outputs.output }}"
-          echo "Validating $JSON_FILE"
-          cat $JSON_FILE
-          jq . $JSON_FILE
+          echo "Validating ${{ matrix.changed_files }} file"
+          echo ${{ steps.convert-yaml.outputs.output }} >> temp_file.json
+          jq . temp_file.json
         continue-on-error: true
 
       - name: Upload JSON to S3
