@@ -32,7 +32,8 @@ tools:
       - path: /workspace
         name: databricks-workspace
     metadata:
-      category: ["DataBricks"]
+      category: 
+        - "DataBricks"
       tags: 
         - "DataBricks"
       image_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55dIioVp7t63K5UzEbQRXg3FxJodU_IiN9w&s"
