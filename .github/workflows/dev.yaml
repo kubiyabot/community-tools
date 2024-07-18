@@ -60,17 +60,21 @@ jobs:
           input: "${{ matrix.changed_files }}"
           from: "yaml"
           to: "json"
+
+      - name: Set JSON file environment variable
+        run: |
+          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
       
       - name: Validate JSON
         run: |
           echo "Validating ${{ matrix.changed_files }} file"
-          echo '${{ steps.convert-yaml.outputs.output }}' >> temp_file.json
-          jq . temp_file.json
+          echo '${{ steps.convert-yaml.outputs.output }}' >> $JSON_FILE
+          jq . $JSON_FILE
         continue-on-error: true
 
       - name: Upload JSON to S3
         run: |
-          JSON_FILE="${{ matrix.changed_files}}"
           echo "Uploading $JSON_FILE to S3"
           aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
         env:
