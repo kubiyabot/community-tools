@@ -89,7 +89,7 @@ jobs:
 
       - name: Merge new data with existing combined.json
         run: |
-          cat combined.json | jq '.  += {"${{ matrix.changed_files }}": ${{ steps.convert-yaml.outputs.output }} }' >> updated_combined.json
+          cat combined.json | jq '.  + {"${{ matrix.changed_files }}": ${{ steps.convert-yaml.outputs.output }} }' >> updated_combined.json
 
       - name: Upload updated combined.json to S3
         run: |
