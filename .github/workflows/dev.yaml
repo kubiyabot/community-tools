@@ -60,6 +60,14 @@ jobs:
           input: "${{ matrix.changed_files }}"
           from: "yaml"
           to: "json"
+      
+      - name: Validate JSON
+        run: |
+          JSON_FILE="${{ steps.convert-yaml.outputs.output }}"
+          echo "Validating $JSON_FILE"
+          cat $JSON_FILE
+          jq . $JSON_FILE
+        continue-on-error: true
 
       - name: Upload JSON to S3
         run: |
@@ -67,5 +75,5 @@ jobs:
           echo "Uploading $JSON_FILE to S3"
           aws s3 cp $JSON_FILE s3://kubiya-marketplace-prod/path/to/destination/$JSON_FILE --region eu-west-1
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
