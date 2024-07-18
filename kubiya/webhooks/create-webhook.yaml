@@ -92,3 +92,4 @@ tools:
       - "KUBIYA_USER_ORG" # Fetched from Kubiya secret
       - "KUBIYA_AGENT_UUID" # Fetched from Kubiya secret
       - "SLACK_CHANNEL" # Fetched from Kubiya secret
+
