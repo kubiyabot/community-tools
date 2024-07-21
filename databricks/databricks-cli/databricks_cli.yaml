@@ -36,6 +36,5 @@ tools:
         - "DataBricks"
       tags: 
         - "DataBricks"
-        - "TEST"
       image_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55dIioVp7t63K5UzEbQRXg3FxJodU_IiN9w&s"
       documentation: "https://raw.githubusercontent.com/kubiyabot/community-tools/main/databricks/databricks-cli/README.md"
