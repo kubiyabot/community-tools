@@ -10,7 +10,6 @@ on:
       - '**/*.yaml'
       - '**/*.yml'
 
-
 jobs:
   changed-files:
     name: Get changes
@@ -39,13 +38,16 @@ jobs:
 
       - name: Set matrix
         id: set-matrix
-        run: echo "matrix={\"changed_files\":${{ steps.changed-files.outputs.all_modified_files }}}" >> "$GITHUB_OUTPUT"
+        run: |
+          changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}' | jq -c 'split("\n") | map(select(. != ""))')
+          echo "matrix={\"changed_files\":$changed_files}" >> $GITHUB_OUTPUT
 
   process-files:
     runs-on: ubuntu-latest
     needs: [changed-files]
     strategy:
-      matrix: ${{ fromJSON(needs.changed-files.outputs.matrix) }}
+      matrix:
+        file: ${{ fromJSON(needs.changed-files.outputs.matrix).changed_files }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,29 +59,38 @@ jobs:
         id: convert-yaml
         uses: fabasoad/data-format-converter-action@v0.2.3
         with:
-          input: "${{ matrix.changed_files }}"
+          input: "${{ matrix.file }}"
           from: "yaml"
           to: "json"
 
       - name: Set JSON file environment variable
         run: |
-          JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
           echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
 
       - name: Validate JSON
         run: |
-          echo "Validating ${{ matrix.changed_files }} file"
+          echo "Validating $JSON_FILE file"
           echo '${{ steps.convert-yaml.outputs.output }}' >> $JSON_FILE
           jq . $JSON_FILE
         continue-on-error: true
 
-
       - name: Save JSON content to temporary file
         id: save-json
         run: |
-          JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
-          echo "{\"${{ matrix.changed_files }}\": $(cat $JSON_FILE)}" >> new_data.json
+          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          echo "{\"${{ matrix.file }}\": $(cat $JSON_FILE)}" > new_data.json
           cat new_data.json
+
+  update-combined-json:
+    runs-on: ubuntu-latest
+    needs: [process-files]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up AWS CLI
+        run: pip install awscli
 
       - name: Download existing combined.json from S3
         run: |
@@ -91,13 +102,13 @@ jobs:
 
       - name: Merge new data with existing combined.json
         run: |
-          yq e '. + ${{ matrix.changed_files }} : ${{ steps.convert-yaml.outputs.output }}' -i combined.json
-
+          jq -s '.[0] * .[1]' combined.json new_data.json > updated_combined.json
+          cat updated_combined.json
 
       - name: Upload updated combined.json to S3
         run: |
-          echo "Uploading combined.json to S3"
-          aws s3 cp combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
+          echo "Uploading updated_combined.json to S3"
+          aws s3 cp updated_combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
