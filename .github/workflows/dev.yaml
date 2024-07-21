@@ -36,8 +36,8 @@ jobs:
 
       - name: Process each changed file
         run: |
-          changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}' | jq -c 'split("\n") | map(select(. != "")) | .[]')
-          for file in $changed_files; do
+          changed_files=$(echo '${{ steps.changed-files.outputs.all_changed_files }}' | jq -r '. | @sh' | tr -d '"')
+          for file in $(echo $changed_files | tr ' ' '\n'); do
             echo "Processing $file"
             JSON_FILE=$(echo "$file" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
 
