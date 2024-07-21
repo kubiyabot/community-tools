@@ -79,6 +79,7 @@ jobs:
         run: |
           JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
           echo "{\"${{ matrix.changed_files }}\": $(cat $JSON_FILE)}" >> new_data.json
+          cat new_data.json
 
       - name: Download existing combined.json from S3
         run: |
