@@ -92,3 +92,10 @@ tools:
       - "KUBIYA_USER_ORG" # Fetched from Kubiya secret
       - "KUBIYA_AGENT_UUID" # Fetched from Kubiya secret
       - "SLACK_CHANNEL" # Fetched from Kubiya secret
+    metadata:
+      category:
+        - "Kubiya"
+      tags: 
+        - "Kubiya"
+      image_url: "https://media.licdn.com/dms/image/D560BAQFaDnQXq7Dtbg/company-logo_200_200/0/1687904106468/kubiya_logo?e=2147483647&v=beta&t=7XFSmE0tW60OylcOGoSMW1oMDUqdH8p8gwCfXLGQnj4"
+      documentation: "https://github.com/kubiyabot/community-tools/blob/main/kubiya/task-scheduler-tool/README.md"
