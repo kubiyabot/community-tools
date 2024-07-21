@@ -21,6 +21,5 @@ tools:
       tags: 
         - "ConfigCat"
         - "CLI"
-        - "TEST"
       image_url: "https://configcat.com/images/shared/configcat-logo-cat-canvas-800.png"
       documentation: "https://raw.githubusercontent.com/kubiyabot/community-tools/main/configcat/README.md"
