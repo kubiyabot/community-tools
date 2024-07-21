@@ -91,18 +91,28 @@ jobs:
           name: json-files
           path: ./json-files
 
-      - name: Merge all JSON files into combined.json
-        run: |
-          jq -s 'reduce .[] as $item ({}; . * $item)' json-files/*.json > combined.json
-          cat combined.json
-
       - name: Set up AWS CLI
         run: pip install awscli
 
+      - name: Download existing combined.json from S3
+        run: |
+          aws s3 cp s3://kubiya-marketplace-prod/combined.json combined.json --region eu-west-1 || echo '{}' > combined.json
+          cat combined.json
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
+
+      - name: Merge all JSON files into combined.json
+        run: |
+          jq -s 'reduce .[] as $item ({}; . * $item)' combined.json json-files/*.json > updated_combined.json
+          cat updated_combined.json
+          mv updated_combined.json combined.json
+
       - name: Upload updated combined.json to S3
         run: |
-          echo "Uploading combined.json to S3"
+          echo "Uploading updated combined.json to S3"
           aws s3 cp combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
+        
