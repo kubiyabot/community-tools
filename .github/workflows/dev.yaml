@@ -91,7 +91,7 @@ jobs:
 
       - name: Merge new data with existing combined.json
         run: |
-          yq e '.${{ matrix.changed_files }} : ${{ steps.convert-yaml.outputs.output }}' -i combined.json
+          yq e '. + ${{ matrix.changed_files }} : ${{ steps.convert-yaml.outputs.output }}' -i combined.json
 
 
       - name: Upload updated combined.json to S3
