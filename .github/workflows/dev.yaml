@@ -53,7 +53,7 @@ jobs:
             cat combined.json
 
             # Merge new data with existing combined.json
-            jq -s '.[0] * .[1]' combined.json new_data.json > updated_combined.json
+            jq --slurp 'reduce .[] as $item ({}; . * $item)' combined.json new_data.json > updated_combined.json
             cat updated_combined.json
 
             # Upload updated combined.json to S3
