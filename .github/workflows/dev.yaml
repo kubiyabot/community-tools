@@ -15,7 +15,7 @@ jobs:
     name: Get changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      files: ${{ steps.set-matrix.outputs.files }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,37 +32,34 @@ jobs:
             **/*.yml
           files_ignore: |
             {.github,.git}/**
-
       - name: List all changed files
         run: echo '${{ steps.changed-files.outputs.all_changed_files }}'
 
-      - name: Set matrix
+      - name: Set output files
         id: set-matrix
-        run: echo "matrix={\"changed_files\":${{ steps.changed-files.outputs.all_modified_files }}}" >> "$GITHUB_OUTPUT"
+        run: echo "files=${{ steps.changed-files.outputs.all_modified_files }}" >> $GITHUB_OUTPUT
 
   process-files:
     runs-on: ubuntu-latest
     needs: [changed-files]
     strategy:
-      matrix: ${{ fromJSON(needs.changed-files.outputs.matrix) }}
+      matrix:
+        file: ${{ fromJSON(needs.changed-files.outputs.files) }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set up AWS CLI
-        run: pip install awscli
 
       - name: Convert YAML to JSON
         id: convert-yaml
         uses: fabasoad/data-format-converter-action@v0.2.3
         with:
-          input: "${{ matrix.changed_files }}"
+          input: "${{ matrix.file }}"
           from: "yaml"
           to: "json"
 
       - name: Set JSON file environment variable
         run: |
-          JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
           echo "JSON_FILE=$JSON_FILE" >> $GITHUB_ENV
 
       - name: Validate JSON
@@ -73,29 +70,39 @@ jobs:
         continue-on-error: true
 
       - name: Save JSON content to temporary file
-        id: save-json
         run: |
-          JSON_FILE=$(echo "${{ matrix.changed_files }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
-          echo "{\"${{ matrix.changed_files }}\": $(cat $JSON_FILE)}" > new_data.json
-          cat new_data.json
+          JSON_FILE=$(echo "${{ matrix.file }}" | sed 's/\.yaml$/.json/' | sed 's/\.yml$/.json/')
+          echo "{\"${{ matrix.file }}\": $(cat $JSON_FILE)}" > ${{ matrix.file }}.json
+          cat ${{ matrix.file }}.json
 
-      - name: Download existing combined.json from S3
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: json-files
+          path: ${{ matrix.file }}.json
+
+  summarize:
+    runs-on: ubuntu-latest
+    needs: [process-files]
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: json-files
+          path: ./json-files
+
+      - name: Merge all JSON files into combined.json
         run: |
-          aws s3 cp s3://kubiya-marketplace-prod/combined.json combined.json --region eu-west-1 || echo '{}' > combined.json
+          jq -s 'reduce .[] as $item ({}; . * $item)' json-files/*.json > combined.json
           cat combined.json
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
 
-      - name: Merge new data with existing combined.json
-        run: |
-          jq -s '.[0] * .[1]' combined.json new_data.json > updated_combined.json
-          cat updated_combined.json
+      - name: Set up AWS CLI
+        run: pip install awscli
 
       - name: Upload updated combined.json to S3
         run: |
-          echo "Uploading updated_combined.json to S3"
-          aws s3 cp updated_combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
+          echo "Uploading combined.json to S3"
+          aws s3 cp combined.json s3://kubiya-marketplace-prod/combined.json --region eu-west-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_COMMUNITY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_COMMUNITY }}
