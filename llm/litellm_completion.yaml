@@ -46,5 +46,6 @@ tools:
       tags: 
         - "LLM"
         - "TEST"
+        - "TESTT"
       image_url: "https://cdn.dribbble.com/users/9433491/screenshots/16647077/media/434ac2ff30929458f2c51a8af2db9c9e.jpg"
       documentation: "https://raw.githubusercontent.com/kubiyabot/community-tools/main/llm/README.md"
