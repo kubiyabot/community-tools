@@ -3,7 +3,7 @@ from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
 issue_tool = GitHubCliTool(
-    name="github_issue",
+    name="issue",
     description="Manages GitHub issues",
     content="""
     #!/bin/bash

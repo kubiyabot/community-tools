@@ -7,6 +7,6 @@ COMMON_ENV = [
 ]
 
 COMMON_FILES = [
-    FileSpec(source="~/.aws/config", destination="/root/.aws/config"),
     FileSpec(source="~/.aws/credentials", destination="/root/.aws/credentials"),
+    FileSpec(source="~/.aws/config", destination="/root/.aws/config"),
 ]

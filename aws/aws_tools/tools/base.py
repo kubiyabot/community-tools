@@ -2,7 +2,7 @@ from kubiya_sdk.tools import Tool
 from .common import COMMON_ENV, COMMON_FILES
 
 class AWSCliTool(Tool):
-    def __init__(self, name, description, content, args):
+    def __init__(self, name, description, content, args, long_running=False):
         super().__init__(
             name=name,
             description=description,
@@ -12,6 +12,7 @@ class AWSCliTool(Tool):
             args=args,
             env=COMMON_ENV,
             files=COMMON_FILES,
+            long_running=long_running
         )
 
 class AWSSdkTool(Tool):
