@@ -1,9 +1,5 @@
-from .ec2_optimizations import *
-from .s3_management import *
-from .cost_analysis import *
+# This file is intentionally left empty to mark the directory as a Python package.
+# It allows the directory to be imported as a module.
 
-__all__ = [
-    'auto_ec2_cost_optimization',
-    'auto_s3_lifecycle_setup',
-    'auto_cost_analysis_report',
-]
+# If specific initializations or imports are needed for the automations package,
+# they can be added here in the future.

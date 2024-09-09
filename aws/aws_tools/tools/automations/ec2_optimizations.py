@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from ..tools.base import AWSCliTool, AWSSdkTool
+from ...tools.base import AWSCliTool, AWSSdkTool
 from kubiya_sdk.tools.registry import tool_registry
 
 auto_ec2_cost_optimization = AWSCliTool(
