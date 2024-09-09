@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Tool
-from .common import COMMON_ENV, COMMON_FILES
+from .common import COMMON_FILES
 
 class AWSCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
@@ -10,19 +10,19 @@ class AWSCliTool(Tool):
             image="amazon/aws-cli:latest",
             content=content,
             args=args,
-            env=COMMON_ENV,
             files=COMMON_FILES,
             long_running=long_running
         )
 
 class AWSSdkTool(Tool):
-    def __init__(self, name, description, content, args):
+    def __init__(self, name, description, content, args, long_running=False):
         super().__init__(
             name=name,
             description=description,
             type="python",
             content=content,
             args=args,
-            env=COMMON_ENV,
+            requirements=["boto3"],
             files=COMMON_FILES,
+            long_running=long_running
         )

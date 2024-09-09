@@ -1,61 +1,117 @@
 from kubiya_sdk.tools import Arg
-from .base import AWSCliTool
+from .base import AWSCliTool, AWSSdkTool
 from kubiya_sdk.tools.registry import tool_registry
 
-s3_tool = AWSCliTool(
-    name="s3",
-    description="Comprehensive S3 bucket and object management",
-    content="""
-    #!/bin/bash
-    set -e
-    case "$action" in
-        ls)
-            aws s3 ls $([[ -n "$bucket" ]] && echo "s3://$bucket/$prefix")
-            ;;
-        cp)
-            aws s3 cp $source $destination $([[ -n "$options" ]] && echo "$options")
-            ;;
-        mv)
-            aws s3 mv $source $destination $([[ -n "$options" ]] && echo "$options")
-            ;;
-        rm)
-            aws s3 rm $target $([[ -n "$options" ]] && echo "$options")
-            ;;
-        sync)
-            aws s3 sync $source $destination $([[ -n "$options" ]] && echo "$options")
-            ;;
-        mb)
-            aws s3 mb s3://$bucket
-            ;;
-        rb)
-            aws s3 rb s3://$bucket $([[ "$force" == "true" ]] && echo "--force")
-            ;;
-        presign)
-            aws s3 presign s3://$bucket/$key --expires-in $expiration
-            ;;
-        website)
-            aws s3 website s3://$bucket --index-document $index --error-document $error
-            ;;
-        *)
-            echo "Invalid action"
-            exit 1
-            ;;
-    esac
-    """,
+s3_list_buckets = AWSCliTool(
+    name="s3_list_buckets",
+    description="List S3 buckets",
+    content="aws s3 ls",
+    args=[],
+)
+
+s3_create_bucket = AWSCliTool(
+    name="s3_create_bucket",
+    description="Create an S3 bucket",
+    content="aws s3 mb s3://$bucket_name --region $region",
     args=[
-        Arg(name="action", type="str", description="Action to perform", required=True),
-        Arg(name="bucket", type="str", description="S3 bucket name", required=False),
-        Arg(name="prefix", type="str", description="S3 prefix", required=False),
-        Arg(name="source", type="str", description="Source path", required=False),
-        Arg(name="destination", type="str", description="Destination path", required=False),
-        Arg(name="target", type="str", description="Target path for removal", required=False),
-        Arg(name="options", type="str", description="Additional options", required=False),
-        Arg(name="force", type="bool", description="Force removal of non-empty bucket", required=False),
-        Arg(name="key", type="str", description="S3 object key for presigning", required=False),
-        Arg(name="expiration", type="int", description="Presigned URL expiration in seconds", required=False),
-        Arg(name="index", type="str", description="Index document for static website", required=False),
-        Arg(name="error", type="str", description="Error document for static website", required=False),
+        Arg(name="bucket_name", type="str", description="Name of the bucket to create (e.g., 'my-unique-bucket')", required=True),
+        Arg(name="region", type="str", description="AWS region for the bucket (e.g., 'us-west-2')", required=True),
     ],
 )
 
-tool_registry.register("aws", s3_tool)
+s3_delete_bucket = AWSCliTool(
+    name="s3_delete_bucket",
+    description="Delete an S3 bucket",
+    content="aws s3 rb s3://$bucket_name --force",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket to delete (e.g., 'my-unique-bucket')", required=True),
+    ],
+)
+
+s3_list_objects = AWSCliTool(
+    name="s3_list_objects",
+    description="List objects in an S3 bucket",
+    content="aws s3 ls s3://$bucket_name $([[ -n \"$prefix\" ]] && echo \"$prefix\")",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket to list objects from (e.g., 'my-bucket')", required=True),
+        Arg(name="prefix", type="str", description="Prefix to filter objects (e.g., 'folder/')", required=False),
+    ],
+)
+
+s3_bulk_delete = AWSSdkTool(
+    name="s3_bulk_delete",
+    description="Delete multiple objects from an S3 bucket",
+    content="""
+import boto3
+
+def bulk_delete(bucket_name, prefix):
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(bucket_name)
+    
+    objects_to_delete = [{'Key': obj.key} for obj in bucket.objects.filter(Prefix=prefix)]
+    
+    if objects_to_delete:
+        bucket.delete_objects(Delete={'Objects': objects_to_delete})
+        print(f"Deleted {len(objects_to_delete)} objects from {bucket_name} with prefix {prefix}")
+    else:
+        print(f"No objects found in {bucket_name} with prefix {prefix}")
+
+bulk_delete(bucket_name, prefix)
+    """,
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket to delete objects from (e.g., 'my-bucket')", required=True),
+        Arg(name="prefix", type="str", description="Prefix of objects to delete (e.g., 'logs/')", required=True),
+    ],
+    long_running=True,
+)
+
+s3_bucket_size_analyzer = AWSSdkTool(
+    name="s3_bucket_size_analyzer",
+    description="Analyze the size of objects in an S3 bucket",
+    content="""
+import boto3
+from collections import defaultdict
+
+def analyze_bucket_size(bucket_name, prefix=''):
+    s3 = boto3.client('s3')
+    paginator = s3.get_paginator('list_objects_v2')
+    
+    total_size = 0
+    size_distribution = defaultdict(int)
+    
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+        for obj in page.get('Contents', []):
+            size = obj['Size']
+            total_size += size
+            
+            if size < 1024:
+                size_distribution['< 1 KB'] += 1
+            elif size < 1024 * 1024:
+                size_distribution['1 KB - 1 MB'] += 1
+            elif size < 1024 * 1024 * 10:
+                size_distribution['1 MB - 10 MB'] += 1
+            elif size < 1024 * 1024 * 100:
+                size_distribution['10 MB - 100 MB'] += 1
+            else:
+                size_distribution['> 100 MB'] += 1
+    
+    print(f"Total size of objects: {total_size / (1024 * 1024 * 1024):.2f} GB")
+    print("Size distribution:")
+    for category, count in size_distribution.items():
+        print(f"{category}: {count} objects")
+
+analyze_bucket_size(bucket_name, prefix)
+    """,
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket to analyze (e.g., 'my-data-bucket')", required=True),
+        Arg(name="prefix", type="str", description="Prefix to filter objects (e.g., 'data/2023/')", required=False),
+    ],
+    long_running=True,
+)
+
+tool_registry.register("aws", s3_list_buckets)
+tool_registry.register("aws", s3_create_bucket)
+tool_registry.register("aws", s3_delete_bucket)
+tool_registry.register("aws", s3_list_objects)
+tool_registry.register("aws", s3_bulk_delete)
+tool_registry.register("aws", s3_bucket_size_analyzer)

@@ -1,10 +1,11 @@
-FROM python:3.9-slim
+FROM amazon/aws-cli:latest
 
-WORKDIR /app
+RUN yum update -y && yum install -y python3 python3-pip
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt
 
-COPY . .
+COPY . /aws_tools
+WORKDIR /aws_tools
 
-CMD ["python", "-m", "aws_tools"]
+CMD ["python3", "-m", "aws_tools"]
