@@ -6,11 +6,12 @@ class AWSCliTool(Tool):
         super().__init__(
             name=name,
             description=description,
-            type="container",
+            type="docker",
             image="amazon/aws-cli:latest",
             content=content,
             args=args,
             files=COMMON_FILES,
+            env=[],
             long_running=long_running
         )
 
@@ -24,5 +25,6 @@ class AWSSdkTool(Tool):
             args=args,
             requirements=["boto3"],
             files=COMMON_FILES,
+            env=[],
             long_running=long_running
         )
