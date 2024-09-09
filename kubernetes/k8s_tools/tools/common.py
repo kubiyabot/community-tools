@@ -8,5 +8,8 @@ COMMON_ENV = [
 ]
 
 COMMON_FILES = [
-    FileSpec(source="~/.kube/config", destination="/root/.kube/config")
+    FileSpec(
+        source="/var/run/secrets/kubernetes.io/serviceaccount/token",
+        destination="/tmp/kubernetes_context_token"
+    ),
 ]
