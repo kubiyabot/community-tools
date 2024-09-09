@@ -14,7 +14,6 @@ __all__ = [
     # Issue
     'issue_create',
     'issue_list',
-    'issue_update',
     'issue_close',
     # PR
     'pr_create',

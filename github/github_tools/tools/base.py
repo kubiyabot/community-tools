@@ -6,7 +6,7 @@ class GitHubCliTool(Tool):
         super().__init__(
             name=name,
             description=description,
-            type="container",
+            type="docker",
             image="ghcr.io/cli/cli:latest",
             content=content,
             args=args,

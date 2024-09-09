@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_sdk.tools.models import Tool
 from .common import COMMON_FILES
 
 class AWSCliTool(Tool):
@@ -11,7 +11,7 @@ class AWSCliTool(Tool):
             content=content,
             args=args,
             files=COMMON_FILES,
-            env=[],
+            env=["BLa"],
             long_running=long_running
         )
 

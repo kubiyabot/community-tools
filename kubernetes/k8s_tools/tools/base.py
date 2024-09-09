@@ -8,7 +8,7 @@ class KubernetesTool(Tool):
         super().__init__(
             name=name,
             description=description,
-            type="container",
+            type="docker",
             image=image,
             content=content,
             args=args,
