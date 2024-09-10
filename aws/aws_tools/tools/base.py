@@ -8,7 +8,7 @@ class AWSCliTool(Tool):
         super().__init__(
             name=name,
             description=description,
-            icon_url=AWS_ICON_URL,
+            #icon_url=AWS_ICON_URL,
             type="docker",
             image="amazon/aws-cli:latest",
             content=content,
@@ -23,7 +23,7 @@ class AWSSdkTool(Tool):
         super().__init__(
             name=name,
             description=description,
-            icon_url=AWS_ICON_URL,
+            #icon_url=AWS_ICON_URL,
             type="python",
             content=content,
             args=args,
