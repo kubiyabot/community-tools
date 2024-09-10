@@ -66,7 +66,7 @@ rm $TEMP_SCRIPT
         super().__init__(
             name=name,
             description=description,
-            icon_url=KUBERNETES_ICON_URL,
+            #icon_url=KUBERNETES_ICON_URL,
             type="docker",
             image=image,
             content=full_content,
