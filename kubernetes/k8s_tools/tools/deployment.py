@@ -15,7 +15,7 @@ deployment_tool = KubernetesTool(
     """,
     args=[
         Arg(name="action", type="str", description="Action to perform (create, update, delete, get)", required=True),
-        Arg(name="name", type="str", description="Name of the deployment", required=True),
+        Arg(name="name", type="str", description="Name of the deployment - always make sure you double confirm with the user before deleting", required=True),
         Arg(name="image", type="str", description="Container image for create/update actions", required=False),
         Arg(name="replicas", type="int", description="Number of replicas", required=False),
         Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
