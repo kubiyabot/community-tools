@@ -1,7 +1,7 @@
 # k8s_tools/tools/base.py
 
 from kubiya_sdk.tools import Tool
-from .common import COMMON_ENV, COMMON_FILES
+from .common import COMMON_ENVIRONMENT_VARIABLES, COMMON_FILE_SPECS
 
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
@@ -11,7 +11,9 @@ set -e
 
 # Inject in-cluster context
 if [ -f /tmp/kubernetes_context_token ]; then
+    # Read the Kubernetes token from the temporary file
     KUBE_TOKEN=$(cat /tmp/kubernetes_context_token)
+    # Configure kubectl to use the in-cluster configuration
     kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     kubectl config set-credentials in-cluster --token=$KUBE_TOKEN
     kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster
@@ -26,16 +28,39 @@ fi
 """
         
         # Create a temporary file, write the script to it, and execute it
-        full_content = f"""
+        full_content = f"""#!/bin/sh
+set -e
+
+# Validate cluster permissions by checking for necessary files
+if [ ! -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
+    echo "Error: Kubernetes service account token not found. Are you running inside a Kubernetes cluster?"
+    exit 1
+fi
+
+if [ ! -f /var/run/secrets/kubernetes.io/serviceaccount/ca.crt ]; then
+    echo "Error: Kubernetes CA certificate not found. Are you running inside a Kubernetes cluster?"
+    exit 1
+fi
+
+# Create a temporary script file
 TEMP_SCRIPT=$(mktemp)
+
+# Write the script content to the temporary file
 cat << 'EOF' > $TEMP_SCRIPT
 {script_content}
 EOF
+
+# Make the temporary script executable
 chmod +x $TEMP_SCRIPT
+
+# Execute the temporary script
 bash $TEMP_SCRIPT
+
+# Clean up by removing the temporary script
 rm $TEMP_SCRIPT
 """
 
+        # Initialize the Tool superclass with the prepared content and other parameters
         super().__init__(
             name=name,
             description=description,
@@ -43,6 +68,6 @@ rm $TEMP_SCRIPT
             image=image,
             content=full_content,
             args=args,
-            env=COMMON_ENV,
-            files=COMMON_FILES,
+            env=COMMON_ENVIRONMENT_VARIABLES,
+            files=COMMON_FILE_SPECS,
         )

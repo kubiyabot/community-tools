@@ -2,12 +2,12 @@
 
 from kubiya_sdk.tools import FileSpec
 
-COMMON_ENV = [
+COMMON_ENVIRONMENT_VARIABLES = [
     "KUBERNETES_SERVICE_HOST",
     "KUBERNETES_SERVICE_PORT",
 ]
 
-COMMON_FILES = [
+COMMON_FILE_SPECS = [
     FileSpec(
         # This is the token that will be used to authenticate with Kubernetes
         # It is mounted into the container at /var/run/secrets/kubernetes.io/serviceaccount/token
