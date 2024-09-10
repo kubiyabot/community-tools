@@ -3,6 +3,8 @@
 from kubiya_sdk.tools import Tool
 from .common import COMMON_ENVIRONMENT_VARIABLES, COMMON_FILE_SPECS
 
+KUBERNETES_ICON_URL = "https://cdn-icons-png.flaticon.com/256/3889/3889548.png"
+
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Prepare the content to inject in-cluster context and create a temporary script
@@ -64,6 +66,7 @@ rm $TEMP_SCRIPT
         super().__init__(
             name=name,
             description=description,
+            icon_url=KUBERNETES_ICON_URL,
             type="docker",
             image=image,
             content=full_content,
