@@ -10,7 +10,7 @@ class AWSCliTool(Tool):
             image="amazon/aws-cli:latest",
             content=content,
             args=args,
-            files=COMMON_FILES,
+            with_files=COMMON_FILES,
             env=COMMON_ENV,
             long_running=long_running
         )
@@ -24,7 +24,7 @@ class AWSSdkTool(Tool):
             content=content,
             args=args,
             requirements=["boto3"],
-            files=COMMON_FILES,
+            with_files=COMMON_FILES,
             env=COMMON_ENV,
             long_running=long_running
         )
