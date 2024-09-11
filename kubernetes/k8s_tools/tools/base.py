@@ -6,7 +6,7 @@ KUBERNETES_ICON_URL = "https://cdn-icons-png.flaticon.com/256/3889/3889548.png"
 
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
-        # Prepare the script to inject in-cluster context and use the token from the temp file
+        # Prepare the script to inject in-cluster context and use the temporary token file
         inject_kubernetes_context = """
 #!/bin/bash
 set -euo pipefail
@@ -24,11 +24,12 @@ else
 fi
 """
 
+        # Strip extra `#!/bin/bash` and remove leading spaces from the caller-provided content
+        sanitized_content = content.strip().lstrip("#!/bin/bash").strip()
+
         # Combine the Kubernetes context setup and the caller's provided shell script
         full_content = f"""{inject_kubernetes_context}
-
-# Execute the original caller-provided content
-{content}
+{sanitized_content}
 """
 
         # Initialize the Tool superclass with the combined content and other parameters
