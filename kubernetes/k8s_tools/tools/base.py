@@ -6,8 +6,9 @@ KUBERNETES_ICON_URL = "https://cdn-icons-png.flaticon.com/256/3889/3889548.png"
 
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
-        # Prepare the script to inject in-cluster context and use the temporary token file
-        script_content = f"""#!/bin/bash
+        # Prepare the script to inject in-cluster context and use the token from the temp file
+        inject_kubernetes_context = """
+#!/bin/bash
 set -euo pipefail
 
 # Inject in-cluster context using the temporary token file
@@ -21,43 +22,16 @@ else
     echo "Error: Kubernetes context token file not found at /tmp/kubernetes_context_token"
     exit 1
 fi
+"""
 
-# Execute the original content
+        # Combine the Kubernetes context setup and the caller's provided shell script
+        full_content = f"""{inject_kubernetes_context}
+
+# Execute the original caller-provided content
 {content}
 """
 
-        # Full content to run the temporary script for Kubernetes context and operations
-        full_content = f"""#!/bin/sh
-set -euo pipefail
-
-# Validate if running inside a Kubernetes cluster by checking the token and CA files
-if [[ ! -f /tmp/kubernetes_context_token ]]; then
-    echo "Error: Kubernetes token file not found in /tmp/kubernetes_context_token"
-    exit 1
-fi
-
-if [[ ! -f /var/run/secrets/kubernetes.io/serviceaccount/ca.crt ]]; then
-    echo "Error: Kubernetes CA certificate not found. Are you running inside a Kubernetes cluster?"
-    exit 1
-fi
-
-# Create a temporary script file
-TEMP_SCRIPT=$(mktemp)
-trap 'rm -f $TEMP_SCRIPT' EXIT
-
-# Write the script content to the temporary file
-cat << 'EOF' > $TEMP_SCRIPT
-{script_content}
-EOF
-
-# Make the script executable
-chmod +x $TEMP_SCRIPT
-
-# Execute the script
-bash $TEMP_SCRIPT
-"""
-
-        # Initialize the Tool superclass with the prepared content and other parameters
+        # Initialize the Tool superclass with the combined content and other parameters
         super().__init__(
             name=name,
             description=description,
