@@ -9,6 +9,25 @@ ec2_describe_instances = AWSCliTool(
     args=[
         Arg(name="instance_ids", type="str", description="Comma-separated list of instance IDs (e.g., 'i-1234567890abcdef0,i-0987654321fedcba0')", required=False),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Ask: List EC2 instances| B[🤖 TeamMate]
+        B --> C{{"Region?" 🌍}}
+        C --> D[User specifies region ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves EC2 instances 📦]
+        F --> G[Convert to readable format 📝]
+        G --> H[User gets EC2 instance list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_start_instance = AWSCliTool(
@@ -18,6 +37,25 @@ ec2_start_instance = AWSCliTool(
     args=[
         Arg(name="instance_id", type="str", description="Instance ID to start (e.g., 'i-1234567890abcdef0')", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Start EC2 instance| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS starts the EC2 instance 🚀]
+        F --> G[Instance state changes to 'running' ✅]
+        G --> H[User notified of successful start 📢]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_stop_instance = AWSCliTool(
@@ -27,6 +65,25 @@ ec2_stop_instance = AWSCliTool(
     args=[
         Arg(name="instance_id", type="str", description="Instance ID to stop (e.g., 'i-1234567890abcdef0')", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Stop EC2 instance| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS stops the EC2 instance 🛑]
+        F --> G[Instance state changes to 'stopped' ⏹️]
+        G --> H[User notified of successful stop 📢]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_get_console_output = AWSCliTool(
@@ -36,6 +93,25 @@ ec2_get_console_output = AWSCliTool(
     args=[
         Arg(name="instance_id", type="str", description="Instance ID to get console output from (e.g., 'i-1234567890abcdef0')", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get EC2 console output| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves console output 📜]
+        F --> G[Format console output 📝]
+        G --> H[User receives console output 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_describe_instance_status = AWSCliTool(
@@ -45,6 +121,25 @@ ec2_describe_instance_status = AWSCliTool(
     args=[
         Arg(name="instance_ids", type="str", description="Comma-separated list of instance IDs (e.g., 'i-1234567890abcdef0,i-0987654321fedcba0')", required=False),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get EC2 instance status| B[🤖 TeamMate]
+        B --> C{{"Instance IDs?" 🔢}}
+        C --> D[User provides instance IDs ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves instance status 📊]
+        F --> G[Format status information 📝]
+        G --> H[User receives instance status 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_get_instance_metrics = AWSSdkTool(
@@ -79,6 +174,25 @@ print(result)
         Arg(name="metric_name", type="str", description="Metric name (e.g., 'CPUUtilization', 'NetworkIn', 'DiskReadOps')", required=True),
         Arg(name="period", type="int", description="Period in seconds (e.g., 300 for 5-minute intervals)", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get EC2 metrics| B[🤖 TeamMate]
+        B --> C{{"Instance ID, Metric, Period?" 🔢}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS CloudWatch ☁️]
+        E --> F[AWS retrieves metric data 📊]
+        F --> G[Process and format metric data 📝]
+        G --> H[User receives metric information 📈]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_describe_instance_types = AWSCliTool(
@@ -88,6 +202,25 @@ ec2_describe_instance_types = AWSCliTool(
     args=[
         Arg(name="instance_type", type="str", description="Instance type to describe (e.g., 't2.micro', 'm5.large')", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Describe EC2 instance type| B[🤖 TeamMate]
+        B --> C{{"Instance Type?" 🖥️}}
+        C --> D[User provides instance type ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves instance type details 📋]
+        F --> G[Format instance type information 📝]
+        G --> H[User receives instance type details 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 ec2_get_instance_tags = AWSCliTool(
@@ -97,6 +230,25 @@ ec2_get_instance_tags = AWSCliTool(
     args=[
         Arg(name="instance_id", type="str", description="Instance ID to get tags for (e.g., 'i-1234567890abcdef0')", required=True),
     ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get EC2 instance tags| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves instance tags 🏷️]
+        F --> G[Format tag information 📝]
+        G --> H[User receives instance tags 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+        style H fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 tool_registry.register("aws", ec2_describe_instances)

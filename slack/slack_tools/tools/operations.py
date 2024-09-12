@@ -26,7 +26,24 @@ except SlackApiError as e:
         Arg(name="channel", type="str", description="Channel to send the message to", required=True),
         Arg(name="message", type="str", description="Message text", required=True),
     ],
-    thread_context=True
+    thread_context=True,
+    mermaid_diagram="""
+    graph TD
+        A[User] -->|Request to send message| B(TeamMate)
+        B -->|Prompt for details| C{Message Details}
+        C -->|Channel| D[Select Channel]
+        C -->|Message| E[Compose Message]
+        D & E -->|Send Message| F[Slack API]
+        F -->|Message Sent| G[Message in Slack]
+        G -->|Confirm| B
+        B -->|Notify| A
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style F fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
 )
 
 slack_upload_file = SlackTool(
