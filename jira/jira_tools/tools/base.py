@@ -15,7 +15,7 @@ class JiraTool(Tool):
             content=content,
             args=args,
             env=["JIRA_OAUTH_TOKEN"],
-            mermaid_diagram=mermaid_diagram
+            mermaid=mermaid_diagram
         )
 
 def register_jira_tool(tool):
