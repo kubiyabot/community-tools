@@ -10,7 +10,6 @@ from .tools.s3 import (
 from .tools.rds import *
 from .tools.cost import *
 from .tools.lambda_function import *
-from .tools.automations import *
 
 __all__ = [
     'ec2_describe_instances',
