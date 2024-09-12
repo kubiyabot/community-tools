@@ -9,6 +9,7 @@ __all__ = [
     'issue_get',
     'issue_delete',
     'issue_assign',
+    'issue_list',
     'issue_add_comment',
     'issue_transition',
     'project_get',

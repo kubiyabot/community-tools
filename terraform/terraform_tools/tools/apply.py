@@ -6,12 +6,15 @@ terraform_apply_tool = TerraformTool(
     name="terraform_apply",
     description="Applies Terraform changes",
     content="""
+    #!/bin/bash
+    set -e
+
     # Change to the module directory if specified
     if [ -n "$module_path" ]; then
         cd "$module_path"
     fi
 
-    # Initialize Terraform if not already done
+    # Initialize Terraform
     terraform init
 
     # Discover variables if requested

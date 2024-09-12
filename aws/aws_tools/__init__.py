@@ -1,5 +1,12 @@
 from .tools.ec2 import *
-from .tools.s3 import *
+from .tools.s3 import (
+    s3_list_buckets,
+    s3_create_bucket,
+    s3_delete_bucket,
+    s3_list_objects,
+    s3_upload_file,
+    s3_download_file,
+)
 from .tools.rds import *
 from .tools.cost import *
 from .tools.lambda_function import *
@@ -15,8 +22,8 @@ __all__ = [
     's3_create_bucket',
     's3_delete_bucket',
     's3_list_objects',
-    's3_upload_object',
-    's3_download_object',
+    's3_upload_file',
+    's3_download_file',
     'rds_describe_instances',
     'rds_create_instance',
     'rds_delete_instance',

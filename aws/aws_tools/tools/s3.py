@@ -109,9 +109,33 @@ analyze_bucket_size(bucket_name, prefix)
     long_running=True,
 )
 
+s3_upload_file = AWSCliTool(
+    name="s3_upload_file",
+    description="Upload a file to an S3 bucket",
+    content="aws s3 cp $local_file_path s3://$bucket_name/$s3_file_path",
+    args=[
+        Arg(name="local_file_path", type="str", description="Path to the local file to upload", required=True),
+        Arg(name="bucket_name", type="str", description="Name of the S3 bucket to upload to", required=True),
+        Arg(name="s3_file_path", type="str", description="Destination path in the S3 bucket", required=True),
+    ],
+)
+
+s3_download_file = AWSCliTool(
+    name="s3_download_file",
+    description="Download a file from an S3 bucket",
+    content="aws s3 cp s3://$bucket_name/$s3_file_path $local_file_path",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the S3 bucket to download from", required=True),
+        Arg(name="s3_file_path", type="str", description="Path of the file in the S3 bucket", required=True),
+        Arg(name="local_file_path", type="str", description="Local path to save the downloaded file", required=True),
+    ],
+)
+
 tool_registry.register("aws", s3_list_buckets)
 tool_registry.register("aws", s3_create_bucket)
 tool_registry.register("aws", s3_delete_bucket)
 tool_registry.register("aws", s3_list_objects)
 tool_registry.register("aws", s3_bulk_delete)
 tool_registry.register("aws", s3_bucket_size_analyzer)
+tool_registry.register("aws", s3_upload_file)
+tool_registry.register("aws", s3_download_file)

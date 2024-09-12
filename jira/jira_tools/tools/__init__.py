@@ -1,22 +1,22 @@
-from .issues import issue_update, issue_get, issue_delete, issue_assign, issue_add_comment, issue_transition
-from .projects import project_get, project_list, board_get, board_list, sprint_get, sprint_create, sprint_update
-from .search import search_issues
-from .users import user_get
+from .issues import *
+from .epics import *
+from .sprints import *
 
 __all__ = [
-    'issue_update',
-    'issue_get',
+    'issue_list',
+    'issue_create',
+    'issue_edit',
     'issue_delete',
     'issue_assign',
-    'issue_add_comment',
-    'issue_transition',
-    'project_get',
-    'project_list',
-    'board_get',
-    'board_list',
-    'sprint_get',
-    'sprint_create',
-    'sprint_update',
-    'search_issues',
-    'user_get',
+    'issue_move',
+    'issue_view',
+    'issue_comment_add',
+    'issue_link',
+    'issue_watch',
+    'epic_list',
+    'epic_create',
+    'epic_add',
+    'epic_remove',
+    'sprint_list',
+    'sprint_add',
 ]
