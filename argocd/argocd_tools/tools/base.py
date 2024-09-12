@@ -12,6 +12,6 @@ class ArgoCDTool(Tool):
             image="argoproj/argocd:latest",
             content=content,
             args=args,
-            env=["ARGOCD_SERVER_URL", "ARGOCD_TOKEN"],
+            env=["ARGOCD_SERVER", "ARGOCD_AUTH_TOKEN"],
             long_running=long_running
         )

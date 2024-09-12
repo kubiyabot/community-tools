@@ -1,4 +1,4 @@
-from .operations import (
+from .tools.operations import (
     argocd_login,
     argocd_list_applications,
     argocd_get_application,

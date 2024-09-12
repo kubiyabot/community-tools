@@ -1,0 +1,2 @@
+kubiya-sdk
+atlassian-python-api

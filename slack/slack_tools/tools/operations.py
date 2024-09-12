@@ -162,6 +162,144 @@ except SlackApiError as e:
     ]
 )
 
+slack_update_message = SlackTool(
+    name="slack_update_message",
+    description="Update an existing Slack message",
+    content="""
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import os
+
+client = WebClient(token=os.environ['SLACK_API_KEY'])
+
+try:
+    response = client.chat_update(
+        channel=channel,
+        ts=message_ts,
+        text=new_text
+    )
+    print(f"Message updated: {response['ts']}")
+except SlackApiError as e:
+    print(f"Error updating message: {e}")
+    """,
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message", required=True),
+        Arg(name="message_ts", type="str", description="Timestamp of the message to update", required=True),
+        Arg(name="new_text", type="str", description="New message text", required=True),
+    ],
+)
+
+slack_delete_message = SlackTool(
+    name="slack_delete_message",
+    description="Delete a Slack message",
+    content="""
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import os
+
+client = WebClient(token=os.environ['SLACK_API_KEY'])
+
+try:
+    response = client.chat_delete(
+        channel=channel,
+        ts=message_ts
+    )
+    print(f"Message deleted: {response['ts']}")
+except SlackApiError as e:
+    print(f"Error deleting message: {e}")
+    """,
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message", required=True),
+        Arg(name="message_ts", type="str", description="Timestamp of the message to delete", required=True),
+    ],
+)
+
+slack_add_reaction = SlackTool(
+    name="slack_add_reaction",
+    description="Add a reaction to a Slack message",
+    content="""
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import os
+
+client = WebClient(token=os.environ['SLACK_API_KEY'])
+
+try:
+    response = client.reactions_add(
+        channel=channel,
+        timestamp=message_ts,
+        name=reaction
+    )
+    print(f"Reaction added: {reaction}")
+except SlackApiError as e:
+    print(f"Error adding reaction: {e}")
+    """,
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message", required=True),
+        Arg(name="message_ts", type="str", description="Timestamp of the message", required=True),
+        Arg(name="reaction", type="str", description="Reaction emoji name", required=True),
+    ],
+)
+
+slack_remove_reaction = SlackTool(
+    name="slack_remove_reaction",
+    description="Remove a reaction from a Slack message",
+    content="""
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import os
+
+client = WebClient(token=os.environ['SLACK_API_KEY'])
+
+try:
+    response = client.reactions_remove(
+        channel=channel,
+        timestamp=message_ts,
+        name=reaction
+    )
+    print(f"Reaction removed: {reaction}")
+except SlackApiError as e:
+    print(f"Error removing reaction: {e}")
+    """,
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message", required=True),
+        Arg(name="message_ts", type="str", description="Timestamp of the message", required=True),
+        Arg(name="reaction", type="str", description="Reaction emoji name", required=True),
+    ],
+)
+
+slack_search_messages = SlackTool(
+    name="slack_search_messages",
+    description="Search for Slack messages",
+    content="""
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import os
+
+client = WebClient(token=os.environ['SLACK_API_KEY'])
+
+try:
+    response = client.search_messages(
+        query=query,
+        count=count
+    )
+    messages = response['messages']['matches']
+    for msg in messages:
+        print(f"Message: {msg['text']}")
+        print(f"Channel: {msg['channel']['name']}")
+        print(f"Timestamp: {msg['ts']}")
+        print("---")
+except SlackApiError as e:
+    print(f"Error searching messages: {e}")
+    """,
+    args=[
+        Arg(name="query", type="str", description="Search query", required=True),
+        Arg(name="count", type="int", description="Number of results to return", required=False, default=20),
+    ],
+)
+
 # Register all Slack tools
-for tool in [slack_send_message, slack_upload_file, slack_list_channels, slack_create_channel, slack_invite_user, slack_get_channel_history]:
+for tool in [slack_send_message, slack_upload_file, slack_list_channels, slack_create_channel, 
+             slack_invite_user, slack_get_channel_history, slack_update_message, slack_delete_message, 
+             slack_add_reaction, slack_remove_reaction, slack_search_messages]:
     tool_registry.register("slack", tool)
