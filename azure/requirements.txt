@@ -1,0 +1,2 @@
+kubiya-sdk
+azure-cli
