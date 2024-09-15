@@ -20,7 +20,6 @@ issue_list = JiraTool(
                     --updated "$updated" \
                     $([[ -n "$labels" ]] && echo "--label $labels") \
                     $([[ "$history" == "true" ]] && echo "--history") \
-                    --limit "$limit" | \
     $([[ -n "$grep_filter" ]] && echo "grep \"$grep_filter\"" || echo "cat")
     """,
     args=[
@@ -38,7 +37,6 @@ issue_list = JiraTool(
         Arg(name="updated", type="str", description="Filter by last update date (e.g., '-24h' for last 24 hours)", required=False),
         Arg(name="labels", type="str", description="Filter by labels (comma-separated)", required=False),
         Arg(name="history", type="bool", description="Show issue history", required=False),
-        Arg(name="limit", type="int", description="Limit the number of results", required=False),
         Arg(name="grep_filter", type="str", description="Additional grep filter for results", required=False),
     ],
     mermaid_diagram="""
@@ -59,7 +57,6 @@ issue_list = JiraTool(
         C -->|Updated| O[Date Range]
         C -->|Labels| P[Comma-separated]
         C -->|History| Q[True/False]
-        C -->|Limit| R[Number]
         C -->|Grep Filter| S[Regex]
         D & E & F & G & H & I & J & K & L & M & N & O & P & Q & R & S -->|List Issues| T[Jira API]
         T -->|Issue List| U[Results]
