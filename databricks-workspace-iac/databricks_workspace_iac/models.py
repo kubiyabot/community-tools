@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 
 @dataclass
@@ -26,6 +26,6 @@ class WorkspaceConfig:
     frequency: Optional[str] = None
     hours: str = "1"
     minutes: str = "0"
-    address_space: List[str] = ["10.0.0.0/16"]
-    address_prefixes_public: List[str] = ["10.0.2.0/24"]
-    address_prefixes_private: List[str] = ["10.0.1.0/24"]
+    address_space: List[str] = field(default_factory=lambda: ["10.0.0.0/16"])
+    address_prefixes_public: List[str] = field(default_factory=lambda: ["10.0.2.0/24"])
+    address_prefixes_private: List[str] = field(default_factory=lambda: ["10.0.1.0/24"])
