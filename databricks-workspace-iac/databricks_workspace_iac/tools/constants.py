@@ -30,7 +30,7 @@ AZURE_ENV = [
     "SLACK_API_TOKEN" # The Slack API Token
 ]
 
-DATABRICKS_ICON_URL = "https://www.databricks.com/wp-content/uploads/2020/04/databricks-logo-1.png"
+DATABRICKS_ICON_URL = "https://cledara-public.s3.eu-west-2.amazonaws.com/Databricks.png"
 
 AWS_FILES = [
     FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"), # The AWS Credentials file - must be set to the location of the AWS credentials file on the host machine
