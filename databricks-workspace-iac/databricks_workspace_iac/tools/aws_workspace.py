@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Arg
 from .base import DatabricksAWSTerraformTool
-from ..constants import AWS_ENV
+from .constants import AWS_ENV, AWS_FILES
 from kubiya_sdk.tools.registry import tool_registry
 
 AWS_WORKSPACE_TEMPLATE = """
@@ -26,7 +26,7 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
     content=AWS_WORKSPACE_TEMPLATE,
     args=[Arg(name="workspace_name", description="The name of the databricks workspace.", required=True)],
     env=AWS_ENV,
-    file=AWS_FILES,
+    files=AWS_FILES,
     mermaid="""
 flowchart TD
     %% User interaction
