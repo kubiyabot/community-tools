@@ -43,8 +43,8 @@ curl -X POST "https://slack.com/api/chat.postMessage" \
 """
 
 azure_db_apply_tool = DatabricksTerraformTool(
-    name="azure-db-apply-tool",
-    description="Create a databricks workspace on Azure.",
+    name="create-databricks-workspace-on-azure",
+    description="Create a databricks workspace on Azure. Will use IAC (Terraform) to create the workspace. Allows easy, manageable and scalable workspace creation.",
     content=AZURE_WORKSPACE_TEMPLATE,
     args=[Arg(name=arg, description=arg, required=True) for arg in WorkspaceConfig.__annotations__],
     env=AZURE_ENV
