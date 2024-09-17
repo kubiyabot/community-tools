@@ -23,7 +23,6 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             description=description,
             content=content,
             args=args,
-            env=env,
             long_running=long_running,
             with_files=AWS_FILES,
             env=AWS_ENV,
