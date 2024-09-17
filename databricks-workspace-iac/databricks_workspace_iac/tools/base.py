@@ -9,7 +9,7 @@ class DatabricksTerraformTool(Tool):
             icon_url=DATABRICKS_ICON_URL,
             type="docker",
             image="hashicorp/terraform:latest",
-            content=content,
+            content=content,fdsfnds fkdsjnfdsojfnds
             args=args,
             env=env,
             long_running=long_running,
