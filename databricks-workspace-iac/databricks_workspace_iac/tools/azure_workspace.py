@@ -1,6 +1,5 @@
 from kubiya_sdk.tools import Arg
 from .base import DatabricksTerraformTool
-from ..constants import AZURE_ENV
 from kubiya_sdk.tools.registry import tool_registry
 
 AZURE_WORKSPACE_TEMPLATE = """
@@ -99,7 +98,6 @@ azure_db_apply_tool = DatabricksTerraformTool(
         Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False),
         Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False),
     ],
-    env=AZURE_ENV,
     mermaid="""
 flowchart TD
     %% User interaction
