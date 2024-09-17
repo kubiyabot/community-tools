@@ -2,7 +2,7 @@ from kubiya_sdk.tools.models import Tool
 from .constants import DATABRICKS_ICON_URL, AWS_FILES, AWS_ENV, AZURE_ENV
 
 class DatabricksTerraformTool(Tool):
-    def __init__(self, name, description, content, args, env, long_running=True, with_files=None):
+    def __init__(self, name, description, content, args, env, long_running=True, with_files=None, image="hashicorp/terraform:latest", mermaid=None):
         super().__init__(
             name=name,
             description=description,
@@ -13,11 +13,12 @@ class DatabricksTerraformTool(Tool):
             args=args,
             env=env,
             long_running=long_running,
-            with_files=with_files
+            with_files=with_files,
+            mermaid=mermaid
         )
 
 class DatabricksAWSTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, env, long_running=True):
+    def __init__(self, name, description, content, args, env, long_running=True, mermaid=None):
         super().__init__(
             name=name,
             description=description,
@@ -26,10 +27,11 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             long_running=long_running,
             with_files=AWS_FILES,
             env=AWS_ENV,
+            mermaid=mermaid,
         )
 
 class DatabricksAzureTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, env, long_running=True):
+    def __init__(self, name, description, content, args, env, long_running=True, mermaid=None):
         super().__init__(
             name=name,
             description=description,
@@ -37,5 +39,6 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             args=args,
             env=AZURE_ENV,
             long_running=long_running,
+            mermaid=mermaid,
             #with_files=AZURE_FILES, ## Kubiya does not support native integration with Azure yet, it is possible to use environment variables / secrets to pass in the execution environment. (eg. Team mate settings)
         )
