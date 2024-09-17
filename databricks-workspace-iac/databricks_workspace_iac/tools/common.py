@@ -1,0 +1,28 @@
+from kubiya_sdk.tools.models import FileSpec
+
+COMMON_ENV = [
+    "DB_ACCOUNT_ID",
+    "DB_ACCOUNT_CLIENT_ID",
+    "DB_ACCOUNT_CLIENT_SECRET",
+    "GIT_ORG",
+    "GIT_REPO",
+    "BRANCH",
+    "DIR",
+    "PAT"
+]
+
+AWS_ENV = COMMON_ENV + [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_DEFAULT_REGION",
+    "AWS_SECRET_ACCESS_KEY"
+]
+
+AZURE_ENV = COMMON_ENV + [
+    "ARM_CLIENT_ID",
+    "ARM_CLIENT_SECRET",
+    "ARM_TENANT_ID",
+    "ARM_SUBSCRIPTION_ID",
+    "SLACK_CHANNEL_ID",
+    "SLACK_THREAD_TS",
+    "SLACK_API_TOKEN"
+]
