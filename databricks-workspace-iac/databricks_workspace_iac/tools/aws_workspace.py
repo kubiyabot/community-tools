@@ -23,7 +23,7 @@ echo "The databricks workspace can be found here: https://accounts.cloud.databri
 """
 
 aws_db_apply_tool = DatabricksAWSTerraformTool(
-    name="aws-db-apply-tool",
+    name="create-databricks-workspace-on-aws",
     description="Create a databricks workspace on AWS.",
     content=AWS_WORKSPACE_TEMPLATE,
     args=[Arg(name=arg, description=arg, required=True) for arg in WorkspaceConfig.__annotations__],
