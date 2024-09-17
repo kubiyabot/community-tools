@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import DatabricksTerraformTool
+from .base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 
 AZURE_WORKSPACE_TEMPLATE = """
@@ -66,7 +66,7 @@ curl -X POST "https://slack.com/api/chat.postMessage" \
 --data "$PAYLOAD"
 """
 
-azure_db_apply_tool = DatabricksTerraformTool(
+azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
     description="Create a databricks workspace on Azure. Will use IAC (Terraform) to create the workspace. Allows easy, manageable and scalable workspace creation.",
     content=AZURE_WORKSPACE_TEMPLATE,
