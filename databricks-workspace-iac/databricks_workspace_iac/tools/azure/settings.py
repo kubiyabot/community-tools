@@ -6,7 +6,7 @@ AZURE_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/azure'
 
 # Terraform variables
 TF_VARS = [
-    tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
+    tf_var("WORKSPACE_NAME", "The name of the Databricks workspace to be created", required=True),
     tf_var("region", "The Azure region where the workspace will be deployed", required=True),
     tf_var("storage_account_name", "The name of the storage account to use for the backend", required=True),
     tf_var("container_name", "The name of the container to use for the backend", required=True),
