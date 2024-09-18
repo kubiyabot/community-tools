@@ -2,18 +2,17 @@ from kubiya_sdk.tools import Arg
 from ..base import DatabricksAWSTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 from .settings import (
-    AWS_TERRAFORM_DIR, TF_VARS, GIT_CLONE_COMMAND, 
-    MERMAID_DIAGRAM, REQUIRED_ENV_VARS, INIT_TEMPLATE,
-    APPLY_TEMPLATE, OUTPUT_TEMPLATE, AWS_WORKSPACE_TEMPLATE
+    AWS_TERRAFORM_DIR, TF_VARS, MERMAID_DIAGRAM, 
+    REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE
 )
-from ..constants import AWS_ENV, AWS_FILES
+from ..constants import AWS_ENV
 
 # Generate args from TF_VARS
 tf_args = [Arg(name=var["name"], description=var["description"], required=var["required"], default=var.get("default")) for var in TF_VARS]
 
 aws_db_apply_tool = DatabricksAWSTerraformTool(
-    name="aws-db-apply-tool",
-    description="Create a databricks workspace on AWS.",
+    name="create-databricks-workspace-on-aws",
+    description="Create a databricks workspace on AWS. Will use IAC (Terraform) to create the workspace. Allows easy, manageable and scalable workspace creation.",
     content=AWS_WORKSPACE_TEMPLATE,
     args=tf_args,
     mermaid=MERMAID_DIAGRAM
