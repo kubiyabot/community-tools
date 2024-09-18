@@ -1,4 +1,4 @@
-# Shared templates for both AWS and Azure
+import json
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
@@ -10,22 +10,25 @@ def tf_var(name, description, required=False, default=None):
     }
 
 # Git clone command for fetching Terraform configurations
-GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git $DIR'
+GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "$DIR"'
 
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
-set -e
-apk add jq --quiet
+#!/bin/bash
+set -euo pipefail
+
+apk add jq curl git --quiet
+
 echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
-cd {TERRAFORM_DIR}
+cd "${{DIR}}/{TERRAFORM_DIR}"
 
 echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {{
-    if [ -z "${{1}}" ]; then
-        echo "❌ Error: ${{1}} is not set. Please provide it as an argument or environment variable."
+    if [ -z "${{1:-}}" ]; then
+        echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
 }}
@@ -39,9 +42,12 @@ echo "🚀 Initializing Terraform..."
 {TERRAFORM_INIT_COMMAND}
 
 echo "🏗️ Applying Terraform configuration..."
-tf_vars=""
-{TERRAFORM_VARS_COMMAND}
-terraform apply -auto-approve $tf_vars
+# Create a JSON file with Terraform variables
+cat << EOF > terraform.tfvars.json
+{TERRAFORM_VARS_JSON}
+EOF
+
+terraform apply -auto-approve -var-file=terraform.tfvars.json
 
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json || echo "{{}}")
@@ -130,7 +136,9 @@ curl -X POST "https://slack.com/api/chat.postMessage" \
 
 # Wrap the workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
-set -e
+#!/bin/bash
+set -euo pipefail
+
 {{
 {WORKSPACE_TEMPLATE}
 }} || {{
@@ -141,5 +149,6 @@ set -e
 }}
 """
 
-def generate_terraform_vars_command(tf_vars):
-    return '\n'.join([f'if [ ! -z "${{var["name"]}}" ]; then tf_vars="$tf_vars -var \'{var["name"]}=${{var["name"]}}\'" ; fi' for var in tf_vars])
+def generate_terraform_vars_json(tf_vars):
+    vars_dict = {{var["name"]: f"${{{{var['name']}}}}" for var in tf_vars}}
+    return json.dumps(vars_dict, indent=2)
