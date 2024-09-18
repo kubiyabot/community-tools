@@ -60,7 +60,8 @@ AWS_TEMPLATE_PARAMS = {
     "TERRAFORM_VARS": ' '.join([f'-var "{var["name"]}=${{{var["name"]}}}"' for var in TF_VARS]),
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
     "BACKEND_TYPE": "s3",
-    "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}"
+    "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}",
+    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND
 }
 
 # Complete workspace creation template for AWS
@@ -73,4 +74,4 @@ AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDL
 )
 
 # Export variables for use in other modules
-__all__ = ['AWS_TERRAFORM_DIR', 'TF_VARS', 'GIT_CLONE_COMMAND', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
+__all__ = ['AWS_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AWS_WORKSPACE_TEMPLATE', 'AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
