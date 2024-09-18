@@ -15,7 +15,7 @@ AWS_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/aws'
 # For more information on these variables, see:
 # https://registry.terraform.io/providers/databricks/databricks/latest/docs
 TF_VARS = [
-    tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
+    tf_var("WORKSPACE_NAME", "The name of the Databricks workspace to be created", required=True),
     tf_var("aws_region", "The AWS region where the workspace will be created", required=True),
     tf_var("vpc_cidr", "The CIDR block for the VPC", required=False, default="10.4.0.0/16"),
     tf_var("subnet_public_cidr", "The CIDR block for the public subnet", required=False, default="10.4.1.0/24"),

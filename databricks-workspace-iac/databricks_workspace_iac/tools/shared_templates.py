@@ -16,9 +16,6 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$G
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
-
-export BRANCH=custom-vpc
-
 set -euo pipefail
 
 apk add jq curl git --quiet
@@ -33,7 +30,7 @@ echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {{
-    if [ -z "${{1:-}}" ]; then
+    if [ -z "${{!1:-}}" ]; then
         echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
