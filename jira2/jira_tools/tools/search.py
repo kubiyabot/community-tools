@@ -1,6 +1,8 @@
 from .base import JiraTool, register_jira_tool
 from kubiya_sdk.tools import Arg
 
+print(os.environ['JIRA_OAUTH_TOKEN'])
+
 search_issues = JiraTool(
     name="search_issues",
     description="Search JIRA issues",
