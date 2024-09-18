@@ -1,4 +1,4 @@
-from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_command
+from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
 
 # AWS-specific settings for Databricks workspace creation
 
@@ -72,7 +72,7 @@ AWS_TEMPLATE_PARAMS = {
     "TERRAFORM_DIR": AWS_TERRAFORM_DIR,
     "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
     "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \\\n    -backend-config="key=databricks/${{workspace_name}}/terraform.tfstate" \\\n    -backend-config="region={AWS_BACKEND_REGION}"',
-    "TERRAFORM_VARS_COMMAND": generate_terraform_vars_command(TF_VARS),
+    "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
     "BACKEND_TYPE": "s3",
     "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}",

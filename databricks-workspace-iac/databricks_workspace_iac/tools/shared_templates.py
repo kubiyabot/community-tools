@@ -150,5 +150,8 @@ set -euo pipefail
 """
 
 def generate_terraform_vars_json(tf_vars):
-    vars_dict = {{var["name"]: f"${{{{var['name']}}}}" for var in tf_vars}}
+    vars_dict = {var["name"]: f"${{{var['name']}}}" for var in tf_vars}
     return json.dumps(vars_dict, indent=2)
+
+# Export the necessary functions and variables
+__all__ = ['tf_var', 'GIT_CLONE_COMMAND', 'COMMON_WORKSPACE_TEMPLATE', 'WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING', 'ERROR_NOTIFICATION_TEMPLATE', 'generate_terraform_vars_json']

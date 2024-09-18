@@ -1,4 +1,4 @@
-from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_command
+from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
 
 # Azure-specific settings for Databricks workspace creation
 
@@ -44,7 +44,7 @@ flowchart TD
     User -->|🗨 Request Azure Databricks Workspace| Teammate
     Teammate -->|🗨 Which Resource Group and Location?| User
     User -->|📍 Resource Group: my-rg, Location: eastus| Teammate
-    Teammate -->|��� Starting Azure Terraform Apply| ApplyAzure
+    Teammate -->| Starting Azure Terraform Apply| ApplyAzure
 
     %% Azure Execution
     subgraph Azure Environment
@@ -73,7 +73,7 @@ AZURE_TEMPLATE_PARAMS = {
     "TERRAFORM_DIR": AZURE_TERRAFORM_DIR,
     "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
     "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .workspace_name}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
-    "TERRAFORM_VARS_COMMAND": generate_terraform_vars_command(TF_VARS),
+    "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
     "BACKEND_TYPE": "azurerm",
     "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
@@ -90,4 +90,4 @@ AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HAN
 )
 
 # Export variables for use in other modules
-__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
+__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
