@@ -21,6 +21,13 @@ apk add jq curl git --quiet
 
 echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
+
+# Check if the directory exists after cloning
+if [ ! -d "${{DIR}}/{TERRAFORM_DIR}" ]; then
+    echo "❌ Error: Directory ${{DIR}}/{TERRAFORM_DIR} does not exist after cloning."
+    exit 1
+fi
+
 cd "${{DIR}}/{TERRAFORM_DIR}"
 
 echo "🔍 Validating input parameters..."
