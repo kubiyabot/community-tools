@@ -1,4 +1,5 @@
 import json
+import os
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
@@ -23,12 +24,23 @@ echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
 # Check if the directory exists after cloning
-if [ ! -d "${{DIR}}/{TERRAFORM_DIR}" ]; then
-    echo "❌ Error: Directory ${{DIR}}/{TERRAFORM_DIR} does not exist after cloning."
+if [ ! -d "${{DIR}}" ]; then
+    echo "❌ Error: Directory ${{DIR}} does not exist after cloning."
     exit 1
 fi
 
-cd "${{DIR}}/{TERRAFORM_DIR}"
+# Navigate to the cloned repository
+cd "${{DIR}}"
+
+# TERRAFORM_DIR is expected to be a relative path within the cloned repository
+# Check if the Terraform directory exists
+if [ ! -d "{TERRAFORM_DIR}" ]; then
+    echo "❌ Error: Terraform directory {TERRAFORM_DIR} does not exist in the cloned repository."
+    exit 1
+fi
+
+# Navigate to the Terraform directory
+cd "{TERRAFORM_DIR}"
 
 echo "🔍 Validating input parameters..."
 
