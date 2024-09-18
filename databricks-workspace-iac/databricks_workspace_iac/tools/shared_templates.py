@@ -58,32 +58,32 @@ echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
-SLACK_MESSAGE=$(cat <<EOF
-{{
+SLACK_MESSAGE_CONTENT=$(cat <<EOF
+{
     "blocks": [
-        {{
+        {
             "type": "context",
             "elements": [
-                {{
+                {
                     "type": "image",
                     "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-1803x2048-hodrzd3t.png",
                     "alt_text": "Terraform Logo"
-                }},
-                {{
+                },
+                {
                     "type": "mrkdwn",
                     "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. \\n\\n🚀 *Going forward*, you can easily manage and track updates on your infrastructure.\\n\\n🔗 *Module Source code*: <$workspace_url|Explore the module>"
-                }}
+                }
             ]
-        }},
-        {{
+        },
+        {
             "type": "section",
-            "text": {{
+            "text": {
                 "type": "mrkdwn",
                 "text": "*To import the state locally, follow these steps:*\\n\\n1. Configure your Terraform backend:\\n\`\`\`\\nterraform {{\\n  backend \\"{BACKEND_TYPE}\\" {{\\n    $backend_config\\n  }}\\n}}\\n\`\`\`\\n2. Run the import command:\\n\`\`\`\\n{IMPORT_COMMAND}\\n\`\`\`"
-            }}
-        }}
+            }
+        }
     ]
-}}
+}
 EOF
 )
 
@@ -91,14 +91,14 @@ echo "📤 Sending Slack message..."
 curl -X POST "https://slack.com/api/chat.postMessage" \\
 -H "Authorization: Bearer $SLACK_API_TOKEN" \\
 -H "Content-Type: application/json" \\
---data "{{\\"channel\\": \\"$SLACK_CHANNEL_ID\\", \\"thread_ts\\": \\"$SLACK_THREAD_TS\\", \\"blocks\\": $SLACK_MESSAGE}}"
+--data "{{\\"channel\\": \\"$SLACK_CHANNEL_ID\\", \\"thread_ts\\": \\"$SLACK_THREAD_TS\\", \\"blocks\\": $SLACK_MESSAGE_CONTENT}}"
 
 echo "✅ Databricks workspace setup complete!"
 """
 
 # Error notification template
 ERROR_NOTIFICATION_TEMPLATE = """
-SLACK_ERROR_MESSAGE=$(cat <<EOF
+SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
 {
     "blocks": [
         {
@@ -128,10 +128,10 @@ SLACK_ERROR_MESSAGE=$(cat <<EOF
 EOF
 )
 
-curl -X POST "https://slack.com/api/chat.postMessage" \
--H "Authorization: Bearer $SLACK_API_TOKEN" \
--H "Content-Type: application/json" \
---data "{\"channel\": \"$SLACK_CHANNEL_ID\", \"thread_ts\": \"$SLACK_THREAD_TS\", \"blocks\": $SLACK_ERROR_MESSAGE}"
+curl -X POST "https://slack.com/api/chat.postMessage" \\
+-H "Authorization: Bearer $SLACK_API_TOKEN" \\
+-H "Content-Type: application/json" \\
+--data "{{\\"channel\\": \\"$SLACK_CHANNEL_ID\\", \\"thread_ts\\": \\"$SLACK_THREAD_TS\\", \\"blocks\\": $SLACK_ERROR_MESSAGE_CONTENT}}"
 """
 
 # Wrap the workspace template with error handling
