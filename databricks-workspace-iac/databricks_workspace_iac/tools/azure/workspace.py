@@ -1,7 +1,7 @@
 from kubiya_sdk.tools import Arg
 from ..base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
-from .settings import AZURE_TERRAFORM_DIR, TF_VARS, GIT_CLONE_COMMAND
+from .settings import AZURE_TERRAFORM_DIR, TF_VARS, GIT_CLONE_COMMAND, MERMAID_DIAGRAM, REQUIRED_ENV_VARS
 from ..constants import AZURE_ENV
 
 # Define the template parts
@@ -17,7 +17,7 @@ check_var() {
 }
 
 # Check required variables
-""" + "\n".join([f"check_var \"{var}\"" for var in AZURE_ENV]) + """
+""" + "\n".join([f"check_var \"{var}\"" for var in REQUIRED_ENV_VARS]) + """
 
 echo "✅ All required parameters are set."
 """
@@ -33,7 +33,7 @@ terraform init -backend-config="storage_account_name={{ .storage_account_name}}"
 
 APPLY_TEMPLATE = """
 echo "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve """ + " ".join([f"-var {var}" for var in TF_VARS])
+terraform apply -auto-approve """ + " ".join([f"-var \"{var['name']}={{{{ .{var['name']} }}}}\"" for var in TF_VARS])
 
 OUTPUT_TEMPLATE = """
 echo "📊 Capturing Terraform output..."
@@ -98,38 +98,20 @@ cd {AZURE_TERRAFORM_DIR}
 echo "✅ Databricks workspace setup complete!"
 """
 
+# Generate args from TF_VARS
+tf_args = [Arg(name=var["name"], description=var["description"], required=var["required"], default=var.get("default")) for var in TF_VARS]
+
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
     description="Create a databricks workspace on Azure. Will use IAC (Terraform) to create the workspace. Allows easy, manageable and scalable workspace creation.",
     content=AZURE_WORKSPACE_TEMPLATE,
-    args=[
-        Arg(name="workspace_name", description="The name of the databricks workspace.", required=True),
-        Arg(name="region", description="The azure region for the workspace.", required=True),
-        Arg(name="storage_account_name", description="The name of the storage account to use for the backend.", required=True),
-        Arg(name="container_name", description="The name of the container to use for the backend.", required=True),
-        Arg(name="resource_group_name", description="The name of the resource group to use for the backend.", required=True),
-    ],
-    env=AZURE_ENV,
-    mermaid="""
-flowchart TD
-    %% User interaction
-    User -->|🗨 Request Azure Databricks Workspace| Teammate
-    Teammate -->|🗨 Which Resource Group and Location?| User
-    User -->|📍 Resource Group: my-rg, Location: eastus| Teammate
-    Teammate -->|🚀 Starting Azure Terraform Apply| ApplyAzure
-
-    %% Azure Execution
-    subgraph Azure Environment
-        ApplyAzure[Azure Kubernetes Job]
-        ApplyAzure -->|Running Terraform on Azure 🛠| K8sAzure[Checking Status 🔄]
-        K8sAzure -->|⌛ Waiting for Completion| DatabricksAzure[Databricks Workspace Created 🎉]
-        ApplyAzure -->|Uses| TerraformDockerAzure[Terraform Docker 🐳]
-    end
-
-    %% Feedback to User
-    K8sAzure -->|✅ Success! Workspace Ready| Teammate
-    Teammate -->|🎉 Workspace is ready!| User
-"""
+    args=tf_args,
+    mermaid=MERMAID_DIAGRAM
 )
 
 tool_registry.register("databricks", azure_db_apply_tool)
+
+# Ensure all required environment variables are set
+for var in REQUIRED_ENV_VARS:
+    if var not in AZURE_ENV:
+        raise ValueError(f"Required environment variable {var} is not set in AZURE_ENV")
