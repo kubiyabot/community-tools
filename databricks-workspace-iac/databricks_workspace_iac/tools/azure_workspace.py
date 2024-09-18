@@ -49,16 +49,6 @@ The link to the workspace is: ${workspace_url}
 The state file can be found here: https://{{ .storage_account_name}}.blob.core.windows.net/{{ .container_name}}
 EOF
 )
-ESCAPED_MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
-
-PAYLOAD=$(cat <<EOF
-{{
-    "channel": "$SLACK_CHANNEL_ID",
-    "text": $ESCAPED_MESSAGE,
-    "thread_ts": "$SLACK_THREAD_TS"
-}}
-EOF
-)
 
 curl -X POST "https://slack.com/api/chat.postMessage" \
 -H "Authorization: Bearer $SLACK_API_TOKEN" \
