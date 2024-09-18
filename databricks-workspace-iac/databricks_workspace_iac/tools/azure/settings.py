@@ -102,14 +102,14 @@ echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {{
-    if [ -z "$1" ]; then
-        echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
+    if [ -z "${{1}}" ]; then
+        echo "❌ Error: ${{1}} is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
 }}
 
 # Check required variables
-{' '.join([f'check_var "${{var}}"' for var in REQUIRED_ENV_VARS])}
+{' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS])}
 
 echo "✅ All required parameters are set."
 
