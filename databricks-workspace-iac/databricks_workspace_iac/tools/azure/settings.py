@@ -98,7 +98,7 @@ echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {
-    if [ -z "${!1}" ]; then
+    if [ -z "$1" ]; then
         echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
@@ -204,7 +204,8 @@ terraform init -backend-config="storage_account_name=$storage_account_name" \\
   -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"
 
 echo "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve {' '.join([f'-var "{var["name"]}=${var["name"]}"' for var in TF_VARS])}
+terraform apply -auto-approve \\
+{' \\\n'.join([f'  -var "{var["name"]}=${{{{ .{var["name"]} | default "{var["default"]}" }}}}"' for var in TF_VARS])}
 
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json || echo "{{}}")
