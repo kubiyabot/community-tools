@@ -26,32 +26,8 @@ apk add jq curl git --quiet
 echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
-# Check if the directory exists after cloning
-if [ ! -d "${{DIR}}" ]; then
-    echo "❌ Error: Directory ${{DIR}} does not exist after cloning."
-    exit 1
-fi
-
 # Navigate to the cloned repository
-cd "${{DIR}}"
-
-# TERRAFORM_DIR is expected to be a relative path within the cloned repository
-# Check if the Terraform directory exists
-if [ ! -d "{TERRAFORM_DIR}" ]; then
-    echo "❌ Error: Terraform directory {TERRAFORM_DIR} does not exist in the cloned repository."
-    echo "🔍 Searching for the Terraform directory..."
-    terraform_dir=$(find . -type d -name "terraform" | grep -i "{CLOUD_PROVIDER}" | head -n 1)
-    if [ -n "$terraform_dir" ]; then
-        echo "✅ Found Terraform directory: $terraform_dir"
-        TERRAFORM_DIR="$terraform_dir"
-    else
-        echo "❌ Could not find the Terraform directory. Exiting."
-        exit 1
-    fi
-fi
-
-# Navigate to the Terraform directory
-cd "$TERRAFORM_DIR"
+cd "${{TERRAFORM_DIR}}"
 
 echo "🔍 Validating input parameters..."
 
