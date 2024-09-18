@@ -1,3 +1,5 @@
+from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE
+
 # AWS-specific settings for Databricks workspace creation
 
 # S3 bucket for Terraform state storage
@@ -9,30 +11,7 @@ AWS_BACKEND_REGION = 'us-west-2'
 # Directory containing Terraform files for AWS
 AWS_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/aws'
 
-# Function to create Terraform variable dictionaries
-def tf_var(name, description, required=False, default=None):
-    """
-    Create a dictionary representing a Terraform variable.
-    
-    Args:
-        name (str): Name of the variable
-        description (str): Description of the variable
-        required (bool): Whether the variable is required
-        default (Any): Default value for the variable
-    
-    Returns:
-        dict: A dictionary representing the Terraform variable
-    """
-    return {
-        "name": name,
-        "description": description,
-        "required": required,
-        "default": default
-    }
-
 # Terraform variables
-# For more information on these variables, see:
-# https://registry.terraform.io/providers/databricks/databricks/latest/docs
 TF_VARS = [
     tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
     tf_var("databricks_account_id", "The Databricks account ID", required=True, default="${DB_ACCOUNT_ID}"),
@@ -43,9 +22,6 @@ TF_VARS = [
     tf_var("subnet_public_cidr", "The CIDR block for the public subnet", required=False, default="10.4.1.0/24"),
     tf_var("subnet_private_cidr", "The CIDR block for the private subnet", required=False, default="10.4.2.0/24"),
 ]
-
-# Git clone command for fetching Terraform configurations
-GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git $DIR'
 
 # Mermaid diagram for visualizing the workflow
 MERMAID_DIAGRAM = """
@@ -73,64 +49,28 @@ flowchart TD
 REQUIRED_ENV_VARS = [
     "DB_ACCOUNT_ID", "DB_ACCOUNT_CLIENT_ID", "DB_ACCOUNT_CLIENT_SECRET",
     "GIT_ORG", "GIT_REPO", "BRANCH", "DIR", "AWS_PROFILE",
-    "PAT"
+    "PAT", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
 ]
 
-# Template for validating input parameters
-VALIDATION_TEMPLATE = """
-echo "🔍 Validating input parameters..."
-
-# Function to check if a variable is set
-check_var() {
-    if [ -z "${!1}" ]; then
-        echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
-        exit 1
-    fi
+# AWS-specific template parameters
+AWS_TEMPLATE_PARAMS = {
+    "TERRAFORM_DIR": AWS_TERRAFORM_DIR,
+    "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
+    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \\\n    -backend-config="key=databricks/${{workspace_name}}/terraform.tfstate" \\\n    -backend-config="region={AWS_BACKEND_REGION}"',
+    "TERRAFORM_VARS": ' '.join([f'-var "{var["name"]}=${{{var["name"]}}}"' for var in TF_VARS]),
+    "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
+    "BACKEND_TYPE": "s3",
+    "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}"
 }
 
-# Check required variables
-""" + "\n".join([f"check_var \"{var}\"" for var in REQUIRED_ENV_VARS]) + """
+# Complete workspace creation template for AWS
+AWS_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AWS_TEMPLATE_PARAMS)
 
-echo "✅ All required parameters are set."
-"""
+# Wrap the workspace template with error handling
+AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING.format(
+    WORKSPACE_TEMPLATE=AWS_WORKSPACE_TEMPLATE,
+    ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE
+)
 
-# Terraform initialization template
-INIT_TEMPLATE = f"""
-echo "🚀 Initializing Terraform..."
-terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \
-  -backend-config="key=databricks/{{{{ .workspace_name}}}}/terraform.tfstate" \
-  -backend-config="region={AWS_BACKEND_REGION}"
-"""
-
-# Terraform apply template
-APPLY_TEMPLATE = """
-echo "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve """ + " ".join([f"-var \"{var['name']}={{{{ .{var['name']} }}}}\"" for var in TF_VARS])
-
-# Output template for displaying results
-OUTPUT_TEMPLATE = f"""
-echo "📊 Capturing Terraform output..."
-tf_output=$(terraform output -json || echo "{{}}")
-workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url=${{workspace_url:-"https://accounts.cloud.databricks.com/workspaces?account_id=${{DB_ACCOUNT_ID}}"}}
-
-echo "🔍 Getting backend config..."
-backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
-
-echo "The state file can be found here: https://{AWS_BACKEND_BUCKET}.s3.{AWS_BACKEND_REGION}.amazonaws.com/aws/"
-echo "The databricks workspace can be found here: $workspace_url"
-"""
-
-# Complete workspace creation template
-AWS_WORKSPACE_TEMPLATE = f"""
-echo "🛠️ Setting up Databricks workspace on AWS..."
-{GIT_CLONE_COMMAND}
-cd {AWS_TERRAFORM_DIR}
-
-{VALIDATION_TEMPLATE}
-{INIT_TEMPLATE}
-{APPLY_TEMPLATE}
-{OUTPUT_TEMPLATE}
-
-echo "✅ Databricks workspace setup complete!"
-"""
+# Export variables for use in other modules
+__all__ = ['AWS_TERRAFORM_DIR', 'TF_VARS', 'GIT_CLONE_COMMAND', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
