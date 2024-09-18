@@ -27,7 +27,7 @@ AZURE_ENV = [
     "ARM_SUBSCRIPTION_ID", # The ARM Subscription ID
     "SLACK_CHANNEL_ID", # The Slack Channel ID
     "SLACK_THREAD_TS", # The Slack Thread Timestamp
-    "SLACK_API_TOKEN" # The Slack API Token
+    "SLACK_API_TOKEN" # The Slack API Token\
 ]
 
 DATABRICKS_ICON_URL = "https://cledara-public.s3.eu-west-2.amazonaws.com/Databricks.png"

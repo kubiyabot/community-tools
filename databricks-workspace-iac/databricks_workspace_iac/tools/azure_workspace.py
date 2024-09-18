@@ -38,7 +38,7 @@ terraform apply -auto-approve \
   -var "minutes={{ .minutes }}" \
   -var 'address_space={{ .address_space }}' \
   -var 'address_prefixes_public={{ .address_prefixes_public }}' \
-  -var 'address_prefixes_private={{ .address_prefixes_private }}' 
+  -var 'address_prefixes_private={{ .address_prefixes_private }}'
 
 workspace_url=$(terraform output -raw databricks_host)
 echo "The link to the workspace is: $workspace_url"
@@ -78,25 +78,25 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
         Arg(name="resource_group_name", description="The name of the resource group to use for the backend.", required=True),
         Arg(name="managed_services_cmk_key_vault_key_id", description="The ID of the key vault key to use for managed services encryption.", required=False),
         Arg(name="managed_disk_cmk_key_vault_key_id", description="The ID of the key vault key to use for managed disk encryption.", required=False),
-        Arg(name="infrastructure_encryption_enabled", description="Enable infrastructure encryption, can be true or false.", required=False),
-        Arg(name="no_public_ip", description="Secure cluster connectivity, no public ip, can be true or false.", required=False),
-        Arg(name="enable_vnet", description="Enable custom vnet use, boolean, can be true or false.", required=False),
+        Arg(name="infrastructure_encryption_enabled", description="Enable infrastructure encryption, can be true or false.", required=False, default="false"),
+        Arg(name="no_public_ip", description="Secure cluster connectivity, no public ip, can be true or false.", required=False, default="false"),
+        Arg(name="enable_vnet", description="Enable custom vnet use, boolean, can be true or false.", required=False, default="false"),
         Arg(name="virtual_network_id", description="The virtual network id.", required=False),
         Arg(name="private_subnet_name", description="The name of the private subnet.", required=False),
         Arg(name="public_subnet_name", description="The name of the public subnet.", required=False),
         Arg(name="public_subnet_network_security_group_association_id", description="The ID of the public subnet network security group association.", required=False),
         Arg(name="private_subnet_network_security_group_association_id", description="The ID of the private subnet network security group association.", required=False),
-        Arg(name="security_profile_enabled", description="Enable security profile, boolean, can be true or false.", required=False),
-        Arg(name="enhanced_monitoring_enabled", description="Enable enhanced monitoring, boolean, can be true or false.", required=False),
-        Arg(name="automatic_update", description="Enable automatic update.", required=False),
-        Arg(name="restart_no_updates", description="Enable restart even if there are no updates.", required=False),
+        Arg(name="security_profile_enabled", description="Enable security profile, boolean, can be true or false.", required=False, default="false"),
+        Arg(name="enhanced_monitoring_enabled", description="Enable enhanced monitoring, boolean, can be true or false.", required=False, default="false"),
+        Arg(name="automatic_update", description="Enable automatic update.", required=False, default="false"),
+        Arg(name="restart_no_updates", description="Enable restart even if there are no updates.", required=False, default="false"),
         Arg(name="day_of_week", description="Day of the week to apply updates.", required=False),
         Arg(name="frequency", description="Frequency of updates.", required=False),
-        Arg(name="hours", description="Hours of window start time.", required=False),
-        Arg(name="minutes", description="Minutes of window start time.", required=False),
-        Arg(name="address_space", description="The address space to be used for the virtual network.", required=False),
-        Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False),
-        Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False),
+        Arg(name="hours", description="Hours of window start time.", required=False, default="1"),
+        Arg(name="minutes", description="Minutes of window start time.", required=False, default="0"),
+        Arg(name="address_space", description="The address space to be used for the virtual network.", required=False, default='["10.0.0.0/16"]'),
+        Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False, default='["10.0.2.0/24"]'),
+        Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False, default='["10.0.1.0/24"]'),
     ],
     mermaid="""
 flowchart TD
