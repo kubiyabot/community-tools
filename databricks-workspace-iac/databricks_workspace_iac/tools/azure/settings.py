@@ -64,13 +64,24 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"
 
 # Mermaid diagram for visualizing the workflow
 MERMAID_DIAGRAM = """
-graph LR
-    A[Start] --> B[Clone Repository]
-    B --> C[Initialize Terraform]
-    C --> D[Apply Terraform]
-    D --> E[Capture Output]
-    E --> F[Send Slack Message]
-    F --> G[End]
+flowchart TD
+    %% User interaction
+    User -->|🗨 Request Azure Databricks Workspace| Teammate
+    Teammate -->|🗨 Which Resource Group and Location?| User
+    User -->|📍 Resource Group: my-rg, Location: eastus| Teammate
+    Teammate -->|🚀 Starting Azure Terraform Apply| ApplyAzure
+
+    %% Azure Execution
+    subgraph Azure Environment
+        ApplyAzure[Azure Kubernetes Job]
+        ApplyAzure -->|Running Terraform on Azure 🛠| K8sAzure[Checking Status 🔄]
+        K8sAzure -->|⌛ Waiting for Completion| DatabricksAzure[Databricks Workspace Created 🎉]
+        ApplyAzure -->|Uses| TerraformDockerAzure[Terraform Docker 🐳]
+    end
+
+    %% Feedback to User
+    K8sAzure -->|✅ Success! Workspace Ready| Teammate
+    Teammate -->|🎉 Workspace is ready!| User
 """
 
 # Required environment variables for the tool to function

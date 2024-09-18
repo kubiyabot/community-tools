@@ -110,7 +110,7 @@ terraform apply -auto-approve """ + " ".join([f"-var \"{var['name']}={{{{ .{var[
 # Output template for displaying results
 OUTPUT_TEMPLATE = f"""
 echo "📊 Capturing Terraform output..."
-tf_output=$(terraform output -json || echo "{}")
+tf_output=$(terraform output -json || echo "{{}}")
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
 workspace_url=${{workspace_url:-"https://accounts.cloud.databricks.com/workspaces?account_id=${{DB_ACCOUNT_ID}}"}}
 
