@@ -32,15 +32,27 @@ fi
 # Navigate to the cloned repository
 cd "${{DIR}}"
 
+# List contents of the cloned directory for debugging
+echo "📂 Contents of ${{DIR}}:"
+ls -R
+
 # TERRAFORM_DIR is expected to be a relative path within the cloned repository
 # Check if the Terraform directory exists
 if [ ! -d "{TERRAFORM_DIR}" ]; then
     echo "❌ Error: Terraform directory {TERRAFORM_DIR} does not exist in the cloned repository."
-    exit 1
+    echo "🔍 Searching for the Terraform directory..."
+    terraform_dir=$(find . -type d -name "terraform" | grep -i "{CLOUD_PROVIDER}" | head -n 1)
+    if [ -n "$terraform_dir" ]; then
+        echo "✅ Found Terraform directory: $terraform_dir"
+        TERRAFORM_DIR="$terraform_dir"
+    else
+        echo "❌ Could not find the Terraform directory. Exiting."
+        exit 1
+    fi
 fi
 
 # Navigate to the Terraform directory
-cd "{TERRAFORM_DIR}"
+cd "$TERRAFORM_DIR"
 
 echo "🔍 Validating input parameters..."
 
