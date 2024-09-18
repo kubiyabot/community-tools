@@ -29,12 +29,12 @@ cd "{TERRAFORM_DIR}"
 echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
-check_var() {{
-    if [ -z "${{!1:-}}" ]; then
+check_var() {
+    if [ -z "${1:-}" ]; then
         echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
-}}
+}
 
 # Check required variables
 {CHECK_REQUIRED_VARS}
@@ -55,7 +55,7 @@ terraform apply -auto-approve -var-file=terraform.tfvars.json
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json || echo "{{}}")
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url=${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}
+workspace_url="${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}"
 
 echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
@@ -142,14 +142,14 @@ WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 #!/bin/bash
 set -euo pipefail
 
-{{
+{
 {WORKSPACE_TEMPLATE}
-}} || {{
+} || {
     error_message="$?"
     echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
     exit 1
-}}
+}
 """
 
 def generate_terraform_vars_json(tf_vars):
