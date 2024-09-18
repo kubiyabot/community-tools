@@ -72,7 +72,7 @@ AZURE_TEMPLATE_PARAMS = {
     "CLOUD_PROVIDER": "Azure",
     "TERRAFORM_DIR": AZURE_TERRAFORM_DIR,
     "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .workspace_name}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
     "BACKEND_TYPE": "azurerm",
