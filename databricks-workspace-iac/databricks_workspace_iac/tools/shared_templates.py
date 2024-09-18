@@ -32,10 +32,6 @@ fi
 # Navigate to the cloned repository
 cd "${{DIR}}"
 
-# List contents of the cloned directory for debugging
-echo "📂 Contents of ${{DIR}}:"
-ls -R
-
 # TERRAFORM_DIR is expected to be a relative path within the cloned repository
 # Check if the Terraform directory exists
 if [ ! -d "{TERRAFORM_DIR}" ]; then
