@@ -77,7 +77,8 @@ AZURE_TEMPLATE_PARAMS = {
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
     "BACKEND_TYPE": "azurerm",
     "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
-    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND
+    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
+    "DIR": "$GIT_REPO"
 }
 
 # Complete workspace creation template for Azure
