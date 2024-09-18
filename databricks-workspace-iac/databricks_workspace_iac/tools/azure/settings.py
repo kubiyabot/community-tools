@@ -94,6 +94,7 @@ REQUIRED_ENV_VARS = [
 
 # Complete workspace creation template
 AZURE_WORKSPACE_TEMPLATE = f"""
+apt-get install -y jq
 echo "🛠️ Setting up Databricks workspace on Azure..."
 {GIT_CLONE_COMMAND}
 cd {AZURE_TERRAFORM_DIR}
