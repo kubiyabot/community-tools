@@ -27,7 +27,7 @@ echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
 # Navigate to the cloned repository
-cd "${{TERRAFORM_DIR}}"
+cd "{TERRAFORM_DIR}"
 
 echo "🔍 Validating input parameters..."
 
