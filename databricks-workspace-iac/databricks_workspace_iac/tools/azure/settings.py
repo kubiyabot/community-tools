@@ -45,7 +45,7 @@ flowchart TD
     User -->|🗨 Request Azure Databricks Workspace| Teammate
     Teammate -->|🗨 Which Resource Group and Location?| User
     User -->|📍 Resource Group: my-rg, Location: eastus| Teammate
-    Teammate -->|🚀 Starting Azure Terraform Apply| ApplyAzure
+    Teammate -->|��� Starting Azure Terraform Apply| ApplyAzure
 
     %% Azure Execution
     subgraph Azure Environment
@@ -70,6 +70,7 @@ REQUIRED_ENV_VARS = [
 
 # Azure-specific template parameters
 AZURE_TEMPLATE_PARAMS = {
+    "CLOUD_PROVIDER": "Azure",
     "TERRAFORM_DIR": AZURE_TERRAFORM_DIR,
     "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
     "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .workspace_name}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
@@ -83,5 +84,11 @@ AZURE_TEMPLATE_PARAMS = {
 # Complete workspace creation template for Azure
 AZURE_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AZURE_TEMPLATE_PARAMS)
 
+# Wrap the workspace template with error handling
+AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING.format(
+    WORKSPACE_TEMPLATE=AZURE_WORKSPACE_TEMPLATE,
+    ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE
+)
+
 # Export variables for use in other modules
-__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE']
+__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']

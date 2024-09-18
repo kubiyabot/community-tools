@@ -2,18 +2,6 @@
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
-    """
-    Create a dictionary representing a Terraform variable.
-    
-    Args:
-        name (str): Name of the variable
-        description (str): Description of the variable
-        required (bool): Whether the variable is required
-        default (Any): Default value for the variable
-    
-    Returns:
-        dict: A dictionary representing the Terraform variable
-    """
     return {
         "name": name,
         "description": description,
@@ -28,16 +16,16 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"
 COMMON_WORKSPACE_TEMPLATE = """
 set -e
 apk add jq
-echo -e "🛠️ Setting up Databricks workspace..."
+echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 cd {TERRAFORM_DIR}
 
-echo -e "🔍 Validating input parameters..."
+echo "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {{
     if [ -z "${{1}}" ]; then
-        echo -e "❌ Error: ${{1}} is not set. Please provide it as an argument or environment variable."
+        echo "❌ Error: ${{1}} is not set. Please provide it as an argument or environment variable."
         exit 1
     fi
 }}
@@ -45,23 +33,25 @@ check_var() {{
 # Check required variables
 {CHECK_REQUIRED_VARS}
 
-echo -e "✅ All required parameters are set."
+echo "✅ All required parameters are set."
 
-echo -e "🚀 Initializing Terraform..."
+echo "🚀 Initializing Terraform..."
 {TERRAFORM_INIT_COMMAND}
 
-echo -e "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve {TERRAFORM_VARS}
+echo "🏗️ Applying Terraform configuration..."
+tf_vars=""
+{TERRAFORM_VARS_COMMAND}
+terraform apply -auto-approve $tf_vars
 
-echo -e "📊 Capturing Terraform output..."
+echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json || echo "{{}}")
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
 workspace_url=${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}
 
-echo -e "🔍 Getting backend config..."
+echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
-echo -e "💬 Preparing Slack message..."
+echo "💬 Preparing Slack message..."
 SLACK_MESSAGE=$(cat <<EOF
 {{
     "blocks": [
@@ -91,13 +81,13 @@ SLACK_MESSAGE=$(cat <<EOF
 EOF
 )
 
-echo -e "📤 Sending Slack message..."
+echo "📤 Sending Slack message..."
 curl -X POST "https://slack.com/api/chat.postMessage" \\
 -H "Authorization: Bearer $SLACK_API_TOKEN" \\
 -H "Content-Type: application/json" \\
 --data "{{\\"channel\\": \\"$SLACK_CHANNEL_ID\\", \\"thread_ts\\": \\"$SLACK_THREAD_TS\\", \\"blocks\\": $SLACK_MESSAGE}}"
 
-echo -e "✅ Databricks workspace setup complete!"
+echo "✅ Databricks workspace setup complete!"
 """
 
 # Error notification template
@@ -117,7 +107,7 @@ SLACK_ERROR_MESSAGE=$(cat <<EOF
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "An error occurred while creating the Databricks workspace. Please check the logs for more details."
+                "text": "An error occurred while creating the Databricks workspace on {CLOUD_PROVIDER}. Please check the logs for more details."
             }
         },
         {
@@ -145,8 +135,11 @@ set -e
 {WORKSPACE_TEMPLATE}
 }} || {{
     error_message="$?"
-    echo -e "❌ An error occurred: $error_message"
+    echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
     exit 1
 }}
 """
+
+def generate_terraform_vars_command(tf_vars):
+    return '\n'.join([f'if [ ! -z "${{var["name"]}}" ]; then tf_vars="$tf_vars -var \'{var["name"]}=${{{var["name"]}}}\'"; fi' for var in tf_vars])
