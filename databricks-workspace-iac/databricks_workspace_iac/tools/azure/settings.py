@@ -1,32 +1,11 @@
+from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE
+
 # Azure-specific settings for Databricks workspace creation
 
 # Directory containing Terraform files for Azure
 AZURE_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/azure'
 
-# Function to create Terraform variable dictionaries
-def tf_var(name, description, required=False, default=None):
-    """
-    Create a dictionary representing a Terraform variable.
-    
-    Args:
-        name (str): Name of the variable
-        description (str): Description of the variable
-        required (bool): Whether the variable is required
-        default (Any): Default value for the variable
-    
-    Returns:
-        dict: A dictionary representing the Terraform variable
-    """
-    return {
-        "name": name,
-        "description": description,
-        "required": required,
-        "default": default
-    }
-
 # Terraform variables
-# For more information on these variables, see:
-# https://registry.terraform.io/providers/databricks/databricks/latest/docs/resources/workspace
 TF_VARS = [
     tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
     tf_var("region", "The Azure region where the workspace will be deployed", required=True),
@@ -59,9 +38,6 @@ TF_VARS = [
     tf_var("address_prefixes_private", "The address prefix for the private network", required=False, default='["10.0.1.0/24"]'),
 ]
 
-# Git clone command for fetching Terraform configurations
-GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git $DIR'
-
 # Mermaid diagram for visualizing the workflow
 MERMAID_DIAGRAM = """
 flowchart TD
@@ -92,85 +68,25 @@ REQUIRED_ENV_VARS = [
     "PAT", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
 ]
 
-# Complete workspace creation template
-AZURE_WORKSPACE_TEMPLATE = f"""
-apk add jq
-echo "🛠️ Setting up Databricks workspace on Azure..."
-{GIT_CLONE_COMMAND}
-cd {AZURE_TERRAFORM_DIR}
+# Azure-specific template parameters
+AZURE_TEMPLATE_PARAMS = {
+    "TERRAFORM_DIR": AZURE_TERRAFORM_DIR,
+    "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .workspace_name}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
+    "TERRAFORM_VARS": ' '.join([f'-var "{var["name"]}=${{{var["name"]}}}"' for var in TF_VARS]),
+    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
+    "BACKEND_TYPE": "azurerm",
+    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name"
+}
 
-echo "🔍 Validating input parameters..."
+# Complete workspace creation template for Azure
+AZURE_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AZURE_TEMPLATE_PARAMS)
 
-# Function to check if a variable is set
-check_var() {{
-    if [ -z "${{1}}" ]; then
-        echo "❌ Error: ${{1}} is not set. Please provide it as an argument or environment variable."
-        exit 1
-    fi
-}}
-
-# Check required variables
-{' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS])}
-
-echo "✅ All required parameters are set."
-
-echo "🚀 Initializing Terraform..."
-terraform init -backend-config="storage_account_name=$storage_account_name" \\
-  -backend-config="container_name=$container_name" \\
-  -backend-config="key=databricks/$workspace_name/terraform.tfstate" \\
-  -backend-config="resource_group_name=$resource_group_name" \\
-  -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"
-
-echo "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve \\
-{' '.join([f'-var "{var["name"]}=${{{var["name"]}}}"' for var in TF_VARS])}
-
-echo "📊 Capturing Terraform output..."
-tf_output=$(terraform output -json || echo "{{}}")
-workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url=${{workspace_url:-"https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name"}}
-
-echo "🔍 Getting backend config..."
-backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
-
-echo "💬 Preparing Slack message..."
-SLACK_MESSAGE=$(cat <<EOF
-{{
-    "blocks": [
-        {{
-            "type": "context",
-            "elements": [
-                {{
-                    "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-1803x2048-hodrzd3t.png",
-                    "alt_text": "Terraform Logo"
-                }},
-                {{
-                    "type": "mrkdwn",
-                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. \\n\\n🚀 *Going forward*, you can easily manage and track updates on your infrastructure.\\n\\n🔗 *Module Source code*: <$workspace_url|Explore the module>"
-                }}
-            ]
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*\\n\\n1. Configure your Terraform backend:\\n\`\`\`\\nterraform {{\\n  backend \\"azurerm\\" {{\\n    $backend_config\\n  }}\\n}}\\n\`\`\`\\n2. Run the import command:\\n\`\`\`\\nterraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name\\n\`\`\`"
-            }}
-        }}
-    ]
-}}
-EOF
+# Wrap the workspace template with error handling
+AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING.format(
+    WORKSPACE_TEMPLATE=AZURE_WORKSPACE_TEMPLATE,
+    ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE
 )
 
-echo "📤 Sending Slack message..."
-curl -X POST "https://slack.com/api/chat.postMessage" \\
--H "Authorization: Bearer $SLACK_API_TOKEN" \\
--H "Content-Type: application/json" \\
---data "{{\\"channel\\": \\"$SLACK_CHANNEL_ID\\", \\"thread_ts\\": \\"$SLACK_THREAD_TS\\", \\"blocks\\": $SLACK_MESSAGE}}"
-
-echo "✅ Databricks workspace setup complete!"
-"""
-
-# Export AZURE_TERRAFORM_DIR for use in other modules
-__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'GIT_CLONE_COMMAND', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE']
+# Export variables for use in other modules
+__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'GIT_CLONE_COMMAND', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
