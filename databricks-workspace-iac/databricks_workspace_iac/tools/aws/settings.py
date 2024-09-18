@@ -76,6 +76,24 @@ REQUIRED_ENV_VARS = [
     "PAT"
 ]
 
+# Template for validating input parameters
+VALIDATION_TEMPLATE = """
+echo "🔍 Validating input parameters..."
+
+# Function to check if a variable is set
+check_var() {
+    if [ -z "${!1}" ]; then
+        echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
+        exit 1
+    fi
+}
+
+# Check required variables
+""" + "\n".join([f"check_var \"{var}\"" for var in REQUIRED_ENV_VARS]) + """
+
+echo "✅ All required parameters are set."
+"""
+
 # Terraform initialization template
 INIT_TEMPLATE = f"""
 echo "🚀 Initializing Terraform..."
@@ -87,12 +105,20 @@ terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \
 # Terraform apply template
 APPLY_TEMPLATE = """
 echo "🏗️ Applying Terraform configuration..."
-terraform apply -auto-approve """ + " ".join([f"-var \"{var['name']}=${{{var['default']}}}\"" if var['default'] else f"-var \"{var['name']}={{{{ .{var['name']} }}}}\"" for var in TF_VARS])
+terraform apply -auto-approve """ + " ".join([f"-var \"{var['name']}={{{{ .{var['name']} }}}}\"" for var in TF_VARS])
 
 # Output template for displaying results
 OUTPUT_TEMPLATE = f"""
+echo "📊 Capturing Terraform output..."
+tf_output=$(terraform output -json || echo "{}")
+workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
+workspace_url=${{workspace_url:-"https://accounts.cloud.databricks.com/workspaces?account_id=${{DB_ACCOUNT_ID}}"}}
+
+echo "🔍 Getting backend config..."
+backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
+
 echo "The state file can be found here: https://{AWS_BACKEND_BUCKET}.s3.{AWS_BACKEND_REGION}.amazonaws.com/aws/"
-echo "The databricks workspace can be found here: https://accounts.cloud.databricks.com/workspaces?account_id=${{DB_ACCOUNT_ID}}"
+echo "The databricks workspace can be found here: $workspace_url"
 """
 
 # Complete workspace creation template
@@ -101,6 +127,7 @@ echo "🛠️ Setting up Databricks workspace on AWS..."
 {GIT_CLONE_COMMAND}
 cd {AWS_TERRAFORM_DIR}
 
+{VALIDATION_TEMPLATE}
 {INIT_TEMPLATE}
 {APPLY_TEMPLATE}
 {OUTPUT_TEMPLATE}
