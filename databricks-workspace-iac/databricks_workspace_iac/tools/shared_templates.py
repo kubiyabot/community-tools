@@ -16,6 +16,9 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$G
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
+
+export BRANCH=custom-vpc
+
 set -euo pipefail
 
 apk add jq curl git --quiet
