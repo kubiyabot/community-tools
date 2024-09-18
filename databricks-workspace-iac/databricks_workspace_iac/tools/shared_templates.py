@@ -15,7 +15,7 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
 set -e
-apk add jq
+apk add jq --quiet
 echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 cd {TERRAFORM_DIR}
@@ -142,4 +142,4 @@ set -e
 """
 
 def generate_terraform_vars_command(tf_vars):
-    return '\n'.join([f'if [ ! -z "${{var["name"]}}" ]; then tf_vars="$tf_vars -var \'{var["name"]}=${{{var["name"]}}}\'"; fi' for var in tf_vars])
+    return '\n'.join([f'if [ ! -z "${{var["name"]}}" ]; then tf_vars="$tf_vars -var \'{var["name"]}=${{var["name"]}}\'" ; fi' for var in tf_vars])
