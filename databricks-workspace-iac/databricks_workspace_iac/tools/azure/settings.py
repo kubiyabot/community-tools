@@ -76,17 +76,12 @@ AZURE_TEMPLATE_PARAMS = {
     "TERRAFORM_VARS": ' '.join([f'-var "{var["name"]}=${{{var["name"]}}}"' for var in TF_VARS]),
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
     "BACKEND_TYPE": "azurerm",
-    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name"
+    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
+    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND
 }
 
 # Complete workspace creation template for Azure
 AZURE_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AZURE_TEMPLATE_PARAMS)
 
-# Wrap the workspace template with error handling
-AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING.format(
-    WORKSPACE_TEMPLATE=AZURE_WORKSPACE_TEMPLATE,
-    ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE
-)
-
 # Export variables for use in other modules
-__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'GIT_CLONE_COMMAND', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
+__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE']
