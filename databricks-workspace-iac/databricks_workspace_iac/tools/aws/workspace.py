@@ -1,11 +1,11 @@
 from kubiya_sdk.tools import Arg
-from ..base import DatabricksAWSTerraformTool
+from databricks_workspace_iac.tools.base import DatabricksAWSTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
-from .settings import (
+from databricks_workspace_iac.tools.aws.settings import (
     TF_VARS, MERMAID_DIAGRAM, 
     REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
-from ..constants import AWS_ENV
+from databricks_workspace_iac.tools.constants import AWS_ENV
 
 # Generate args from TF_VARS
 tf_args = [Arg(name=var["name"], description=var["description"], required=var["required"], default=var.get("default")) for var in TF_VARS]

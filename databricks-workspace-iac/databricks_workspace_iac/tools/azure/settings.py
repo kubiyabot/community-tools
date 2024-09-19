@@ -1,5 +1,5 @@
 # Import necessary functions and templates from shared_templates module
-from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
+from databricks_workspace_iac.tools.shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
 
 # Azure-specific settings for Databricks workspace creation
 
@@ -80,7 +80,7 @@ REQUIRED_ENV_VARS = [
 # These parameters are used to customize the workspace creation template for Azure
 AZURE_TEMPLATE_PARAMS = {
     "CLOUD_PROVIDER": "Azure",  # Specifies the cloud provider as Azure
-    "CHECK_REQUIRED_VARS": ' '.join(REQUIRED_ENV_VARS),  # Generates a string to check all required environment variables
+    "CHECK_REQUIRED_VARS": ' '.join(f'check_var "{var}"' for var in REQUIRED_ENV_VARS),  # Generates a string to check all required environment variables
     "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',  # Terraform init command with Azure-specific backend configuration
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),  # Generates JSON representation of Terraform variables
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",  # Fallback URL for the Azure Databricks workspace
@@ -102,5 +102,12 @@ AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HAN
     ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE.format(CLOUD_PROVIDER="Azure")
 )
 
-# export all variables
-__all__ = ['AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_TEMPLATE_PARAMS']
+# Make sure to export all necessary variables
+__all__ = [
+    'AZURE_WORKSPACE_TEMPLATE',
+    'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING',
+    'TF_VARS',
+    'MERMAID_DIAGRAM',
+    'REQUIRED_ENV_VARS',
+    'AZURE_TEMPLATE_PARAMS'
+]

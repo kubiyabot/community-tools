@@ -1,5 +1,5 @@
 from kubiya_sdk.tools.models import Tool
-from .constants import DATABRICKS_ICON_URL, AWS_ENV, AZURE_ENV
+from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL, AWS_ENV, AZURE_ENV
 
 class DatabricksTerraformTool(Tool):
     def __init__(self, name, description, content, args, env, long_running=True, with_files=None, image="hashicorp/terraform:latest", mermaid=None):
