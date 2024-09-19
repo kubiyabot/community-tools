@@ -55,6 +55,8 @@ send_slack_message() {{
 
     SLACK_MESSAGE_CONTENT=$(cat <<EOF
 {{
+    "channel": "$SLACK_CHANNEL_ID",
+    "thread_ts": "$SLACK_THREAD_TS",
     "attachments": [
         {{
             "color": "$color",
