@@ -18,11 +18,7 @@ terraform apply -auto-approve \
   -var "enable_vpc={{ .enable_vpc }}" \
   -var "vpc_id={{ .vpc_id }}" \
   -var "enable_privatelink={{ .enable_privatelink }}" \
-  -var "enable_cmk={{ .enable_cmk }}" \
-  -var "private_subnet_id={{ .private_subnet_id }}" \
-  -var "public_subnet_id={{ .public_subnet_id }}" \
-  -var "public_subnet_network_security_group_id={{ .public_subnet_network_security_group_id }}" \
-  -var "private_subnet_network_security_group_id={{ .private_subnet_network_security_group_id }}"
+  -var "enable_cmk={{ .enable_cmk }}" 
 
 workspace_url=$(terraform output -raw databricks_host)
 echo "The link to the workspace is: $workspace_url"
@@ -73,10 +69,6 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
         Arg(name="vpc_id", description="Optional: Existing VPC ID to use for the workspace.", required=False, default=""),
         Arg(name="enable_privatelink", description="Advanced: Enable AWS PrivateLink for the Databricks workspace.", required=False, default="False"),
         Arg(name="enable_cmk", description="Advanced: Enable Customer Managed Keys for the Databricks workspace.", required=False, default="False"),
-        Arg(name="private_subnet_id", description="Optional: ID of an existing private subnet for the workspace.", required=False, default=""),
-        Arg(name="public_subnet_id", description="Optional: ID of an existing public subnet for the workspace.", required=False, default=""),
-        Arg(name="public_subnet_network_security_group_id", description="Optional: ID of an existing public subnet network security group for the workspace.", required=False, default=""),
-        Arg(name="private_subnet_network_security_group_id", description="Optional: ID of an existing private subnet network security group for the workspace.", required=False, default=""),
     ],
     mermaid="""
     // ... existing mermaid diagram ...
