@@ -79,14 +79,17 @@ flowchart TD
 
 # List of required secrets
 REQUIRED_SECRETS = [
-    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT", "SLACK_API_TOKEN"
+    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT",
 ]
 
 # List of required environment variables
-# Environment variables are set automatically by Kubiya if running from a teammate tool context
-# If running manually, set them up in your shell before running the tool
-# If you want to inject secrets such as tokens, keys, etc use the secrets management feature in Kubiya
 REQUIRED_ENV_VARS = [
+    # Azure-specific variables
+    "ARM_CLIENT_ID",
+    "ARM_CLIENT_SECRET",
+    "ARM_TENANT_ID",
+    "ARM_SUBSCRIPTION_ID",
+    
     # Git-related variables
     "GIT_ORG",
     "GIT_REPO",
@@ -95,7 +98,15 @@ REQUIRED_ENV_VARS = [
     # Slack-related variables
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
+    "SLACK_API_TOKEN",
+    
+    # Personal Access Token for GitHub (private repository authentication for the repository holding the terraform code)
+    "PAT"
 ]
+
+# Temporary hack to add secrets to the list of required environment variables
+# TODO: Find a better way to handle this (fix agent manager to pass secrets to the tools)
+REQUIRED_ENV_VARS = REQUIRED_ENV_VARS + REQUIRED_SECRETS
 
 # Generate the commands to check required variables
 CHECK_REQUIRED_VARS_COMMANDS = '\n'.join([f'check_var "{var}"' for var in REQUIRED_ENV_VARS])
