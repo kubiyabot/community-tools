@@ -79,7 +79,8 @@ AWS_TEMPLATE_PARAMS = {
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
     "BACKEND_TYPE": "s3",
     "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}",
-    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND
+    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
+    "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH
 }
 
 # Complete workspace creation template for AWS
