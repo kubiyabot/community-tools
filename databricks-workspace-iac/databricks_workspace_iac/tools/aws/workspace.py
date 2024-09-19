@@ -5,7 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from databricks_workspace_iac.tools.base import DatabricksAWSTerraformTool
 from databricks_workspace_iac.tools.aws.settings import (
     TF_VARS, MERMAID_DIAGRAM,
-    REQUIRED_ENV_VARS, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
+    REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
 
 # Generate args from TF_VARS
