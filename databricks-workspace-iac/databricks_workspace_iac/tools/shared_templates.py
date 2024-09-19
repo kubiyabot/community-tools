@@ -11,27 +11,32 @@ def tf_var(name, description, required=False, default=None):
     }
 
 # Git clone command for fetching Terraform configurations
-GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "$DIR"'
+GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "iac_workspace"'
 
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
+# We're running Terraform in a container, so we don't need color output
+# We're also not running Terraform interactively, so we don't need interactive input
+export TERRAFORM_NO_COLOR=true
+export TF_INPUT=false
 set -euo pipefail
 
 apk add jq curl git --quiet
 
-echo "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
+echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
-# Navigate to the cloned repository
-cd "{TERRAFORM_DIR}"
+# Navigate to the cloned repository, then to the Terraform module directory
+cd iac_workspace/${TERRAFORM_MODULE_PATH}
 
-echo "🔍 Validating input parameters..."
+echo -e "🔍 Validating input parameters..."
 
 # Function to check if a variable is set
 check_var() {
     if [ -z "${1:-}" ]; then
         echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
+        echo "Could not apply Terraform workspace. Please provide the necessary variables and try again."
         exit 1
     fi
 }
@@ -39,12 +44,12 @@ check_var() {
 # Check required variables
 {CHECK_REQUIRED_VARS}
 
-echo "✅ All required parameters are set."
+echo -e "✅ All required parameters are set."
 
-echo "🚀 Initializing Terraform..."
+echo -e "🚀 Initializing Terraform..."
 {TERRAFORM_INIT_COMMAND}
 
-echo "🏗️ Applying Terraform configuration..."
+echo -e "🏗️ Applying Terraform configuration..."
 # Create a JSON file with Terraform variables
 cat << EOF > terraform.tfvars.json
 {TERRAFORM_VARS_JSON}
@@ -90,13 +95,13 @@ SLACK_MESSAGE_CONTENT=$(cat <<EOF
 EOF
 )
 
-echo "📤 Sending Slack message..."
+echo -e "📤 Sending Slack message..."
 curl -X POST "https://slack.com/api/chat.postMessage" \\
 -H "Authorization: Bearer $SLACK_API_TOKEN" \\
 -H "Content-Type: application/json" \\
 --data "$SLACK_MESSAGE_CONTENT"
 
-echo "✅ Databricks workspace setup complete!"
+echo -e "✅ Databricks workspace setup complete!"
 """
 
 # Error notification template
