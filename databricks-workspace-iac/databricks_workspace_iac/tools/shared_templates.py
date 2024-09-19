@@ -128,7 +128,7 @@ WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 {WORKSPACE_TEMPLATE}
 }} || {{
     error_message="$?"
-    echo "❌ Databricks workspace setup failed!\n\nI was trying to create a workspace on {CLOUD_PROVIDER} using the {TERRAFORM_MODULE_PATH} module.\n\nError: $error_message"
+    echo "❌ Failed to create Databricks workspace on {CLOUD_PROVIDER} using the {TERRAFORM_MODULE_PATH} module."
     {ERROR_NOTIFICATION_TEMPLATE}
     exit 1
 }}
