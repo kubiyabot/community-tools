@@ -24,7 +24,7 @@ TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/azure'
 # Define Terraform variables for Azure Databricks workspace
 # Each variable is created using the tf_var function, which sets name, description, required status, and default value
 TF_VARS = [
-    tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
+    tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True, default="${WORKSPACE_NAME}),
     tf_var("region", "The Azure region where the workspace will be deployed", required=True),
     tf_var("storage_account_name", "The name of the storage account to use for the backend", required=True),
     tf_var("resource_group_name", "The name of the resource group to use for the backend", required=True),
