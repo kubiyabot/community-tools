@@ -51,6 +51,9 @@ send_slack_message() {{
     local message=$2
     local color=$3
 
+    # Escape special characters in the message
+    escaped_message=$(echo "$message" | sed 's/"/\\"/g' | sed 's/`/\\`/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+
     SLACK_MESSAGE_CONTENT=$(cat <<EOF
 {{
     "channel": "$SLACK_CHANNEL_ID",
@@ -77,7 +80,7 @@ send_slack_message() {{
                     "type": "section",
                     "text": {{
                         "type": "mrkdwn",
-                        "text": "$message"
+                        "text": "$escaped_message"
                     }}
                 }}
             ]
@@ -87,9 +90,10 @@ send_slack_message() {{
 EOF
     )
 
+    # Send the message to Slack with proper headers and encoding
     curl -X POST "https://slack.com/api/chat.postMessage" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-        -H "Content-Type: application/json" \\
+        -H "Content-Type: application/json; charset=utf-8" \\
         --data "$SLACK_MESSAGE_CONTENT"
 }}
 
@@ -102,7 +106,7 @@ report_failure() {{
     truncated_error_output=$(echo "$error_output" | tail -c 2000)
 
     # Escape the error output for Slack (handle backticks and other special characters)
-    escaped_error_output=$(echo "$truncated_error_output" | sed 's/`/`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+    escaped_error_output=$(echo "$truncated_error_output" | sed 's/`/\\`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
 
     # Print the error to the console for visibility
     echo -e "❌ Error during $step: $error_message"
