@@ -122,51 +122,13 @@ curl -X POST "https://slack.com/api/chat.postMessage" \\
 echo -e "✅ Databricks workspace setup complete!"
 """
 
-# Error notification template
-ERROR_NOTIFICATION_TEMPLATE = """
-SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
-{{
-    "blocks": [
-        {{
-            "type": "header",
-            "text": {{
-                "type": "plain_text",
-                "text": "❌ Error: Databricks Workspace Creation Failed",
-                "emoji": true
-            }}
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "An error occurred while creating the Databricks workspace on {CLOUD_PROVIDER}. Please check the logs for more details."
-            }}
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "*Error Message:*\n\`\`\`$error_message\`\`\`"
-            }}
-        }}
-    ]
-}}
-EOF
-)
-
-curl -X POST "https://slack.com/api/chat.postMessage" \\
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-    -H "Content-Type: application/json" \\
-    --data "$SLACK_ERROR_MESSAGE_CONTENT"
-"""
-
 # Workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 {{
 {WORKSPACE_TEMPLATE}
 }} || {{
     error_message="$?"
-    echo "❌ An error occurred: $error_message"
+    echo "❌ Databricks workspace setup failed!\n\nI was trying to create a workspace on {CLOUD_PROVIDER} using the {TERRAFORM_MODULE_PATH} module.\n\nError: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
     exit 1
 }}
