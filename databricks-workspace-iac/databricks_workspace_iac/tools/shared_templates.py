@@ -1,5 +1,6 @@
 import json
 import os
+from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
@@ -74,12 +75,12 @@ SLACK_MESSAGE_CONTENT=$(cat <<EOF
             "elements": [
                 {{
                     "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-1803x2048-hodrzd3t.png",
-                    "alt_text": "Terraform Logo"
+                    "image_url": "${DATABRICKS_ICON_URL}",
+                    "alt_text": "Databricks Logo"
                 }},
                 {{
                     "type": "mrkdwn",
-                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. \\n\\n🚀 *Going forward*, you can easily manage and track updates on your infrastructure.\\n\\n🔗 *Module Source code*: <$workspace_url|Explore the module>"
+                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. *Going forward*, you can easily manage and track updates on your infrastructure. *Module Source code*: <{GIT_REPO}|Explore the module>"
                 }}
             ]
         }},
@@ -87,7 +88,7 @@ SLACK_MESSAGE_CONTENT=$(cat <<EOF
             "type": "section",
             "text": {{
                 "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*\\n\\n1. Configure your Terraform backend:\\n\`\`\`\\nterraform {{\\n  backend \\"{BACKEND_TYPE}\\" {{\\n    $backend_config\\n  }}\\n}}\\n\`\`\`\\n2. Run the import command:\\n\`\`\`\\n{IMPORT_COMMAND}\\n\`\`\`"
+                "text": "*To import the state locally, follow these steps:*\\n1. Configure your Terraform backend:\\n\`\`\`\\nterraform {{\\n  backend \\"{BACKEND_TYPE}\\" {{\\n    $backend_config\\n  }}\\n}}\\n\`\`\`\\n2. Run the import command:\\n\`\`\`\\n{IMPORT_COMMAND}\\n\`\`\`"
             }}
         }}
     ]
@@ -96,9 +97,9 @@ EOF
 )
 
 echo -e "📤 Sending Slack message..."
-curl -X POST "https://slack.com/api/chat.postMessage" \\
--H "Authorization: Bearer $SLACK_API_TOKEN" \\
--H "Content-Type: application/json" \\
+curl -X POST "https://slack.com/api/chat.postMessage" \
+-H "Authorization: Bearer $SLACK_API_TOKEN" \
+-H "Content-Type: application/json" \
 --data "$SLACK_MESSAGE_CONTENT"
 
 echo -e "✅ Databricks workspace setup complete!"
@@ -136,9 +137,9 @@ SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
 EOF
 )
 
-curl -X POST "https://slack.com/api/chat.postMessage" \\
--H "Authorization: Bearer $SLACK_API_TOKEN" \\
--H "Content-Type: application/json" \\
+curl -X POST "https://slack.com/api/chat.postMessage" \
+-H "Authorization: Bearer $SLACK_API_TOKEN" \
+-H "Content-Type: application/json" \
 --data "$SLACK_ERROR_MESSAGE_CONTENT"
 """
 
@@ -147,14 +148,14 @@ WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 #!/bin/bash
 set -euo pipefail
 
-{
+{{
 {WORKSPACE_TEMPLATE}
-} || {
+}} || {{
     error_message="$?"
     echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
     exit 1
-}
+}}
 """
 
 def generate_terraform_vars_json(tf_vars):

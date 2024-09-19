@@ -5,7 +5,7 @@ from databricks_workspace_iac.tools.azure.settings import (
     TF_VARS, MERMAID_DIAGRAM, 
     REQUIRED_ENV_VARS, AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
-from ..constants import AZURE_ENV
+from databricks_workspace_iac.tools.constants import AZURE_ENV
 
 # Generate args from TF_VARS
 tf_args = [Arg(name=var["name"], description=var["description"], required=var["required"], default=var.get("default")) for var in TF_VARS]
