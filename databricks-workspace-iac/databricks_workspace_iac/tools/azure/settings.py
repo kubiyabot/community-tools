@@ -98,10 +98,6 @@ REQUIRED_ENV_VARS = [
     "SLACK_API_TOKEN",
 ]
 
-# Temporary hack to add secrets to the list of required environment variables
-# TODO: Find a better way to handle this (fix agent manager to pass secrets to the tools)
-REQUIRED_ENV_VARS = REQUIRED_ENV_VARS + REQUIRED_SECRETS
-
 # Generate the commands to check required variables
 CHECK_REQUIRED_VARS_COMMANDS = '\n'.join([f'check_var "{var}"' for var in REQUIRED_ENV_VARS])
 
