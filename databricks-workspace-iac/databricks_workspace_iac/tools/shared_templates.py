@@ -21,7 +21,7 @@ def generate_terraform_vars_json(tf_vars):
         if default is not None:
             value = default
         else:
-            value = "${" + name + "}"
+            value = "${{" + name + "}}"
 
         # Try to parse the default value as JSON
         try:
@@ -96,7 +96,7 @@ EOF
         --data "$SLACK_MESSAGE_CONTENT"
 }}
 
-report_failure() {{
+report_failure() {
     local step=$1
     local error_message=$2
     local error_output=$3
@@ -104,11 +104,8 @@ report_failure() {{
     # Truncate the error output to the last 2000 characters
     truncated_error_output=$(echo "$error_output" | tail -c 2000)
 
-    # Escape the error output for JSON
-    escaped_error_output=$(printf "%s" "$truncated_error_output" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-
     # Prepare the message with error output
-    error_message_full="❌ Error during $step: $error_message\\n*Last part of the error log:*\\n\`\`\`$truncated_error_output\`\`\`"
+    error_message_full=$(printf "❌ Error during %s: %s\n*Last part of the error log:*\n\`\`\`%s\`\`\`" "$step" "$error_message" "$truncated_error_output")
 
     send_slack_message "failed" "$error_message_full" "danger"
 
@@ -116,7 +113,7 @@ report_failure() {{
     echo -e "$error_message_full"
 
     exit 1
-}}
+}
 
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository" "$(git clone 2>&1)"
@@ -124,13 +121,13 @@ echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory" "$(cd iac_workspace/{TERRAFORM_MODULE_PATH} 2>&1)"
 
 echo -e "🔍 Validating input parameters..."
-check_var() {{
+check_var() {
     var_name="$1"
     var_value="$(printenv "$var_name")"
     if [ -z "$var_value" ]; then
         report_failure "Input validation" "${{var_name}} is not set" ""
     fi
-}}
+}
 # Check required variables
 {CHECK_REQUIRED_VARS}
 
@@ -160,26 +157,15 @@ echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
 
 echo "💬 Preparing Slack message..."
-success_message=$(cat <<EOF
-🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.
-
-👉 *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>
-
-*To import the state locally, follow these steps:*
-1. Configure your Terraform backend:
-\`\`\`
-terraform {{
-  backend "{BACKEND_TYPE}" {{
-    $backend_config
-  }}
-}}
-\`\`\`
-2. Run the import command:
-\`\`\`
-{IMPORT_COMMAND}
-\`\`\`
-EOF
-)
+success_message=$(jq -n \
+    --arg org "${{GIT_ORG}}" \
+    --arg repo "{GIT_REPO}" \
+    --arg backend_type "{BACKEND_TYPE}" \
+    --arg backend_config "$backend_config" \
+    --arg import_command "{IMPORT_COMMAND}" \
+    '{
+        "text": "🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.\n\n👉 *Module Source code*: <https://github.com/\($org)/\($repo)|Explore the module>\n\n*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {\n  backend \"\($backend_type)\" {\n    \($backend_config)\n  }\n}\n```\n2. Run the import command:\n```\n\($import_command)\n```"
+    }' | jq -r '.text')
 
 send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack" ""
 
