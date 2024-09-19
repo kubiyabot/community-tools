@@ -98,25 +98,33 @@ report_failure() {{
     local error_message=$2
     local error_output=$3
 
-    # Escape the error output for Slack (handle backticks and other special characters)
-    escaped_error_output=$(echo "$error_output" | sed 's/`/`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+    # Truncate the error output to the last 2000 characters
+    truncated_error_output=$(echo "$error_output" | tail -c 2000)
 
-    # Include the error output in the Slack message
-    send_slack_message "failed" "❌ Error during $step: $error_message\n\`\`\`$escaped_error_output\`\`\`" "danger"
+    # Escape the error output for Slack (handle backticks and other special characters)
+    escaped_error_output=$(echo "$truncated_error_output" | sed 's/`/`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+
+    # Print the error to the console for visibility
+    echo -e "❌ Error during $step: $error_message"
+    echo -e "Last part of the error log:\n$truncated_error_output"
+
+    # Send the error to Slack
+    send_slack_message "failed" "❌ Error during $step: $error_message\n*Last part of the error log:*\n\`\`\`$escaped_error_output\`\`\`" "danger"
+
     exit 1
 }}
 
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
-{GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository"
+{GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository" "$(git clone)"
 
-cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory"
+cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory" "$(cd iac_workspace/{TERRAFORM_MODULE_PATH})"
 
 echo -e "🔍 Validating input parameters..."
 check_var() {{
     var_name="$1"
     var_value="$(printenv "$var_name")"
     if [ -z "$var_value" ]; then
-        report_failure "Input validation" "${{var_name}} is not set"
+        report_failure "Input validation" "${{var_name}} is not set" ""
     fi
 }}
 # Check required variables
