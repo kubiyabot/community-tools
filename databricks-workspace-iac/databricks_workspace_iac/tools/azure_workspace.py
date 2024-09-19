@@ -46,12 +46,8 @@ echo "The link to the workspace is: $workspace_url"
 # Install required packages
 apk update && apk add curl jq
 
-# # Prepare the message
-# MESSAGE=$(cat <<EOF
-# The link to the workspace is: ${workspace_url}
-# EOF
-# )
-ESCAPED_MESSAGE=$(echo "$workspace_url" | jq -Rs .)
+# Escape the workspace_url for JSON
+ESCAPED_WORKSPACE_URL=$(echo "$workspace_url" | sed 's/["\]/\\&/g')
 
 # Check for required environment variables
 if [ -z "$SLACK_CHANNEL_ID" ] || [ -z "$SLACK_THREAD_TS" ] || [ -z "$SLACK_API_TOKEN" ]; then
@@ -87,7 +83,7 @@ PAYLOAD=$(cat <<EOF
 						"text": "Open Databricks Workspace",
 						"emoji": true
 					},
-					"url": ${workspace_url},
+					"url": "$ESCAPED_WORKSPACE_URL",
 					"action_id": "open_workspace"
 				}
 			]
@@ -96,7 +92,7 @@ PAYLOAD=$(cat <<EOF
 }
 EOF
 )
-echo "$PAYLOAD" | jq .
+
 # Send the message using Slack API
 curl -X POST "https://slack.com/api/chat.postMessage" \
 -H "Authorization: Bearer $SLACK_API_TOKEN" \
