@@ -79,7 +79,7 @@ flowchart TD
 
 # List of required secrets
 REQUIRED_SECRETS = [
-    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT",
+    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT", "SLACK_API_TOKEN"
 ]
 
 # List of required environment variables
@@ -95,7 +95,6 @@ REQUIRED_ENV_VARS = [
     # Slack-related variables
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
-    "SLACK_API_TOKEN",
 ]
 
 # Generate the commands to check required variables
