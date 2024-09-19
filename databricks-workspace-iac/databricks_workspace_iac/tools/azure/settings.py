@@ -130,7 +130,7 @@ AZURE_TEMPLATE_PARAMS = {
     
     # Terraform init command with Azure backend configuration
     # Double curly braces are used to interpolate variables in the command
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${{storage_account_name}}" -backend-config="container_name=${{container_name}}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="resource_group_name=${{resource_group_name}}""',
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${container_name}" -backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" -backend-config="resource_group_name=${resource_group_name}"',
     
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
