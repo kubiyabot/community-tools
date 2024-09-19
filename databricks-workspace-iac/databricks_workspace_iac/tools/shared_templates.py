@@ -48,6 +48,51 @@ DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
 
 apk add jq curl git --quiet
 
+send_slack_message() {{
+    local status=$1
+    local message=$2
+    local color=$3
+
+    SLACK_MESSAGE_CONTENT=$(cat <<EOF
+{{
+    "attachments": [
+        {{
+            "color": "$color",
+            "blocks": [
+                {{
+                    "type": "context",
+                    "elements": [
+                        {{
+                            "type": "image",
+                            "image_url": "{DATABRICKS_ICON_URL}",
+                            "alt_text": "Databricks Logo"
+                        }},
+                        {{
+                            "type": "mrkdwn",
+                            "text": "🔧 Databricks workspace provisioning $status"
+                        }}
+                    ]
+                }},
+                {{
+                    "type": "section",
+                    "text": {{
+                        "type": "mrkdwn",
+                        "text": "$message"
+                    }}
+                }}
+            ]
+        }}
+    ]
+}}
+EOF
+    )
+
+    curl -X POST "https://slack.com/api/chat.postMessage" \\
+        -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+        -H "Content-Type: application/json" \\
+        --data "$SLACK_MESSAGE_CONTENT"
+}}
+
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
@@ -58,6 +103,7 @@ check_var() {{
     var_name="$1"
     if [ -z "${{!var_name:-}}" ]]; then
         echo "❌ Error: ${{var_name}} is not set."
+        send_slack_message "failed" "❌ Error: ${{var_name}} is not set." "danger"
         exit 1
     fi
 }}
@@ -73,7 +119,13 @@ cat << EOF > terraform.tfvars.json
 {TERRAFORM_VARS_JSON}
 EOF
 
-terraform apply -auto-approve -var-file=terraform.tfvars.json
+if ! terraform apply -auto-approve -var-file=terraform.tfvars.json; then
+    error_message=$(terraform show -json | jq -r '.values.root_module.resources[] | select(.type == "error") | .values.summary')
+    truncated_error=$(echo "$error_message" | tail -n 10)
+    escaped_error=$(echo "$truncated_error" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+    send_slack_message "failed" "*Terraform apply failed. Last 10 lines of error:*\n\`\`\`$escaped_error\`\`\`" "danger"
+    exit 1
+fi
 
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json)
@@ -84,40 +136,28 @@ echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
-SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{{
-    "blocks": [
-        {{
-            "type": "context",
-            "elements": [
-                {{
-                    "type": "image",
-                    "image_url": "{DATABRICKS_ICON_URL}",
-                    "alt_text": "Databricks Logo"
-                }},
-                {{
-                    "type": "mrkdwn",
-                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices. *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>"
-                }}
-            ]
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {{\n  backend \"{BACKEND_TYPE}\" {{\n    $backend_config\n  }}\n}}\n```\n2. Run the import command:\n```\n{IMPORT_COMMAND}\n```"
-            }}
-        }}
-    ]
+success_message=$(cat <<EOF
+🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.
+
+*Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>
+
+*To import the state locally, follow these steps:*
+1. Configure your Terraform backend:
+\`\`\`
+terraform {{
+  backend "{BACKEND_TYPE}" {{
+    $backend_config
+  }}
 }}
+\`\`\`
+2. Run the import command:
+\`\`\`
+{IMPORT_COMMAND}
+\`\`\`
 EOF
 )
 
-echo -e "📤 Sending Slack message..."
-curl -X POST "https://slack.com/api/chat.postMessage" \\
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-    -H "Content-Type: application/json" \\
-    --data "$SLACK_MESSAGE_CONTENT"
+send_slack_message "succeeded" "$success_message" "good"
 
 echo -e "✅ Databricks workspace setup complete!"
 """
