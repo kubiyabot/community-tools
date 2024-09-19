@@ -2,9 +2,6 @@
 
 import json
 
-# Databricks icon URL
-DATABRICKS_ICON_URL = "https://www.databricks.com/static/images/databricks-logo.png"
-
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
     return {

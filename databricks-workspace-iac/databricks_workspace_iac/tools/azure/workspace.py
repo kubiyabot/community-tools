@@ -28,8 +28,3 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
 )
 
 tool_registry.register("databricks", azure_db_apply_tool)
-
-# Ensure all required environment variables are set
-for var in REQUIRED_ENV_VARS:
-    if var not in AZURE_ENV:
-        raise ValueError(f"Required environment variable {var} is not set in AZURE_ENV")
