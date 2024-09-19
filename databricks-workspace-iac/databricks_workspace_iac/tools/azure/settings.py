@@ -3,7 +3,7 @@
 from databricks_workspace_iac.tools.shared_templates import (
     tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE,
     WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE,
-    generate_terraform_vars_json
+    generate_terraform_vars_json, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
 
 from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
