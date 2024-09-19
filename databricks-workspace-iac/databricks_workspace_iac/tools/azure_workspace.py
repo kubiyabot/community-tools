@@ -100,7 +100,7 @@ EOF
 # Send the message using Slack API
 curl -X POST "https://slack.com/api/chat.postMessage" \
 -H "Authorization: Bearer $SLACK_API_TOKEN" \
--H "Content-Type: application/json" \
+-H "Content-Type: application/json; charset=utf-8" \
 --data "$PAYLOAD"
 """
 
