@@ -73,7 +73,7 @@ REQUIRED_ENV_VARS = [
 AWS_TEMPLATE_PARAMS = {
     "CLOUD_PROVIDER": "AWS",
     "TERRAFORM_DIR": AWS_TERRAFORM_DIR,
-    "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
+    "CHECK_REQUIRED_VARS": ' '.join([f'check_var {var}' for var in REQUIRED_ENV_VARS]),
     "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \\\n    -backend-config="key=databricks/${{workspace_name}}/terraform.tfstate" \\\n    -backend-config="region={AWS_BACKEND_REGION}"',
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
