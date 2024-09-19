@@ -2,7 +2,7 @@ from kubiya_sdk.tools import Arg
 from ..base import DatabricksAWSTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 from .settings import (
-    AWS_TERRAFORM_DIR, TF_VARS, MERMAID_DIAGRAM, 
+    TF_VARS, MERMAID_DIAGRAM, 
     REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE
 )
 from ..constants import AWS_ENV
