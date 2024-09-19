@@ -46,12 +46,12 @@ echo "The link to the workspace is: $workspace_url"
 # Install required packages
 apk update && apk add curl jq
 
-# Prepare the message
-MESSAGE=$(cat <<EOF
-The link to the workspace is: ${workspace_url}
-EOF
-)
-ESCAPED_MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
+# # Prepare the message
+# MESSAGE=$(cat <<EOF
+# The link to the workspace is: ${workspace_url}
+# EOF
+# )
+# ESCAPED_MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
 
 # Check for required environment variables
 if [ -z "$SLACK_CHANNEL_ID" ] || [ -z "$SLACK_THREAD_TS" ] || [ -z "$SLACK_API_TOKEN" ]; then
@@ -63,8 +63,36 @@ fi
 PAYLOAD=$(cat <<EOF
 {
     "channel": "$SLACK_CHANNEL_ID",
-    "text": $ESCAPED_MESSAGE,
-    "thread_ts": "$SLACK_THREAD_TS"
+    "thread_ts": "$SLACK_THREAD_TS",
+    "blocks": [
+		{
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": ":tada: *Databricks Workspace Provisioned Successfully!* :rocket:\n\nYour Databricks workspace is ready! You can access it using the link below."
+			},
+			"accessory": {
+				"type": "image",
+				"image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ55dIioVp7t63K5UzEbQRXg3FxJodU_IiN9w&s",
+				"alt_text": "Databricks Logo"
+			}
+		},
+		{
+			"type": "actions",
+			"elements": [
+				{
+					"type": "button",
+					"text": {
+						"type": "plain_text",
+						"text": "Open Databricks Workspace",
+						"emoji": true
+					},
+					"url": "${workspace_url}",
+					"action_id": "open_workspace"
+				}
+			]
+		}
+	]
 }
 EOF
 )
