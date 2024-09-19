@@ -87,7 +87,7 @@ PAYLOAD=$(cat <<EOF
 						"text": "Open Databricks Workspace",
 						"emoji": true
 					},
-					"url": "${ESCAPED_MESSAGE}",
+					"url": ${workspace_url},
 					"action_id": "open_workspace"
 				}
 			]
@@ -96,7 +96,7 @@ PAYLOAD=$(cat <<EOF
 }
 EOF
 )
-
+echo "$PAYLOAD" | jq .
 # Send the message using Slack API
 curl -X POST "https://slack.com/api/chat.postMessage" \
 -H "Authorization: Bearer $SLACK_API_TOKEN" \
