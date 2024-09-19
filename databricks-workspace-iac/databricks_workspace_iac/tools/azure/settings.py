@@ -8,10 +8,17 @@ from databricks_workspace_iac.tools.shared_templates import (
 
 from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
 
-# Azure-specific settings for Databricks workspace creation
+# Azure-specific settings for Databricks workspace creation using Terraform
 
-# Define Git repository details for Terraform configurations
+# Do not forget to declare the variables in the executor (Kubiya team mate, or the Kubiya CLI)
+
+# The GitHub organization containing the Terraform code for the Databricks workspace (name of the org)
+GIT_ORG = '${GIT_ORG}' # passed dynamically from the executor (Kubiya team mate, or the Kubiya CLI)
+
+# The GitHub repository containing the Terraform code for the Databricks workspace (name of the repo)
 GIT_REPO = 'databricks-workspace-iac'
+
+# The path to the Terraform module within the repository
 TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/azure'
 
 # Define Terraform variables for Azure Databricks workspace
@@ -77,9 +84,24 @@ REQUIRED_SECRETS = [
 
 # List of required environment variables
 REQUIRED_ENV_VARS = [
-    "ARM_CLIENT_ID", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID",
-    "GIT_ORG", "GIT_REPO", "BRANCH",
-    "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
+    # Azure-specific variables
+    "ARM_CLIENT_ID",
+    "ARM_CLIENT_SECRET",
+    "ARM_TENANT_ID",
+    "ARM_SUBSCRIPTION_ID",
+    
+    # Git-related variables
+    "GIT_ORG",
+    "GIT_REPO",
+    "BRANCH",
+    
+    # Slack-related variables
+    "SLACK_CHANNEL_ID",
+    "SLACK_THREAD_TS",
+    "SLACK_API_TOKEN",
+    
+    # Personal Access Token for GitHub (private repository authentication for the repository holding the terraform code)
+    "PAT"
 ]
 
 # Temporary hack to add secrets to the list of required environment variables
