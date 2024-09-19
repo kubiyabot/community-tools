@@ -72,10 +72,14 @@ flowchart TD
 
 # List of required environment variables
 REQUIRED_ENV_VARS = [
-    "DB_ACCOUNT_ID", "DB_ACCOUNT_CLIENT_ID", "DB_ACCOUNT_CLIENT_SECRET",
+    "ARM_CLIENT_ID", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID",
     "GIT_ORG", "GIT_REPO", "BRANCH",
-    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID",
-    "PAT", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
+    "SLACK_CHANNEL_ID", "SLACK_THREAD_TS"
+]
+
+# List of required secrets
+REQUIRED_SECRETS = [
+    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT", "SLACK_API_TOKEN"
 ]
 
 # Generate the commands to check required variables
