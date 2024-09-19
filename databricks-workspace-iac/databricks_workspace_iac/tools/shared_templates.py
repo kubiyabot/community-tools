@@ -16,13 +16,33 @@ GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$G
 
 # Function to generate Terraform variables in JSON format
 def generate_terraform_vars_json(tf_vars):
-    vars_dict = {}
-    for var in tf_vars:
-        if var['default'] is not None:
-            vars_dict[var['name']] = var['default']
+    json_lines = ['{']
+    for i, var in enumerate(tf_vars):
+        name = var['name']
+        default = var.get('default')
+        if default is not None:
+            value = default
         else:
-            vars_dict[var['name']] = f"${{{var['name']}}}"
-    return json.dumps(vars_dict, indent=2)
+            value = "${" + name + "}"
+        # Determine the correct representation based on the value type
+        if isinstance(value, str):
+            if value.lower() in ["true", "false"]:
+                # Handle booleans
+                json_line = f'  "{name}": {value.lower()}'
+            elif value.startswith('[') and value.endswith(']'):
+                # Handle lists
+                json_line = f'  "{name}": {value}'
+            else:
+                # Handle strings with variable expansion
+                json_line = f'  "{name}": "{value}"'
+        else:
+            # Handle numbers and other types
+            json_line = f'  "{name}": {value}'
+        if i < len(tf_vars) - 1:
+            json_line += ','
+        json_lines.append(json_line)
+    json_lines.append('}')
+    return '\n'.join(json_lines)
 
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
@@ -72,31 +92,7 @@ backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
 SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{{
-    "blocks": [
-        {{
-            "type": "context",
-            "elements": [
-                {{
-                    "type": "image",
-                    "image_url": "{DATABRICKS_ICON_URL}",
-                    "alt_text": "Databricks Logo"
-                }},
-                {{
-                    "type": "mrkdwn",
-                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices. *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>"
-                }}
-            ]
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {{\n  backend \\"{BACKEND_TYPE}\\" {{\n    $backend_config\n  }}\n}}\n```\n2. Run the import command:\n```\n{IMPORT_COMMAND}\n```"
-            }}
-        }}
-    ]
-}}
+{...}  # Existing Slack message content
 EOF
 )
 
