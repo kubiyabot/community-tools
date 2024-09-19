@@ -1,10 +1,17 @@
+# Import necessary functions and templates from shared_templates module
 from ..shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
 
 # Azure-specific settings for Databricks workspace creation
 
-AZURE_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/azure'
+# Which repo to use
+GIT_REPO = 'databricks-workspace-iac'
 
-# Terraform variables
+# Path to the Azure-specific Terraform module
+# Where inside the repo is the Terraform module we want to use
+TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/azure'
+
+# Define Terraform variables for Azure Databricks workspace
+# Each variable is created using the tf_var function, which sets name, description, required status, and default value
 TF_VARS = [
     tf_var("WORKSPACE_NAME", "The name of the Databricks workspace to be created", required=True),
     tf_var("region", "The Azure region where the workspace will be deployed", required=True),
@@ -38,6 +45,7 @@ TF_VARS = [
 ]
 
 # Mermaid diagram for visualizing the workflow
+# This diagram illustrates the process of creating an Azure Databricks workspace
 MERMAID_DIAGRAM = """
 flowchart TD
     %% User interaction
@@ -59,36 +67,40 @@ flowchart TD
     Teammate -->|🎉 Workspace is ready!| User
 """
 
-# Required environment variables for the tool to function
+# List of required environment variables for the tool to function
+# These variables are necessary for authentication and resource identification
 REQUIRED_ENV_VARS = [
     "DB_ACCOUNT_ID", "DB_ACCOUNT_CLIENT_ID", "DB_ACCOUNT_CLIENT_SECRET",
-    "GIT_ORG", "GIT_REPO", "BRANCH", "DIR",
+    "GIT_ORG", "GIT_REPO", "BRANCH",
     "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID",
     "PAT", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
 ]
 
 # Azure-specific template parameters
+# These parameters are used to customize the workspace creation template for Azure
 AZURE_TEMPLATE_PARAMS = {
-    "CLOUD_PROVIDER": "Azure",
-    "TERRAFORM_DIR": AZURE_TERRAFORM_DIR,
-    "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
-    "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
-    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
-    "BACKEND_TYPE": "azurerm",
-    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",
-    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
-    "DIR": "$GIT_REPO"
+    "CLOUD_PROVIDER": "Azure",  # Specifies the cloud provider as Azure
+    "CHECK_REQUIRED_VARS": ' '.join([f'check_var "${{{var}}}"' for var in REQUIRED_ENV_VARS]),  # Generates a string to check all required environment variables
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',  # Terraform init command with Azure-specific backend configuration
+    "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),  # Generates JSON representation of Terraform variables
+    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",  # Fallback URL for the Azure Databricks workspace
+    "BACKEND_TYPE": "azurerm",  # Specifies the backend type as Azure Resource Manager
+    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",  # Command to import existing Azure Databricks workspace into Terraform state
+    "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,  # Command to clone the Git repository containing Terraform configurations
+    "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH,  # Path to the Terraform module within the cloned repository
+    "GIT_REPO": GIT_REPO  # Name of the Git repository containing Terraform configurations
 }
 
 # Complete workspace creation template for Azure
+# This template is created by formatting the COMMON_WORKSPACE_TEMPLATE with Azure-specific parameters
 AZURE_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AZURE_TEMPLATE_PARAMS)
 
 # Wrap the workspace template with error handling
+# This ensures that any errors during workspace creation are properly caught and reported
 AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING.format(
     WORKSPACE_TEMPLATE=AZURE_WORKSPACE_TEMPLATE,
     ERROR_NOTIFICATION_TEMPLATE=ERROR_NOTIFICATION_TEMPLATE.format(CLOUD_PROVIDER="Azure")
 )
 
 # Export variables for use in other modules
-__all__ = ['AZURE_TERRAFORM_DIR', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
+__all__ = ['TERRAFORM_MODULE_PATH', 'TF_VARS', 'MERMAID_DIAGRAM', 'REQUIRED_ENV_VARS', 'AZURE_WORKSPACE_TEMPLATE', 'AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING']
