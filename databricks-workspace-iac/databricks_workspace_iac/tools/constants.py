@@ -10,6 +10,9 @@ AWS_ENV = [
     "DIR", # The directory to use
     "PAT", # The PAT to use
     "AWS_PROFILE" # The AWS Profile to use
+    "SLACK_CHANNEL_ID", # The Slack Channel ID
+    "SLACK_THREAD_TS", # The Slack Thread Timestamp
+    "SLACK_API_TOKEN" # The Slack API Token\
 ]
 
 AZURE_ENV = [
