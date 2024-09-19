@@ -15,7 +15,7 @@ tf_args = [
         description=var["description"],
         required=var["required"],
         default=var.get("default")
-    ) for var in TF_VARS
+    ) for var in TF_VARS if var["default"] is not None
 ]
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
