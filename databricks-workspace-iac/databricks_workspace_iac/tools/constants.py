@@ -9,7 +9,7 @@ AWS_ENV = [
     "BRANCH", # The branch to use
     "DIR", # The directory to use
     "PAT", # The PAT to use
-    "AWS_PROFILE" # The AWS Profile to use
+    "AWS_PROFILE", # The AWS Profile to use
     "SLACK_CHANNEL_ID", # The Slack Channel ID
     "SLACK_THREAD_TS", # The Slack Thread Timestamp
     "SLACK_API_TOKEN" # The Slack API Token\
