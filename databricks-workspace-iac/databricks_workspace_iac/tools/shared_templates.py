@@ -46,47 +46,47 @@ DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
 
 apk add jq curl git --quiet
 
-send_slack_message() {{
+send_slack_message() {
     local status=$1
     local message=$2
     local color=$3
 
     # Escape special characters in the message for JSON
-    escaped_message=$(printf "%s" "$message" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+    escaped_message=$(echo "$message" | jq -R -s '.')
 
     SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{{
+{
     "channel": "$SLACK_CHANNEL_ID",
     "thread_ts": "$SLACK_THREAD_TS",
     "attachments": [
-        {{
+        {
             "color": "$color",
             "blocks": [
-                {{
+                {
                     "type": "context",
                     "elements": [
-                        {{
+                        {
                             "type": "image",
                             "image_url": "{DATABRICKS_ICON_URL}",
                             "alt_text": "Databricks Logo"
-                        }},
-                        {{
+                        },
+                        {
                             "type": "mrkdwn",
                             "text": "🔧 Databricks workspace provisioning $status"
-                        }}
+                        }
                     ]
-                }},
-                {{
+                },
+                {
                     "type": "section",
-                    "text": {{
+                    "text": {
                         "type": "mrkdwn",
                         "text": $escaped_message
-                    }}
-                }}
+                    }
+                }
             ]
-        }}
+        }
     ]
-}}
+}
 EOF
     )
 
