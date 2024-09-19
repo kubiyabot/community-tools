@@ -91,6 +91,11 @@ AWS_TEMPLATE_PARAMS = {
     "GIT_REPO": GIT_REPO
 }
 
+# List of required secrets
+REQUIRED_SECRETS = [
+    "PAT", "SLACK_API_TOKEN"
+]
+
 # Generate the AWS-specific workspace template
 AWS_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AWS_TEMPLATE_PARAMS)
 

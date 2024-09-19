@@ -5,7 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from databricks_workspace_iac.tools.base import DatabricksAWSTerraformTool
 from databricks_workspace_iac.tools.aws.settings import (
     TF_VARS, MERMAID_DIAGRAM,
-    REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
+    REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, REQUIRED_SECRETS
 )
 
 # Generate args from TF_VARS
@@ -20,9 +20,10 @@ tf_args = [
 
 aws_db_apply_tool = DatabricksAWSTerraformTool(
     name="create-databricks-workspace-on-aws",
-    description="Create a Databricks workspace on AWS using Terraform for IAC.",
+    description="Create a Databricks workspace on AWS using Terraform for IAC. Allows flexible configuration of Terraform variables using a smooth English conversation - no Terraform knowledge required.",
     content=AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     args=tf_args,
+    secrets=REQUIRED_SECRETS,
     env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM
 )
