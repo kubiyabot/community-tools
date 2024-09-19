@@ -18,7 +18,7 @@ class DatabricksTerraformTool(Tool):
         )
 
 class DatabricksAWSTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, long_running=True, mermaid=None):
+    def __init__(self, name, description, content, args, long_running=True, mermaid=None, env=[]):
         super().__init__(
             name=name,
             description=description,
@@ -27,10 +27,11 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             long_running=long_running,
             env=AWS_ENV,
             mermaid=mermaid,
+           # with_files=with_files,
         )
 
 class DatabricksAzureTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, long_running=True, mermaid=None):
+    def __init__(self, name, description, content, args, long_running=True, mermaid=None, env=[]):
         super().__init__(
             name=name,
             description=description,

@@ -7,7 +7,6 @@ from databricks_workspace_iac.tools.aws.settings import (
     TF_VARS, MERMAID_DIAGRAM,
     REQUIRED_ENV_VARS, AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
-from databricks_workspace_iac.tools.constants import AWS_ENV
 
 # Generate args from TF_VARS
 tf_args = [
@@ -24,7 +23,7 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
     description="Create a Databricks workspace on AWS using Terraform for IAC.",
     content=AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     args=tf_args,
-    env=AWS_ENV,
+    env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM
 )
 
