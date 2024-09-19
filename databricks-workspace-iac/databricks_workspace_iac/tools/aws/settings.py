@@ -71,10 +71,11 @@ REQUIRED_ENV_VARS = [
     "GIT_ORG",
     "GIT_REPO",
     "BRANCH",
-    "AWS_PROFILE", # Automatically set by Kubiya if running from a teammate tool context
-    "SLACK_CHANNEL_ID", # Automatically set by Kubiya if running from a teammate tool context
-    "SLACK_THREAD_TS", # Automatically set by Kubiya if running from a teammate tool context
-    "SLACK_API_TOKEN", # Automatically set by Kubiya if running from a teammate tool context
+    "AWS_PROFILE",
+    "SLACK_CHANNEL_ID",
+    "SLACK_THREAD_TS",
+    "SLACK_API_TOKEN", # Automatically set by Kubiya if running from a teammate tool
+    "PAT"
 ]
 
 # Generate the commands to check required variables
@@ -121,7 +122,7 @@ REQUIRED_SECRETS = [
     # PAT is a private access token with the necessary permissions to clone the module containing the terraform code
     # To create one on github, go to your personal access token settings and create one with the necessary permissions
     # GitHub documentation: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
-    "PAT" # Set this in the environment you are running the tool from (on Kubiya, create a secret called PAT with the value of your PAT)
+    "PAT"
 ]
 
 # Generate the AWS-specific workspace template
