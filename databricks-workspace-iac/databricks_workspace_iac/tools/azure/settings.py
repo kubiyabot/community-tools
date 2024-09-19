@@ -2,7 +2,7 @@
 
 from databricks_workspace_iac.tools.shared_templates import (
     tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE,
-    WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE,
+    WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     generate_terraform_vars_json, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
 
