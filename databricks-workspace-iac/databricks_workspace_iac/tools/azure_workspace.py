@@ -41,6 +41,7 @@ terraform apply -auto-approve \
   -var 'address_prefixes_private={{ .address_prefixes_private }}'
 
 workspace_url=$(terraform output -raw databricks_host)
+workspace_url="https://$workspace_url"
 echo "The link to the workspace is: $workspace_url"
 
 # Install required packages
