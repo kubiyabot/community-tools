@@ -52,7 +52,7 @@ send_slack_message() {{
     local color=$3
 
     # Escape special characters in the message for JSON
-    escaped_message=$(printf "%s" "$message" | jq -Rs .)
+    escaped_message=$(printf "%s" "$message" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
     SLACK_MESSAGE_CONTENT=$(cat <<EOF
 {{
@@ -105,7 +105,7 @@ report_failure() {{
     truncated_error_output=$(echo "$error_output" | tail -c 2000)
 
     # Escape the error output for JSON
-    escaped_error_output=$(printf "%s" "$truncated_error_output" | jq -Rs .)
+    escaped_error_output=$(printf "%s" "$truncated_error_output" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
     # Prepare the message with error output
     error_message_full="❌ Error during $step: $error_message\\n*Last part of the error log:*\\n\`\`\`$truncated_error_output\`\`\`"
@@ -119,14 +119,9 @@ report_failure() {{
 }}
 
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
-if ! {GIT_CLONE_COMMAND} 2>&1 | tee /tmp/git_clone.log; then
-    error_output=$(cat /tmp/git_clone.log)
-    report_failure "Git clone" "Failed to clone repository" "$error_output"
-fi
+{GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository" "$(git clone 2>&1)"
 
-if ! cd iac_workspace/{TERRAFORM_MODULE_PATH} 2>&1; then
-    report_failure "Directory change" "Failed to change to Terraform module directory" ""
-fi
+cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory" "$(cd iac_workspace/{TERRAFORM_MODULE_PATH} 2>&1)"
 
 echo -e "🔍 Validating input parameters..."
 check_var() {{
@@ -141,7 +136,7 @@ check_var() {{
 
 echo -e "✅ All required parameters are set."
 echo -e "🚀 Initializing Terraform..."
-if ! {TERRAFORM_INIT_COMMAND} 2>&1 | tee /tmp/terraform_init.log; then
+if ! terraform init {TERRAFORM_INIT_COMMAND} 2>&1 | tee /tmp/terraform_init.log; then
     error_output=$(cat /tmp/terraform_init.log)
     report_failure "Terraform init" "Failed to initialize Terraform" "$error_output"
 fi
@@ -157,19 +152,12 @@ if ! terraform apply -auto-approve -var-file=terraform.tfvars.json 2>&1 | tee /t
 fi
 
 echo "📊 Capturing Terraform output..."
-if ! tf_output=$(terraform output -json 2>&1); then
-    error_output="$tf_output"
-    report_failure "Terraform output" "Failed to capture Terraform output" "$error_output"
-fi
-
+tf_output=$(terraform output -json) || report_failure "Terraform output" "Failed to capture Terraform output" "$(terraform output -json 2>&1)"
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
 workspace_url="${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}"
 
 echo "🔍 Getting backend config..."
-if ! backend_config=$(terraform show -json 2>&1); then
-    error_output="$backend_config"
-    report_failure "Backend config" "Failed to get backend configuration" "$error_output"
-fi
+backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
 
 echo "💬 Preparing Slack message..."
 success_message=$(cat <<EOF

@@ -22,7 +22,7 @@ TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/aws'
 
 # Terraform variables
 TF_VARS = [
-    tf_var("WORKSPACE_NAME", "The name of the Databricks workspace to be created", required=True),
+    tf_var("workspace_name", "The name of the Databricks workspace to be created", required=True),
     tf_var("aws_region", "The AWS region where the workspace will be created", required=True),
     tf_var("vpc_cidr", "The CIDR block for the VPC", required=False, default="10.4.0.0/16"),
     tf_var("subnet_public_cidr", "The CIDR block for the public subnet", required=False, default="10.4.1.0/24"),
