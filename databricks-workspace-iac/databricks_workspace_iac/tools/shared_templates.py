@@ -85,15 +85,39 @@ backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
 SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{...}  # Existing Slack message content
+{{
+    "blocks": [
+        {{
+            "type": "context",
+            "elements": [
+                {{
+                    "type": "image",
+                    "image_url": "{DATABRICKS_ICON_URL}",
+                    "alt_text": "Databricks Logo"
+                }},
+                {{
+                    "type": "mrkdwn",
+                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices. *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>"
+                }}
+            ]
+        }},
+        {{
+            "type": "section",
+            "text": {{
+                "type": "mrkdwn",
+                "text": "*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {{\n  backend \"{BACKEND_TYPE}\" {{\n    $backend_config\n  }}\n}}\n```\n2. Run the import command:\n```\n{IMPORT_COMMAND}\n```"
+            }}
+        }}
+    ]
+}}
 EOF
 )
 
 echo -e "📤 Sending Slack message..."
 curl -X POST "https://slack.com/api/chat.postMessage" \\
--H "Authorization: Bearer $SLACK_API_TOKEN" \\
--H "Content-Type: application/json" \\
---data "$SLACK_MESSAGE_CONTENT"
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+    -H "Content-Type: application/json" \\
+    --data "$SLACK_MESSAGE_CONTENT"
 
 echo -e "✅ Databricks workspace setup complete!"
 """
@@ -131,9 +155,9 @@ EOF
 )
 
 curl -X POST "https://slack.com/api/chat.postMessage" \\
--H "Authorization: Bearer $SLACK_API_TOKEN" \\
--H "Content-Type: application/json" \\
---data "$SLACK_ERROR_MESSAGE_CONTENT"
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+    -H "Content-Type: application/json" \\
+    --data "$SLACK_ERROR_MESSAGE_CONTENT"
 """
 
 # Workspace template with error handling
@@ -148,3 +172,4 @@ WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
     exit 1
 }}
 """
+
