@@ -96,9 +96,6 @@ REQUIRED_ENV_VARS = [
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
     "SLACK_API_TOKEN",
-    
-    # Personal Access Token for GitHub (private repository authentication for the repository holding the terraform code)
-    "PAT"
 ]
 
 # Temporary hack to add secrets to the list of required environment variables
