@@ -1,5 +1,3 @@
-# shared_templates.py
-
 import json
 
 # Function to create Terraform variable dictionaries
@@ -42,7 +40,7 @@ COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
 export TERRAFORM_NO_COLOR=true
 export TF_INPUT=false
-set -euo pipefail
+set -eo pipefail  # Removed 'u' to prevent errors on unset variables
 
 DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
 
@@ -110,7 +108,8 @@ cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "F
 echo -e "🔍 Validating input parameters..."
 check_var() {{
     var_name="$1"
-    if [ -z "${{!var_name:-}}" ]; then
+    var_value="$(printenv "$var_name")"
+    if [ -z "$var_value" ]; then
         report_failure "Input validation" "${{var_name}} is not set"
     fi
 }}
