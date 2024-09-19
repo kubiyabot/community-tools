@@ -81,7 +81,7 @@ REQUIRED_ENV_VARS = [
 AZURE_TEMPLATE_PARAMS = {
     "CLOUD_PROVIDER": "Azure",  # Specifies the cloud provider as Azure
     "CHECK_REQUIRED_VARS": ' '.join(f'check_var "{var}"' for var in REQUIRED_ENV_VARS),  # Generates a string to check all required environment variables
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" \\\n    -backend-config="container_name={{ .container_name}}" \\\n    -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" \\\n    -backend-config="resource_group_name={{ .resource_group_name}}" \\\n    -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',  # Terraform init command with Azure-specific backend configuration
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name={{ .storage_account_name}}" -backend-config="container_name={{ .container_name}}" -backend-config="key=databricks/{{ .WORKSPACE_NAME}}/terraform.tfstate" -backend-config="resource_group_name={{ .resource_group_name}}" -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',  # Terraform init command with Azure-specific backend configuration
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),  # Generates JSON representation of Terraform variables
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/$resource_group_name/providers/Microsoft.Databricks/workspaces/$workspace_name",  # Fallback URL for the Azure Databricks workspace
     "BACKEND_TYPE": "azurerm",  # Specifies the backend type as Azure Resource Manager

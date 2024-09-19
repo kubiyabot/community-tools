@@ -1,8 +1,5 @@
 from databricks_workspace_iac.tools.shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
 
-# Add this line near the top of the file, after other similar definitions
-TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/aws'
-
 # AWS-specific settings for Databricks workspace creation
 
 # S3 bucket for Terraform state storage
@@ -11,8 +8,12 @@ AWS_BACKEND_BUCKET = 'my-test-backend-bucket'
 # AWS region for the Terraform backend
 AWS_BACKEND_REGION = 'us-west-2'
 
-# Directory containing Terraform files for AWS
-AWS_TERRAFORM_DIR = '$DIR/aux/databricks/terraform/aws'
+# Which repo to clone (which one contains the Terraform module)
+GIT_REPO = 'databricks-workspace-iac'
+
+# Path to the Azure-specific Terraform module
+# Where inside the repo is the Terraform module we want to use
+TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/aws'
 
 # Terraform variables
 # For more information on these variables, see:
@@ -72,17 +73,16 @@ REQUIRED_ENV_VARS = [
 # AWS-specific template parameters
 AWS_TEMPLATE_PARAMS = {
     "CLOUD_PROVIDER": "AWS",
-    "TERRAFORM_DIR": AWS_TERRAFORM_DIR,
     "CHECK_REQUIRED_VARS": ' '.join(f'check_var "{var}"' for var in REQUIRED_ENV_VARS),
-    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" \\\n    -backend-config="key=databricks/${{workspace_name}}/terraform.tfstate" \\\n    -backend-config="region={AWS_BACKEND_REGION}"',
+    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" -backend-config="key=databricks/${{workspace_name}}/terraform.tfstate" -backend-config="region={AWS_BACKEND_REGION}"',
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
     "BACKEND_TYPE": "s3",
     "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${workspace_name}",
     "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
-    "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH
+    "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH,
+    "GIT_REPO": GIT_REPO
 }
-
 # Complete workspace creation template for AWS
 AWS_WORKSPACE_TEMPLATE = COMMON_WORKSPACE_TEMPLATE.format(**AWS_TEMPLATE_PARAMS)
 
