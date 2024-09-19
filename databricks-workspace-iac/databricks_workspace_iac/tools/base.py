@@ -25,9 +25,8 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             content=content,
             args=args,
             long_running=long_running,
-            env=AWS_ENV,
+            env=env,
             mermaid=mermaid,
-           # with_files=with_files,
         )
 
 class DatabricksAzureTerraformTool(DatabricksTerraformTool):
@@ -37,7 +36,7 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             description=description,
             content=content,
             args=args,
-            env=AZURE_ENV,
+            env=env,
             long_running=long_running,
             mermaid=mermaid,
         )

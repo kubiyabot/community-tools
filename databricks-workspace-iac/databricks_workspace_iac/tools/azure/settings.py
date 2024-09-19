@@ -15,13 +15,37 @@ GIT_REPO = 'databricks-workspace-iac'
 TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/azure'
 
 # Define Terraform variables for Azure Databricks workspace
+# Each variable is created using the tf_var function, which sets name, description, required status, and default value
 TF_VARS = [
     tf_var("WORKSPACE_NAME", "The name of the Databricks workspace to be created", required=True),
     tf_var("region", "The Azure region where the workspace will be deployed", required=True),
     tf_var("storage_account_name", "The name of the storage account to use for the backend", required=True),
     tf_var("container_name", "The name of the container to use for the backend", required=True),
     tf_var("resource_group_name", "The name of the resource group to use for the backend", required=True),
-    # ... (include all other tf_vars as previously defined) ...
+    tf_var("managed_services_cmk_key_vault_key_id", "The ID of the key vault key to use for managed services encryption", required=False),
+    tf_var("managed_disk_cmk_key_vault_key_id", "The ID of the key vault key to use for managed disk encryption", required=False),
+    tf_var("infrastructure_encryption_enabled", "Enable infrastructure encryption, can be true or false", required=False, default="false"),
+    tf_var("no_public_ip", "Secure cluster connectivity, no public ip, can be true or false", required=False, default="false"),
+    tf_var("enable_vnet", "Enable custom vnet use, boolean, can be true or false", required=False, default="false"),
+    tf_var("virtual_network_id", "The virtual network id", required=False),
+    tf_var("private_subnet_name", "The name of the private subnet", required=False),
+    tf_var("public_subnet_name", "The name of the public subnet", required=False),
+    tf_var("public_subnet_network_security_group_association_id", "The ID of the public subnet network security group association", required=False),
+    tf_var("private_subnet_network_security_group_association_id", "The ID of the private subnet network security group association", required=False),
+    tf_var("security_profile_enabled", "Enable security profile, boolean, can be true or false", required=False, default="false"),
+    tf_var("enhanced_monitoring_enabled", "Enable enhanced monitoring, boolean, can be true or false", required=False, default="false"),
+    tf_var("azure_client_id", "Azure client ID", required=False, default="${ARM_CLIENT_ID}"),
+    tf_var("azure_client_secret", "Azure client secret", required=False, default="${ARM_CLIENT_SECRET}"),
+    tf_var("azure_tenant_id", "Azure tenant ID", required=False, default="${ARM_TENANT_ID}"),
+    tf_var("automatic_update", "Enable automatic update", required=False, default="false"),
+    tf_var("restart_no_updates", "Enable restart even if there are no updates", required=False, default="false"),
+    tf_var("day_of_week", "Day of the week to apply updates", required=False),
+    tf_var("frequency", "Frequency of updates", required=False),
+    tf_var("hours", "Hours of window start time", required=False, default="1"),
+    tf_var("minutes", "Minutes of window start time", required=False, default="0"),
+    tf_var("address_space", "The address space to be used for the virtual network", required=False, default='["10.0.0.0/16"]'),
+    tf_var("address_prefixes_public", "The address prefix for the public network", required=False, default='["10.0.2.0/24"]'),
+    tf_var("address_prefixes_private", "The address prefix for the private network", required=False, default='["10.0.1.0/24"]'),
 ]
 
 # Mermaid diagram for visualizing the workflow
