@@ -51,8 +51,8 @@ send_slack_message() {{
     local message=$2
     local color=$3
 
-    # Escape special characters in the message
-    escaped_message=$(echo "$message" | sed 's/"/\\"/g' | sed 's/`/\\`/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+    # Escape special characters in the message for JSON
+    escaped_message=$(printf "%s" "$message" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
     SLACK_MESSAGE_CONTENT=$(cat <<EOF
 {{
@@ -80,7 +80,7 @@ send_slack_message() {{
                     "type": "section",
                     "text": {{
                         "type": "mrkdwn",
-                        "text": "$escaped_message"
+                        "text": $escaped_message
                     }}
                 }}
             ]
@@ -90,7 +90,6 @@ send_slack_message() {{
 EOF
     )
 
-    # Send the message to Slack with proper headers and encoding
     curl -X POST "https://slack.com/api/chat.postMessage" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
@@ -105,23 +104,24 @@ report_failure() {{
     # Truncate the error output to the last 2000 characters
     truncated_error_output=$(echo "$error_output" | tail -c 2000)
 
-    # Escape the error output for Slack (handle backticks and other special characters)
-    escaped_error_output=$(echo "$truncated_error_output" | sed 's/`/\\`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+    # Escape the error output for JSON
+    escaped_error_output=$(printf "%s" "$truncated_error_output" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+
+    # Prepare the message with error output
+    error_message_full="❌ Error during $step: $error_message\\n*Last part of the error log:*\\n\`\`\`$truncated_error_output\`\`\`"
+
+    send_slack_message "failed" "$error_message_full" "danger"
 
     # Print the error to the console for visibility
-    echo -e "❌ Error during $step: $error_message"
-    echo -e "Last part of the error log:\n$truncated_error_output"
-
-    # Send the error to Slack
-    send_slack_message "failed" "❌ Error during $step: $error_message\n*Last part of the error log:*\n\`\`\`$escaped_error_output\`\`\`" "danger"
+    echo -e "$error_message_full"
 
     exit 1
 }}
 
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
-{GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository" "$(git clone)"
+{GIT_CLONE_COMMAND} || report_failure "Git clone" "Failed to clone repository" "$(git clone 2>&1)"
 
-cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory" "$(cd iac_workspace/{TERRAFORM_MODULE_PATH})"
+cd iac_workspace/{TERRAFORM_MODULE_PATH} || report_failure "Directory change" "Failed to change to Terraform module directory" "$(cd iac_workspace/{TERRAFORM_MODULE_PATH} 2>&1)"
 
 echo -e "🔍 Validating input parameters..."
 check_var() {{
@@ -136,7 +136,7 @@ check_var() {{
 
 echo -e "✅ All required parameters are set."
 echo -e "🚀 Initializing Terraform..."
-if ! terraform init -backend-config="config here" 2>&1 | tee /tmp/terraform_init.log; then
+if ! terraform init {TERRAFORM_INIT_COMMAND} 2>&1 | tee /tmp/terraform_init.log; then
     error_output=$(cat /tmp/terraform_init.log)
     report_failure "Terraform init" "Failed to initialize Terraform" "$error_output"
 fi
@@ -152,18 +152,18 @@ if ! terraform apply -auto-approve -var-file=terraform.tfvars.json 2>&1 | tee /t
 fi
 
 echo "📊 Capturing Terraform output..."
-tf_output=$(terraform output -json) || report_failure "Terraform output" "Failed to capture Terraform output"
+tf_output=$(terraform output -json) || report_failure "Terraform output" "Failed to capture Terraform output" "$(terraform output -json 2>&1)"
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
 workspace_url="${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}"
 
 echo "🔍 Getting backend config..."
-backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration"
+backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
 
 echo "💬 Preparing Slack message..."
 success_message=$(cat <<EOF
 🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.
 
-*Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>
+👉 *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>
 
 *To import the state locally, follow these steps:*
 1. Configure your Terraform backend:
@@ -181,7 +181,7 @@ terraform {{
 EOF
 )
 
-send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack"
+send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack" ""
 
 echo -e "✅ Databricks workspace setup complete!"
 """
