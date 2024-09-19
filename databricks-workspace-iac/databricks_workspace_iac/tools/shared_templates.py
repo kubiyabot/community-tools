@@ -165,7 +165,6 @@ WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 {{
 {WORKSPACE_TEMPLATE}
 }} || {{
-
     error_message="$?"
     echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
