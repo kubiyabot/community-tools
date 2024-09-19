@@ -99,19 +99,19 @@ AWS_TEMPLATE_PARAMS = {
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
     
     # Terraform init command with AWS S3 backend configuration
-    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket=$AWS_BACKEND_BUCKET" -backend-config="key=databricks/$WORKSPACE_NAME/terraform.tfstate" -backend-config="region=AWS_BACKEND_REGION"',
+    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config=bucket=${{AWS_BACKEND_BUCKET}}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="region=${{AWS_BACKEND_REGION}}"',
     
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     
     # Fallback URL for the Databricks workspace if direct URL is unavailable
-    "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
-    
+    "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${{DB_ACCOUNT_ID}}",
+
     # Specifies the backend type for Terraform state (S3 for AWS)
     "BACKEND_TYPE": "s3",
     
     # Command to import existing Databricks workspace into Terraform state
-    "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${WORKSPACE_NAME}",
+    "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${{WORKSPACE_NAME}}",
     
     # Name of the Git repository containing the Terraform configurations
     "GIT_REPO": GIT_REPO
