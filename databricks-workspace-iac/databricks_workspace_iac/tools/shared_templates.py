@@ -1,5 +1,9 @@
+# shared_templates.py
+
 import json
-from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
+
+# URL for the Databricks icon
+DATABRICKS_ICON_URL = "https://databricks.com/favicon.ico"
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
@@ -13,16 +17,23 @@ def tf_var(name, description, required=False, default=None):
 # Git clone command for fetching Terraform configurations
 GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "iac_workspace"'
 
+# Function to generate Terraform variables in JSON format
+def generate_terraform_vars_json(tf_vars):
+    vars_dict = {}
+    for var in tf_vars:
+        if var['default'] is not None:
+            vars_dict[var['name']] = var['default']
+        else:
+            vars_dict[var['name']] = f"${{{var['name']}}}"
+    return json.dumps(vars_dict, indent=2)
+
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
-# We're running Terraform in a container, so we don't need color output
-# We're also not running Terraform interactively, so we don't need interactive input
 export TERRAFORM_NO_COLOR=true
 export TF_INPUT=false
 set -euo pipefail
 
-# Declare variables based on the environment
 DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
 
 apk add jq curl git --quiet
@@ -30,30 +41,24 @@ apk add jq curl git --quiet
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
 {GIT_CLONE_COMMAND}
 
-# Navigate to the cloned repository, then to the Terraform module directory
-cd iac_workspace/${TERRAFORM_MODULE_PATH}
+cd iac_workspace/{TERRAFORM_MODULE_PATH}
 
 echo -e "🔍 Validating input parameters..."
-
-# Function to check if a variable is set
-check_var() {
-    if [ -z "${1:-}" ]; then
-        echo "❌ Error: $1 is not set. Please provide it as an argument or environment variable."
-        echo "Could not apply Terraform workspace. Please provide the necessary variables and try again."
+check_var() {{
+    var_name="$1"
+    if [ -z "${{!var_name:-}}" ]]; then
+        echo "❌ Error: ${{var_name}} is not set."
         exit 1
     fi
-}
-
+}}
 # Check required variables
 {CHECK_REQUIRED_VARS}
 
 echo -e "✅ All required parameters are set."
-
 echo -e "🚀 Initializing Terraform..."
 {TERRAFORM_INIT_COMMAND}
 
 echo -e "🏗️ Applying Terraform configuration..."
-# Create a JSON file with Terraform variables
 cat << EOF > terraform.tfvars.json
 {TERRAFORM_VARS_JSON}
 EOF
@@ -63,51 +68,50 @@ terraform apply -auto-approve -var-file=terraform.tfvars.json
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json)
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url="${workspace_url:-"{FALLBACK_WORKSPACE_URL}"}"
+workspace_url="${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}"
 
 echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
 SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{
+{{
     "blocks": [
-        {
+        {{
             "type": "context",
             "elements": [
-                {
+                {{
                     "type": "image",
                     "image_url": "{DATABRICKS_ICON_URL}",
                     "alt_text": "Databricks Logo"
-                },
-                {
+                }},
+                {{
                     "type": "mrkdwn",
-                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. *Going forward*, you can easily manage and track updates on your infrastructure. *Module Source code*: <{GIT_REPO}|Explore the module>"
-                }
+                    "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices. *Module Source code*: <https://github.com/$GIT_ORG/{GIT_REPO}|Explore the module>"
+                }}
             ]
-        },
-        {
+        }},
+        {{
             "type": "section",
             "text": {{
                 "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*$(printf '\n')1. Configure your Terraform backend:$(printf '\n')\`\`\`$(printf '\n')terraform {{$(printf '\\n')  backend \\"{BACKEND_TYPE}\\" {{$(printf '\n')    $backend_config$(printf '\n')  }}$(printf '\n')}}$(printf '\n')\`\`\`$(printf '\n')2. Run the import command:$(printf '\n')\`\`\`$(printf '\n'){IMPORT_COMMAND}$(printf '\n')\`\`\`"
-            }
-        }
+                "text": "*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {{\n  backend \\"{BACKEND_TYPE}\\" {{\n    $backend_config\n  }}\n}}\n```\n2. Run the import command:\n```\n{IMPORT_COMMAND}\n```"
+            }}
+        }}
     ]
-}
+}}
 EOF
 )
 
 echo -e "📤 Sending Slack message..."
-curl -X POST "https://slack.com/api/chat.postMessage" \
--H "Authorization: Bearer $SLACK_API_TOKEN" \
--H "Content-Type: application/json" \
+curl -X POST "https://slack.com/api/chat.postMessage" \\
+-H "Authorization: Bearer $SLACK_API_TOKEN" \\
+-H "Content-Type: application/json" \\
 --data "$SLACK_MESSAGE_CONTENT"
 
 echo -e "✅ Databricks workspace setup complete!"
-""".format(
-    DATABRICKS_ICON_URL=DATABRICKS_ICON_URL,
-)
+"""
+
 # Error notification template
 ERROR_NOTIFICATION_TEMPLATE = """
 SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
@@ -132,7 +136,7 @@ SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
             "type": "section",
             "text": {{
                 "type": "mrkdwn",
-                "text": "*Error Message:*$(printf '\\n')\`\`\`$1\`\`\`"
+                "text": "*Error Message:*\n\`\`\`$error_message\`\`\`"
             }}
         }}
     ]
@@ -140,26 +144,24 @@ SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
 EOF
 )
 
-curl -X POST "https://slack.com/api/chat.postMessage" \
--H "Authorization: Bearer $SLACK_API_TOKEN" \
--H "Content-Type: application/json" \
+curl -X POST "https://slack.com/api/chat.postMessage" \\
+-H "Authorization: Bearer $SLACK_API_TOKEN" \\
+-H "Content-Type: application/json" \\
 --data "$SLACK_ERROR_MESSAGE_CONTENT"
 """
 
-# Wrap the workspace template with error handling
+# Workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 #!/bin/bash
-# Error handling for workspace creation
-
 set -euo pipefail
 
-{WORKSPACE_TEMPLATE} || {{
+{{
+{WORKSPACE_TEMPLATE}
+}} || {{
+
     error_message="$?"
     echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
+    exit 1
 }}
 """
-
-def generate_terraform_vars_json(tf_vars):
-    vars_dict = {var["name"]: f"${{{var['name']}}}" for var in tf_vars}
-    return json.dumps(vars_dict, indent=2)
