@@ -1,7 +1,7 @@
 from kubiya_sdk.tools import Arg
-from ..base import DatabricksAzureTerraformTool
+from databricks_workspace_iac.tools.base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
-from .settings import (
+from databricks_workspace_iac.tools.azure.settings import (
     TF_VARS, MERMAID_DIAGRAM, 
     REQUIRED_ENV_VARS, AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
