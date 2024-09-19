@@ -51,7 +51,7 @@ apk update && apk add curl jq
 # The link to the workspace is: ${workspace_url}
 # EOF
 # )
-# ESCAPED_MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
+ESCAPED_MESSAGE=$(echo "$workspace_url" | jq -Rs .)
 
 # Check for required environment variables
 if [ -z "$SLACK_CHANNEL_ID" ] || [ -z "$SLACK_THREAD_TS" ] || [ -z "$SLACK_API_TOKEN" ]; then
@@ -87,7 +87,7 @@ PAYLOAD=$(cat <<EOF
 						"text": "Open Databricks Workspace",
 						"emoji": true
 					},
-					"url": "${workspace_url}",
+					"url": "${ESCAPED_MESSAGE}",
 					"action_id": "open_workspace"
 				}
 			]
