@@ -3,8 +3,7 @@ from ..base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 from .settings import (
     TF_VARS, MERMAID_DIAGRAM, 
-    REQUIRED_ENV_VARS, AZURE_WORKSPACE_TEMPLATE,
-    AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
+    REQUIRED_ENV_VARS, AZURE_WORKSPACE_TEMPLATE
 )
 from ..constants import AZURE_ENV
 
