@@ -149,9 +149,6 @@ curl -X POST "https://slack.com/api/chat.postMessage" \\
 
 # Workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
-#!/bin/bash
-set -euo pipefail
-
 {{
 {WORKSPACE_TEMPLATE}
 }} || {{
