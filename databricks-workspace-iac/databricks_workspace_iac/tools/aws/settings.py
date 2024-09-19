@@ -70,7 +70,7 @@ flowchart TD
 REQUIRED_ENV_VARS = [
     "DB_ACCOUNT_ID", "DB_ACCOUNT_CLIENT_ID", "DB_ACCOUNT_CLIENT_SECRET",
     "GIT_ORG", "GIT_REPO", "BRANCH", "AWS_PROFILE",
-    "PAT", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
+    "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
 ]
 
 # Generate the commands to check required variables
