@@ -24,6 +24,7 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
     description="Create a Databricks workspace on Azure using Terraform for IAC.",
     content=AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     args=tf_args,
+    env=AZURE_ENV,
     mermaid=MERMAID_DIAGRAM
 )
 

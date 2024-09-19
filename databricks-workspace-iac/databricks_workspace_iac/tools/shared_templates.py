@@ -1,9 +1,7 @@
 # shared_templates.py
 
 import json
-
-# URL for the Databricks icon
-DATABRICKS_ICON_URL = "https://databricks.com/favicon.ico"
+from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
@@ -110,7 +108,9 @@ curl -X POST "https://slack.com/api/chat.postMessage" \\
 --data "$SLACK_MESSAGE_CONTENT"
 
 echo -e "✅ Databricks workspace setup complete!"
-"""
+""".format(
+    DATABRICKS_ICON_URL=DATABRICKS_ICON_URL,
+)
 
 # Error notification template
 ERROR_NOTIFICATION_TEMPLATE = """
