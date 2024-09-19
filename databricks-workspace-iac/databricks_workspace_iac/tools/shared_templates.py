@@ -14,35 +14,28 @@ def tf_var(name, description, required=False, default=None):
 # Git clone command for fetching Terraform configurations
 GIT_CLONE_COMMAND = 'git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "iac_workspace"'
 
-# Function to generate Terraform variables in JSON format
 def generate_terraform_vars_json(tf_vars):
-    json_lines = ['{']
-    for i, var in enumerate(tf_vars):
+    vars_dict = {}
+    for var in tf_vars:
         name = var['name']
         default = var.get('default')
+
         if default is not None:
             value = default
         else:
             value = "${" + name + "}"
-        # Determine the correct representation based on the value type
-        if isinstance(value, str):
-            if value.lower() in ["true", "false"]:
-                # Handle booleans
-                json_line = f'  "{name}": {value.lower()}'
-            elif value.startswith('[') and value.endswith(']'):
-                # Handle lists
-                json_line = f'  "{name}": {value}'
-            else:
-                # Handle strings with variable expansion
-                json_line = f'  "{name}": "{value}"'
-        else:
-            # Handle numbers and other types
-            json_line = f'  "{name}": {value}'
-        if i < len(tf_vars) - 1:
-            json_line += ','
-        json_lines.append(json_line)
-    json_lines.append('}')
-    return '\n'.join(json_lines)
+
+        # Try to parse the default value as JSON
+        try:
+            # This will handle booleans, numbers, lists, and nulls
+            value_parsed = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            # If it's not valid JSON, treat it as a string
+            value_parsed = value
+
+        vars_dict[name] = value_parsed
+
+    return json.dumps(vars_dict, indent=2)
 
 # Common workspace creation template
 COMMON_WORKSPACE_TEMPLATE = """
