@@ -7,7 +7,6 @@ from databricks_workspace_iac.tools.azure.settings import (
     TF_VARS, MERMAID_DIAGRAM,
     REQUIRED_ENV_VARS, AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING
 )
-from databricks_workspace_iac.tools.constants import AZURE_ENV
 
 # Generate args from TF_VARS
 tf_args = [
@@ -24,7 +23,7 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
     description="Create a Databricks workspace on Azure using Terraform for IAC.",
     content=AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     args=tf_args,
-    env=AZURE_ENV,
+    env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM
 )
 

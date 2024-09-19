@@ -1,7 +1,9 @@
 # shared_templates.py
 
 import json
-from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
+
+# Databricks icon URL
+DATABRICKS_ICON_URL = "https://www.databricks.com/static/images/databricks-logo.png"
 
 # Function to create Terraform variable dictionaries
 def tf_var(name, description, required=False, default=None):
