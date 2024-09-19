@@ -70,6 +70,11 @@ flowchart TD
     Teammate -->|🎉 Workspace is ready!| User
 """
 
+# List of required secrets
+REQUIRED_SECRETS = [
+    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT",
+]
+
 # List of required environment variables
 REQUIRED_ENV_VARS = [
     "ARM_CLIENT_ID", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID",
@@ -77,10 +82,9 @@ REQUIRED_ENV_VARS = [
     "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "SLACK_API_TOKEN"
 ]
 
-# List of required secrets
-REQUIRED_SECRETS = [
-    "ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID", "PAT",
-]
+# Temporary hack to add secrets to the list of required environment variables
+# TODO: Find a better way to handle this (fix agent manager to pass secrets to the tools)
+REQUIRED_ENV_VARS = REQUIRED_ENV_VARS + REQUIRED_SECRETS
 
 # Generate the commands to check required variables
 CHECK_REQUIRED_VARS_COMMANDS = '\n'.join([f'check_var "{var}"' for var in REQUIRED_ENV_VARS])
