@@ -42,14 +42,34 @@ terraform apply -auto-approve \
 
 workspace_url=$(terraform output -raw databricks_host)
 echo "The link to the workspace is: $workspace_url"
+
+# Install required packages
 apk update && apk add curl jq
 
+# Prepare the message
 MESSAGE=$(cat <<EOF
 The link to the workspace is: ${workspace_url}
-The state file can be found here: https://{{ .storage_account_name}}.blob.core.windows.net/{{ .container_name}}
+EOF
+)
+ESCAPED_MESSAGE=$(echo "$MESSAGE" | jq -Rs .)
+
+# Check for required environment variables
+if [ -z "$SLACK_CHANNEL_ID" ] || [ -z "$SLACK_THREAD_TS" ] || [ -z "$SLACK_API_TOKEN" ]; then
+  echo "Error: SLACK_CHANNEL_ID, SLACK_THREAD_TS, and SLACK_API_TOKEN must be set."
+  exit 1
+fi
+
+# Prepare the payload for sending a multiline message in a thread
+PAYLOAD=$(cat <<EOF
+{
+    "channel": "$SLACK_CHANNEL_ID",
+    "text": $ESCAPED_MESSAGE,
+    "thread_ts": "$SLACK_THREAD_TS"
+}
 EOF
 )
 
+# Send the message using Slack API
 curl -X POST "https://slack.com/api/chat.postMessage" \
 -H "Authorization: Bearer $SLACK_API_TOKEN" \
 -H "Content-Type: application/json" \
