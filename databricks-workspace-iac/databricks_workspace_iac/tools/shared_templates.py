@@ -108,9 +108,7 @@ curl -X POST "https://slack.com/api/chat.postMessage" \\
 --data "$SLACK_MESSAGE_CONTENT"
 
 echo -e "✅ Databricks workspace setup complete!"
-""".format(
-    DATABRICKS_ICON_URL=DATABRICKS_ICON_URL,
-)
+"""
 
 # Error notification template
 ERROR_NOTIFICATION_TEMPLATE = """

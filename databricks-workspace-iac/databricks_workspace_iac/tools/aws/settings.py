@@ -1,4 +1,8 @@
-from databricks_workspace_iac.tools.shared_templates import tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE, WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE, generate_terraform_vars_json
+from databricks_workspace_iac.tools.shared_templates import (
+    tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE,
+    WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE,
+    generate_terraform_vars_json, DATABRICKS_ICON_URL
+)
 
 # AWS-specific settings for Databricks workspace creation
 
@@ -20,12 +24,6 @@ TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/aws'
 # https://registry.terraform.io/providers/databricks/databricks/latest/docs
 # aws/settings.py
 
-from databricks_workspace_iac.tools.shared_templates import (
-    tf_var, GIT_CLONE_COMMAND, COMMON_WORKSPACE_TEMPLATE,
-    WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING, ERROR_NOTIFICATION_TEMPLATE,
-    generate_terraform_vars_json, DATABRICKS_ICON_URL
-)
-
 # AWS-specific settings for Databricks workspace creation
 
 # S3 bucket for Terraform state storage
@@ -36,6 +34,9 @@ AWS_BACKEND_REGION = 'us-west-2'
 
 # Git repository details
 GIT_REPO = 'databricks-workspace-iac'
+
+# Path to the AWS-specific Terraform module
+# Where inside the repo is the Terraform module we want to use
 TERRAFORM_MODULE_PATH = 'aux/databricks/terraform/aws'
 
 # Terraform variables
