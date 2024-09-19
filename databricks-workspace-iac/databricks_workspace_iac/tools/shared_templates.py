@@ -124,12 +124,5 @@ echo -e "✅ Databricks workspace setup complete!"
 
 # Workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
-{{
 {WORKSPACE_TEMPLATE}
-}} || {{
-    error_message="$?"
-    echo "❌ Failed to create Databricks workspace on {CLOUD_PROVIDER} using the {TERRAFORM_MODULE_PATH} module."
-    exit 1
-}}
 """
-
