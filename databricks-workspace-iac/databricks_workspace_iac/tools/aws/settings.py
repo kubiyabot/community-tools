@@ -83,11 +83,7 @@ AWS_TEMPLATE_PARAMS = {
     "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
     "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH,
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
-    "TERRAFORM_INIT_COMMAND": (
-        f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" '
-        '-backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" '
-        f'-backend-config="region={AWS_BACKEND_REGION}"'
-    ),
+    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="region={AWS_BACKEND_REGION}"',
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
     "BACKEND_TYPE": "s3",

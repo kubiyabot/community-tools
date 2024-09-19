@@ -88,14 +88,7 @@ AZURE_TEMPLATE_PARAMS = {
     "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
     "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH,
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
-    "TERRAFORM_INIT_COMMAND": (
-        'terraform init '
-        '-backend-config="storage_account_name=${storage_account_name}" '
-        '-backend-config="container_name=${container_name}" '
-        '-backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" '
-        '-backend-config="resource_group_name=${resource_group_name}" '
-        '-backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"'
-    ),
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${container_name}" -backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" -backend-config="resource_group_name=${resource_group_name}" -backend-config="subscription_id=$ARM_SUBSCRIPTION_ID"',
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     "FALLBACK_WORKSPACE_URL": 'https://portal.azure.com/#@/resource/subscriptions/$ARM_SUBSCRIPTION_ID/resourceGroups/${resource_group_name}/providers/Microsoft.Databricks/workspaces/${WORKSPACE_NAME}',
     "BACKEND_TYPE": "azurerm",
