@@ -83,13 +83,10 @@ REQUIRED_SECRETS = [
 ]
 
 # List of required environment variables
+# Environment variables are set automatically by Kubiya if running from a teammate tool context
+# If running manually, set them up in your shell before running the tool
+# If you want to inject secrets such as tokens, keys, etc use the secrets management feature in Kubiya
 REQUIRED_ENV_VARS = [
-    # Azure-specific variables
-    "ARM_CLIENT_ID",
-    "ARM_CLIENT_SECRET",
-    "ARM_TENANT_ID",
-    "ARM_SUBSCRIPTION_ID",
-    
     # Git-related variables
     "GIT_ORG",
     "GIT_REPO",
@@ -130,7 +127,7 @@ AZURE_TEMPLATE_PARAMS = {
     
     # Terraform init command with Azure backend configuration
     # Double curly braces are used to interpolate variables in the command
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${container_name}" -backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" -backend-config="resource_group_name=${resource_group_name}"',
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${container_name}" -backend-config="key=databricks/${WORKSPACE_NAME}/terraform.tfstate" -backend-config="resource_group_name=${resource_group_name}" -backend-config="subscription_id=${ARM_SUBSCRIPTION_ID}"',
     
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
