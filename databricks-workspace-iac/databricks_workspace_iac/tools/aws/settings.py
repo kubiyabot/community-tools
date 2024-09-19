@@ -78,22 +78,46 @@ CHECK_REQUIRED_VARS_COMMANDS = '\n'.join([f'check_var "{var}"' for var in REQUIR
 
 # AWS-specific template parameters
 AWS_TEMPLATE_PARAMS = {
+    # URL for the Databricks icon, used for visual identification in UIs
     "DATABRICKS_ICON_URL": DATABRICKS_ICON_URL,
+    
+    # Specifies the cloud provider, used for cloud-specific logic
     "CLOUD_PROVIDER": "AWS",
+    
+    # Command to clone the Git repository containing Terraform configurations
     "GIT_CLONE_COMMAND": GIT_CLONE_COMMAND,
+    
+    # Path to the Terraform module within the cloned repository
     "TERRAFORM_MODULE_PATH": TERRAFORM_MODULE_PATH,
+    
+    # Commands to check for required environment variables
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
+    
+    # Terraform init command with AWS S3 backend configuration
     "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config="bucket={AWS_BACKEND_BUCKET}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="region={AWS_BACKEND_REGION}"',
+    
+    # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
+    
+    # Fallback URL for the Databricks workspace if direct URL is unavailable
     "FALLBACK_WORKSPACE_URL": "https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}",
+    
+    # Specifies the backend type for Terraform state (S3 for AWS)
     "BACKEND_TYPE": "s3",
+    
+    # Command to import existing Databricks workspace into Terraform state
     "IMPORT_COMMAND": "terraform import aws_databricks_workspace.this ${WORKSPACE_NAME}",
+    
+    # Name of the Git repository containing the Terraform configurations
     "GIT_REPO": GIT_REPO
 }
 
 # List of required secrets
 REQUIRED_SECRETS = [
-    "PAT", "SLACK_API_TOKEN"
+    # PAT is a private access token with the necessary permissions to clone the module containing the terraform code
+    # To create one on github, go to your personal access token settings and create one with the necessary permissions
+    # GitHub documentation: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
+    "PAT"
 ]
 
 # Generate the AWS-specific workspace template
