@@ -12,7 +12,7 @@ terraform init  -backend-config="storage_account_name={{ .storage_account_name}}
   -backend-config="resource_group_name={{ .resource_group_name}}" \
   -backend-config="subscription_id=${ARM_SUBSCRIPTION_ID}"
 terraform apply -auto-approve \
-  -var "WORKSPACE_NAME={{ .workspace_name }}" \
+  -var "workspace_name={{ .workspace_name }}" \
   -var "region={{ .region }}" \
   -var "managed_services_cmk_key_vault_key_id={{ .managed_services_cmk_key_vault_key_id }}" \
   -var "managed_disk_cmk_key_vault_key_id={{ .managed_disk_cmk_key_vault_key_id }}" \

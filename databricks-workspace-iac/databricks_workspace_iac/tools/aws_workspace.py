@@ -12,7 +12,7 @@ terraform init -backend-config="bucket=my-test-backend-bucket" \
 terraform apply -auto-approve \
   -var "databricks_account_id=${DB_ACCOUNT_ID}" \
   -var "databricks_client_id=${DB_ACCOUNT_CLIENT_ID}" \
-  -var "WORKSPACE_NAME={{ .workspace_name }}" \
+  -var "workspace_name={{ .workspace_name }}" \
   -var "databricks_client_secret=${DB_ACCOUNT_CLIENT_SECRET}" 
 
 echo "The state file can be found here: https://my-test-backend-bucket.s3.us-west-2.amazonaws.com/aws/"
