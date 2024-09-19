@@ -123,6 +123,4 @@ echo -e "✅ Databricks workspace setup complete!"
 """
 
 # Workspace template with error handling
-WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
-{WORKSPACE_TEMPLATE}
-"""
+WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """{WORKSPACE_TEMPLATE}"""
