@@ -40,7 +40,7 @@ COMMON_WORKSPACE_TEMPLATE = """
 #!/bin/bash
 export TERRAFORM_NO_COLOR=true
 export TF_INPUT=false
-set -eo pipefail  # Removed 'u' to prevent errors on unset variables
+set -eo pipefail  # Removing 'u' to prevent unset variable errors
 
 DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
 
@@ -96,7 +96,13 @@ EOF
 report_failure() {{
     local step=$1
     local error_message=$2
-    send_slack_message "failed" "❌ Error during $step: $error_message" "danger"
+    local error_output=$3
+
+    # Escape the error output for Slack (handle backticks and other special characters)
+    escaped_error_output=$(echo "$error_output" | sed 's/`/`/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
+
+    # Include the error output in the Slack message
+    send_slack_message "failed" "❌ Error during $step: $error_message\n\`\`\`$escaped_error_output\`\`\`" "danger"
     exit 1
 }}
 
@@ -118,18 +124,19 @@ check_var() {{
 
 echo -e "✅ All required parameters are set."
 echo -e "🚀 Initializing Terraform..."
-{TERRAFORM_INIT_COMMAND} || report_failure "Terraform init" "Failed to initialize Terraform"
+if ! terraform init -backend-config="config here" 2>&1 | tee /tmp/terraform_init.log; then
+    error_output=$(cat /tmp/terraform_init.log)
+    report_failure "Terraform init" "Failed to initialize Terraform" "$error_output"
+fi
 
 echo -e "🏗️ Applying Terraform configuration..."
 cat << EOF > terraform.tfvars.json
 {TERRAFORM_VARS_JSON}
 EOF
 
-if ! terraform apply -auto-approve -var-file=terraform.tfvars.json; then
-    error_message=$(terraform show -json | jq -r '.values.root_module.resources[] | select(.type == "error") | .values.summary')
-    truncated_error=$(echo "$error_message" | tail -n 10)
-    escaped_error=$(echo "$truncated_error" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\\n/\\\\n/g')
-    report_failure "Terraform apply" "*Last 10 lines of error:*\n\`\`\`$escaped_error\`\`\`"
+if ! terraform apply -auto-approve -var-file=terraform.tfvars.json 2>&1 | tee /tmp/terraform_apply.log; then
+    error_output=$(cat /tmp/terraform_apply.log)
+    report_failure "Terraform apply" "Failed to apply Terraform configuration" "$error_output"
 fi
 
 echo "📊 Capturing Terraform output..."
