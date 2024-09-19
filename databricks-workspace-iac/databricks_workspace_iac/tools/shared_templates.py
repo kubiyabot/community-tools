@@ -23,6 +23,9 @@ export TERRAFORM_NO_COLOR=true
 export TF_INPUT=false
 set -euo pipefail
 
+# Declare variables based on the environment
+DATABRICKS_ICON_URL="{DATABRICKS_ICON_URL}"
+
 apk add jq curl git --quiet
 
 echo -e "🛠️ Setting up Databricks workspace on {CLOUD_PROVIDER}..."
@@ -59,40 +62,40 @@ EOF
 terraform apply -auto-approve -var-file=terraform.tfvars.json
 
 echo "📊 Capturing Terraform output..."
-tf_output=$(terraform output -json || echo "{{}}")
+tf_output=$(terraform output -json)
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url="${{workspace_url:-"{FALLBACK_WORKSPACE_URL}"}}"
+workspace_url="${workspace_url:-"{FALLBACK_WORKSPACE_URL}"}"
 
 echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
 SLACK_MESSAGE_CONTENT=$(cat <<EOF
-{{
+{
     "blocks": [
-        {{
+        {
             "type": "context",
             "elements": [
-                {{
+                {
                     "type": "image",
-                    "image_url": "${DATABRICKS_ICON_URL}",
+                    "image_url": "{DATABRICKS_ICON_URL}",
                     "alt_text": "Databricks Logo"
-                }},
-                {{
+                },
+                {
                     "type": "mrkdwn",
                     "text": "🔧 Your *Databricks workspace* was provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices for smooth future changes and management. *Going forward*, you can easily manage and track updates on your infrastructure. *Module Source code*: <{GIT_REPO}|Explore the module>"
-                }}
+                }
             ]
-        }},
-        {{
+        },
+        {
             "type": "section",
             "text": {{
                 "type": "mrkdwn",
-                "text": "*To import the state locally, follow these steps:*\\n1. Configure your Terraform backend:\\n\`\`\`\\nterraform {{\\n  backend \\"{BACKEND_TYPE}\\" {{\\n    $backend_config\\n  }}\\n}}\\n\`\`\`\\n2. Run the import command:\\n\`\`\`\\n{IMPORT_COMMAND}\\n\`\`\`"
-            }}
-        }}
+                "text": "*To import the state locally, follow these steps:*$(printf '\n')1. Configure your Terraform backend:$(printf '\n')\`\`\`$(printf '\n')terraform {{$(printf '\\n')  backend \\"{BACKEND_TYPE}\\" {{$(printf '\n')    $backend_config$(printf '\n')  }}$(printf '\n')}}$(printf '\n')\`\`\`$(printf '\n')2. Run the import command:$(printf '\n')\`\`\`$(printf '\n'){IMPORT_COMMAND}$(printf '\n')\`\`\`"
+            }
+        }
     ]
-}}
+}
 EOF
 )
 
@@ -129,7 +132,7 @@ SLACK_ERROR_MESSAGE_CONTENT=$(cat <<EOF
             "type": "section",
             "text": {{
                 "type": "mrkdwn",
-                "text": "*Error Message:*\\n\`\`\`$1\`\`\`"
+                "text": "*Error Message:*$(printf '\\n')\`\`\`$1\`\`\`"
             }}
         }}
     ]
@@ -146,15 +149,14 @@ curl -X POST "https://slack.com/api/chat.postMessage" \
 # Wrap the workspace template with error handling
 WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING = """
 #!/bin/bash
+# Error handling for workspace creation
+
 set -euo pipefail
 
-{{
-{WORKSPACE_TEMPLATE}
-}} || {{
+{WORKSPACE_TEMPLATE} || {{
     error_message="$?"
     echo "❌ An error occurred: $error_message"
     {ERROR_NOTIFICATION_TEMPLATE}
-    exit 1
 }}
 """
 
