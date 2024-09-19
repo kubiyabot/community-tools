@@ -67,8 +67,8 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
         Arg(name="backend_region", description="The AWS region for the Terraform state backend.", required=True),
         Arg(name="enable_vpc", description="Optional: Enable VPC creation (true/false).", required=False, default="True"),
         Arg(name="vpc_id", description="Optional: Existing VPC ID to use for the workspace.", required=False, default=""),
-        Arg(name="enable_privatelink", description="Advanced: Enable AWS PrivateLink for the Databricks workspace.", required=False, default="False"),
-        Arg(name="enable_cmk", description="Advanced: Enable Customer Managed Keys for the Databricks workspace.", required=False, default="False"),
+        Arg(name="enable_privatelink", description="Advanced: Enable AWS PrivateLink for the Databricks workspace.", required=False, default="false"),
+        Arg(name="enable_cmk", description="Advanced: Enable Customer Managed Keys for the Databricks workspace.", required=False, default="false"),
     ],
     mermaid="""
     // ... existing mermaid diagram ...
