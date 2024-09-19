@@ -28,8 +28,3 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
 )
 
 tool_registry.register("databricks", aws_db_apply_tool)
-
-# Ensure all required environment variables are set
-for var in REQUIRED_ENV_VARS:
-    if var not in AWS_ENV:
-        raise ValueError(f"Required environment variable {var} is not set in AWS_ENV")
