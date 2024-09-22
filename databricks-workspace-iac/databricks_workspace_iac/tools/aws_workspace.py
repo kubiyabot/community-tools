@@ -21,7 +21,7 @@ terraform apply -auto-approve \
   -var "enable_cmk={{ .enable_cmk }}" 
 
 workspace_url=$(terraform output -raw databricks_host)
-workspace_url="https://$workspace_url"
+workspace_url="$workspace_url"
 echo "The link to the workspace is: $workspace_url"
 
 # Install required packages
