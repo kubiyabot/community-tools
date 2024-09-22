@@ -27,7 +27,7 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
     description="Create a Databricks workspace on AWS using Terraform for IAC. Allows flexible configuration of Terraform variables using a smooth English conversation - no Terraform knowledge required.",
     content=AWS_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
     args=tf_args,
-    # secrets=REQUIRED_SECRETS,
+    secrets=REQUIRED_SECRETS,
     env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM,
 )

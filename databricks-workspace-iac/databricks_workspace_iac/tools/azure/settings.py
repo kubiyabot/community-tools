@@ -155,20 +155,17 @@ flowchart TD
 
 # List of required secrets
 REQUIRED_SECRETS = [
-    "ARM_CLIENT_ID",
-    "ARM_CLIENT_SECRET",
-    "ARM_TENANT_ID",
-    "ARM_SUBSCRIPTION_ID",
-    "PAT",
-]
-
-# List of required environment variables
-REQUIRED_ENV_VARS = [
     # Azure-specific variables
     "ARM_CLIENT_ID",
     "ARM_CLIENT_SECRET",
     "ARM_TENANT_ID",
     "ARM_SUBSCRIPTION_ID",
+    "SLACK_API_TOKEN",
+    "PAT",
+]
+
+# List of required environment variables
+REQUIRED_ENV_VARS = [
     # Git-related variables
     "GIT_ORG",
     "GIT_REPO",
@@ -176,14 +173,8 @@ REQUIRED_ENV_VARS = [
     # Slack-related variables
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
-    "SLACK_API_TOKEN",
     # Personal Access Token for GitHub (private repository authentication for the repository holding the terraform code)
-    "PAT",
 ]
-
-# Temporary hack to add secrets to the list of required environment variables
-# TODO: Find a better way to handle this (fix agent manager to pass secrets to the tools)
-REQUIRED_ENV_VARS = REQUIRED_ENV_VARS + REQUIRED_SECRETS
 
 # Generate the commands to check required variables
 CHECK_REQUIRED_VARS_COMMANDS = "\n".join(
@@ -207,7 +198,7 @@ AZURE_TEMPLATE_PARAMS = {
     "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${{storage_account_name}}" -backend-config="container_name=${{container_name}}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="resource_group_name=${{resource_group_name}}" -backend-config="subscription_id=${{ARM_SUBSCRIPTION_ID}}"',
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
-    # Fallback URL for the Databricks workspace if direct URL is unavailable
+    # Fallback URL for the V_VARS + REQUIRED_SECRETSDatabricks workspace if direct URL is unavailable
     "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/${{ARM_SUBSCRIPTION_ID}}/resourceGroups/${{resource_group_name}}/providers/Microsoft.Databricks/workspaces/${{WORKSPACE_NAME}}",
     # Specifies the backend type for Terraform state (azurerm for Azure)
     "BACKEND_TYPE": "azurerm",

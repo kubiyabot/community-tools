@@ -30,7 +30,7 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
     args=tf_args,
     env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM,
-    # secrets=REQUIRED_SECRETS
+    secrets=REQUIRED_SECRETS,
 )
 
 tool_registry.register("databricks", azure_db_apply_tool)

@@ -138,8 +138,6 @@ REQUIRED_ENV_VARS = [
     "AWS_PROFILE",
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
-    "SLACK_API_TOKEN",  # Automatically set by Kubiya if running from a teammate tool
-    "PAT",
 ]
 
 # Generate the commands to check required variables
@@ -175,10 +173,15 @@ AWS_TEMPLATE_PARAMS = {
 
 # List of required secrets
 REQUIRED_SECRETS = [
-    # PAT is a private access token with the necessary permissions to clone the module containing the terraform code
-    # To create one on github, go to your personal access token settings and create one with the necessary permissions
-    # GitHub documentation: https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
-    "PAT"
+    "PAT",
+    "SLACK_API_TOKEN",
+    "DB_ACCOUNT_ID",
+    "DB_ACCOUNT_CLIENT_ID",
+    "DB_ACCOUNT_CLIENT_SECRET",
+    # AWS-specific variables
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_DEFAULT_REGION",
 ]
 
 # Generate the AWS-specific workspace template
