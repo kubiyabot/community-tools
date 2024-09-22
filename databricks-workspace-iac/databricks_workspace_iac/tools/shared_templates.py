@@ -129,7 +129,7 @@ check_var() {
     var_name="$1"
     var_value="$(printenv "$var_name")"
     if [ -z "$var_value" ]; then
-        report_failure "Input validation" "${{var_name}} is not set" ""
+        report_failure "Input validation" "${var_name} is not set" ""
     fi
 }
 # Check required variables
