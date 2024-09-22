@@ -27,9 +27,6 @@ terraform apply -auto-approve \
   -var "storage_account_name={{ .storage_account_name }}" \
   -var "security_profile_enabled={{ .security_profile_enabled }}" \
   -var "enhanced_monitoring_enabled={{ .enhanced_monitoring_enabled }}" \
-  -var "azure_client_id=${ARM_CLIENT_ID}" \
-  -var "azure_client_secret=${ARM_CLIENT_SECRET}" \
-  -var "azure_tenant_id=${ARM_TENANT_ID}" \
   -var "automatic_update={{ .automatic_update }}" \
   -var "restart_no_updates={{ .restart_no_updates }}" \
   -var "day_of_week={{ .day_of_week }}" \
