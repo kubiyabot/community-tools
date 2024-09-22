@@ -155,7 +155,7 @@ fi
 echo "📊 Capturing Terraform output..."
 tf_output=$(terraform output -json) || report_failure "Terraform output" "Failed to capture Terraform output" "$(terraform output -json 2>&1)"
 workspace_url=$(echo "$tf_output" | jq -r '.databricks_host.value // empty')
-workspace_url="${{workspace_url:-"{!FALLBACK_WORKSPACE_URL!}"}}"
+workspace_url="${workspace_url:-"{!FALLBACK_WORKSPACE_URL!}"}"
 
 echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
