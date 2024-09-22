@@ -1,6 +1,6 @@
 # aws/settings.py
 
-from databricks_workspace_iac.tools.shared_templates import (
+from tools.shared_templates import (
     tf_var,
     GIT_CLONE_COMMAND,
     COMMON_WORKSPACE_TEMPLATE,
@@ -9,7 +9,7 @@ from databricks_workspace_iac.tools.shared_templates import (
     WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
 )
 
-from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
+from tools.constants import DATABRICKS_ICON_URL
 
 # AWS-specific settings for Databricks workspace creation
 

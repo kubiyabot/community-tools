@@ -1,8 +1,21 @@
 from kubiya_sdk.tools.models import Tool
-from databricks_workspace_iac.tools.constants import DATABRICKS_ICON_URL
+from tools.constants import DATABRICKS_ICON_URL
+
 
 class DatabricksTerraformTool(Tool):
-    def __init__(self, name, description, content, args, env, long_running=True, with_files=None, image="hashicorp/terraform:latest", mermaid=None, secrets=[]):
+    def __init__(
+        self,
+        name,
+        description,
+        content,
+        args,
+        env,
+        long_running=True,
+        with_files=None,
+        image="hashicorp/terraform:latest",
+        mermaid=None,
+        secrets=[],
+    ):
         super().__init__(
             name=name,
             description=description,
@@ -15,11 +28,22 @@ class DatabricksTerraformTool(Tool):
             long_running=long_running,
             with_files=with_files,
             mermaid=mermaid,
-            secrets=secrets
+            secrets=secrets,
         )
+
 
 class DatabricksAWSTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, long_running=True, mermaid=None, env=[], secrets=[]):
+    def __init__(
+        self,
+        name,
+        description,
+        content,
+        args,
+        long_running=True,
+        mermaid=None,
+        env=[],
+        secrets=[],
+    ):
         super().__init__(
             name=name,
             description=description,
@@ -28,11 +52,22 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             long_running=long_running,
             env=env,
             mermaid=mermaid,
-            secrets=secrets
+            secrets=secrets,
         )
 
+
 class DatabricksAzureTerraformTool(DatabricksTerraformTool):
-    def __init__(self, name, description, content, args, long_running=True, mermaid=None, env=[], secrets=[]):
+    def __init__(
+        self,
+        name,
+        description,
+        content,
+        args,
+        long_running=True,
+        mermaid=None,
+        env=[],
+        secrets=[],
+    ):
         super().__init__(
             name=name,
             description=description,
@@ -41,5 +76,5 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             env=env,
             long_running=long_running,
             mermaid=mermaid,
-            secrets=secrets
+            secrets=secrets,
         )
