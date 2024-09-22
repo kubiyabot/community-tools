@@ -22,6 +22,25 @@ tf_args = [
     for var in TF_VARS
     if var["default"] is not None
 ]
+tf_args.extend(
+    [
+        Arg(
+            name="container_name",
+            description="The name of the container to use for the backend",
+            required=True,
+        ),
+        Arg(
+            name="workspace_name",
+            description="The name of the Databricks workspace to be created",
+            required=True,
+        ),
+        Arg(
+            name="resource_group_name",
+            description="The name of the resource group to use for the backend",
+            required=True,
+        ),
+    ]
+)
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",

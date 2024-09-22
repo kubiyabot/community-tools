@@ -195,15 +195,15 @@ AZURE_TEMPLATE_PARAMS = {
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
     # Terraform init command with Azure backend configuration
     # Double curly braces are used to interpolate variables in the command
-    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${{container_name}}" -backend-config="key=databricks/${{WORKSPACE_NAME}}/terraform.tfstate" -backend-config="resource_group_name=${{resource_group_name}}" -backend-config="subscription_id=${{ARM_SUBSCRIPTION_ID}}"',
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config="storage_account_name=${storage_account_name}" -backend-config="container_name=${container_name}" -backend-config="key=databricks/${workspace_name}/terraform.tfstate" -backend-config="resource_group_name=${resource_group_name}" -backend-config="subscription_id=${{ARM_SUBSCRIPTION_ID}}"',
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     # Fallback URL for the V_VARS + REQUIRED_SECRETSDatabricks workspace if direct URL is unavailable
-    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/${{ARM_SUBSCRIPTION_ID}}/resourceGroups/${{resource_group_name}}/providers/Microsoft.Databricks/workspaces/${{WORKSPACE_NAME}}",
+    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/${{ARM_SUBSCRIPTION_ID}}/resourceGroups/${resource_group_name}/providers/Microsoft.Databricks/workspaces/${workspace_name}",
     # Specifies the backend type for Terraform state (azurerm for Azure)
     "BACKEND_TYPE": "azurerm",
     # Command to import existing Databricks workspace into Terraform state
-    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/${{ARM_SUBSCRIPTION_ID}}/resourceGroups/${{resource_group_name}}/providers/Microsoft.Databricks/workspaces/${{WORKSPACE_NAME}}",
+    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/${{ARM_SUBSCRIPTION_ID}}/resourceGroups/${resource_group_name}/providers/Microsoft.Databricks/workspaces/${workspace_name}",
     # Name of the Git repository containing the Terraform configurations
     "GIT_REPO": GIT_REPO,
 }
