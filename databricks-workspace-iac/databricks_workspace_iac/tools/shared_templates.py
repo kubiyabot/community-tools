@@ -162,7 +162,7 @@ backend_config=$(terraform show -json | jq -r '.values.backend_config // empty')
 
 echo "💬 Preparing Slack message..."
 success_message=$(jq -n \
-    --arg org "${{GIT_ORG}}" \
+    --arg org "${GIT_ORG}" \
     --arg repo "{!GIT_REPO!}" \
     --arg backend_type "{!BACKEND_TYPE!}" \
     --arg backend_config "$backend_config!" \
