@@ -1,6 +1,6 @@
 import json
 
-# from jinja2 import Template
+from jinja2 import Template
 
 
 # Function to create Terraform variable dictionaries
@@ -177,13 +177,12 @@ echo -e "✅ Databricks workspace setup complete!"
 """
 
 # Common workspace creation template
-# COMMON_WORKSPACE_TEMPLATE = Template(
-#     COMMON_WORKSPACE_TEMPLATE_JINJA,
-#     variable_start_string="{!",
-#     variable_end_string="!}",
-# )
+COMMON_WORKSPACE_TEMPLATE = Template(
+    COMMON_WORKSPACE_TEMPLATE_JINJA,
+    variable_start_string="{!",
+    variable_end_string="!}",
+)
 
-COMMON_WORKSPACE_TEMPLATE = ""
 # COMMON_WORKSPACE_TEMPLATE = """
 # #!/bin/bash
 # export TERRAFORM_NO_COLOR=true
