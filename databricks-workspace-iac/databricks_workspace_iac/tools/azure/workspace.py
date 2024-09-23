@@ -12,7 +12,7 @@ from tools.azure.settings import (
 )
 
 # Generate args from TF_VARS
-tf_args = [
+args = [
     Arg(
         name=var["name"],
         description=var["description"],
@@ -22,31 +22,31 @@ tf_args = [
     for var in TF_VARS
     if var["required"] is True
 ]
-# tf_args.extend(
-#     [
-#         Arg(
-#             name="container_name",
-#             description="The name of the container to use for the backend",
-#             required=True,
-#         ),
-#         Arg(
-#             name="workspace_name",
-#             description="The name of the Databricks workspace to be created",
-#             required=True,
-#         ),
-#         Arg(
-#             name="resource_group_name",
-#             description="The name of the resource group to use for the backend",
-#             required=True,
-#         ),
-#     ]
-# )
+args.extend(
+    [
+        Arg(
+            name="container_name",
+            description="The name of the container to use for the backend",
+            required=True,
+        ),
+        Arg(
+            name="workspace_name",
+            description="The name of the Databricks workspace to be created",
+            required=True,
+        ),
+        Arg(
+            name="resource_group_name",
+            description="The name of the resource group to use for the backend",
+            required=True,
+        ),
+    ]
+)
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
     description="Create a Databricks workspace on Azure using Terraform for IAC. Allows flexible configuration of Terraform variables using a smooth English conversation - no Terraform knowledge required.",
     content=AZURE_WORKSPACE_TEMPLATE_WITH_ERROR_HANDLING,
-    args=tf_args,
+    args=args,
     env=REQUIRED_ENV_VARS,
     mermaid=MERMAID_DIAGRAM,
     secrets=REQUIRED_SECRETS,
