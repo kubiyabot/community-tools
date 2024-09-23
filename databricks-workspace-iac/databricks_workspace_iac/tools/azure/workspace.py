@@ -20,7 +20,7 @@ tf_args = [
         default=var.get("default"),
     )
     for var in TF_VARS
-    if var["default"] is None
+    if var["required"] is True
 ]
 # tf_args.extend(
 #     [
