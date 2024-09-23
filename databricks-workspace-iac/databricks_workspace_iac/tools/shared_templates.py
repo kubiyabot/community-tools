@@ -162,7 +162,7 @@ echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
 
 echo "💬 Preparing Slack message..."
-success_message="🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.\n\n👉 *Module Source code*: <https://github.com/(${GIT_ORG})/({!GIT_REPO!})|Explore the module>\n\n*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {\n  backend \"{!BACKEND_TYPE!}\" {\n    $backend_config\n  }\n}\n```\n2. Run the import command:\n```\n{!IMPORT_COMMAND!}\n```"
+success_message="🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*"
 
 send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack" ""
 
