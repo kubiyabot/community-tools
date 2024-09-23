@@ -158,7 +158,7 @@ AWS_TEMPLATE_PARAMS = {
     # Commands to check for required environment variables
     "CHECK_REQUIRED_VARS": CHECK_REQUIRED_VARS_COMMANDS,
     # Terraform init command with AWS S3 backend configuration
-    "TERRAFORM_INIT_COMMAND": f'terraform init -backend-config=bucket=${{AWS_BACKEND_BUCKET}}" -backend-config="key=databricks/${workspace_name}/terraform.tfstate" -backend-config="region=${{AWS_BACKEND_REGION}}"',
+    "TERRAFORM_INIT_COMMAND": 'terraform init -backend-config=bucket=${AWS_BACKEND_BUCKET}" -backend-config="key=databricks/${workspace_name}/terraform.tfstate" -backend-config="region=${AWS_BACKEND_REGION}"',
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     # Fallback URL for the Databricks workspace if direct URL is unavailable
