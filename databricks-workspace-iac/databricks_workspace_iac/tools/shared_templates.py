@@ -161,8 +161,12 @@ workspace_url="${workspace_url:-"{!FALLBACK_WORKSPACE_URL!}"}"
 echo "🔍 Getting backend config..."
 backend_config=$(terraform show -json | jq -r '.values.backend_config // empty') || report_failure "Backend config" "Failed to get backend configuration" "$(terraform show -json 2>&1)"
 
+workspace_url=$(terraform output -raw databricks_host)
+workspace_url="https://$workspace_url"
+echo "The link to the workspace is: $workspace_url"
+
 echo "💬 Preparing Slack message..."
-success_message="🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*"
+success_message="🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*\n Link to created workspace: $workspace_url"
 
 send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack" ""
 
