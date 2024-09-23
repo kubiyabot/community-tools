@@ -34,11 +34,6 @@ args.extend(
             description="The name of the Databricks workspace to be created",
             required=True,
         ),
-        Arg(
-            name="resource_group_name",
-            description="The name of the resource group to use for the backend",
-            required=True,
-        ),
     ]
 )
 
