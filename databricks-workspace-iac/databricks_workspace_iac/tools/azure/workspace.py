@@ -29,11 +29,6 @@ args.extend(
             description="The name of the container to use for the backend",
             required=True,
         ),
-        Arg(
-            name="workspace_name",
-            description="The name of the Databricks workspace to be created",
-            required=True,
-        ),
     ]
 )
 
