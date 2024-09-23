@@ -138,7 +138,7 @@ check_var() {
 
 echo -e "✅ All required parameters are set."
 echo -e "🚀 Initializing Terraform..."
-if ! terraform init {!TERRAFORM_INIT_COMMAND!} 2>&1 | tee /tmp/terraform_init.log; then
+if ! {!TERRAFORM_INIT_COMMAND!} 2>&1 | tee /tmp/terraform_init.log; then
     error_output=$(cat /tmp/terraform_init.log)
     report_failure "Terraform init" "Failed to initialize Terraform" "$error_output"
 fi
