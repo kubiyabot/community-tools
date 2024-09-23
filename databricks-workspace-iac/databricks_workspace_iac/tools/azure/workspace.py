@@ -20,7 +20,7 @@ args = [
         default=var.get("default"),
     )
     for var in TF_VARS
-    # if var["required"] is True
+    if var is not None         #if var["required"] is True
 ]
 args.extend(
     [
