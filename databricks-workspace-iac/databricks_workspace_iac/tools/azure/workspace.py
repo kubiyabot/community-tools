@@ -29,6 +29,11 @@ args.extend(
             description="The name of the container to use for the backend",
             required=True,
         ),
+        Arg(
+            name="resource_group_name",
+            description="The name of the resource group",
+            required=True,
+        ),
     ]
 )
 

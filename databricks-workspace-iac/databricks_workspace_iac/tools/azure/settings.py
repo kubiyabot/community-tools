@@ -41,11 +41,6 @@ TF_VARS = [
         required=True,
     ),
     tf_var(
-        "resource_group_name",
-        "The name of the resource group to use for the backend",
-        required=True,
-    ),
-    tf_var(
         "managed_services_cmk_key_vault_key_id",
         "The ID of the key vault key to use for managed services encryption",
         required=False,

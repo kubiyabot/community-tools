@@ -26,7 +26,7 @@ def generate_terraform_vars_json(tf_vars):
         if default is not None:
             value = default
         else:
-            value = f"${{{name}}}"
+            value = "${{ ." + f"{name}" + " }}"
         # Try to parse the default value as JSON
         try:
             # This will handle booleans, numbers, lists, and nulls
