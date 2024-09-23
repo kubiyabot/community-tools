@@ -168,8 +168,8 @@ success_message=$(jq -n \
     --arg backend_config "$backend_config!" \
     --arg import_command "{!IMPORT_COMMAND!}" \
     '{
-        "text": "🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*, following *Infrastructure as Code (IAC)* best practices.\n\n👉 *Module Source code*: <https://github.com/\($org)/\($repo)|Explore the module>\n\n*To import the state locally, follow these steps:*\n1. Configure your Terraform backend:\n```\nterraform {\n  backend \"\($backend_type)\" {\n    \($backend_config)\n  }\n}\n```\n2. Run the import command:\n```\n\($import_command)\n```"
-    }' | jq -r '.text')
+        "text": "🎉 Your *Databricks workspace* was successfully provisioned using *Terraform*"
+    }')
 
 send_slack_message "succeeded" "$success_message" "good" || report_failure "Slack notification" "Failed to send success message to Slack" ""
 
