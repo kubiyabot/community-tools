@@ -44,7 +44,7 @@ COMMON_WORKSPACE_TEMPLATE_JINJA = """
 #!/bin/bash
 export TERRAFORM_NO_COLOR=true
 export TF_INPUT=false
-export TF_LOG=DEBUG
+
 set -eo pipefail  # Removing 'u' to prevent unset variable errors
 
 DATABRICKS_ICON_URL="{!DATABRICKS_ICON_URL!}"
