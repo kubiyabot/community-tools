@@ -194,11 +194,11 @@ AZURE_TEMPLATE_PARAMS = {
     # JSON representation of Terraform variables
     "TERRAFORM_VARS_JSON": generate_terraform_vars_json(TF_VARS),
     # Fallback URL for the V_VARS + REQUIRED_SECRETSDatabricks workspace if direct URL is unavailable
-    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${resource_group_name}/providers/Microsoft.Databricks/workspaces/${workspace_name}",
+    "FALLBACK_WORKSPACE_URL": "https://portal.azure.com/#@/resource/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/{{ .resource_group_name }}/providers/Microsoft.Databricks/workspaces/{{ .workspace_name}}",
     # Specifies the backend type for Terraform state (azurerm for Azure)
     "BACKEND_TYPE": "azurerm",
     # Command to import existing Databricks workspace into Terraform state
-    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${resource_group_name}/providers/Microsoft.Databricks/workspaces/${workspace_name}",
+    "IMPORT_COMMAND": "terraform import azurerm_databricks_workspace.this /subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/{{ .resource_group_name}}/providers/Microsoft.Databricks/workspaces/{{ .workspace_name}}",
     # Name of the Git repository containing the Terraform configurations
     "GIT_REPO": GIT_REPO,
 }
