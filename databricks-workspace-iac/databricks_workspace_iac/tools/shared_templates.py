@@ -98,7 +98,7 @@ EOF
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
         --data "$SLACK_MESSAGE_CONTENT"
-}}
+}
 
 report_failure() {
     local step=$1
