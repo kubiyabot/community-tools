@@ -14,5 +14,6 @@ class ReportTool(Tool):
             requirements=["requests", "boto3"],
             env=["ES_USER", "ES_PASS"],
             long_running=long_running,
-            mermaid=mermaid_diagram
+            mermaid=mermaid_diagram,
+            image="python:3.8-alpine"
         )
