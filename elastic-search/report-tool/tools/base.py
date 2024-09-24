@@ -11,7 +11,7 @@ class ReportTool(Tool):
             type="python",
             content=content,
             args=args,
-            requirements=["requests", "boto3"],
+            requirements=["requests", "boto3", "kubiya-sdk"],
             env=["ES_USER", "ES_PASS"],
             long_running=long_running,
             mermaid=mermaid_diagram,

@@ -7,6 +7,7 @@ setup(
     install_requires=[
         "requests>=2.0",
         "boto3>=1.38.0",
+        "kubiya-sdk",
     ],
     entry_points={
         'console_scripts': [
