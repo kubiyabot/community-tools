@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "requests",
-        "boto3>=1.38.0",
+        "boto3",
         "kubiya-sdk",
     ]
  
