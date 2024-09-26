@@ -15,5 +15,6 @@ class ReportTool(Tool):
             env=["ES_USER", "ES_PASS"],
             long_running=long_running,
             mermaid=mermaid_diagram,
+            requirements=["requests", "boto3", "kubiya-sdk"],
             # image="python:3.8-alpine"
         )
