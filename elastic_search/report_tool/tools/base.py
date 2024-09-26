@@ -15,5 +15,5 @@ class ReportTool(Tool):
             env=["ES_USER", "ES_PASS"],
             long_running=long_running,
             mermaid=mermaid_diagram,
-            image="python:3.8-alpine"
+            # image="python:3.8-alpine"
         )
