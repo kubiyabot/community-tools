@@ -14,7 +14,7 @@ AWS_SECRETS = [
     "DB_ACCOUNT_ID", # The Databricks Account ID
     "DB_ACCOUNT_CLIENT_ID", # The Databricks Client ID
     "DB_ACCOUNT_CLIENT_SECRET", # The Databricks Client Secret
-    "SLACK_API_TOKEN" # The Slack API Token\
+    "SLACK_API_TOKEN", # The Slack API Token\
     "PAT", # The PAT to use
 ]
 
