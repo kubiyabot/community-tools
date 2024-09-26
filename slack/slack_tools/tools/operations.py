@@ -121,7 +121,7 @@ except SlackApiError as e:
     """,
     args=[
         Arg(name="channel_name", type="str", description="Name of the channel to create", required=True),
-        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False, default=False),
+        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False, default="false"),
     ]
 )
 
@@ -175,7 +175,7 @@ except SlackApiError as e:
     """,
     args=[
         Arg(name="channel_id", type="str", description="ID of the channel to get history from", required=True),
-        Arg(name="limit", type="int", description="Maximum number of messages to retrieve", required=False, default=100),
+        Arg(name="limit", type="int", description="Maximum number of messages to retrieve", required=False, default="100"),
     ]
 )
 
@@ -311,7 +311,7 @@ except SlackApiError as e:
     """,
     args=[
         Arg(name="query", type="str", description="Search query", required=True),
-        Arg(name="count", type="int", description="Number of results to return", required=False, default=20),
+        Arg(name="count", type="int", description="Number of results to return", required=False, default="20"),
     ],
 )
 
