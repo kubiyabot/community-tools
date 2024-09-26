@@ -5,7 +5,6 @@ AWS_ENV = [
     "GIT_REPO", # The GitHub Repository
     "BRANCH", # The branch to use
     "DIR", # The directory to use
-    "PAT", # The PAT to use
     "AWS_PROFILE", # The AWS Profile to use
     "SLACK_CHANNEL_ID", # The Slack Channel ID
     "SLACK_THREAD_TS", # The Slack Thread Timestamp
@@ -16,6 +15,7 @@ AWS_SECRETS = [
     "DB_ACCOUNT_CLIENT_ID", # The Databricks Client ID
     "DB_ACCOUNT_CLIENT_SECRET", # The Databricks Client Secret
     "SLACK_API_TOKEN" # The Slack API Token\
+    "PAT", # The PAT to use
 ]
 
 AZURE_ENV = [
