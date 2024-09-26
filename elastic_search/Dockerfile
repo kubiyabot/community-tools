@@ -1,11 +1,10 @@
-FROM python:3.8-alpine
+FROM python:3.8-slim
 
-RUN apk update && apk add --no-cache python3-pip
-
-COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
-
-COPY . /report_tool
 WORKDIR /report_tool
 
-CMD ["python3", "-m", "report_tool"]
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["python", "-m", "report_tool"]
