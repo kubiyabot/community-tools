@@ -8,6 +8,7 @@ setup(
         "requests>=2.0",
         "boto3>=1.38.0",
         "kubiya-sdk",
+        "setuptools",
     ]
  
 )
