@@ -121,7 +121,7 @@ except SlackApiError as e:
     """,
     args=[
         Arg(name="channel_name", type="str", description="Name of the channel to create", required=True),
-        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False, default=False),
+        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False, default="false"),
     ]
 )
 
