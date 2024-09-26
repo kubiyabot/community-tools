@@ -2,6 +2,7 @@ from kubiya_sdk.tools import Arg
 from .base import ReportTool
 from kubiya_sdk.tools.registry import tool_registry
 
+
 create_es_watchers = ReportTool(
     name="create_es_watchers",
     description="Create Elasticsearch watchers for organizations",
