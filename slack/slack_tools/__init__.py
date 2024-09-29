@@ -1,27 +1,14 @@
-from .tools.operations import (
-    slack_send_message,
-    slack_upload_file,
-    slack_list_channels,
-    slack_create_channel,
-    slack_invite_user,
-    slack_get_channel_history,
-    slack_update_message,
-    slack_delete_message,
-    slack_add_reaction,
-    slack_remove_reaction,
-    slack_search_messages,
-)
+from .tools..operations import get_slack_send_message, get_slack_list_channels
+from kubiya_sdk.tools.registry import tool_registry
+
+slack_send_message = get_slack_send_message()
+slack_list_channels = get_slack_list_channels()
+
+# Register all Slack tools
+for tool in [slack_send_message, slack_list_channels]:
+    tool_registry.register("slack", tool)
 
 __all__ = [
     'slack_send_message',
-    'slack_upload_file',
     'slack_list_channels',
-    'slack_create_channel',
-    'slack_invite_user',
-    'slack_get_channel_history',
-    'slack_update_message',
-    'slack_delete_message',
-    'slack_add_reaction',
-    'slack_remove_reaction',
-    'slack_search_messages',
 ]
