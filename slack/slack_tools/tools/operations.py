@@ -42,16 +42,16 @@ slack_send_message = SlackTool(
     #],
 #)
 
-# Slack Get Channel History Tool - permissions required channels:history, groups:history, search:read
-#slack_get_channel_history = SlackTool(
- #   name="slack_get_channel_history",
-  #  description="Get the message history of a Slack channel",
-   # action="conversations_history",
-    #args=[
-     #   Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
-      #  Arg(name="limit", type="int", description="Number of messages to return (default 100)", required=False),
-    #],
-#)
+#Slack Get Channel History Tool
+slack_get_channel_history = SlackTool(
+    name="slack_get_channel_history",
+    description="Get the message history of a Slack channel",
+    action="conversations_history",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
+        Arg(name="limit", type="int", description="Number of messages to return (default 100)", required=False),
+    ],
+)
 
 slack_add_reaction = SlackTool(
     name="slack_add_reaction",
@@ -75,17 +75,18 @@ slack_remove_reaction = SlackTool(
     ],
 )
 
-slack_search_messages = SlackTool(
-    name="slack_search_messages",
-    description="Search for messages in a Slack workspace",
-    action="search_messages",
-    args=[
-        Arg(name="query", type="str", description="Search query string", required=True),
-        Arg(name="sort", type="str", description="Sort messages by score or timestamp", required=False),
-        Arg(name="sort_dir", type="str", description="Sort direction (asc or desc)", required=False),
-        Arg(name="count", type="int", description="Number of results to return", required=False),
-    ],
-)
+# - permissions required channels:history, groups:history, search:read
+#slack_search_messages = SlackTool(
+ #   name="slack_search_messages",
+  #  description="Search for messages in a Slack workspace",
+   # action="search_messages",
+    #args=[
+     #   Arg(name="query", type="str", description="Search query string", required=True),
+      #  Arg(name="sort", type="str", description="Sort messages by score or timestamp", required=False),
+       # Arg(name="sort_dir", type="str", description="Sort direction (asc or desc)", required=False),
+        #Arg(name="count", type="int", description="Number of results to return", required=False),
+    #],
+#)
 
 slack_delete_message = SlackTool(
     name="slack_delete_message",
