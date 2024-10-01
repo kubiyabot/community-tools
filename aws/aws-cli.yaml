@@ -7,10 +7,10 @@ tools:
     content: |
       aws {{.command}}
     args:
-      command:
+      - command:
         description: 'The AWS CLI command to run (example: s3 ls)'
         required: true
-      profile:
+      - profile:
         description: 'The AWS CLI profile to use (profiles are stored in /root/.aws/credentials)'
         required: false
     env:
