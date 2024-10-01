@@ -1,21 +1,18 @@
 tools:
-# https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html
   - name: aws_cli
     image: amazon/aws-cli
-    description: Runs AWS CLI commands - recieves the command to run as an argument
+    description: "Runs AWS CLI commands - recieves the command to run as an argument"
     alias: aws
     content: |
       aws {{.command}}
     args:
-      - command:
-          description: 'The AWS CLI command to run (example: s3 ls)'
-          required: true
-      - profile:
-          description: 'The AWS CLI profile to use (profiles are stored in /root/.aws/credentials)'
-          required: false
+      - name: command
+        description: "The AWS CLI command to run (example: s3 ls). Do not add `aws` at the front."
+        required: true
     env:
-      - "AWS_PROFILE"
-      - "AWS_DEFAULT_REGION" # OR "AWS_REGION" # TODO:: Check which one is correct
+      - AWS_PROFILE
     with_files:
-      - source: /root/.aws/credentials
+      - source: $HOME/.aws/credentials
         destination: /root/.aws/credentials
+      - source: $HOME/.aws/config
+        destination: /root/.aws/config
