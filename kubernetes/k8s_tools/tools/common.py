@@ -2,10 +2,7 @@
 from kubiya_sdk.tools import FileSpec
 
 # Common environment variables for Kubernetes in-cluster context
-COMMON_ENVIRONMENT_VARIABLES = [
-    "KUBERNETES_SERVICE_HOST",
-    "KUBERNETES_SERVICE_PORT",
-]
+COMMON_ENVIRONMENT_VARIABLES = []
 
 # Common file specifications, including the Kubernetes service account token
 COMMON_FILE_SPECS = [
