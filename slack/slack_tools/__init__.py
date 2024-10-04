@@ -10,6 +10,9 @@ from .tools.operations import (
     slack_add_reaction,
     slack_remove_reaction,
     slack_search_messages,
+    slack_schedule_message,
+    slack_get_user_info,
+    slack_get_channel_members,
 )
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     'slack_add_reaction',
     'slack_remove_reaction',
     'slack_search_messages',
+    'slack_schedule_message',
+    'slack_get_user_info',
+    'slack_get_channel_members',
 ]

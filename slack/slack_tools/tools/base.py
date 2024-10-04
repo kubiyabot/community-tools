@@ -5,7 +5,7 @@ SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_
 
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["SLACK_API_TOKEN"]
+        env = ["SLACK_API_TOKEN", "KUBIYA_USER_EMAIL"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -14,6 +14,8 @@ import subprocess
 import sys
 import os
 import json
+import base64
+from datetime import datetime
 
 def install(package):
     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
@@ -24,16 +26,16 @@ install('slack_sdk')
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-def serialize_slack_response(obj, max_depth=10):
+def serialize_slack_response(obj, max_depth=10, max_items=100):
     def _serialize(o, depth):
         if depth > max_depth:
             return str(o)
         if isinstance(o, (str, int, float, bool, type(None))):
             return o
         if isinstance(o, (list, tuple)):
-            return [_serialize(i, depth + 1) for i in o]
+            return [_serialize(i, depth + 1) for i in o[:max_items]]
         if isinstance(o, dict):
-            return {{k: _serialize(v, depth + 1) for k, v in o.items()}}
+            return {{k: _serialize(v, depth + 1) for k, v in list(o.items())[:max_items]}}
         return str(o)
     
     return _serialize(obj, 0)
@@ -41,23 +43,70 @@ def serialize_slack_response(obj, max_depth=10):
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
-        if action == "{action}":
+        if action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
+            return paginate_results(client, action, **kwargs)
+        else:
             response = getattr(client, action)(**kwargs)
             return serialize_slack_response(response.data)
-        else:
-            raise ValueError(f"Unsupported action: {{action}}")
     except SlackApiError as e:
-        print(f"Error executing Slack action: {{e}}")
+        error_message = str(e)
+        if "missing_scope" in error_message:
+            print(f"Error: The Slack app is missing required scopes. Please check the app's permissions.")
+        elif "not_in_channel" in error_message:
+            print(f"Error: The Slack app is not in the specified channel. Please invite the app to the channel.")
+        else:
+            print(f"Error executing Slack action: {{e}}")
         raise
+
+def paginate_results(client, action, **kwargs):
+    method = getattr(client, action)
+    all_results = []
+    limit = int(kwargs.get('limit', 100))
+    kwargs['limit'] = min(limit, 1000)  # Slack API max limit per request
+
+    while True:
+        response = method(**kwargs)
+        results = response.data.get('channels') or response.data.get('messages') or response.data.get('members') or []
+        all_results.extend(results)
+
+        if len(all_results) >= limit or not response.data.get('response_metadata', {{}}).get('next_cursor'):
+            break
+
+        kwargs['cursor'] = response.data['response_metadata']['next_cursor']
+
+    return serialize_slack_response({"results": all_results[:limit]})
+
+def add_kubiya_disclaimer(text, user_email):
+    disclaimer = f"\\n\\n_This message was sent using the Kubiya platform on behalf of: {{user_email}}_"
+    return text + disclaimer
+
+def convert_base64_to_file(base64_string, file_name):
+    file_data = base64.b64decode(base64_string)
+    with open(file_name, 'wb') as f:
+        f.write(file_data)
+    return file_name
 
 if __name__ == "__main__":
     token = os.environ["SLACK_API_TOKEN"]
+    user_email = os.environ.get("KUBIYA_USER_EMAIL")
     
     arg_names = {arg_names_json}
     args = {{}}
     for arg in arg_names:
         if arg in os.environ:
             args[arg] = os.environ[arg]
+    
+    # Handle special cases
+    if 'text' in args and user_email:
+        args['text'] = add_kubiya_disclaimer(args['text'], user_email)
+    
+    if 'blocks' in args:
+        args['blocks'] = json.loads(args['blocks'])
+    
+    if 'file' in args and args['file'].startswith('base64:'):
+        file_data = args['file'].split('base64:')[1]
+        file_name = f"temp_file_{{datetime.now().strftime('%Y%m%d%H%M%S')}}"
+        args['file'] = convert_base64_to_file(file_data, file_name)
     
     result = execute_slack_action(token, "{action}", **args)
     print(json.dumps(result, indent=2))
