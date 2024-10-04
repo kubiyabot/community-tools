@@ -42,32 +42,30 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
     return _serialize(obj, 0)
 
 def create_block_kit_message(template, **kwargs):
-    print(f"Debug: Creating block kit message with template: {template}")
-    print(f"Debug: kwargs: {kwargs}")
     try:
         formatted_template = [
             {k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}
             for block in template
         ]
         blocks = json.dumps(formatted_template)
-        text = f"{kwargs.get('title', '')}\n\n{kwargs.get('message', '')}"
+        text = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', '')}}"
         return {'blocks': blocks, 'text': text}
     except KeyError as e:
-        print(f"Error: Missing key in kwargs: {e}")
+        print(f"Error: Missing key in kwargs: {{e}}")
         raise
     except Exception as e:
-        print(f"Error creating block kit message: {e}")
+        print(f"Error creating block kit message: {{e}}")
         raise
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
-        print(f"Debug: Action: {action}, kwargs: {kwargs}")
+        print(f"Debug: Action: {{action}}, kwargs: {{kwargs}}")
         if action == "chat_postMessage":
             original_text = kwargs.get('text', '')
             if kwargs.get('name') in ["slack_send_simple_text_with_header", "slack_send_info_message", "slack_send_warning_message", "slack_send_success_message", "slack_send_two_column_message", "slack_send_image_message"]:
-                template_name = f"{kwargs['name']}_template"
-                print(f"Debug: Using template: {template_name}")
+                template_name = f"{{kwargs['name']}}_template"
+                print(f"Debug: Using template: {{template_name}}")
                 if template_name in globals():
                     template = globals()[template_name]
                     try:
@@ -75,23 +73,23 @@ def execute_slack_action(token, action, **kwargs):
                         kwargs.update(message_content)
                         print(f"Debug: Updated kwargs after applying template: {kwargs}")
                     except Exception as e:
-                        print(f"Error creating Block Kit message: {e}")
+                        print(f"Error creating Block Kit message: {{e}}")
                         # Fallback to simple text message
-                        kwargs['text'] = f"{kwargs.get('title', '')}\n\n{kwargs.get('message', original_text)}"
+                        kwargs['text'] = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', original_text)}}"
                         kwargs.pop('blocks', None)
                 else:
                     print(f"Error: Template {template_name} not found in globals")
                     # Fallback to simple text message
-                    kwargs['text'] = f"{kwargs.get('title', '')}\n\n{kwargs.get('message', original_text)}"
+                    kwargs['text'] = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', original_text)}}"
                     kwargs.pop('blocks', None)
             
-            print(f"Debug: Sending message with final kwargs: {kwargs}")
+            print(f"Debug: Sending message with final kwargs: {{kwargs}}")
             response = client.chat_postMessage(**kwargs)
-            print(f"Debug: Slack API response: {response}")
+            print(f"Debug: Slack API response: {{response}}")
             
             if kwargs.get('name') == "slack_send_and_pin_message":
                 pin_response = client.pins_add(channel=kwargs['channel'], timestamp=response['ts'])
-                return serialize_slack_response({"message": response.data, "pin": pin_response.data})
+                return serialize_slack_response({{"message": response.data, "pin": pin_response.data}})
             return serialize_slack_response(response.data)
         elif action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
             return paginate_results(client, action, **kwargs)
@@ -105,10 +103,10 @@ def execute_slack_action(token, action, **kwargs):
         elif "not_in_channel" in error_message:
             print(f"Error: The Slack app is not in the specified channel. Please invite the app to the channel.")
         else:
-            print(f"Error executing Slack action: {e}")
+            print(f"Error executing Slack action: {{e}}")
         raise
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"Unexpected error: {{e}}")
         raise
 
 def paginate_results(client, action, **kwargs):
