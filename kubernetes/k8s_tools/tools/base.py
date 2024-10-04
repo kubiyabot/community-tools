@@ -9,10 +9,10 @@ class KubernetesTool(Tool):
         # Prepare the script to inject in-cluster context and use the temporary token file
         inject_kubernetes_context = """
 #!/bin/bash
-set -euo pipefail
+set -e
 
 # Inject in-cluster context using the temporary token file
-if [[ -f /tmp/kubernetes_context_token ]]; then
+if [ -f /tmp/kubernetes_context_token ]; then
     KUBE_TOKEN=$(cat /tmp/kubernetes_context_token)
     kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
     kubectl config set-credentials in-cluster --token=$KUBE_TOKEN
