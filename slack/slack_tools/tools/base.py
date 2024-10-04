@@ -27,9 +27,9 @@ def execute_slack_action(token, action, **kwargs):
         return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
-    token = os.environ.get("SLACK_BOT_TOKEN")
+    token = os.environ.get("SLACK_API_TOKEN")
     if not token:
-        print(json.dumps({{"success": False, "error": "SLACK_BOT_TOKEN is not set"}}))
+        print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
         sys.exit(1)
 
     arg_names = {arg_names_json}
