@@ -1,0 +1,41 @@
+tools:
+- name: aws-db-apply-tool
+  image: hashicorp/terraform              
+  description: "Create a databricks workspace."
+  long_running: true
+  type: docker
+  alias: ter-aws-apply
+  content: |
+    git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git $DIR
+    cd $DIR/aux/databricks/terraform/aws  
+
+    terraform init -backend-config="bucket=my-test-backend-bucket" \
+      -backend-config="key=databricks/{{ .workspace_name}}/terraform.tfstate" \
+      -backend-config="region=us-west-2"
+    terraform apply -auto-approve \
+      -var "databricks_account_id=${DB_ACCOUNT_ID}" \
+      -var "databricks_client_id=${DB_ACCOUNT_CLIENT_ID}" \
+      -var "WORKSPACE_NAME={{ .workspace_name }}" \
+      -var "databricks_client_secret=${DB_ACCOUNT_CLIENT_SECRET}" 
+      
+
+    echo "The state file can be found here: https://my-test-backend-bucket.s3.us-west-2.amazonaws.com/aws/"
+    echo "The databricks workspace can be found here: https://accounts.cloud.databricks.com/workspaces?account_id=${DB_ACCOUNT_ID}"
+   
+  args:
+    - name: "workspace_name"
+      description: "The name of the databricks workspace."
+      required: true
+
+  env:
+    - "DB_ACCOUNT_ID"
+    - "DB_ACCOUNT_CLIENT_ID"
+    - "DB_ACCOUNT_CLIENT_SECRET"
+    - "GIT_ORG"
+    - "GIT_REPO"
+    - "BRANCH"
+    - "DIR"
+    - "AWS_ACCESS_KEY_ID"
+    - "AWS_DEFAULT_REGION"
+    - "AWS_SECRET_ACCESS_KEY"
+    - "PAT"
