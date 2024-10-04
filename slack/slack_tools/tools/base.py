@@ -1,7 +1,6 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 import logging
-from slack_sdk.web import SlackResponse
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
