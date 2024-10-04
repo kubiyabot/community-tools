@@ -5,7 +5,8 @@ SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_
 
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["SLACK_API_TOKEN", "KUBIYA_USER_EMAIL"]
+        env = ["KUBIYA_USER_EMAIL"] # This is the user email that will be used to send the message on behalf of (user which is running the tool)
+        secrets = ["SLACK_API_TOKEN"] # This is the Slack API token that will be used to authenticate the request to the Slack API
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -119,7 +120,8 @@ if __name__ == "__main__":
             image="python:3.11",
             content="python /tmp/script.py",
             args=args,
-            secrets=env,
+            env=env,
+            secrets=secrets,
             long_running=long_running,
             mermaid=mermaid_diagram,
             with_files=[
