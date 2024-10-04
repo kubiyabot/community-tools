@@ -74,7 +74,7 @@ def paginate_results(client, action, **kwargs):
 
         kwargs['cursor'] = response.data['response_metadata']['next_cursor']
 
-    return serialize_slack_response({"results": all_results[:limit]})
+    return serialize_slack_response({{"results": all_results[:limit]}})
 
 def add_kubiya_disclaimer(text, user_email):
     disclaimer = f"\\n\\n_This message was sent using the Kubiya platform on behalf of: {{user_email}}_"
