@@ -44,7 +44,13 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
-        if action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
+        if action == "chat_postMessage":
+            response = client.chat_postMessage(**kwargs)
+            if kwargs.get('name') == "slack_send_and_pin_message":
+                pin_response = client.pins_add(channel=kwargs['channel'], timestamp=response['ts'])
+                return serialize_slack_response({{"message": response.data, "pin": pin_response.data}})
+            return serialize_slack_response(response.data)
+        elif action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
             return paginate_results(client, action, **kwargs)
         else:
             response = getattr(client, action)(**kwargs)

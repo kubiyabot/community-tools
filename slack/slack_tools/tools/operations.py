@@ -3,16 +3,48 @@ from .base import SlackTool
 from kubiya_sdk.tools.registry import tool_registry
 import json
 
-# Slack Send Message Tool
+# Slack Send Message Tool (without blocks)
 slack_send_message = SlackTool(
     name="slack_send_message",
-    description="Send a message to a Slack channel or user",
+    description="Send a simple text message to a Slack channel or user",
     action="chat_postMessage",
     args=[
         Arg(name="channel", type="str", description="The channel or user ID to send the message to", required=True),
         Arg(name="text", type="str", description="The message text", required=True),
-        Arg(name="blocks", type="str", description="JSON string of Block Kit blocks", required=False),
         Arg(name="thread_ts", type="str", description="Timestamp of the parent message to reply in a thread", required=False),
+    ],
+)
+
+# Slack Pin Message Tool
+slack_pin_message = SlackTool(
+    name="slack_pin_message",
+    description="Pin a message to a channel",
+    action="pins_add",
+    args=[
+        Arg(name="channel", type="str", description="The channel where the message is located", required=True),
+        Arg(name="timestamp", type="str", description="Timestamp of the message to pin", required=True),
+    ],
+)
+
+# Slack Unpin Message Tool
+slack_unpin_message = SlackTool(
+    name="slack_unpin_message",
+    description="Unpin a message from a channel",
+    action="pins_remove",
+    args=[
+        Arg(name="channel", type="str", description="The channel where the message is located", required=True),
+        Arg(name="timestamp", type="str", description="Timestamp of the message to unpin", required=True),
+    ],
+)
+
+# Slack Send and Pin Message Tool
+slack_send_and_pin_message = SlackTool(
+    name="slack_send_and_pin_message",
+    description="Send a message and pin it to the channel",
+    action="chat_postMessage",
+    args=[
+        Arg(name="channel", type="str", description="The channel or user ID to send the message to", required=True),
+        Arg(name="text", type="str", description="The message text", required=True),
     ],
 )
 
@@ -170,7 +202,9 @@ slack_get_channel_members = SlackTool(
 # New Block Kit template tools
 
 def create_block_kit_message(template, **kwargs):
-    return json.dumps(template.format(**kwargs))
+    blocks = json.dumps(template.format(**kwargs))
+    text = kwargs.get('text', 'Message sent using Block Kit')  # Fallback text
+    return {'blocks': blocks, 'text': text}
 
 # Simple text message with header
 simple_text_with_header_template = [
@@ -433,6 +467,9 @@ slack_get_team_members = SlackTool(
 # Add new tools to the all_tools list
 all_tools = [
     slack_send_message,
+    slack_pin_message,
+    slack_unpin_message,
+    slack_send_and_pin_message,
     slack_list_channels,
     slack_create_channel,
     slack_invite_user,
