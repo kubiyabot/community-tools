@@ -44,11 +44,32 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
 def create_block_kit_message(template, **kwargs):
     print(f"Debug: Creating block kit message with template: {template}")  # Add this debug line
     print(f"Debug: kwargs: {kwargs}")  # Add this debug line
-    formatted_template = [
-        {k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}
-        for block in template
-    ]
-    blocks = json.dumps(formatted_template)
+    try:
+        formatted_template = [
+            {k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}
+            for block in template
+        ]
+        blocks = json.dumps(formatted_template)
+    except KeyError as e:
+        print(f"Error: Missing key in kwargs: {e}")
+        # Use a simple fallback template
+        blocks = json.dumps([{
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Error formatting message: {str(e)}\n\nOriginal message: {kwargs.get('text', 'No message provided')}"
+            }
+        }])
+    except Exception as e:
+        print(f"Error creating block kit message: {e}")
+        blocks = json.dumps([{
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"Error creating message: {str(e)}\n\nOriginal message: {kwargs.get('text', 'No message provided')}"
+            }
+        }])
+    
     text = kwargs.get('text', 'Message sent using Block Kit')  # Fallback text
     print(f"Debug: Formatted blocks: {blocks}")  # Add this debug line
     return {'blocks': blocks, 'text': text}
@@ -68,6 +89,18 @@ def execute_slack_action(token, action, **kwargs):
                     print(f"Debug: Updated kwargs: {kwargs}")  # Add this debug line
                 else:
                     print(f"Error: Template {template_name} not found in globals")
+                    # Use a default template if the specific one is not found
+                    default_template = [
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "{message}"
+                            }
+                        }
+                    ]
+                    message_content = create_block_kit_message(default_template, message=kwargs.get('text', 'No message provided'))
+                    kwargs.update(message_content)
             
             print(f"Debug: Sending message with kwargs: {kwargs}")
             response = client.chat_postMessage(**kwargs)
