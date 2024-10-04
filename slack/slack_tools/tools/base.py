@@ -1,8 +1,15 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 import logging
+from slack_sdk.web import SlackResponse
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
+
+class SlackResponseEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, SlackResponse):
+            return obj.data
+        return super().default(obj)
 
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
@@ -18,8 +25,15 @@ import json
 import logging
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from slack_sdk.web import SlackResponse
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class SlackResponseEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, SlackResponse):
+            return obj.data
+        return super().default(obj)
 
 def find_channel_id(client, channel_name):
     try:
@@ -42,7 +56,7 @@ def send_slack_message(client, channel, text):
             channel_id = channel
 
         response = client.chat_postMessage(channel=channel_id, text=text)
-        return {{"success": True, "result": response.data}}
+        return {{"success": True, "result": response}}
     except SlackApiError as e:
         logging.error(f"Error sending message: {{e}}")
         return {{"success": False, "error": str(e), "response": e.response}}
@@ -58,7 +72,7 @@ def execute_slack_action(token, action, **kwargs):
         else:
             method = getattr(client, action)
             response = method(**kwargs)
-            return {{"success": True, "result": response.data}}
+            return {{"success": True, "result": response}}
     except SlackApiError as e:
         logging.error(f"SlackApiError: {{e}}")
         return {{"success": False, "error": str(e), "response": e.response}}
@@ -80,7 +94,7 @@ if __name__ == "__main__":
             args[arg] = os.environ[arg]
     
     result = execute_slack_action(token, "{action}", **args)
-    print(json.dumps(result))
+    print(json.dumps(result, cls=SlackResponseEncoder))
 """
         super().__init__(
             name=name,
