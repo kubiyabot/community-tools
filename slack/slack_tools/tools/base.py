@@ -1,5 +1,6 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
+import logging
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
@@ -14,21 +15,61 @@ class SlackTool(Tool):
 import os
 import sys
 import json
+import logging
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-def execute_slack_action(token, action, **kwargs):
-    client = WebClient(token=token)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def find_channel_id(client, channel_name):
     try:
-        method = getattr(client, action)
-        response = method(**kwargs)
+        for result in client.conversations_list():
+            for channel in result["channels"]:
+                if channel["name"] == channel_name:
+                    return channel["id"]
+        return None
+    except SlackApiError as e:
+        logging.error(f"Error listing conversations: {{e}}")
+        return None
+
+def send_slack_message(client, channel, text):
+    try:
+        if channel.startswith('#'):
+            channel_id = find_channel_id(client, channel[1:])
+            if not channel_id:
+                return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
+        else:
+            channel_id = channel
+
+        response = client.chat_postMessage(channel=channel_id, text=text)
         return {{"success": True, "result": response.data}}
     except SlackApiError as e:
+        logging.error(f"Error sending message: {{e}}")
+        return {{"success": False, "error": str(e), "response": e.response}}
+
+def execute_slack_action(token, action, **kwargs):
+    client = WebClient(token=token)
+    logging.info(f"Executing Slack action: {{action}}")
+    logging.info(f"Action parameters: {{kwargs}}")
+
+    try:
+        if action == "chat_postMessage":
+            return send_slack_message(client, kwargs['channel'], kwargs['text'])
+        else:
+            method = getattr(client, action)
+            response = method(**kwargs)
+            return {{"success": True, "result": response.data}}
+    except SlackApiError as e:
+        logging.error(f"SlackApiError: {{e}}")
+        return {{"success": False, "error": str(e), "response": e.response}}
+    except Exception as e:
+        logging.error(f"Unexpected error: {{e}}")
         return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
     token = os.environ.get("SLACK_API_TOKEN")
     if not token:
+        logging.error("SLACK_API_TOKEN is not set")
         print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
         sys.exit(1)
 

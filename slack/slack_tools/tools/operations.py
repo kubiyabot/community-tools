@@ -8,7 +8,7 @@ slack_send_message = SlackTool(
     description="Send a message to a Slack channel or user",
     action="chat_postMessage",
     args=[
-        Arg(name="channel", type="str", description="The channel or user ID to send the message to", required=True),
+        Arg(name="channel", type="str", description="The channel name (with # prefix) or ID, or user ID to send the message to", required=True),
         Arg(name="text", type="str", description="The message text", required=True),
     ],
 )
@@ -20,7 +20,7 @@ slack_upload_file = SlackTool(
     action="files_upload",
     args=[
         Arg(name="channels", type="str", description="Comma-separated list of channel IDs to share the file to", required=True),
-        Arg(name="file", type="str", description="File content or path to the file", required=True),
+        Arg(name="content", type="str", description="File content", required=True),
         Arg(name="filename", type="str", description="Name of the file", required=True),
         Arg(name="initial_comment", type="str", description="Initial comment for the file", required=False),
     ],
@@ -58,29 +58,6 @@ slack_invite_user = SlackTool(
     ],
 )
 
-# Slack Get Channel History Tool
-slack_get_channel_history = SlackTool(
-    name="slack_get_channel_history",
-    description="Get the message history of a Slack channel",
-    action="conversations_history",
-    args=[
-        Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
-        Arg(name="limit", type="int", description="Number of messages to return (default 100)", required=False),
-    ],
-)
-
-# Slack Add Reaction Tool
-slack_add_reaction = SlackTool(
-    name="slack_add_reaction",
-    description="Add a reaction to a message",
-    action="reactions_add",
-    args=[
-        Arg(name="channel", type="str", description="Channel containing the message", required=True),
-        Arg(name="timestamp", type="str", description="Timestamp of the message", required=True),
-        Arg(name="name", type="str", description="Name of the emoji to react with", required=True),
-    ],
-)
-
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -88,8 +65,6 @@ all_tools = [
     slack_list_channels,
     slack_create_channel,
     slack_invite_user,
-    slack_get_channel_history,
-    slack_add_reaction,
 ]
 
 # Register all Slack tools
