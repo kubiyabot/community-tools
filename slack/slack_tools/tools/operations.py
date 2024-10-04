@@ -3,6 +3,89 @@ from .base import SlackTool
 from kubiya_sdk.tools.registry import tool_registry
 import json
 
+# Define templates in the global scope
+simple_text_with_header_template = [
+    {
+        "type": "header",
+        "text": {
+            "type": "plain_text",
+            "text": "{header}"
+        }
+    },
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "{body}"
+        }
+    }
+]
+
+info_message_template = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":information_source: *{title}*\n\n{message}"
+        }
+    }
+]
+
+warning_message_template = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":warning: *Warning: {title}*\n\n{message}"
+        }
+    }
+]
+
+success_message_template = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":white_check_mark: *Success: {title}*\n\n{message}"
+        }
+    }
+]
+
+two_column_message_template = [
+    {
+        "type": "section",
+        "fields": [
+            {
+                "type": "mrkdwn",
+                "text": "*Left column:*\n{left_column}"
+            },
+            {
+                "type": "mrkdwn",
+                "text": "*Right column:*\n{right_column}"
+            }
+        ]
+    }
+]
+
+image_message_template = [
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "{text}"
+        }
+    },
+    {
+        "type": "image",
+        "title": {
+            "type": "plain_text",
+            "text": "{image_title}"
+        },
+        "image_url": "{image_url}",
+        "alt_text": "{alt_text}"
+    }
+]
+
 # Slack Send Message Tool (without blocks)
 slack_send_message = SlackTool(
     name="slack_send_message",
@@ -207,23 +290,6 @@ def create_block_kit_message(template, **kwargs):
     return {'blocks': blocks, 'text': text}
 
 # Simple text message with header
-simple_text_with_header_template = [
-    {
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": "{header}"
-        }
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "{body}"
-        }
-    }
-]
-
 slack_send_simple_text_with_header = SlackTool(
     name="slack_send_simple_text_with_header",
     description="Send a message with a header and body text. Options: header, body",
@@ -236,16 +302,6 @@ slack_send_simple_text_with_header = SlackTool(
 )
 
 # Information message with icon
-info_message_template = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":information_source: *{title}*\n\n{message}"
-        }
-    }
-]
-
 slack_send_info_message = SlackTool(
     name="slack_send_info_message",
     description="Send an information message with an icon. Options: title, message",
@@ -258,16 +314,6 @@ slack_send_info_message = SlackTool(
 )
 
 # Warning message with icon
-warning_message_template = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":warning: *Warning: {title}*\n\n{message}"
-        }
-    }
-]
-
 slack_send_warning_message = SlackTool(
     name="slack_send_warning_message",
     description="Send a warning message with an icon. Options: title, message",
@@ -280,16 +326,6 @@ slack_send_warning_message = SlackTool(
 )
 
 # Success message with icon
-success_message_template = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":white_check_mark: *Success: {title}*\n\n{message}"
-        }
-    }
-]
-
 slack_send_success_message = SlackTool(
     name="slack_send_success_message",
     description="Send a success message with an icon. Options: title, message",
@@ -302,22 +338,6 @@ slack_send_success_message = SlackTool(
 )
 
 # Two-column layout message
-two_column_message_template = [
-    {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": "*Left column:*\n{left_column}"
-            },
-            {
-                "type": "mrkdwn",
-                "text": "*Right column:*\n{right_column}"
-            }
-        ]
-    }
-]
-
 slack_send_two_column_message = SlackTool(
     name="slack_send_two_column_message",
     description="Send a message with two columns. Options: left_column, right_column",
@@ -330,25 +350,6 @@ slack_send_two_column_message = SlackTool(
 )
 
 # Message with image
-image_message_template = [
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "{text}"
-        }
-    },
-    {
-        "type": "image",
-        "title": {
-            "type": "plain_text",
-            "text": "{image_title}"
-        },
-        "image_url": "{image_url}",
-        "alt_text": "{alt_text}"
-    }
-]
-
 slack_send_image_message = SlackTool(
     name="slack_send_image_message",
     description="Send a message with an image. Options: text, image_title, image_url, alt_text",
