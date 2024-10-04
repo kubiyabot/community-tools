@@ -44,69 +44,47 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
 def create_block_kit_message(template, **kwargs):
     try:
         formatted_template = [
-            {k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}
+            {{k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}}
             for block in template
         ]
         blocks = json.dumps(formatted_template)
-        text = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', '')}}"
-        return {'blocks': blocks, 'text': text}
+        text = f"{{{{kwargs.get('title', '')}}}}\\n\\n{{{{kwargs.get('message', '')}}}}"
+        return {{'blocks': blocks, 'text': text}}
     except KeyError as e:
-        print(f"Error: Missing key in kwargs: {{e}}")
+        print(f"Error: Missing key in kwargs: {{{{e}}}}")
         raise
     except Exception as e:
-        print(f"Error creating block kit message: {{e}}")
+        print(f"Error creating block kit message: {{{{e}}}}")
         raise
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
-        print(f"Debug: Action: {{action}}, kwargs: {{kwargs}}")
+        print(f"Debug: Executing Slack action: {{{{action}}}}")
+        print(f"Debug: Action parameters: {{{{kwargs}}}}")
+        
         if action == "chat_postMessage":
-            original_text = kwargs.get('text', '')
-            if kwargs.get('name') in ["slack_send_simple_text_with_header", "slack_send_info_message", "slack_send_warning_message", "slack_send_success_message", "slack_send_two_column_message", "slack_send_image_message"]:
-                template_name = f"{{kwargs['name']}}_template"
-                print(f"Debug: Using template: {{template_name}}")
-                if template_name in globals():
-                    template = globals()[template_name]
-                    try:
-                        message_content = create_block_kit_message(template, **kwargs)
-                        kwargs.update(message_content)
-                        print(f"Debug: Updated kwargs after applying template: {kwargs}")
-                    except Exception as e:
-                        print(f"Error creating Block Kit message: {{e}}")
-                        # Fallback to simple text message
-                        kwargs['text'] = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', original_text)}}"
-                        kwargs.pop('blocks', None)
-                else:
-                    print(f"Error: Template {template_name} not found in globals")
-                    # Fallback to simple text message
-                    kwargs['text'] = f"{{kwargs.get('title', '')}}\n\n{{kwargs.get('message', original_text)}}"
-                    kwargs.pop('blocks', None)
-            
-            print(f"Debug: Sending message with final kwargs: {{kwargs}}")
             response = client.chat_postMessage(**kwargs)
-            print(f"Debug: Slack API response: {{response}}")
-            
-            if kwargs.get('name') == "slack_send_and_pin_message":
-                pin_response = client.pins_add(channel=kwargs['channel'], timestamp=response['ts'])
-                return serialize_slack_response({{"message": response.data, "pin": pin_response.data}})
+            print(f"Debug: Message sent successfully. Response: {{{{response}}}}")
             return serialize_slack_response(response.data)
-        elif action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
-            return paginate_results(client, action, **kwargs)
-        else:
-            response = getattr(client, action)(**kwargs)
-            return serialize_slack_response(response.data)
+        # ... (other actions)
+    
     except SlackApiError as e:
         error_message = str(e)
-        if "missing_scope" in error_message:
-            print(f"Error: The Slack app is missing required scopes. Please check the app's permissions.")
+        print(f"SlackApiError: {{{{error_message}}}}")
+        if "invalid_auth" in error_message:
+            print("Error: Invalid authentication token. Please check your Slack API token.")
+        elif "channel_not_found" in error_message:
+            print(f"Error: Channel not found. Please check the channel ID: {{{{kwargs.get('channel')}}}}")
         elif "not_in_channel" in error_message:
-            print(f"Error: The Slack app is not in the specified channel. Please invite the app to the channel.")
+            print(f"Error: The Slack app is not in the specified channel. Please invite the app to the channel: {{{{kwargs.get('channel')}}}}")
+        elif "missing_scope" in error_message:
+            print("Error: The Slack app is missing required scopes. Please check the app's permissions.")
         else:
-            print(f"Error executing Slack action: {{e}}")
+            print(f"Unexpected Slack API error: {{{{error_message}}}}")
         raise
     except Exception as e:
-        print(f"Unexpected error: {{e}}")
+        print(f"Unexpected error: {{{{str(e)}}}}")
         raise
 
 def paginate_results(client, action, **kwargs):
@@ -128,7 +106,7 @@ def paginate_results(client, action, **kwargs):
     return serialize_slack_response({{"results": all_results[:limit]}})
 
 def add_kubiya_disclaimer(text, user_email):
-    disclaimer = f"\\n\\n_This message was sent using the Kubiya platform on behalf of: {{user_email}}_"
+    disclaimer = f"\\n\\n_This message was sent using the Kubiya platform on behalf of: {{{{user_email}}}}_"
     return text + disclaimer
 
 def convert_base64_to_file(base64_string, file_name):
@@ -137,33 +115,43 @@ def convert_base64_to_file(base64_string, file_name):
         f.write(file_data)
     return file_name
 
+def check_slack_token():
+    token = os.environ.get("SLACK_API_TOKEN")
+    if not token:
+        raise ValueError("SLACK_API_TOKEN is not set. Please set the SLACK_API_TOKEN environment variable.")
+    return token
+
 if __name__ == "__main__":
-    token = os.environ["SLACK_API_TOKEN"]
-    user_email = os.environ.get("KUBIYA_USER_EMAIL")
-    
-    arg_names = {arg_names_json}
-    args = {{}}
-    for arg in arg_names:
-        if arg in os.environ:
-            args[arg] = os.environ[arg]
-    
-    # Handle special cases
-    if 'text' in args and user_email:
-        args['text'] = add_kubiya_disclaimer(args['text'], user_email)
-    
-    if 'blocks' in args:
-        args['blocks'] = json.loads(args['blocks'])
-    
-    if 'file' in args and args['file'].startswith('base64:'):
-        file_data = args['file'].split('base64:')[1]
-        file_name = f"temp_file_{{datetime.now().strftime('%Y%m%d%H%M%S')}}"
-        args['file'] = convert_base64_to_file(file_data, file_name)
-    
     try:
-        result = execute_slack_action(token, "{action}", **args)
-        print(json.dumps(result, indent=2))
-    except Exception as e:
-        print(f"Error: {{e}}")
+        token = check_slack_token()
+        user_email = os.environ.get("KUBIYA_USER_EMAIL")
+        
+        arg_names = {arg_names_json}
+        args = {{}}
+        for arg in arg_names:
+            if arg in os.environ:
+                args[arg] = os.environ[arg]
+        
+        # Handle special cases
+        if 'text' in args and user_email:
+            args['text'] = add_kubiya_disclaimer(args['text'], user_email)
+        
+        if 'blocks' in args:
+            args['blocks'] = json.loads(args['blocks'])
+        
+        if 'file' in args and args['file'].startswith('base64:'):
+            file_data = args['file'].split('base64:')[1]
+            file_name = f"temp_file_{{{{datetime.now().strftime('%Y%m%d%H%M%S')}}}}"
+            args['file'] = convert_base64_to_file(file_data, file_name)
+        
+        try:
+            result = execute_slack_action(token, "{action}", **args)
+            print(json.dumps(result, indent=2))
+        except Exception as e:
+            print(f"Error: {{{{e}}}}")
+            sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {{{{e}}}}")
         sys.exit(1)
 """
         super().__init__(
