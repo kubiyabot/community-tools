@@ -6,7 +6,7 @@ SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
         env = ["KUBIYA_USER_EMAIL"]
-        secrets = ["SLACK_API_TOKEN"]
+        secrets = ["SLACK_BOT_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -20,18 +20,16 @@ from slack_sdk.errors import SlackApiError
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
-        if action == "chat_postMessage":
-            response = client.chat_postMessage(**kwargs)
-            return {{"message": "Message sent successfully", "ts": response['ts']}}
-        else:
-            raise ValueError(f"Unsupported action: {{action}}")
+        method = getattr(client, action)
+        response = method(**kwargs)
+        return {{"success": True, "result": response.data}}
     except SlackApiError as e:
-        return {{"error": f"Slack API error: {{str(e)}}"}}
+        return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
-    token = os.environ.get("SLACK_API_TOKEN")
+    token = os.environ.get("SLACK_BOT_TOKEN")
     if not token:
-        print(json.dumps({{"error": "SLACK_API_TOKEN is not set"}}))
+        print(json.dumps({{"success": False, "error": "SLACK_BOT_TOKEN is not set"}}))
         sys.exit(1)
 
     arg_names = {arg_names_json}
@@ -40,12 +38,8 @@ if __name__ == "__main__":
         if arg in os.environ:
             args[arg] = os.environ[arg]
     
-    try:
-        result = execute_slack_action(token, "{action}", **args)
-        print(json.dumps(result))
-    except Exception as e:
-        print(json.dumps({{"error": str(e)}}))
-        sys.exit(1)
+    result = execute_slack_action(token, "{action}", **args)
+    print(json.dumps(result))
 """
         super().__init__(
             name=name,
