@@ -5,8 +5,8 @@ SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_
 
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL"] # This is the user email that will be used to send the message on behalf of (user which is running the tool)
-        secrets = ["SLACK_API_TOKEN"] # This is the Slack API token that will be used to authenticate the request to the Slack API
+        env = ["KUBIYA_USER_EMAIL"]
+        secrets = ["SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -41,11 +41,23 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
     
     return _serialize(obj, 0)
 
+def create_block_kit_message(template, **kwargs):
+    blocks = json.dumps(template.format(**kwargs))
+    text = kwargs.get('text', 'Message sent using Block Kit')  # Fallback text
+    return {{'blocks': blocks, 'text': text}}
+
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
         if action == "chat_postMessage":
+            if kwargs.get('name') in ["slack_send_simple_text_with_header", "slack_send_info_message", "slack_send_warning_message", "slack_send_success_message", "slack_send_two_column_message", "slack_send_image_message"]:
+                template = globals()[f"{{kwargs['name']}}_template"]
+                message_content = create_block_kit_message(template, **kwargs)
+                kwargs.update(message_content)
+            
+            print(f"Debug: Sending message with kwargs: {{kwargs}}")
             response = client.chat_postMessage(**kwargs)
+            
             if kwargs.get('name') == "slack_send_and_pin_message":
                 pin_response = client.pins_add(channel=kwargs['channel'], timestamp=response['ts'])
                 return serialize_slack_response({{"message": response.data, "pin": pin_response.data}})
@@ -115,8 +127,12 @@ if __name__ == "__main__":
         file_name = f"temp_file_{{datetime.now().strftime('%Y%m%d%H%M%S')}}"
         args['file'] = convert_base64_to_file(file_data, file_name)
     
-    result = execute_slack_action(token, "{action}", **args)
-    print(json.dumps(result, indent=2))
+    try:
+        result = execute_slack_action(token, "{action}", **args)
+        print(json.dumps(result, indent=2))
+    except Exception as e:
+        print(f"Error: {{e}}")
+        sys.exit(1)
 """
         super().__init__(
             name=name,
