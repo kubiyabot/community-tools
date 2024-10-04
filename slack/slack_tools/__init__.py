@@ -1,5 +1,8 @@
 from .tools.operations import (
     slack_send_message,
+    slack_pin_message,
+    slack_unpin_message,
+    slack_send_and_pin_message,
     slack_upload_file,
     slack_list_channels,
     slack_create_channel,
@@ -17,6 +20,9 @@ from .tools.operations import (
 
 __all__ = [
     'slack_send_message',
+    'slack_pin_message',
+    'slack_unpin_message',
+    'slack_send_and_pin_message',
     'slack_upload_file',
     'slack_list_channels',
     'slack_create_channel',

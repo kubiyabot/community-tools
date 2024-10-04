@@ -1,7 +1,24 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool
+from kubiya_sdk.tools.models import Tool
 from kubiya_sdk.tools.registry import tool_registry
 import json
+
+# Define SlackTool class here to avoid circular import
+class SlackTool(Tool):
+    def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png",
+            type="docker",
+            image="python:3.11",
+            content="python /tmp/script.py",
+            args=args,
+            env=["KUBIYA_USER_EMAIL"],
+            secrets=["SLACK_API_TOKEN"],
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+        )
 
 # Define templates in the global scope
 simple_text_with_header_template = [
