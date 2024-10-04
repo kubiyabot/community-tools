@@ -42,25 +42,40 @@ def serialize_slack_response(obj, max_depth=10, max_items=100):
     return _serialize(obj, 0)
 
 def create_block_kit_message(template, **kwargs):
-    blocks = json.dumps(template.format(**kwargs))
+    print(f"Debug: Creating block kit message with template: {template}")  # Add this debug line
+    print(f"Debug: kwargs: {kwargs}")  # Add this debug line
+    formatted_template = [
+        {k: v.format(**kwargs) if isinstance(v, str) else v for k, v in block.items()}
+        for block in template
+    ]
+    blocks = json.dumps(formatted_template)
     text = kwargs.get('text', 'Message sent using Block Kit')  # Fallback text
-    return {{'blocks': blocks, 'text': text}}
+    print(f"Debug: Formatted blocks: {blocks}")  # Add this debug line
+    return {'blocks': blocks, 'text': text}
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
     try:
+        print(f"Debug: Action: {action}, kwargs: {kwargs}")  # Add this debug line
         if action == "chat_postMessage":
             if kwargs.get('name') in ["slack_send_simple_text_with_header", "slack_send_info_message", "slack_send_warning_message", "slack_send_success_message", "slack_send_two_column_message", "slack_send_image_message"]:
-                template = globals()[f"{{kwargs['name']}}_template"]
-                message_content = create_block_kit_message(template, **kwargs)
-                kwargs.update(message_content)
+                template_name = f"{kwargs['name']}_template"
+                print(f"Debug: Using template: {template_name}")  # Add this debug line
+                if template_name in globals():
+                    template = globals()[template_name]
+                    message_content = create_block_kit_message(template, **kwargs)
+                    kwargs.update(message_content)
+                    print(f"Debug: Updated kwargs: {kwargs}")  # Add this debug line
+                else:
+                    print(f"Error: Template {template_name} not found in globals")
             
-            print(f"Debug: Sending message with kwargs: {{kwargs}}")
+            print(f"Debug: Sending message with kwargs: {kwargs}")
             response = client.chat_postMessage(**kwargs)
+            print(f"Debug: Slack API response: {response}")  # Add this debug line
             
             if kwargs.get('name') == "slack_send_and_pin_message":
                 pin_response = client.pins_add(channel=kwargs['channel'], timestamp=response['ts'])
-                return serialize_slack_response({{"message": response.data, "pin": pin_response.data}})
+                return serialize_slack_response({"message": response.data, "pin": pin_response.data})
             return serialize_slack_response(response.data)
         elif action in ["conversations_list", "conversations_history", "conversations_members", "search_messages"]:
             return paginate_results(client, action, **kwargs)
@@ -74,7 +89,7 @@ def execute_slack_action(token, action, **kwargs):
         elif "not_in_channel" in error_message:
             print(f"Error: The Slack app is not in the specified channel. Please invite the app to the channel.")
         else:
-            print(f"Error executing Slack action: {{e}}")
+            print(f"Error executing Slack action: {e}")
         raise
 
 def paginate_results(client, action, **kwargs):
