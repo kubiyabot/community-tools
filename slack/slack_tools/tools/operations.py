@@ -464,7 +464,7 @@ slack_get_team_members = SlackTool(
     ],
 )
 
-# Add new tools to the all_tools list
+# Update the all_tools list
 all_tools = [
     slack_send_message,
     slack_pin_message,
