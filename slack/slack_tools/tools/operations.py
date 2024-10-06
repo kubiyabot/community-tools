@@ -5,11 +5,12 @@ from kubiya_sdk.tools.registry import tool_registry
 # Slack Send Message Tool
 slack_send_message = SlackTool(
     name="slack_send_message",
-    description="Send a message to a Slack channel or user",
+    description="Send a message to a Slack channel or user with optional styling",
     action="chat_postMessage",
     args=[
         Arg(name="channel", type="str", description="The channel name (with # prefix) or ID, or user ID to send the message to", required=True),
         Arg(name="text", type="str", description="The message text", required=True),
+        Arg(name="style", type="str", description="Predefined style for the message (simple, info, warning, success, error)", required=False),
     ],
 )
 
