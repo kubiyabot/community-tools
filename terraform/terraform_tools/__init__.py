@@ -2,7 +2,7 @@ from .tools import terraform_operations
 from kubiya_sdk.tools.registry import tool_registry
 
 # Get all registered Terraform tools
-terraform_tools = tool_registry.get_tools("terraform")
+terraform_tools = tool_registry["terraform"]
 
 # Create a dictionary of tool names to tool objects
 terraform_tool_dict = {tool.name.replace("terraform_", ""): tool for tool in terraform_tools}
