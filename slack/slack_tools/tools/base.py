@@ -108,7 +108,7 @@ if __name__ == "__main__":
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="python /tmp/script.py",
+            content="pip install slack-sdk && python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
