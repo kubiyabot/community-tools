@@ -120,8 +120,8 @@ def send_slack_message(client, channel, text, style=None):
                         channel_id = ch["id"]
                         break
                 else:
-                    logging.error(f"Channel '{channel}' not found")
-                    return {{"success": False, "error": f"Channel '{channel}' not found"}}
+                    logging.error(f"Channel '{{channel}}' not found")
+                    return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
             except SlackApiError as e:
                 logging.error(f"Error listing channels: {{e}}")
                 return {{"success": False, "error": f"Failed to list channels: {{str(e)}}"}}
