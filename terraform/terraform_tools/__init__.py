@@ -1,13 +1,27 @@
-from .tools import terraform_operations
-from kubiya_sdk.tools.registry import tool_registry
+from .tools.terraform_operations import (
+    terraform_init,
+    terraform_plan,
+    terraform_apply,
+    terraform_destroy,
+    terraform_output,
+    terraform_show,
+    terraform_validate,
+    terraform_workspace_list,
+    terraform_workspace_select,
+    terraform_state_list,
+    terraform_state_show
+)
 
-# Get all registered Terraform tools
-terraform_tools = tool_registry["terraform"]
-
-# Create a dictionary of tool names to tool objects
-terraform_tool_dict = {tool.name.replace("terraform_", ""): tool for tool in terraform_tools}
-
-# Add the tools to the module's namespace
-globals().update(terraform_tool_dict)
-
-__all__ = list(terraform_tool_dict.keys())
+__all__ = [
+    'terraform_init',
+    'terraform_plan',
+    'terraform_apply',
+    'terraform_destroy',
+    'terraform_output',
+    'terraform_show',
+    'terraform_validate',
+    'terraform_workspace_list',
+    'terraform_workspace_select',
+    'terraform_state_list',
+    'terraform_state_show'
+]
