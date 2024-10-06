@@ -1,4 +1,4 @@
 from .base import TerraformTool
-from .terraform_operations import create_terraform_tool
+from . import terraform_operations
 
-__all__ = ['TerraformTool', 'create_terraform_tool', 'tool_registry']
+__all__ = ['TerraformTool', 'terraform_operations']
