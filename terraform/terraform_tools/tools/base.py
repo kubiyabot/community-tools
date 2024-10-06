@@ -25,4 +25,3 @@ class TerraformTool(Tool):
                 FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
             ]
         )
-        return self
