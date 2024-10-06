@@ -120,7 +120,8 @@ def send_slack_message(client, channel, text, style=None):
                         channel_id = ch["id"]
                         break
                 else:
-                    return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
+                    logging.error(f"Channel '{channel}' not found")
+                    return {{"success": False, "error": f"Channel '{channel}' not found"}}
             except SlackApiError as e:
                 logging.error(f"Error listing channels: {{e}}")
                 return {{"success": False, "error": f"Failed to list channels: {{str(e)}}"}}
@@ -130,6 +131,8 @@ def send_slack_message(client, channel, text, style=None):
             # Assume it's a user ID
             channel_id = channel
 
+        logging.info(f"Sending message to channel ID: {{channel_id}}")
+        
         blocks = get_styled_blocks(text, style)
         
         kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL")
@@ -145,20 +148,27 @@ def send_slack_message(client, channel, text, style=None):
                 if block["type"] == "section" and "text" in block["text"]:
                     block["text"]["text"] = text
 
+        logging.info(f"Sending message with text: {{text[:100]}}...")
         response = client.chat_postMessage(channel=channel_id, text=text, blocks=blocks)
+        logging.info(f"Message sent successfully. Response: {{response}}")
         return {{"success": True, "result": response.data}}
 
     except SlackApiError as e:
         error_message = str(e)
+        logging.error(f"SlackApiError: {{error_message}}")
         if "invalid_blocks" in error_message:
             # Fallback to simple text message if blocks are invalid
             try:
+                logging.info("Falling back to simple text message")
                 response = client.chat_postMessage(channel=channel_id, text=text)
+                logging.info(f"Simple message sent successfully. Response: {{response}}")
                 return {{"success": True, "result": response.data, "warning": "Fell back to simple text message due to invalid blocks"}}
             except SlackApiError as simple_e:
+                logging.error(f"Failed to send even a simple message: {{simple_e}}")
                 return {{"success": False, "error": f"Failed to send even a simple message: {{simple_e}}"}}
         elif "rate_limited" in error_message:
             retry_after = e.response.headers.get("Retry-After", 1)
+            logging.error(f"Rate limited. Retry after {{retry_after}} seconds")
             return {{"success": False, "error": f"Rate limited. Retry after {{retry_after}} seconds", "retry_after": int(retry_after)}}
         else:
             logging.error(f"Error sending message: {{e}}")
@@ -177,6 +187,7 @@ def execute_slack_action(token, action, **kwargs):
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
         
+        logging.info(f"Action result: {{result}}")
         return result
     except SlackApiError as e:
         logging.error(f"SlackApiError: {{e}}")
