@@ -1,4 +1,4 @@
-from terraform.terraform_tools.tools.terraform_operations import (
+from .tools.terraform_operations import (
     terraform_init,
     terraform_plan,
     terraform_apply,
