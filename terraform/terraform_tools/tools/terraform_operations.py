@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from terraform.terraform_tools.tools.base import TerraformTool
+from .base import TerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 
 def create_terraform_tool(name, description, content, additional_args=None):
