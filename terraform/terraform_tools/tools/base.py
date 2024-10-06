@@ -3,7 +3,7 @@ from kubiya_sdk.tools import Tool, FileSpec
 TERRAFORM_ICON_URL = "https://www.terraform.io/assets/images/logo-terraform-main.svg"
 
 class TerraformTool(Tool):
-    def __init__(self, name, description, content, args=[], files=[], env=[], long_running=True):
+    def __init__(self, name, description, content, args=[], files=[], env=[], secrets=[], long_running=True):
         super().__init__(
             name=name,
             description=description,
@@ -13,23 +13,16 @@ class TerraformTool(Tool):
             content=content,
             args=args,
             long_running=long_running,
-            env=env,
-            files=files,
+            env=[
+                "AWS_PROFILE", # AWS Profile - used to get AWS credentials (integration)
+            ],
+            secrets=[
+                "GITHUB_TOKEN", # Github Token (integration)
+            ],
+            files=[
+                # AWS Credentials (integration) - https://docs.kubiya.ai
+                FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+                FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+            ]
         )
-
-        # add env vars for github token and aws credentials
-        self = self.with_github_token()
-        self = self.with_aws_credentials()
-        return self
-
-    def with_github_token(self):
-        self.env.append("GH_TOKEN")
-        return self
-
-    def with_aws_credentials(self):
-        self.env.extend(["AWS_PROFILE"])
-        self.files.extend([
-            FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
-            FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config")
-        ])
         return self
