@@ -3,9 +3,7 @@ from kubiya_sdk.tools import Tool, FileSpec
 TERRAFORM_ICON_URL = "https://www.terraform.io/assets/images/logo-terraform-main.svg"
 
 class TerraformTool(Tool):
-    def __init__(self, name, description, content, args, long_running=True):
-        files = []
-
+    def __init__(self, name, description, content, args=[], files=[], env=[], long_running=True):
         super().__init__(
             name=name,
             description=description,
@@ -15,7 +13,7 @@ class TerraformTool(Tool):
             content=content,
             args=args,
             long_running=long_running,
-            env=[],
+            env=env,
             files=files,
         )
 
