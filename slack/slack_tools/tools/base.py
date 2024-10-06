@@ -1,6 +1,7 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 import logging
+from datetime import datetime
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
@@ -8,6 +9,10 @@ class SlackResponseEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, SlackResponse):
             return obj.data
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, '__dict__'):
+            return obj.__dict__
         return super().default(obj)
 
 class SlackTool(Tool):
@@ -22,9 +27,21 @@ import os
 import sys
 import json
 import logging
+import re
+import subprocess
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# Install required packages
+install('slack_sdk')
+install('fuzzywuzzy')
+install('python-Levenshtein')
+
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
+from fuzzywuzzy import process
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -32,14 +49,45 @@ class SlackResponseEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, SlackResponse):
             return obj.data
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif hasattr(obj, '__dict__'):
+            return obj.__dict__
         return super().default(obj)
 
-def find_channel_id(client, channel_name):
+def find_channel_id(client, channel_input, fuzzy_match=True):
+    channel_input = channel_input.lstrip('#')
+    
+    # Check if it's already a channel ID
+    if re.match(r'^[C][A-Z0-9]{{8,}}$', channel_input):
+        return channel_input
+
     try:
+        channels = []
         for result in client.conversations_list():
-            for channel in result["channels"]:
-                if channel["name"] == channel_name:
-                    return channel["id"]
+            channels.extend(result["channels"])
+        
+        # Exact match
+        for channel in channels:
+            if channel["name"] == channel_input:
+                return channel["id"]
+        
+        if fuzzy_match:
+            # Fuzzy match
+            channel_names = [channel["name"] for channel in channels]
+            best_matches = process.extract(channel_input, channel_names, limit=5)
+            
+            if best_matches and best_matches[0][1] >= 80:  # 80% similarity threshold
+                matched_channel = next(channel for channel in channels if channel["name"] == best_matches[0][0])
+                return matched_channel["id"]
+            else:
+                options = [{{
+                    "name": match[0],
+                    "score": match[1],
+                    "id": next(channel["id"] for channel in channels if channel["name"] == match[0])
+                }} for match in best_matches]
+                return {{"error": "No high confidence match found", "options": options}}
+        
         return None
     except SlackApiError as e:
         logging.error(f"Error listing conversations: {{e}}")
@@ -47,18 +95,19 @@ def find_channel_id(client, channel_name):
 
 def send_slack_message(client, channel, text):
     try:
-        if channel.startswith('#'):
-            channel_id = find_channel_id(client, channel[1:])
-            if not channel_id:
-                return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
-        else:
-            channel_id = channel
+        channel_id_result = find_channel_id(client, channel, fuzzy_match=True)
+        
+        if isinstance(channel_id_result, dict) and "error" in channel_id_result:
+            return json.loads(json.dumps(channel_id_result, cls=SlackResponseEncoder))
+        
+        if not channel_id_result:
+            return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
 
-        response = client.chat_postMessage(channel=channel_id, text=text)
-        return {{"success": True, "result": response}}
+        response = client.chat_postMessage(channel=channel_id_result, text=text)
+        return json.loads(json.dumps(response, cls=SlackResponseEncoder))
     except SlackApiError as e:
         logging.error(f"Error sending message: {{e}}")
-        return {{"success": False, "error": str(e), "response": e.response}}
+        return json.loads(json.dumps({{"success": False, "error": str(e), "response": e.response}}, cls=SlackResponseEncoder))
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
@@ -67,14 +116,15 @@ def execute_slack_action(token, action, **kwargs):
 
     try:
         if action == "chat_postMessage":
-            return send_slack_message(client, kwargs['channel'], kwargs['text'])
+            result = send_slack_message(client, kwargs['channel'], kwargs['text'])
         else:
             method = getattr(client, action)
-            response = method(**kwargs)
-            return {{"success": True, "result": response}}
+            result = method(**kwargs)
+        
+        return json.loads(json.dumps({{"success": True, "result": result}}, cls=SlackResponseEncoder))
     except SlackApiError as e:
         logging.error(f"SlackApiError: {{e}}")
-        return {{"success": False, "error": str(e), "response": e.response}}
+        return json.loads(json.dumps({{"success": False, "error": str(e), "response": e.response}}, cls=SlackResponseEncoder))
     except Exception as e:
         logging.error(f"Unexpected error: {{e}}")
         return {{"success": False, "error": str(e)}}
@@ -101,7 +151,7 @@ if __name__ == "__main__":
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="pip install slack_sdk && python /tmp/script.py",
+            content="python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,

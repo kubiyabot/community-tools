@@ -58,6 +58,38 @@ slack_invite_user = SlackTool(
     ],
 )
 
+# Slack Get Channel Info Tool
+slack_get_channel_info = SlackTool(
+    name="slack_get_channel_info",
+    description="Get information about a Slack channel",
+    action="conversations_info",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to get info for", required=True),
+    ],
+)
+
+# Slack Get User Info Tool
+slack_get_user_info = SlackTool(
+    name="slack_get_user_info",
+    description="Get information about a Slack user",
+    action="users_info",
+    args=[
+        Arg(name="user", type="str", description="The ID of the user to get info for", required=True),
+    ],
+)
+
+# Slack Add Reaction Tool
+slack_add_reaction = SlackTool(
+    name="slack_add_reaction",
+    description="Add a reaction to a message",
+    action="reactions_add",
+    args=[
+        Arg(name="channel", type="str", description="The channel containing the message", required=True),
+        Arg(name="timestamp", type="str", description="The timestamp of the message", required=True),
+        Arg(name="name", type="str", description="The name of the emoji to react with", required=True),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -65,6 +97,9 @@ all_tools = [
     slack_list_channels,
     slack_create_channel,
     slack_invite_user,
+    slack_get_channel_info,
+    slack_get_user_info,
+    slack_add_reaction,
 ]
 
 # Register all Slack tools
