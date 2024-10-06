@@ -109,70 +109,23 @@ def get_styled_blocks(text, style):
 
 def send_slack_message(client, channel, text, style=None):
     try:
-        # If channel starts with '#', remove it and try to find the channel
+        # If channel starts with '#', remove it
         if channel.startswith('#'):
-            channel_name = channel[1:]
-            try:
-                # List all channels and find the matching one
-                response = client.conversations_list(types="public_channel,private_channel")
-                for ch in response["channels"]:
-                    if ch["name"] == channel_name:
-                        channel_id = ch["id"]
-                        break
-                else:
-                    logging.error(f"Channel '{{channel}}' not found")
-                    return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
-            except SlackApiError as e:
-                logging.error(f"Error listing channels: {{e}}")
-                return {{"success": False, "error": f"Failed to list channels: {{str(e)}}"}}
-        elif channel.startswith('C'):
-            channel_id = channel
-        else:
-            # Assume it's a user ID
-            channel_id = channel
+            channel = channel[1:]
 
-        logging.info(f"Sending message to channel ID: {{channel_id}}")
+        logging.info(f"Sending message to channel: {{channel}}")
+        logging.info(f"Message text: {{text[:100]}}...")  # Log first 100 characters of the message
+
+        # Send a simple message without any styling or blocks
+        response = client.chat_postMessage(channel=channel, text=text)
         
-        blocks = get_styled_blocks(text, style)
-        
-        kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL")
-        if kubiya_user_email:
-            disclaimer = f"This message was sent by <@{{kubiya_user_email}}> using the Kubiya platform as part of a request/workflow."
-            blocks.append({{"type": "context", "elements": [{{"type": "mrkdwn", "text": disclaimer}}]}})
-
-        # Check message length and truncate if necessary
-        max_text_length = 3000
-        if len(text) > max_text_length:
-            text = text[:max_text_length-3] + "..."
-            for block in blocks:
-                if block["type"] == "section" and "text" in block["text"]:
-                    block["text"]["text"] = text
-
-        logging.info(f"Sending message with text: {{text[:100]}}...")
-        response = client.chat_postMessage(channel=channel_id, text=text, blocks=blocks)
         logging.info(f"Message sent successfully. Response: {{response}}")
         return {{"success": True, "result": response.data}}
 
     except SlackApiError as e:
         error_message = str(e)
         logging.error(f"SlackApiError: {{error_message}}")
-        if "invalid_blocks" in error_message:
-            # Fallback to simple text message if blocks are invalid
-            try:
-                logging.info("Falling back to simple text message")
-                response = client.chat_postMessage(channel=channel_id, text=text)
-                logging.info(f"Simple message sent successfully. Response: {{response}}")
-                return {{"success": True, "result": response.data, "warning": "Fell back to simple text message due to invalid blocks"}}
-            except SlackApiError as simple_e:
-                logging.error(f"Failed to send even a simple message: {{simple_e}}")
-                return {{"success": False, "error": f"Failed to send even a simple message: {{simple_e}}"}}
-        elif "rate_limited" in error_message:
-            retry_after = e.response.headers.get("Retry-After", 1)
-            logging.error(f"Rate limited. Retry after {{retry_after}} seconds")
-            return {{"success": False, "error": f"Rate limited. Retry after {{retry_after}} seconds", "retry_after": int(retry_after)}}
-        else:
-            logging.error(f"Error sending message: {{e}}")
-            return {{"success": False, "error": error_message, "response": e.response.data if e.response else None}}
+        return {{"success": False, "error": error_message, "response": e.response.data if e.response else None}}
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
@@ -181,7 +134,7 @@ def execute_slack_action(token, action, **kwargs):
 
     try:
         if action == "chat_postMessage":
-            result = send_slack_message(client, kwargs['channel'], kwargs['text'], kwargs.get('style'))
+            result = send_slack_message(client, kwargs['channel'], kwargs['text'])
         else:
             method = getattr(client, action)
             response = method(**kwargs)
