@@ -24,10 +24,13 @@ def install(package):
 
 # Install required packages
 install('slack_sdk')
+install('fuzzywuzzy')
+install('python-Levenshtein')
 
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
+from fuzzywuzzy import process
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -41,91 +44,59 @@ class SlackResponseEncoder(json.JSONEncoder):
             return obj.__dict__
         return super().default(obj)
 
-def find_channel_or_user(client, input_value):
-    input_value = input_value.lstrip('#@')
+def find_channel_id(client, channel_input, fuzzy_match=True):
+    channel_input = channel_input.lstrip('#')
     
-    # Check if it's already a channel or user ID
-    if re.match(r'^[CU][A-Z0-9]{{8,}}$', input_value):
-        return input_value
+    # Check if it's already a channel ID
+    if re.match(r'^[C][A-Z0-9]{{8,}}$', channel_input):
+        return channel_input
 
     try:
-        # Try to find channel
-        response = client.conversations_list(types="public_channel,private_channel")
-        for channel in response["channels"]:
-            if channel["name"] == input_value:
+        channels = []
+        for result in client.conversations_list():
+            channels.extend(result["channels"])
+        
+        # Exact match
+        for channel in channels:
+            if channel["name"] == channel_input:
                 return channel["id"]
         
-        # Try to find user
-        response = client.users_list()
-        for user in response["members"]:
-            if user["name"] == input_value or user["real_name"] == input_value:
-                return user["id"]
+        if fuzzy_match:
+            # Fuzzy match
+            channel_names = [channel["name"] for channel in channels]
+            best_matches = process.extract(channel_input, channel_names, limit=5)
+            
+            if best_matches and best_matches[0][1] >= 80:  # 80% similarity threshold
+                matched_channel = next(channel for channel in channels if channel["name"] == best_matches[0][0])
+                return matched_channel["id"]
+            else:
+                options = [{{
+                    "name": match[0],
+                    "score": match[1],
+                    "id": next(channel["id"] for channel in channels if channel["name"] == match[0])
+                }} for match in best_matches]
+                return {{"error": "No high confidence match found", "options": options}}
         
         return None
     except SlackApiError as e:
-        logging.error(f"Error finding channel or user: {{e}}")
+        logging.error(f"Error listing conversations: {{e}}")
         return None
 
-def get_styled_blocks(text, style):
-    if style == "simple" or not style:
-        return [{{"type": "section", "text": {{"type": "mrkdwn", "text": text}}}}]
-    
-    color_map = {{
-        "info": "#3498db",
-        "warning": "#f39c12",
-        "success": "#2ecc71",
-        "error": "#e74c3c"
-    }}
-    
-    if style in color_map:
-        return [
-            {{
-                "type": "header",
-                "text": {{
-                    "type": "plain_text",
-                    "text": style.capitalize(),
-                    "emoji": True
-                }}
-            }},
-            {{
-                "type": "divider"
-            }},
-            {{
-                "type": "section",
-                "text": {{"type": "mrkdwn", "text": text}}
-            }},
-            {{
-                "type": "context",
-                "elements": [
-                    {{
-                        "type": "mrkdwn",
-                        "text": f"*{{style.capitalize()}}*"
-                    }}
-                ]
-            }}
-        ]
-    
-    return [{{"type": "section", "text": {{"type": "mrkdwn", "text": text}}}}]
-
-def send_slack_message(client, channel, text, style=None):
+def send_slack_message(client, channel, text):
     try:
-        # If channel starts with '#', remove it
-        if channel.startswith('#'):
-            channel = channel[1:]
-
-        logging.info(f"Sending message to channel: {{channel}}")
-        logging.info(f"Message text: {{text[:100]}}...")  # Log first 100 characters of the message
-
-        # Send a simple message without any styling or blocks
-        response = client.chat_postMessage(channel=channel, text=text)
+        channel_id_result = find_channel_id(client, channel, fuzzy_match=True)
         
-        logging.info(f"Message sent successfully. Response: {{response}}")
-        return {{"success": True, "result": response.data}}
+        if isinstance(channel_id_result, dict) and "error" in channel_id_result:
+            return channel_id_result
+        
+        if not channel_id_result:
+            return {{"success": False, "error": f"Channel '{{channel}}' not found"}}
 
+        response = client.chat_postMessage(channel=channel_id_result, text=text)
+        return {{"success": True, "result": response.data}}
     except SlackApiError as e:
-        error_message = str(e)
-        logging.error(f"SlackApiError: {{error_message}}")
-        return {{"success": False, "error": error_message, "response": e.response.data if e.response else None}}
+        logging.error(f"Error sending message: {{e}}")
+        return {{"success": False, "error": str(e), "response": e.response.data if e.response else None}}
 
 def execute_slack_action(token, action, **kwargs):
     client = WebClient(token=token)
@@ -140,7 +111,6 @@ def execute_slack_action(token, action, **kwargs):
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
         
-        logging.info(f"Action result: {{result}}")
         return result
     except SlackApiError as e:
         logging.error(f"SlackApiError: {{e}}")

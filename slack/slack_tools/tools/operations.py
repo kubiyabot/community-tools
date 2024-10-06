@@ -8,8 +8,8 @@ slack_send_message = SlackTool(
     description="Send a message to a Slack channel or user",
     action="chat_postMessage",
     args=[
-        Arg(name="channel", type="str", description="The channel name (with # prefix) or ID, or user ID to send the message to", required=True),
-        Arg(name="text", type="str", description="The message text", required=True),
+        Arg(name="channel_name", type="str", description="The channel name (with # prefix) or ID (starts with C), or user ID (starts with U) to send the message to", required=True),
+        Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
     ],
 )
 
