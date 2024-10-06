@@ -20,13 +20,9 @@ from slack_sdk.errors import SlackApiError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def send_slack_message(client, channel_name, text):
-    print("Starting to send Slack message...")
+def send_slack_message(client, channel, text):
+    print(f"Starting to send Slack message to: {{channel}}")
     try:
-        # Remove '#' if present in channel name
-        channel_name = channel_name.lstrip('#')
-        print(f"Preparing to send message to channel: {{channel_name}}")
-
         # Prepare the message with disclaimer
         kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL", "Unknown User")
         full_message = f"{{text}}\\n\\n_This message was sent through the Kubiya platform by {{kubiya_user_email}}._"
@@ -34,8 +30,8 @@ def send_slack_message(client, channel_name, text):
 
         # Try to send the message
         print("Attempting to send message...")
-        response = client.chat_postMessage(channel=channel_name, text=full_message)
-        print(f"Message sent successfully to {{channel_name}}")
+        response = client.chat_postMessage(channel=channel, text=full_message)
+        print(f"Message sent successfully to {{channel}}")
         return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
 
     except SlackApiError as e:
@@ -44,18 +40,22 @@ def send_slack_message(client, channel_name, text):
 
         if "channel_not_found" in error_message:
             print("Channel not found. Attempting to look up channel...")
-            # If channel not found, try to find it
             try:
-                print("Listing conversations...")
-                channels = client.conversations_list()
-                for channel in channels["channels"]:
-                    if channel["name"] == channel_name:
-                        channel_id = channel["id"]
-                        print(f"Channel found. ID: {{channel_id}}")
-                        print("Sending message to found channel...")
-                        response = client.chat_postMessage(channel=channel_id, text=full_message)
-                        print(f"Message sent successfully to {{channel_name}} after lookup")
-                        return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
+                # Remove '#' if present in channel name
+                channel_name = channel.lstrip('#')
+                print(f"Looking up channel: {{channel_name}}")
+                
+                # Try to find the channel
+                for response in client.conversations_list(types="public_channel,private_channel"):
+                    for ch in response["channels"]:
+                        if ch["name"] == channel_name:
+                            channel_id = ch["id"]
+                            print(f"Channel found. ID: {{channel_id}}")
+                            print("Sending message to found channel...")
+                            response = client.chat_postMessage(channel=channel_id, text=full_message)
+                            print(f"Message sent successfully to {{channel_name}} after lookup")
+                            return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
+                
                 print("Channel not found in the list")
             except SlackApiError as lookup_error:
                 print(f"Error during channel lookup: {{lookup_error}}")
