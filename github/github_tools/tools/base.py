@@ -80,7 +80,7 @@ get_repo_context
             image=GITHUB_CLI_DOCKER_IMAGE,
             content=enhanced_content,
             args=updated_args,
-            env=COMMON_ENV,
+            env=COMMON_ENV + ["org", "repo"],  # Add org and repo to environment variables
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
             long_running=long_running
