@@ -51,8 +51,8 @@ class GitHubCliTool(Tool):
         get_repo_context
 
         # Original command content
-        {original_content}
-        """.format(original_content=content)
+        {0}
+        """.format(content)
 
         # Add org and repo arguments if not present
         has_org_arg = any(arg.name == "org" for arg in args)
