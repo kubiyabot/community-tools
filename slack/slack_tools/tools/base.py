@@ -5,7 +5,7 @@ SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_
 
 class SlackTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL"]
+        env = ["KUBIYA_USER_EMAIL", "KUBIYA_AGENT_PROFILE", "KUBIYA_AGENT_UUID"]
         secrets = ["SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
@@ -20,18 +20,74 @@ from slack_sdk.errors import SlackApiError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def create_block_kit_message(text, kubiya_user_email, kubiya_agent_profile, kubiya_agent_uuid):
+    return [
+        {
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "{{text}}"}
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": f":robot_face: This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform"
+                }
+            ]
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Kubiya Teammate:* {{kubiya_agent_profile}}\n_This AI teammate assisted in generating and sending this message._"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "_Note: Conversing directly with this teammate may require special permissions._"
+            }
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "View Teammate Settings", "emoji": True},
+                    "url": f"https://app.kubiya.ai/teammates/overview/{{kubiya_agent_uuid}}",
+                    "action_id": "view_teammate_settings"
+                }
+            ]
+        }
+    ]
+
 def send_slack_message(client, channel, text):
     print(f"Starting to send Slack message to: {{channel}}")
     try:
-        # Prepare the message with disclaimer
         kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL", "Unknown User")
-        full_message = f"{{text}}\\n\\n_This message was sent through the Kubiya platform by {{kubiya_user_email}}._"
-        print("Message prepared with disclaimer")
+        kubiya_agent_profile = os.environ.get("KUBIYA_AGENT_PROFILE", "Unknown Agent")
+        kubiya_agent_uuid = os.environ.get("KUBIYA_AGENT_UUID", "unknown")
+        
+        blocks = create_block_kit_message(text, kubiya_user_email, kubiya_agent_profile, kubiya_agent_uuid)
+        
+        fallback_text = (
+            f"{{text}}\\n\\n_This message was sent on behalf of <@{{kubiya_user_email}}> "
+            f"using the Kubiya platform (Teammate: {{kubiya_agent_profile}})_"
+        )
 
-        # Try to send the message
-        print("Attempting to send message...")
-        response = client.chat_postMessage(channel=channel, text=full_message)
-        print(f"Message sent successfully to {{channel}}")
+        print("Attempting to send Block Kit message...")
+        try:
+            response = client.chat_postMessage(channel=channel, blocks=blocks, text=fallback_text)
+            print(f"Block Kit message sent successfully to {{channel}}")
+        except SlackApiError as block_error:
+            print(f"Failed to send Block Kit message: {{block_error}}. Falling back to regular message.")
+            response = client.chat_postMessage(channel=channel, text=fallback_text)
+            print(f"Regular message sent successfully to {{channel}}")
+
         return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
 
     except SlackApiError as e:
@@ -41,20 +97,16 @@ def send_slack_message(client, channel, text):
         if "channel_not_found" in error_message:
             print("Channel not found. Attempting to look up channel...")
             try:
-                # Remove '#' if present in channel name
                 channel_name = channel.lstrip('#')
                 print(f"Looking up channel: {{channel_name}}")
                 
-                # Try to find the channel
                 for response in client.conversations_list(types="public_channel,private_channel"):
                     for ch in response["channels"]:
                         if ch["name"] == channel_name:
                             channel_id = ch["id"]
                             print(f"Channel found. ID: {{channel_id}}")
                             print("Sending message to found channel...")
-                            response = client.chat_postMessage(channel=channel_id, text=full_message)
-                            print(f"Message sent successfully to {{channel_name}} after lookup")
-                            return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
+                            return send_slack_message(client, channel_id, text)
                 
                 print("Channel not found in the list")
             except SlackApiError as lookup_error:
