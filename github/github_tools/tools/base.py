@@ -12,8 +12,8 @@ class GitHubCliTool(Tool):
 set -e
 
 if ! command -v jq &> /dev/null; then
-    echo "jq is not installed. Installing jq..."
-    apk update && apk add --no-cache jq
+    # silently install jq
+    apk update && apk add --no-cache jq > /dev/null 2>&1
 fi
 
 check_and_set_org() {{
