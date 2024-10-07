@@ -130,9 +130,36 @@ pr_files = GitHubCliTool(
     ],
 )
 
-# Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_checkout, pr_ready, pr_checks, pr_files]:
-    tool_registry.register("github", tool)
+# Add these new tools at the end of the file
 
-# Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_checkout', 'pr_ready', 'pr_checks', 'pr_files']
+github_graphql = GitHubCliTool(
+    name="github_graphql",
+    description="Execute a custom GraphQL query against the GitHub API.",
+    content="""
+    echo '$query' | gh api graphql -f query=@- $([[ -n "$variables" ]] && echo "--raw-field $variables")
+    """,
+    args=[
+        Arg(name="query", type="str", description="GraphQL query to execute. Example: 'query { viewer { login } }'", required=True),
+        Arg(name="variables", type="str", description="JSON string of variables for the GraphQL query. Example: '{\"owner\": \"octocat\", \"name\": \"Hello-World\"}'", required=False),
+    ],
+)
+
+github_rest = GitHubCliTool(
+    name="github_rest",
+    description="Make a custom REST API request to GitHub.",
+    content="""
+    gh api $endpoint $([[ -n "$method" ]] && echo "-X $method") $([[ -n "$data" ]] && echo "-f $data")
+    """,
+    args=[
+        Arg(name="endpoint", type="str", description="REST API endpoint. Example: '/repos/octocat/Hello-World'", required=True),
+        Arg(name="method", type="str", description="HTTP method (GET, POST, PATCH, DELETE, etc.). Default is GET. Example: 'POST'", required=False),
+        Arg(name="data", type="str", description="JSON string of data to send with the request. Example: '{\"name\": \"new-repo-name\"}'", required=False),
+    ],
+)
+
+# Register the new tools
+tool_registry.register("github", github_graphql)
+tool_registry.register("github", github_rest)
+
+# Update the __all__ list to include the new tools
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_checkout', 'pr_ready', 'pr_checks', 'pr_files', 'github_graphql', 'github_rest']
