@@ -5,7 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 # Kubiya Create Webhook Tool
 kubiya_create_webhook = KubiyaTool(
     name="kubiya_create_webhook",
-    description="Create a webhook event with Kubiya API",
+    description="Create a webhook event with the Kubiya API, webhook events are used to trigger team mates to perform actions based on third party events",
     action="create_webhook",
     args=[
         Arg(name="name", type="str", description="The name of the webhook event", required=True),

@@ -5,7 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 # Kubiya Schedule Task Tool
 kubiya_schedule_task = KubiyaTool(
     name="kubiya_schedule_task",
-    description="Schedule a task with Kubiya API",
+    description="Schedule a task with the Kubiya API",
     action="schedule_task",
     args=[
         Arg(name="execution_delay", type="str", description="The delay before the task is executed (e.g., 5h for 5 hours, 30m for 30 minutes)", required=True),

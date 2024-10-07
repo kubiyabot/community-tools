@@ -1,7 +1,7 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 
-KUBIYA_ICON_URL = "https://media.licdn.com/dms/image/D560BAQFaDnQXq7Dtbg/company-logo_200_200/0/1687904106468/kubiya_logo?e=2147483647&v=beta&t=7XFSmE0tW60OylcOGoSMW1oMDUqdH8p8gwCfXLGQnj4"
+KUBIYA_ICON_URL = "https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
 
 class KubiyaTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
@@ -13,6 +13,7 @@ class KubiyaTool(Tool):
 import os
 import sys
 import requests
+
 from datetime import datetime, timedelta, timezone
 from pytimeparse.timeparse import timeparse
 import json
