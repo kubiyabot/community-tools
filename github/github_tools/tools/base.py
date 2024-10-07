@@ -1,7 +1,9 @@
 from kubiya_sdk.tools import Tool, FileSpec
 from kubiya_sdk.tools import Arg
+from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
 GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
+GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 class GitHubCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
@@ -68,13 +70,11 @@ get_repo_context
             description=description,
             icon_url=GITHUB_ICON_URL,
             type="docker",
-            image="ghcr.io/cli/cli:latest",
+            image=GITHUB_CLI_DOCKER_IMAGE,
             content=enhanced_content.replace("{original_content}", content),
             args=args,
-            env=["GITHUB_TOKEN"],
-            files=[
-                FileSpec(source="~/.config/gh/config.yml", destination="/root/.config/gh/config.yml"),
-                FileSpec(source="~/.config/gh/hosts.yml", destination="/root/.config/gh/hosts.yml"),
-            ],
+            env=COMMON_ENV,
+            files=COMMON_FILES,
+            secrets=COMMON_SECRETS,
             long_running=long_running
         )
