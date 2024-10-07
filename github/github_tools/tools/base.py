@@ -14,6 +14,7 @@ class GitHubCliTool(Tool):
             content=content,
             args=args,
             env=COMMON_ENV,
+            secrets=["GH_TOKEN"],
             files=COMMON_FILES,
             long_running=long_running
         )
