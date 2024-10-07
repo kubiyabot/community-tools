@@ -10,7 +10,7 @@ class GitHubCliTool(Tool):
             description=description,
             icon_url=GITHUB_ICON_URL,
             type="docker",
-            image="ghcr.io/cli/cli:latest",
+            image="maniator/gh:latest",
             content=content,
             args=args,
             env=COMMON_ENV,
