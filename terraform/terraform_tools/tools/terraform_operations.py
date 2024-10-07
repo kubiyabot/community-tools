@@ -2,199 +2,221 @@ from kubiya_sdk.tools import Arg
 from terraform_tools.tools.base import TerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 
-terraform_init = TerraformTool(
-    name="terraform_init",
-    description="Initialize a Terraform working directory",
+terraform_clone_module = TerraformTool(
+    name="terraform_clone_module",
+    description="Clone a Terraform module from a Git repository and prepare it for use.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    echo "Terraform initialization successful"
+    #!/bin/bash
+    set -e
+    
+    if [ -z "$git_repo" ]; then
+        echo "Error: Git repository URL is required."
+        exit 1
+    fi
+
+    git clone "$git_repo" module
+    cd module
+
+    if [ -n "$git_branch" ]; then
+        git checkout "$git_branch"
+    fi
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    echo "Module cloned successfully. Current directory contents:"
+    ls -la
+
+    if [ -f "README.md" ]; then
+        echo "Module README contents:"
+        cat README.md
+    fi
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
+        Arg(name="git_repo", type="str", description="Git repository URL containing the Terraform module. Example: 'https://github.com/example/terraform-aws-vpc.git'", required=True),
+        Arg(name="git_branch", type="str", description="Git branch to use. Default is the repository's default branch. Example: 'develop'", required=False),
+        Arg(name="module_path", type="str", description="Path to the module within the repository, if not in the root. Example: 'modules/networking'", required=False),
     ]
 )
 
-terraform_plan = TerraformTool(
-    name="terraform_plan",
-    description="Generate and show an execution plan",
+terraform_discover_variables = TerraformTool(
+    name="terraform_discover_variables",
+    description="Discover and list variables needed for a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform plan -no-color 2>&1 || { echo "Error: Terraform plan failed"; exit 1; }
+    #!/bin/bash
+    set -e
+
+    # Function to extract variables from Terraform files
+    extract_variables() {
+        grep -h '^\s*variable' *.tf | sed 's/variable\s*"\([^"]*\)".*/\1/'
+    }
+
+    # Function to extract variables from tfvars files
+    extract_tfvars() {
+        for file in *.tfvars *.tfvars.json; do
+            if [[ -f "$file" ]]; then
+                case "$file" in
+                    *.tfvars)
+                        grep -v '^\s*#' "$file" | grep '=' | cut -d'=' -f1 | tr -d ' '
+                        ;;
+                    *.tfvars.json)
+                        jq -r 'keys[]' "$file"
+                        ;;
+                esac
+            fi
+        done
+    }
+
+    # Main execution
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    echo "Variables defined in Terraform files:"
+    extract_variables
+
+    echo "Variables defined in tfvars files:"
+    extract_tfvars
+
+    echo "Attempting to run terraform init to discover module variables..."
+    if terraform init -backend=false > /dev/null 2>&1; then
+        echo "Module variables (may include variables from nested modules):"
+        terraform providers schema -json | jq -r '.provider_schemas."registry.terraform.io/hashicorp/aws".resource_schemas | keys[]'
+    else
+        echo "Failed to run terraform init. Unable to discover module variables."
+    fi
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
     ]
 )
 
-terraform_apply = TerraformTool(
-    name="terraform_apply",
-    description="Builds or changes infrastructure",
+terraform_plan_module = TerraformTool(
+    name="terraform_plan_module",
+    description="Generate and show an execution plan for a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform apply -auto-approve -no-color 2>&1 || { echo "Error: Terraform apply failed"; exit 1; }
-    echo "Terraform apply completed successfully"
+    #!/bin/bash
+    set -e
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    if [ -n "$tfvars_content" ]; then
+        echo "$tfvars_content" > terraform.tfvars
+    fi
+
+    terraform init
+    terraform plan -no-color
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
+        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format. Example: 'region = \"us-west-2\"\ninstance_type = \"t2.micro\"'", required=False),
     ]
 )
 
-terraform_destroy = TerraformTool(
-    name="terraform_destroy",
-    description="Destroy Terraform-managed infrastructure",
+terraform_apply_module = TerraformTool(
+    name="terraform_apply_module",
+    description="Apply changes defined in a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform destroy -auto-approve -no-color 2>&1 || { echo "Error: Terraform destroy failed"; exit 1; }
-    echo "Terraform destroy completed successfully"
+    #!/bin/bash
+    set -e
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    if [ -n "$tfvars_content" ]; then
+        echo "$tfvars_content" > terraform.tfvars
+    fi
+
+    terraform init
+    terraform apply -auto-approve -no-color
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
+        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format. Example: 'region = \"us-west-2\"\ninstance_type = \"t2.micro\"'", required=False),
     ]
 )
 
-terraform_output = TerraformTool(
-    name="terraform_output",
-    description="Read an output from a Terraform state",
+terraform_destroy_module = TerraformTool(
+    name="terraform_destroy_module",
+    description="Destroy resources managed by a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform output -json 2>&1 || { echo "Error: Terraform output failed"; exit 1; }
+    #!/bin/bash
+    set -e
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    if [ -n "$tfvars_content" ]; then
+        echo "$tfvars_content" > terraform.tfvars
+    fi
+
+    terraform init
+    terraform destroy -auto-approve -no-color
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-        Arg(name="output_name", type="str", description="Name of the specific output to retrieve. If not provided, all outputs will be shown.", required=False),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
+        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format. Example: 'region = \"us-west-2\"\ninstance_type = \"t2.micro\"'", required=False),
     ]
 )
 
-terraform_show = TerraformTool(
-    name="terraform_show",
-    description="Inspect Terraform state or plan",
+terraform_output_module = TerraformTool(
+    name="terraform_output_module",
+    description="Read and display output values from a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform show -json 2>&1 || { echo "Error: Terraform show failed"; exit 1; }
+    #!/bin/bash
+    set -e
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    terraform init
+    terraform output -json
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
     ]
 )
 
-terraform_validate = TerraformTool(
-    name="terraform_validate",
-    description="Validates the Terraform files",
+terraform_validate_module = TerraformTool(
+    name="terraform_validate_module",
+    description="Validate the configuration files in a Terraform module.",
     content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform validate -json 2>&1 || { echo "Error: Terraform validate failed"; exit 1; }
-    """,
-    args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-    ]
-)
+    #!/bin/bash
+    set -e
 
-terraform_workspace_list = TerraformTool(
-    name="terraform_workspace_list",
-    description="List Terraform workspaces",
-    content="""
-    terraform workspace list 2>&1 || { echo "Error: Failed to list Terraform workspaces"; exit 1; }
-    """,
-    args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-    ]
-)
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
 
-terraform_workspace_select = TerraformTool(
-    name="terraform_workspace_select",
-    description="Select a Terraform workspace",
-    content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform workspace select "$workspace_name" 2>&1 || terraform workspace new "$workspace_name" 2>&1 || { echo "Error: Failed to select or create workspace"; exit 1; }
-    echo "Workspace '$workspace_name' selected or created successfully"
+    terraform init
+    terraform validate -json
     """,
     args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-        Arg(name="workspace_name", type="str", description="Name of the workspace to select or create.", required=True),
-    ]
-)
-
-terraform_state_list = TerraformTool(
-    name="terraform_state_list",
-    description="List resources in the Terraform state",
-    content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform state list 2>&1 || { echo "Error: Failed to list Terraform state"; exit 1; }
-    """,
-    args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-    ]
-)
-
-terraform_state_show = TerraformTool(
-    name="terraform_state_show",
-    description="Show a resource in the Terraform state",
-    content="""
-    terraform init 2>&1 || { echo "Error: Terraform init failed"; exit 1; }
-    terraform state show "$resource_address" 2>&1 || { echo "Error: Failed to show resource in Terraform state"; exit 1; }
-    """,
-    args=[
-        Arg(name="terraform_code", type="str", description="Terraform configuration code as a string.", required=True),
-        Arg(name="tfvars_content", type="str", description="Terraform variables content as a string. Can be in HCL or JSON format.", required=False),
-        Arg(name="git_repo", type="str", description="Git repository URL containing Terraform code.", required=False),
-        Arg(name="git_branch", type="str", description="Git branch to use. Default is 'main'", required=False),
-        Arg(name="resource_address", type="str", description="Address of the resource to show.", required=True),
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
     ]
 )
 
 # Register the tools
-tool_registry.register("terraform", terraform_init)
-tool_registry.register("terraform", terraform_plan)
-tool_registry.register("terraform", terraform_apply)
-tool_registry.register("terraform", terraform_destroy)
-tool_registry.register("terraform", terraform_output)
-tool_registry.register("terraform", terraform_show)
-tool_registry.register("terraform", terraform_validate)
-tool_registry.register("terraform", terraform_workspace_list)
-tool_registry.register("terraform", terraform_workspace_select)
-tool_registry.register("terraform", terraform_state_list)
-tool_registry.register("terraform", terraform_state_show)
+tool_registry.register("terraform", terraform_clone_module)
+tool_registry.register("terraform", terraform_discover_variables)
+tool_registry.register("terraform", terraform_plan_module)
+tool_registry.register("terraform", terraform_apply_module)
+tool_registry.register("terraform", terraform_destroy_module)
+tool_registry.register("terraform", terraform_output_module)
+tool_registry.register("terraform", terraform_validate_module)
 
 __all__ = [
-    'terraform_init',
-    'terraform_plan',
-    'terraform_apply',
-    'terraform_destroy',
-    'terraform_output',
-    'terraform_show',
-    'terraform_validate',
-    'terraform_workspace_list',
-    'terraform_workspace_select',
-    'terraform_state_list',
-    'terraform_state_show'
+    'terraform_clone_module',
+    'terraform_discover_variables',
+    'terraform_plan_module',
+    'terraform_apply_module',
+    'terraform_destroy_module',
+    'terraform_output_module',
+    'terraform_validate_module'
 ]
