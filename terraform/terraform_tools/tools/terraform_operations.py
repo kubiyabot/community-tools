@@ -237,6 +237,58 @@ terraform_read_readme = TerraformTool(
     ]
 )
 
+# Add this new tool to the existing file
+
+terraform_append_block = TerraformTool(
+    name="terraform_append_block",
+    description="Append a Terraform block to an existing file and validate the resulting configuration.",
+    content="""
+    #!/bin/bash
+    set -e
+
+    if [ -z "$file_path" ] || [ -z "$block_content" ]; then
+        echo "Error: Both file_path and block_content are required."
+        exit 1
+    fi
+
+    if [ ! -f "$file_path" ]; then
+        echo "Error: File $file_path does not exist."
+        exit 1
+    fi
+
+    # Append the new block to the file
+    echo -e "\n$block_content" >> "$file_path"
+
+    echo "Block appended to $file_path"
+
+    # Validate the updated configuration
+    echo "Validating the updated configuration..."
+    if terraform fmt -check "$file_path" > /dev/null 2>&1; then
+        echo "Formatting check passed."
+    else
+        echo "Warning: Formatting issues detected. Running terraform fmt..."
+        terraform fmt "$file_path"
+    fi
+
+    if terraform validate $(dirname "$file_path") > /dev/null 2>&1; then
+        echo "Validation successful. The appended block is valid Terraform code."
+    else
+        echo "Error: Validation failed. The appended block may contain errors."
+        echo "Validation output:"
+        terraform validate $(dirname "$file_path")
+        exit 1
+    fi
+
+    # Display the updated file content
+    echo "Updated file content:"
+    cat "$file_path"
+    """,
+    args=[
+        Arg(name="file_path", type="str", description="Path to the Terraform file to append to. Example: '/path/to/main.tf'", required=True),
+        Arg(name="block_content", type="str", description="Terraform block content to append. Example: 'resource \"aws_s3_bucket\" \"example\" {\n  bucket = \"my-tf-test-bucket\"\n  acl    = \"private\"\n}'", required=True),
+    ]
+)
+
 # Register the tools
 tool_registry.register("terraform", terraform_clone_module)
 tool_registry.register("terraform", terraform_read_readme)
@@ -246,6 +298,7 @@ tool_registry.register("terraform", terraform_apply_module)
 tool_registry.register("terraform", terraform_destroy_module)
 tool_registry.register("terraform", terraform_output_module)
 tool_registry.register("terraform", terraform_validate_module)
+tool_registry.register("terraform", terraform_append_block)
 
 __all__ = [
     'terraform_clone_module',
@@ -255,5 +308,6 @@ __all__ = [
     'terraform_apply_module',
     'terraform_destroy_module',
     'terraform_output_module',
-    'terraform_validate_module'
+    'terraform_validate_module',
+    'terraform_append_block'
 ]
