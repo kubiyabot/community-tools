@@ -50,10 +50,10 @@ get_repo_context() {{
     else
         if [[ "$repo" != *"/"* ]]; then
             if [ -n "$org" ]; then
-                repo="${org}/${repo}"
+                repo="${{org}}/${{repo}}"
             else
                 current_user=$(gh api user --jq '.login')
-                repo="${current_user}/${repo}"
+                repo="${{current_user}}/${{repo}}"
             fi
         fi
         echo "Using repository: $repo"
