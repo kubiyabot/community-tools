@@ -5,7 +5,8 @@ KUBIYA_ICON_URL = "https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/comp
 
 class KubiyaTool(Tool):
     def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_API_KEY", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "KUBIYA_AGENT_UUID", "SLACK_CHANNEL_ID", "KUBIYA_AGENT_PROFILE", "SLACK_BOT_TOKEN"]
+        env = ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "KUBIYA_AGENT_UUID", "SLACK_CHANNEL_ID", "KUBIYA_AGENT_PROFILE"]
+        secrets = ["KUBIYA_API_KEY", "SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -74,7 +75,7 @@ def find_slack_destination(client, name):
 
 def schedule_task(schedule_time, slack_destination=None, ai_instructions="", **kwargs):
     required_vars = [
-        "KUBIYA_API_KEY", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "KUBIYA_AGENT_PROFILE", "SLACK_BOT_TOKEN"
+        "KUBIYA_API_KEY", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "KUBIYA_AGENT_PROFILE", "SLACK_API_TOKEN"
     ]
     for var in required_vars:
         if var not in os.environ:
@@ -159,6 +160,7 @@ if __name__ == "__main__":
             content="pip install requests pytimeparse slack_sdk fuzzywuzzy python-Levenshtein && python /tmp/script.py",
             args=args,
             env=env,
+            secrets=secrets,
             long_running=long_running,
             mermaid=mermaid_diagram,
             with_files=[
