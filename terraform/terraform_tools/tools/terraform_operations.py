@@ -25,13 +25,11 @@ terraform_clone_module = TerraformTool(
         cd "$module_path"
     fi
 
-    echo "Module cloned successfully. Current directory contents:"
-    ls -la
+    echo "Module cloned successfully. Directory structure:"
+    find . -maxdepth 2 -type d
 
-    if [ -f "README.md" ]; then
-        echo "Module README contents:"
-        cat README.md
-    fi
+    echo "Terraform files in the module:"
+    find . -maxdepth 1 -name "*.tf" -printf "%f\n"
     """,
     args=[
         Arg(name="git_repo", type="str", description="Git repository URL containing the Terraform module. Example: 'https://github.com/example/terraform-aws-vpc.git'", required=True),
@@ -202,8 +200,46 @@ terraform_validate_module = TerraformTool(
     ]
 )
 
+terraform_read_readme = TerraformTool(
+    name="terraform_read_readme",
+    description="Read and display specific content from the module's README file.",
+    content="""
+    #!/bin/bash
+    set -e
+
+    if [ -n "$module_path" ]; then
+        cd "$module_path"
+    fi
+
+    if [ ! -f "README.md" ]; then
+        echo "README.md not found in the module directory."
+        exit 1
+    fi
+
+    if [ -n "$search_term" ]; then
+        echo "Searching for '$search_term' in README.md:"
+        grep -i -C 3 "$search_term" README.md || echo "Search term not found."
+    elif [ -n "$start_line" ] && [ -n "$end_line" ]; then
+        echo "Displaying lines $start_line to $end_line of README.md:"
+        sed -n "${start_line},${end_line}p" README.md
+    else
+        echo "First 10 lines of README.md:"
+        head -n 10 README.md
+        echo "..."
+        echo "Use 'search_term' or 'start_line' and 'end_line' arguments for more specific content."
+    fi
+    """,
+    args=[
+        Arg(name="module_path", type="str", description="Path to the Terraform module. Example: '/path/to/module' or '.' for current directory", required=True),
+        Arg(name="search_term", type="str", description="Term to search for in the README. Example: 'Usage'", required=False),
+        Arg(name="start_line", type="int", description="Start line number to read from. Example: 15", required=False),
+        Arg(name="end_line", type="int", description="End line number to read to. Example: 30", required=False),
+    ]
+)
+
 # Register the tools
 tool_registry.register("terraform", terraform_clone_module)
+tool_registry.register("terraform", terraform_read_readme)
 tool_registry.register("terraform", terraform_discover_variables)
 tool_registry.register("terraform", terraform_plan_module)
 tool_registry.register("terraform", terraform_apply_module)
@@ -213,6 +249,7 @@ tool_registry.register("terraform", terraform_validate_module)
 
 __all__ = [
     'terraform_clone_module',
+    'terraform_read_readme',
     'terraform_discover_variables',
     'terraform_plan_module',
     'terraform_apply_module',
