@@ -17,17 +17,21 @@ if ! command -v jq &> /dev/null; then
 fi
 
 check_and_set_org() {{
-    orgs=$(gh api user/orgs --jq '.[].login')
-    org_count=$(echo "$orgs" | wc -l)
-    if [ "$org_count" -eq 0 ]; then
-        echo "You are not part of any organization."
-    elif [ "$org_count" -eq 1 ]; then
-        org=$orgs
-        echo "You are part of one organization: $org. Using this organization."
+    if [ -n "$org" ]; then
+        echo "Using organization: $org"
     else
-        echo "You are part of the following organizations:"
-        echo "$orgs"
-        echo "Please specify the organization in your command if needed."
+        orgs=$(gh api user/orgs --jq '.[].login')
+        org_count=$(echo "$orgs" | wc -l)
+        if [ "$org_count" -eq 0 ]; then
+            echo "You are not part of any organization."
+        elif [ "$org_count" -eq 1 ]; then
+            org=$orgs
+            echo "You are part of one organization: $org. Using this organization."
+        else
+            echo "You are part of the following organizations:"
+            echo "$orgs"
+            echo "Please specify the organization in your command if needed."
+        fi
     fi
 }}
 
