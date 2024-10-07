@@ -52,7 +52,7 @@ class GitHubCliTool(Tool):
 
         # Original command content
         {0}
-        """.format(content)
+        """
 
         # Add org and repo arguments if not present
         has_org_arg = any(arg.name == "org" for arg in args)
@@ -69,7 +69,7 @@ class GitHubCliTool(Tool):
             icon_url=GITHUB_ICON_URL,
             type="docker",
             image="ghcr.io/cli/cli:latest",
-            content=enhanced_content,
+            content=enhanced_content.format(content),
             args=args,
             env=["GITHUB_TOKEN"],
             files=[
