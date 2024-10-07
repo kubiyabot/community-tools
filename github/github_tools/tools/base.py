@@ -11,9 +11,9 @@ class GitHubCliTool(Tool):
 #!/bin/sh
 set -e
 
-if ! command -v jq &> /dev/null; then
-    # silently install jq
-    apk update && apk add --no-cache jq > /dev/null 2>&1
+if ! command -v jq >/dev/null 2>&1; then
+    # Silently install jq
+    apk add --no-cache --quiet jq >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
