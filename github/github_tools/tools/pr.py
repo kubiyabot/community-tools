@@ -157,9 +157,9 @@ github_rest = GitHubCliTool(
     ],
 )
 
-# Register the new tools
-tool_registry.register("github", github_graphql)
-tool_registry.register("github", github_rest)
+# Register all PR tools
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_checkout, pr_ready, pr_checks, pr_files]:
+    tool_registry.register("github", tool)
 
-# Update the __all__ list to include the new tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_checkout', 'pr_ready', 'pr_checks', 'pr_files', 'github_graphql', 'github_rest']
+# Export all PR tools
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_checkout', 'pr_ready', 'pr_checks', 'pr_files']
