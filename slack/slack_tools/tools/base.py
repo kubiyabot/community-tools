@@ -22,7 +22,7 @@ from fuzzywuzzy import fuzz
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_block_kit_message(text, kubiya_user_email, kubiya_agent_profile, kubiya_agent_uuid):
+def create_block_kit_message(text, kubiya_user_email):
     return [
         {{
             "type": "section",
@@ -37,31 +37,6 @@ def create_block_kit_message(text, kubiya_user_email, kubiya_agent_profile, kubi
                 {{
                     "type": "mrkdwn",
                     "text": f":robot_face: This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform"
-                }}
-            ]
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": f"*Kubiya Teammate:* {{kubiya_agent_profile}}\\n_This AI teammate assisted in generating and sending this message._"
-            }}
-        }},
-        {{
-            "type": "section",
-            "text": {{
-                "type": "mrkdwn",
-                "text": "_Note: Conversing directly with this teammate may require special permissions._"
-            }}
-        }},
-        {{
-            "type": "actions",
-            "elements": [
-                {{
-                    "type": "button",
-                    "text": {{"type": "plain_text", "text": "View Teammate Settings", "emoji": True}},
-                    "url": f"https://app.kubiya.ai/teammates/overview/{{kubiya_agent_uuid}}",
-                    "action_id": "view_teammate_settings"
                 }}
             ]
         }}
@@ -96,21 +71,20 @@ def find_channel(client, channel_input):
 def send_slack_message(client, channel, text):
     logger.info(f"Starting to send Slack message to: {{channel}}")
     
+    if not channel:
+        logger.error("Channel parameter is missing or empty")
+        return {{"success": False, "error": "Channel parameter is missing or empty"}}
+    
     channel_id = find_channel(client, channel)
     if not channel_id:
         return {{"success": False, "error": f"Channel not found: {{channel}}"}}
 
     try:
         kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL", "Unknown User")
-        kubiya_agent_profile = os.environ.get("KUBIYA_AGENT_PROFILE", "Unknown Agent")
-        kubiya_agent_uuid = os.environ.get("KUBIYA_AGENT_UUID", "unknown")
         
-        blocks = create_block_kit_message(text, kubiya_user_email, kubiya_agent_profile, kubiya_agent_uuid)
+        blocks = create_block_kit_message(text, kubiya_user_email)
         
-        fallback_text = (
-            f"{{text}}\\n\\n_This message was sent on behalf of <@{{kubiya_user_email}}> "
-            f"using the Kubiya platform (Teammate: {{kubiya_agent_profile}})_"
-        )
+        fallback_text = f"{{text}}\\n\\n_This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform_"
 
         logger.info("Attempting to send Block Kit message...")
         try:
@@ -135,6 +109,9 @@ def execute_slack_action(token, action, **kwargs):
 
     try:
         if action == "chat_postMessage":
+            if 'channel' not in kwargs or 'text' not in kwargs:
+                logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
+                return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
             result = send_slack_message(client, kwargs['channel'], kwargs['text'])
         else:
             logger.info(f"Executing action: {{action}}")
@@ -147,7 +124,7 @@ def execute_slack_action(token, action, **kwargs):
         logger.info(f"Action completed. Result: {{result}}")
         return result
     except Exception as e:
-        logger.error(f"Unexpected error: {{e}}")
+        logger.error(f"Unexpected error: {{str(e)}}")
         return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
