@@ -10,23 +10,7 @@ class DockerTool(Tool):
         set -e
 
         # Install necessary tools
-        apk add --no-cache curl jq kubectl python3 py3-pip git github-cli aws-cli
-
-        # Install Dagger SDK
-        pip3 install dagger-io
-
-        # Setup Git providers
-        if [ -n "$GH_TOKEN" ]; then
-            echo "🔑 GitHub CLI authenticated"
-            gh auth setup-git
-        else
-            echo "⚠️ GH_TOKEN not set. Only public GitHub repositories will be accessible."
-        fi
-
-        if [ "$BITBUCKET_ENABLED" = "true" ]; then
-            echo "🔧 Setting up Bitbucket..."
-            # Add Bitbucket setup here
-        fi
+        apk add --no-cache curl jq kubectl git github-cli aws-cli
 
         # Your tool's content starts here
         """
