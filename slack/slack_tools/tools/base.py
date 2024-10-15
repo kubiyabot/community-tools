@@ -43,30 +43,50 @@ def create_block_kit_message(text, kubiya_user_email):
     ]
 
 def find_channel(client, channel_input):
+    logger.info(f"Attempting to find channel: {{channel_input}}")
     channel_input = channel_input.lstrip('#')
     
     # Check if it's already a valid channel ID
     try:
         result = client.conversations_info(channel=channel_input)
+        logger.info(f"Valid channel ID found: {{channel_input}}")
         return channel_input
-    except SlackApiError:
-        pass
+    except SlackApiError as e:
+        if e.response['error'] != 'channel_not_found':
+            logger.error(f"Error checking channel ID: {{e}}")
+            return None
 
-    # Search for the channel
+    # Search for public channels first
     try:
-        for response in client.conversations_list(types="public_channel,private_channel"):
+        for response in client.conversations_list(types="public_channel"):
             for channel in response["channels"]:
                 if channel["name"] == channel_input:
+                    logger.info(f"Exact match found in public channels: {{channel['id']}}")
                     return channel["id"]
                 elif fuzz.ratio(channel["name"], channel_input) > 80:
-                    logger.info(f"Found close match: {{channel['name']}} (ID: {{channel['id']}})")
+                    logger.info(f"Close match found in public channels: {{channel['name']}} (ID: {{channel['id']}})")
                     return channel["id"]
-        
-        logger.error(f"Channel not found: {{channel_input}}")
-        return None
     except SlackApiError as e:
-        logger.error(f"Error listing channels: {{e}}")
-        return None
+        logger.error(f"Error listing public channels: {{e}}")
+
+    # If not found in public channels, try private channels
+    try:
+        for response in client.conversations_list(types="private_channel"):
+            for channel in response["channels"]:
+                if channel["name"] == channel_input:
+                    logger.info(f"Exact match found in private channels: {{channel['id']}}")
+                    return channel["id"]
+                elif fuzz.ratio(channel["name"], channel_input) > 80:
+                    logger.info(f"Close match found in private channels: {{channel['name']}} (ID: {{channel['id']}})")
+                    return channel["id"]
+    except SlackApiError as e:
+        if 'missing_scope' in str(e):
+            logger.warning("Missing scope for private channels. Skipping private channel search.")
+        else:
+            logger.error(f"Error listing private channels: {{e}}")
+
+    logger.error(f"Channel not found: {{channel_input}}")
+    return None
 
 def send_slack_message(client, channel, text):
     logger.info(f"Starting to send Slack message to: {{channel}}")
@@ -112,6 +132,12 @@ def execute_slack_action(token, action, **kwargs):
             if 'channel' not in kwargs or 'text' not in kwargs:
                 logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
                 return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
+            
+            channel_id = find_channel(client, kwargs['channel'])
+            if not channel_id:
+                return {{"success": False, "error": f"Channel not found: {{kwargs['channel']}}"}}
+            
+            kwargs['channel'] = channel_id
             result = send_slack_message(client, kwargs['channel'], kwargs['text'])
         else:
             logger.info(f"Executing action: {{action}}")
@@ -124,8 +150,8 @@ def execute_slack_action(token, action, **kwargs):
         logger.info(f"Action completed. Result: {{result}}")
         return result
     except Exception as e:
-        logger.error(f"Unexpected error: {{str(e)}}")
-        return {{"success": False, "error": str(e)}}
+        logger.error(f"Unexpected error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 if __name__ == "__main__":
     token = os.environ.get("SLACK_API_TOKEN")
