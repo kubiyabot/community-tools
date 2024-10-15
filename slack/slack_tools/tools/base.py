@@ -150,8 +150,8 @@ def execute_slack_action(token, action, **kwargs):
         logger.info(f"Action completed. Result: {{result}}")
         return result
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
-        return {"success": False, "error": str(e)}
+        logger.error(f"Unexpected error: {{str(e)}}")
+        return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
     token = os.environ.get("SLACK_API_TOKEN")
