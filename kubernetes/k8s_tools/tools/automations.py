@@ -122,7 +122,7 @@ cluster_health_tool = KubernetesTool(
     set -e
     echo "🏥 Cluster Health Summary:"
     echo "========================="
-     
+    
     # Node Status
     echo "🖥️  Node Status:"
     kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,VERSION:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,MEMORY:.status.capacity.memory | 
@@ -327,7 +327,13 @@ resource_usage_tool = KubernetesTool(
     elif [ "$resource_type" = "pods" ]; then
         echo "🛠️  Pod Resource Usage:"
         echo "====================="
-        kubectl top pods $([[ -n "$namespace" ]] && echo "-n $namespace") --sort-by=cpu | awk 'NR>1 {print "  🔧 " $0}'
+        if [ -z "$namespace" ]; then
+            echo "Showing pod resource usage across all namespaces:"
+            kubectl top pods --all-namespaces --sort-by=cpu | awk 'NR>1 {print "  🔧 " $0}'
+        else
+            echo "Showing pod resource usage in namespace: $namespace"
+            kubectl top pods -n "$namespace" --sort-by=cpu | awk 'NR>1 {print "  🔧 " $0}'
+        fi
     else
         echo "❌ Invalid resource type. Use 'nodes' or 'pods'."
         exit 1
@@ -335,7 +341,7 @@ resource_usage_tool = KubernetesTool(
     """,
     args=[
         Arg(name="resource_type", type="str", description="Resource type to show usage for (nodes or pods)", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace (for pods only)", required=False),
+        Arg(name="namespace", type="str", description="Kubernetes namespace (for pods only, if not specified all namespaces will be checked)", required=False),
     ],
 )
 
@@ -349,25 +355,14 @@ check_pod_restarts_tool = KubernetesTool(
     threshold="${threshold:-5}"
     echo "🔄 Pods with high restart counts (threshold: $threshold):"
     echo "======================================================="
-    if [ -z "$namespace" ]; then
-        kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
-        awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
-            restarts = $3;
-            emoji = "⚠️";
-            if (restarts >= 20) emoji = "🚨";
-            else if (restarts >= 10) emoji = "⛔";
-            print "  " emoji " " $0;
-        }'
-    else
-        kubectl get pods -n "$namespace" -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
-        awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
-            restarts = $3;
-            emoji = "⚠️";
-            if (restarts >= 20) emoji = "🚨";
-            else if (restarts >= 10) emoji = "⛔";
-            print "  " emoji " " $0;
-        }'
-    fi
+    kubectl get pods ${namespace:+--namespace "$namespace"} ${namespace:---all-namespaces} -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
+    awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
+        restarts = $3;
+        emoji = "⚠️";
+        if (restarts >= 20) emoji = "🚨";
+        else if (restarts >= 10) emoji = "⛔";
+        print "  " emoji " " $0;
+    }'
     """,
     args=[
         Arg(name="namespace", type="str", description="Kubernetes namespace - if not specified, pods in all namespaces will be checked", required=False),
