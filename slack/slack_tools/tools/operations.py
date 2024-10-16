@@ -5,10 +5,10 @@ from kubiya_sdk.tools.registry import tool_registry
 # Slack Send Message Tool
 slack_send_message = SlackTool(
     name="slack_send_message",
-    description="Send a message to a Slack channel or user",
+    description="Send a message to a given channel name or ID",
     action="chat_postMessage",
     args=[
-        Arg(name="channel_name", type="str", description="The channel name (with # prefix) or ID (starts with C), or user ID (starts with U) to send the message to", required=True),
+        Arg(name="channel", type="str", description="The channel name (with or without # prefix) or ID to send the message to", required=True),
         Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
     ],
 )
