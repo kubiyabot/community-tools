@@ -44,7 +44,7 @@ mermaid_render_and_share_tool = DiagrammingTool(
 )
 
 # Register all tools
-for tool in [mermaid_render_tool, mermaid_to_svg_tool, mermaid_to_png_tool, share_diagram_tool]:
+for tool in [mermaid_render_and_share_tool]:
     tool_registry.register("diagramming", tool)
 
 # Register the tool
