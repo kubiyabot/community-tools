@@ -116,14 +116,16 @@ get_resource_logs_tool = KubernetesTool(
 
 cluster_health_tool = KubernetesTool(
     name="cluster_health",
-    description="Provides a summary of the Kubernetes cluster health",
+    description="Provides a comprehensive summary of the Kubernetes cluster health and generates a visual diagram",
     content="""
     #!/bin/bash
     set -e
     echo "🏥 Cluster Health Summary:"
     echo "========================="
+     
+    # Node Status
     echo "🖥️  Node Status:"
-    kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason | 
+    kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,VERSION:.status.nodeInfo.kubeletVersion,CPU:.status.capacity.cpu,MEMORY:.status.capacity.memory | 
     awk 'NR>1 {
         status = $2;
         emoji = "❓";
@@ -132,28 +134,36 @@ cluster_health_tool = KubernetesTool(
         else if (status == "SchedulingDisabled") emoji = "🚫";
         print "  " emoji " " $0;
     }'
+    
+    # Pod Status
     echo "\n🛠️  Pod Status:"
-    kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName | 
+    kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName,RESTARTS:.status.containerStatuses[0].restartCount | 
     awk 'NR>1 {
         status = $3;
+        restarts = $5;
         emoji = "❓";
-        if (status == "Running") emoji = "✅";
+        if (status == "Running" && restarts == "0") emoji = "✅";
+        else if (status == "Running" && restarts != "0") emoji = "⚠️";
         else if (status == "Pending") emoji = "⏳";
         else if (status == "Succeeded") emoji = "🎉";
         else if (status == "Failed") emoji = "❌";
         else if (status == "Unknown") emoji = "❔";
         print "  " emoji " " $0;
     }'
+    
+    # Deployment Status
     echo "\n🚀 Deployment Status:"
-    kubectl get deployments --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,DESIRED:.spec.replicas,AVAILABLE:.status.availableReplicas,UP-TO-DATE:.status.updatedReplicas | 
+    kubectl get deployments --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,DESIRED:.spec.replicas,CURRENT:.status.replicas,UP-TO-DATE:.status.updatedReplicas,AVAILABLE:.status.availableReplicas | 
     awk 'NR>1 {
-        if ($3 == $4 && $3 == $5) emoji = "✅";
-        else if ($4 == "0") emoji = "❌";
+        if ($3 == $4 && $3 == $5 && $3 == $6) emoji = "✅";
+        else if ($6 == "0") emoji = "❌";
         else emoji = "⚠️";
         print "  " emoji " " $0;
     }'
+    
+    # Persistent Volume Status
     echo "\n💾 Persistent Volume Status:"
-    kubectl get pv -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage,STATUS:.status.phase,CLAIM:.spec.claimRef.name | 
+    kubectl get pv -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage,STATUS:.status.phase,CLAIM:.spec.claimRef.name,STORAGECLASS:.spec.storageClassName | 
     awk 'NR>1 {
         status = $3;
         emoji = "❓";
@@ -163,6 +173,82 @@ cluster_health_tool = KubernetesTool(
         else if (status == "Failed") emoji = "❌";
         print "  " emoji " " $0;
     }'
+    
+    # Resource Usage
+    echo "\n📊 Resource Usage:"
+    echo "  Nodes:"
+    kubectl top nodes | awk 'NR>1 {print "    💻 " $0}'
+    echo "  Pods (Top 5 by CPU):"
+    kubectl top pods --all-namespaces --sort-by=cpu | head -n 6 | awk 'NR>1 {print "    🔧 " $0}'
+    
+    # Recent Events
+    echo "\n📅 Recent Events (last 5):"
+    kubectl get events --sort-by=.metadata.creationTimestamp | tail -n 5 | 
+    awk '{
+        type = $3;
+        emoji = "ℹ️";
+        if (type == "Warning") emoji = "⚠️";
+        else if (type == "Normal") emoji = "✅";
+        print "  " emoji " " $0;
+    }'
+    
+    # Generate Mermaid diagram
+    echo "\n📊 Cluster Diagram:"
+    cat << EOF > /tmp/cluster_diagram.mmd
+graph TB
+    classDef default fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef node fill:#ccf,stroke:#333,stroke-width:2px;
+    classDef deployment fill:#cfc,stroke:#333,stroke-width:2px;
+    classDef service fill:#fcc,stroke:#333,stroke-width:2px;
+    classDef pv fill:#cff,stroke:#333,stroke-width:2px;
+
+    subgraph Cluster
+        N[Nodes]:::node
+        D[Deployments]:::deployment
+        S[Services]:::service
+        PV[Persistent Volumes]:::pv
+EOF
+
+    # Add nodes
+    kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type --no-headers | 
+    awk '{
+        gsub(/[^a-zA-Z0-9]/, "_", $1);
+        print "        N --> N_" $1 "[\"" $1 "<br>Status: " $2 "\"]:::node"
+    }' >> /tmp/cluster_diagram.mmd
+
+    # Add deployments
+    kubectl get deployments --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.readyReplicas,DESIRED:.spec.replicas --no-headers |
+    awk '{
+        gsub(/[^a-zA-Z0-9]/, "_", $2);
+        print "        D --> D_" $2 "[\"" $1 "/" $2 "<br>Ready: " $3 "/" $4 "\"]:::deployment"
+    }' >> /tmp/cluster_diagram.mmd
+
+    # Add services
+    kubectl get services --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type --no-headers |
+    awk '{
+        gsub(/[^a-zA-Z0-9]/, "_", $2);
+        print "        S --> S_" $2 "[\"" $1 "/" $2 "<br>Type: " $3 "\"]:::service"
+    }' >> /tmp/cluster_diagram.mmd
+
+    # Add persistent volumes
+    kubectl get pv -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,CAPACITY:.spec.capacity.storage --no-headers |
+    awk '{
+        gsub(/[^a-zA-Z0-9]/, "_", $1);
+        print "        PV --> PV_" $1 "[\"" $1 "<br>Status: " $2 "<br>Capacity: " $3 "\"]:::pv"
+    }' >> /tmp/cluster_diagram.mmd
+
+    echo "    end" >> /tmp/cluster_diagram.mmd
+
+    # Generate mermaid.live link
+    mermaid_content=$(cat /tmp/cluster_diagram.mmd)
+    compressed_content=$(echo -n "$mermaid_content" | gzip -9 | base64 -w 0 | tr '+/' '-_' | tr -d '=')
+    mermaid_link="https://mermaid.live/edit#pako:$compressed_content"
+
+    echo "Mermaid Diagram:"
+    cat /tmp/cluster_diagram.mmd
+    echo ""
+    echo "Mermaid.live link:"
+    echo "$mermaid_link"
     """,
     args=[],
 )
@@ -255,7 +341,7 @@ resource_usage_tool = KubernetesTool(
 
 check_pod_restarts_tool = KubernetesTool(
     name="check_pod_restarts",
-    description="Checks for pods with high restart counts",
+    description="Checks for pods with high restart counts across all namespaces",
     content="""
     #!/bin/bash
     set -e
@@ -263,17 +349,28 @@ check_pod_restarts_tool = KubernetesTool(
     threshold="${threshold:-5}"
     echo "🔄 Pods with high restart counts (threshold: $threshold):"
     echo "======================================================="
-    kubectl get pods $([[ -n "$namespace" ]] && echo "-n $namespace") -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
-    awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
-        restarts = $3;
-        emoji = "⚠️";
-        if (restarts >= 20) emoji = "🚨";
-        else if (restarts >= 10) emoji = "⛔";
-        print "  " emoji " " $0;
-    }'
+    if [ -z "$namespace" ]; then
+        kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
+        awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
+            restarts = $3;
+            emoji = "⚠️";
+            if (restarts >= 20) emoji = "🚨";
+            else if (restarts >= 10) emoji = "⛔";
+            print "  " emoji " " $0;
+        }'
+    else
+        kubectl get pods -n "$namespace" -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,RESTARTS:.status.containerStatuses[0].restartCount,STATUS:.status.phase |
+        awk -v threshold="$threshold" 'NR>1 && $3 >= threshold {
+            restarts = $3;
+            emoji = "⚠️";
+            if (restarts >= 20) emoji = "🚨";
+            else if (restarts >= 10) emoji = "⛔";
+            print "  " emoji " " $0;
+        }'
+    fi
     """,
     args=[
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
+        Arg(name="namespace", type="str", description="Kubernetes namespace - if not specified, pods in all namespaces will be checked", required=False),
         Arg(name="threshold", type="int", description="Minimum number of restarts to report", required=False),
     ],
 )
