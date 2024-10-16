@@ -43,42 +43,76 @@ def create_block_kit_message(text, kubiya_user_email):
     ]
 
 def find_channel(client, channel_input):
-    logger.info(f"Attempting to find channel: {{channel_input}}")
+    logger.info(f"Attempting to find channel or user: {{channel_input}}")
     
     # If it's already a valid channel ID (starts with C and is 11 characters long), use it directly
     if channel_input.startswith('C') and len(channel_input) == 11:
         logger.info(f"Using provided channel ID directly: {{channel_input}}")
         return channel_input
     
-    # Remove '#' if present
-    channel_input = channel_input.lstrip('#')
+    # If it's a valid user ID (starts with U and is 11 characters long), get or create a DM channel
+    if channel_input.startswith('U') and len(channel_input) == 11:
+        try:
+            response = client.conversations_open(users=[channel_input])
+            dm_channel_id = response['channel']['id']
+            logger.info(f"Opened DM channel with user: {{channel_input}}, channel ID: {{dm_channel_id}}")
+            return dm_channel_id
+        except SlackApiError as e:
+            logger.error(f"Error opening DM channel with user {{channel_input}}: {{e}}")
+            return None
+    
+    # If it starts with @, treat it as a username and try to find the user
+    if channel_input.startswith('@'):
+        username = channel_input[1:]
+        try:
+            response = client.users_list()
+            for user in response['members']:
+                if user['name'] == username or user.get('real_name') == username:
+                    user_id = user['id']
+                    dm_response = client.conversations_open(users=[user_id])
+                    dm_channel_id = dm_response['channel']['id']
+                    logger.info(f"Opened DM channel with user @{{username}}, channel ID: {{dm_channel_id}}")
+                    return dm_channel_id
+            logger.error(f"User @{{username}} not found")
+            return None
+        except SlackApiError as e:
+            logger.error(f"Error finding user @{{username}}: {{e}}")
+            return None
+    
+    # Add '#' prefix if it's missing and the input looks like a channel name
+    if not channel_input.startswith('#') and not channel_input.startswith('C'):
+        channel_input = f"#{{channel_input}}"
+        logger.info(f"Added '#' prefix to channel name: {{channel_input}}")
+    
+    # Remove '#' if present for the API call
+    channel_name = channel_input.lstrip('#')
     
     # Try to find the channel by name
     try:
         for response in client.conversations_list(types="public_channel,private_channel"):
             for channel in response["channels"]:
-                if channel["name"] == channel_input:
+                if channel["name"].lower() == channel_name.lower():
                     logger.info(f"Exact match found: {{channel['id']}}")
                     return channel["id"]
-                elif fuzz.ratio(channel["name"], channel_input) > 80:
+                elif fuzz.ratio(channel["name"].lower(), channel_name.lower()) > 80:
                     logger.info(f"Close match found: {{channel['name']}} (ID: {{channel['id']}})")
                     return channel["id"]
     except SlackApiError as e:
         logger.error(f"Error listing channels: {{e}}")
 
-    logger.error(f"Channel not found: {{channel_input}}")
+    logger.error(f"Channel or user not found: {{channel_input}}")
     return None
 
 def send_slack_message(client, channel, text):
     logger.info(f"Starting to send Slack message to: {{channel}}")
     
     if not channel:
-        logger.error("Channel parameter is missing or empty")
-        return {{"success": False, "error": "Channel parameter is missing or empty"}}
+        logger.error("Channel or user parameter is missing or empty")
+        return {{"success": False, "error": "Channel or user parameter is missing or empty"}}
     
     channel_id = find_channel(client, channel)
     if not channel_id:
-        return {{"success": False, "error": f"Channel not found: {{channel}}"}}
+        return {{"success": False, "error": f"Channel or user not found: {{channel}}"}}
 
     try:
         kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL", "Unknown User")
@@ -87,7 +121,7 @@ def send_slack_message(client, channel, text):
         
         fallback_text = f"{{text}}\\n\\n_This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform_"
 
-        logger.info(f"Attempting to send Block Kit message to channel ID: {{channel_id}}")
+        logger.info(f"Attempting to send Block Kit message to channel/user ID: {{channel_id}}")
         try:
             response = client.chat_postMessage(channel=channel_id, blocks=blocks, text=fallback_text)
             logger.info(f"Block Kit message sent successfully to {{channel_id}}")
