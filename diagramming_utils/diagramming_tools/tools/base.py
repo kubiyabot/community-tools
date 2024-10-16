@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_sdk.tools import Tool
 
 MERMAID_ICON_URL = "https://mermaid.js.org/favicon.svg"
 

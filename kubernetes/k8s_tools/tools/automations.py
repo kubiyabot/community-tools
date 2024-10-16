@@ -238,17 +238,9 @@ EOF
     }' >> /tmp/cluster_diagram.mmd
 
     echo "    end" >> /tmp/cluster_diagram.mmd
-
-    # Generate mermaid.live link
-    mermaid_content=$(cat /tmp/cluster_diagram.mmd)
-    compressed_content=$(echo -n "$mermaid_content" | gzip -9 | base64 -w 0 | tr '+/' '-_' | tr -d '=')
-    mermaid_link="https://mermaid.live/edit#pako:$compressed_content"
-
-    echo "Mermaid Diagram:"
+    echo "Below is a mermaid diagram describing the current state of the cluster:"
     cat /tmp/cluster_diagram.mmd
-    echo ""
-    echo "Mermaid.live link:"
-    echo "$mermaid_link"
+    echo "You can use the mermaid_render_and_share tool to render and share this diagram to a channel or email it to someone."
     """,
     args=[],
 )
