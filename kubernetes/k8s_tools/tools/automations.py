@@ -213,28 +213,28 @@ EOF
     kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type --no-headers | 
     awk '{
         gsub(/[^a-zA-Z0-9]/, "_", $1);
-        print "        N --> N_" $1 "[\"" $1 "<br>Status: " $2 "\"]:::node"
+        print "        N --> N_" $1 "(" $1 "<br>Status: " $2 "):::node"
     }' >> /tmp/cluster_diagram.mmd
 
     # Add deployments
     kubectl get deployments --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.readyReplicas,DESIRED:.spec.replicas --no-headers |
     awk '{
         gsub(/[^a-zA-Z0-9]/, "_", $2);
-        print "        D --> D_" $2 "[\"" $1 "/" $2 "<br>Ready: " $3 "/" $4 "\"]:::deployment"
+        print "        D --> D_" $2 "(" $1 "/" $2 "<br>Ready: " $3 "/" $4 "):::deployment"
     }' >> /tmp/cluster_diagram.mmd
 
     # Add services
     kubectl get services --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.type --no-headers |
     awk '{
         gsub(/[^a-zA-Z0-9]/, "_", $2);
-        print "        S --> S_" $2 "[\"" $1 "/" $2 "<br>Type: " $3 "\"]:::service"
+        print "        S --> S_" $2 "(" $1 "/" $2 "<br>Type: " $3 "):::service"
     }' >> /tmp/cluster_diagram.mmd
 
     # Add persistent volumes
     kubectl get pv -o custom-columns=NAME:.metadata.name,STATUS:.status.phase,CAPACITY:.spec.capacity.storage --no-headers |
     awk '{
         gsub(/[^a-zA-Z0-9]/, "_", $1);
-        print "        PV --> PV_" $1 "[\"" $1 "<br>Status: " $2 "<br>Capacity: " $3 "\"]:::pv"
+        print "        PV --> PV_" $1 "(" $1 "<br>Status: " $2 "<br>Capacity: " $3 "):::pv"
     }' >> /tmp/cluster_diagram.mmd
 
     echo "    end" >> /tmp/cluster_diagram.mmd
