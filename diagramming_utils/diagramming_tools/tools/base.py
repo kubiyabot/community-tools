@@ -10,7 +10,12 @@ class DiagrammingTool(Tool):
         set -e # Exit on error
         npm install @mermaid-js/mermaid-cli
         """
-        default_env = ["SLACK_API_TOKEN", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS"]
+        # The default env and secrets are for the mermaid_render_and_share tool
+        # Built in slack tools will use these to find the slack channel and thread
+        default_env = ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"]
+        # The default secrets are for the mermaid_render_and_share tool
+        # Built in slack tools will use these to find the slack api token
+        default_secrets = ["SLACK_API_TOKEN"]
         modified_content = mermaid_setup + "\n" + content
         super().__init__(
             name=name,
@@ -19,6 +24,7 @@ class DiagrammingTool(Tool):
             type="docker",
             image=NODE_IMAGE,
             env=default_env,
+            secrets=default_secrets,
             content=modified_content,
             args=args,
             long_running=long_running,
