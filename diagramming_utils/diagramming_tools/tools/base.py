@@ -10,6 +10,7 @@ class DiagrammingTool(Tool):
         set -e # Exit on error
         npm install @mermaid-js/mermaid-cli
         """
+        default_env = ["SLACK_API_TOKEN", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS"]
         modified_content = mermaid_setup + "\n" + content
         super().__init__(
             name=name,
@@ -17,6 +18,7 @@ class DiagrammingTool(Tool):
             icon_url=MERMAID_ICON_URL,
             type="docker",
             image=NODE_IMAGE,
+            env=default_env,
             content=modified_content,
             args=args,
             long_running=long_running,
