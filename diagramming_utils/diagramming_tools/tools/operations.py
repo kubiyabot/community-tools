@@ -14,7 +14,7 @@ mermaid_render_and_share_tool = DiagrammingTool(
     echo "$mermaid_content" > $MERMAID_FILE
 
     # Generate the diagram
-    mmdc -i $MERMAID_FILE -o /tmp/diagram.svg -b transparent
+    ./node_modules/.bin/mmdc -i $MERMAID_FILE -o /tmp/diagram.svg -b transparent
 
     # Share via Slack if requested
     if [ "$share_on_slack" = "true" ] && [ -n "$SLACK_API_TOKEN" ] && [ -n "$slack_channel" ]; then
