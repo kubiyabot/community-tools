@@ -8,7 +8,15 @@ class DiagrammingTool(Tool):
         mermaid_setup = """
         #!/bin/bash
         set -e # Exit on error
-        npm install @mermaid-js/mermaid-cli
+        if ! command -v npm &> /dev/null; then
+            echo "npm is not installed. Installing npm..."
+            apt-get update
+            apt-get install -y npm
+        fi
+        if ! command -v mmdc &> /dev/null; then
+            echo "mmdc is not installed. Installing mmdc..."
+            npm install @mermaid-js/mermaid-cli
+        fi
         """
         # The default env and secrets are for the mermaid_render_and_share tool
         # Built in slack tools will use these to find the slack channel and thread
