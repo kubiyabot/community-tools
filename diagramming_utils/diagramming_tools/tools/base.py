@@ -1,6 +1,7 @@
 from kubiya_sdk.tools import Tool
 
 MERMAID_ICON_URL = "https://mermaid.js.org/favicon.svg"
+NODE_IMAGE = "node:23-slim"
 
 class DiagrammingTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
@@ -15,7 +16,7 @@ class DiagrammingTool(Tool):
             description=description,
             icon_url=MERMAID_ICON_URL,
             type="docker",
-            image="node:14-slim",
+            image=NODE_IMAGE,
             content=modified_content,
             args=args,
             long_running=long_running,
