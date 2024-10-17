@@ -6,9 +6,6 @@ mermaid_render_and_share_tool = DiagrammingTool(
     name="mermaid_render_and_share",
     description="Renders a Mermaid diagram from provided content and optionally shares it",
     content="""
-    #!/bin/bash
-    set -e
-
     # Create a temporary file for the Mermaid content
     MERMAID_FILE=$(mktemp)
     echo "$mermaid_content" > $MERMAID_FILE

@@ -7,7 +7,7 @@ class DiagrammingTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
         mermaid_setup = """
         #!/bin/bash
-        set -e
+        set -e # Exit on error
         npm install @mermaid-js/mermaid-cli
         """
         modified_content = mermaid_setup + "\n" + content
