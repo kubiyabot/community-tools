@@ -40,7 +40,7 @@ mermaid_render_and_share_tool = DiagrammingTool(
     """,
     args=[
         Arg(name="mermaid_content", type="str", description="Mermaid diagram content as string (should be valid mermaid syntax)", required=True),
-        Arg(name="share_on_slack", type="bool", description="Whether to share the diagram on Slack", required=False, default=False),
+        Arg(name="share_on_slack", type="bool", description="Whether to share the diagram on Slack", required=False),
         Arg(name="slack_channel", type="str", description="Slack channel to share the diagram (required if share_on_slack is true)", required=False),
         Arg(name="initial_comment", type="str", description="Initial comment for the Slack message", required=False),
         Arg(name="title", type="str", description="Title for the diagram in Slack", required=False),
