@@ -28,10 +28,11 @@ find_resource_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    result=$(kubectl get $resource_type $([[ -n "$namespace" ]] && echo "-n $namespace") \
-    $([[ -n "$label_selector" ]] && echo "-l $label_selector") \
-    $([[ -n "$field_selector" ]] && echo "--field-selector=$field_selector") \
+    result=$(kubectl get $resource_type $( [ -n "$namespace" ] && echo "-n $namespace" ) \
+    $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
+    $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
     -o wide | grep -i "$search_term" || true)
+
     if [ -z "$result" ]; then
         echo "🔍 No resources found matching the criteria"
     else
