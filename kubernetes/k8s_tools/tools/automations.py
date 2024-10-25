@@ -8,7 +8,12 @@ scale_deployment_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    if kubectl scale deployment $name --replicas=$replicas $([[ -n "$namespace" ]] && echo "-n $namespace"); then
+
+    # Set namespace flag if provided
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "" )
+
+    # Attempt to scale the deployment
+    if kubectl scale deployment "$name" --replicas="$replicas" $namespace_flag; then
         echo "✅ Successfully scaled deployment $name to $replicas replicas"
     else
         echo "❌ Failed to scale deployment $name"
