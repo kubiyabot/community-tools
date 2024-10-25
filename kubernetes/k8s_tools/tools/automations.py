@@ -28,6 +28,12 @@ find_resource_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
+
+    # Ensure optional parameters are set to empty strings if not provided
+    namespace=${namespace:-}
+    label_selector=${label_selector:-}
+    field_selector=${field_selector:-}
+
     result=$(kubectl get $resource_type $( [ -n "$namespace" ] && echo "-n $namespace" ) \
     $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
     $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
