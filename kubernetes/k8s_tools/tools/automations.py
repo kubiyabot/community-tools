@@ -28,10 +28,20 @@ find_resource_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    result=$(kubectl get $resource_type $([[ -n "$namespace" ]] && echo "-n $namespace") \
-    $([[ -n "$label_selector" ]] && echo "-l $label_selector") \
-    $([[ -n "$field_selector" ]] && echo "--field-selector=$field_selector") \
+
+    # Ensure optional parameters are set to empty strings if not provided
+    namespace=${namespace:-}
+    label_selector=${label_selector:-}
+    field_selector=${field_selector:-}
+
+    # Use --all-namespaces if no specific namespace is provided
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+
+    result=$(kubectl get $resource_type $namespace_flag \
+    $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
+    $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
     -o wide | grep -i "$search_term" || true)
+
     if [ -z "$result" ]; then
         echo "🔍 No resources found matching the criteria"
     else
@@ -47,7 +57,6 @@ find_resource_tool = KubernetesTool(
         Arg(name="search_term", type="str", description="Search term to filter results", required=False),
     ],
 )
-
 change_replicas_tool = KubernetesTool(
     name="change_replicas",
     description="Modifies the number of replicas for a specific Kubernetes resource like deployments or statefulsets. Use this to scale up or down a resource.",
