@@ -34,7 +34,10 @@ find_resource_tool = KubernetesTool(
     label_selector=${label_selector:-}
     field_selector=${field_selector:-}
 
-    result=$(kubectl get $resource_type $( [ -n "$namespace" ] && echo "-n $namespace" ) \
+    # Use --all-namespaces if no specific namespace is provided
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+
+    result=$(kubectl get $resource_type $namespace_flag \
     $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
     $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
     -o wide | grep -i "$search_term" || true)
