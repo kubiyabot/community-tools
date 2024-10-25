@@ -4,7 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 
 deployment_tool = KubernetesTool(
     name="deployment",
-    description="Manages Kubernetes deployments",
+    description="Manages Kubernetes deployments, including creating, updating, deleting, and retrieving deployment information. Use this for deployment-specific operations.",
     content="""
     #!/bin/bash
     set -e

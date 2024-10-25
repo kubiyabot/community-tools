@@ -24,7 +24,7 @@ scale_deployment_tool = KubernetesTool(
 
 find_resource_tool = KubernetesTool(
     name="find_resource",
-    description="Finds Kubernetes resources based on filters and search criteria",
+    description="Searches for and lists Kubernetes resources based on type, namespace, labels, and other criteria. Use this for general resource discovery, not for checking specific deployment details.",
     content="""
     #!/bin/bash
     set -e
@@ -50,7 +50,7 @@ find_resource_tool = KubernetesTool(
 
 change_replicas_tool = KubernetesTool(
     name="change_replicas",
-    description="Changes the number of replicas for a Kubernetes resource",
+    description="Modifies the number of replicas for a specific Kubernetes resource like deployments or statefulsets. Use this to scale up or down a resource.",
     content="""
     #!/bin/bash
     set -e
@@ -386,6 +386,22 @@ pod_disruption_budget_checker_tool = KubernetesTool(
     args=[],
 )
 
+check_replicas_tool = KubernetesTool(
+    name="check_replicas",
+    description="Retrieves the current number of replicas for a specific Kubernetes deployment or statefulset. Use this to get the replica count of a resource.",
+    content="""
+    #!/bin/bash
+    set -e
+    replicas=$(kubectl get $resource_type $resource_name $([[ -n "$namespace" ]] && echo "-n $namespace") -o jsonpath='{.spec.replicas}')
+    echo "Current number of replicas for $resource_type/$resource_name: $replicas"
+    """,
+    args=[
+        Arg(name="resource_type", type="str", description="Type of resource (e.g., deployment, statefulset)", required=True),
+        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
+    ],
+)
+
 # Register all tools
 for tool in [
     network_policy_analyzer_tool,
@@ -394,5 +410,6 @@ for tool in [
     resource_quota_usage_tool,
     cluster_autoscaler_status_tool,
     pod_disruption_budget_checker_tool,
+    check_replicas_tool,
 ]:
     tool_registry.register("kubernetes", tool)
