@@ -411,7 +411,7 @@ check_replicas_tool = KubernetesTool(
     # Get the number of replicas
     replicas=$(kubectl get $resource_type $resource_name $namespace_flag -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "NotFound")
 
-    if [ "$replicas" == "NotFound" ]; then
+    if [ "$replicas" = "NotFound" ]; then
         echo "❗Error: $resource_type/$resource_name not found in ${namespace:-all namespaces}"
     else
         echo "Current number of replicas for $resource_type/$resource_name: $replicas"
