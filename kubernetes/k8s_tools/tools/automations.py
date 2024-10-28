@@ -8,7 +8,12 @@ scale_deployment_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    if kubectl scale deployment $name --replicas=$replicas $([[ -n "$namespace" ]] && echo "-n $namespace"); then
+
+    # Set namespace flag if provided
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "" )
+
+    # Attempt to scale the deployment
+    if kubectl scale deployment "$name" --replicas="$replicas" $namespace_flag; then
         echo "✅ Successfully scaled deployment $name to $replicas replicas"
     else
         echo "❌ Failed to scale deployment $name"
@@ -33,14 +38,16 @@ find_resource_tool = KubernetesTool(
     namespace=${namespace:-}
     label_selector=${label_selector:-}
     field_selector=${field_selector:-}
+    search_term=${search_term:-}
 
     # Use --all-namespaces if no specific namespace is provided
     namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
 
+    # Run kubectl command and filter by search_term if provided
     result=$(kubectl get $resource_type $namespace_flag \
     $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
     $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
-    -o wide | grep -i "$search_term" || true)
+    -o wide | { [ -z "$search_term" ] && cat || grep -i "$search_term"; } || true)
 
     if [ -z "$result" ]; then
         echo "🔍 No resources found matching the criteria"
@@ -57,13 +64,19 @@ find_resource_tool = KubernetesTool(
         Arg(name="search_term", type="str", description="Search term to filter results", required=False),
     ],
 )
+
 change_replicas_tool = KubernetesTool(
     name="change_replicas",
     description="Modifies the number of replicas for a specific Kubernetes resource like deployments or statefulsets. Use this to scale up or down a resource.",
     content="""
     #!/bin/bash
     set -e
-    if kubectl scale $resource_type/$resource_name --replicas=$replicas $([[ -n "$namespace" ]] && echo "-n $namespace"); then
+
+    # Set namespace flag if provided
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "" )
+
+    # Attempt to scale the resource
+    if kubectl scale "$resource_type/$resource_name" --replicas="$replicas" $namespace_flag; then
         echo "✅ Successfully changed replicas for $resource_type/$resource_name to $replicas"
     else
         echo "❌ Failed to change replicas for $resource_type/$resource_name"
@@ -401,8 +414,18 @@ check_replicas_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    replicas=$(kubectl get $resource_type $resource_name $([[ -n "$namespace" ]] && echo "-n $namespace") -o jsonpath='{.spec.replicas}')
-    echo "Current number of replicas for $resource_type/$resource_name: $replicas"
+
+    # Set namespace argument if provided, or use default empty string
+    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "" )
+
+    # Get the number of replicas
+    replicas=$(kubectl get $resource_type $resource_name $namespace_flag -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "NotFound")
+
+    if [ "$replicas" = "NotFound" ]; then
+        echo "❗Error: $resource_type/$resource_name not found in ${namespace:-all namespaces}"
+    else
+        echo "Current number of replicas for $resource_type/$resource_name: $replicas"
+    fi
     """,
     args=[
         Arg(name="resource_type", type="str", description="Type of resource (e.g., deployment, statefulset)", required=True),
@@ -410,6 +433,7 @@ check_replicas_tool = KubernetesTool(
         Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
     ],
 )
+
 
 # Register all tools
 for tool in [
