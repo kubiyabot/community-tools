@@ -1,5 +1,5 @@
 from kubiya_sdk.tools.models import Tool
-from .constants import AWS_SECRETS, AZURE_SECRETS, DATABRICKS_ICON_URL, AWS_FILES, AWS_ENV, AZURE_ENV
+from .constants import AWS_SECRETS, AZURE_SECRETS, DATABRICKS_ICON_URL, AWS_FILES, AWS_ENV, AZURE_ENV, COMMON_ENV
 
 class DatabricksTerraformTool(Tool):
     def __init__(self, name, description, content, args, env, secrets, long_running=True, with_files=None, image="hashicorp/terraform:latest", mermaid=None):
@@ -27,7 +27,7 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             args=args,
             long_running=long_running,
             with_files=AWS_FILES,
-            env=AWS_ENV,
+            env=AWS_ENV + COMMON_ENV,
             secrets=AWS_SECRETS,
             mermaid=mermaid,
         )
@@ -39,7 +39,7 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             description=description,
             content=content,
             args=args,
-            env=AZURE_ENV,
+            env=AZURE_ENV + COMMON_ENV,
             secrets=AZURE_SECRETS,
             long_running=long_running,
             mermaid=mermaid,

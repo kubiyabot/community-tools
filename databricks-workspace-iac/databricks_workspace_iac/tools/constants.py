@@ -1,5 +1,10 @@
 from kubiya_sdk.tools.models import FileSpec
 
+
+COMMON_ENV = [
+    "SLACK_API_TOKEN", # The Slack API Token (Set via Team Mate settings -> Integrations -> Slack)
+]
+
 AWS_ENV = [
     "GIT_ORG", # The GitHub Organization
     "GIT_REPO", # The GitHub Repository
