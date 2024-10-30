@@ -157,36 +157,42 @@ fi
 echo -e "\\n🚀 Applying Terraform Configuration..."
 update_deployment_status "3/4" "Applying Terraform configuration (this may take several minutes)..."
 
-# Prepare variables
-address_space_json={{ .address_space }}
-address_prefixes_public_json={{ .address_prefixes_public }}
-address_prefixes_private_json={{ .address_prefixes_private }}
+# Prepare variables (ensure they're properly quoted)
+address_space_json="{{ .address_space }}"
+address_prefixes_public_json="{{ .address_prefixes_public }}"
+address_prefixes_private_json="{{ .address_prefixes_private }}"
 
-if terraform apply -auto-approve \\
-    -var "workspace_name={{ .workspace_name }}" \\
-    -var "region={{ .region }}" \\
-    -var "managed_services_cmk_key_vault_key_id={{ .managed_services_cmk_key_vault_key_id }}" \\
-    -var "managed_disk_cmk_key_vault_key_id={{ .managed_disk_cmk_key_vault_key_id }}" \\
-    -var "infrastructure_encryption_enabled={{ .infrastructure_encryption_enabled }}" \\
-    -var "no_public_ip={{ .no_public_ip }}" \\
-    -var "enable_vnet={{ .enable_vnet }}" \\
-    -var "virtual_network_id={{ .virtual_network_id }}" \\
-    -var "private_subnet_name={{ .private_subnet_name }}" \\
-    -var "public_subnet_name={{ .public_subnet_name }}" \\
-    -var "public_subnet_network_security_group_association_id={{ .public_subnet_network_security_group_association_id }}" \\
-    -var "private_subnet_network_security_group_association_id={{ .private_subnet_network_security_group_association_id }}" \\
-    -var "security_profile_enabled={{ .security_profile_enabled }}" \\
-    -var "enhanced_monitoring_enabled={{ .enhanced_monitoring_enabled }}" \\
-    -var "automatic_update={{ .automatic_update }}" \\
-    -var "restart_no_updates={{ .restart_no_updates }}" \\
-    -var "day_of_week={{ .day_of_week }}" \\
-    -var "frequency={{ .frequency }}" \\
-    -var "hours={{ .hours }}" \\
-    -var "minutes={{ .minutes }}" \\
-    -var "address_space=${address_space_json}" \\
-    -var "address_prefixes_public=${address_prefixes_public_json}" \\
-    -var "address_prefixes_private=${address_prefixes_private_json}" \\
-    > /tmp/terraform_apply.log 2>&1; then
+# Create terraform vars file to avoid command line length issues
+cat > terraform.tfvars.json <<EOF
+{
+    "workspace_name": "{{ .workspace_name }}",
+    "region": "{{ .region }}",
+    "managed_services_cmk_key_vault_key_id": "{{ .managed_services_cmk_key_vault_key_id }}",
+    "managed_disk_cmk_key_vault_key_id": "{{ .managed_disk_cmk_key_vault_key_id }}",
+    "infrastructure_encryption_enabled": {{ .infrastructure_encryption_enabled }},
+    "no_public_ip": {{ .no_public_ip }},
+    "enable_vnet": {{ .enable_vnet }},
+    "virtual_network_id": "{{ .virtual_network_id }}",
+    "private_subnet_name": "{{ .private_subnet_name }}",
+    "public_subnet_name": "{{ .public_subnet_name }}",
+    "public_subnet_network_security_group_association_id": "{{ .public_subnet_network_security_group_association_id }}",
+    "private_subnet_network_security_group_association_id": "{{ .private_subnet_network_security_group_association_id }}",
+    "security_profile_enabled": {{ .security_profile_enabled }},
+    "enhanced_monitoring_enabled": {{ .enhanced_monitoring_enabled }},
+    "automatic_update": {{ .automatic_update }},
+    "restart_no_updates": {{ .restart_no_updates }},
+    "day_of_week": "{{ .day_of_week }}",
+    "frequency": "{{ .frequency }}",
+    "hours": "{{ .hours }}",
+    "minutes": "{{ .minutes }}",
+    "address_space": ${address_space_json},
+    "address_prefixes_public": ${address_prefixes_public_json},
+    "address_prefixes_private": ${address_prefixes_private_json}
+}
+EOF
+
+# Apply Terraform configuration using vars file
+if terraform apply -auto-approve -var-file="terraform.tfvars.json" > /tmp/terraform_apply.log 2>&1; then
     update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
 else
     error_details=$(cat /tmp/terraform_apply.log)
