@@ -158,7 +158,7 @@ send_progress_update() {
     local status_message="$4"
     local eta="$5"
 
-    echo -e "\\n$status_icon $status_message"
+    echo -e "\\n${status_icon} ${status_message}"
 
     local blocks="$(cat <<EOF
 [
@@ -180,23 +180,26 @@ send_progress_update() {
             },
             {
                 "type": "mrkdwn",
-                "text": "*Provisioning Infrastructure* • Phase $phase of $total_phases"
+                "text": "*Provisioning Infrastructure* • Phase ${phase} of ${total_phases}"
             }
         ]
     },
     {
         "type": "divider"
     },
-    ${
-        # Include status messages for each phase
-        status_blocks
-    }
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "${status_icon} ${status_message}"
+        }
+    },
     {
         "type": "context",
         "elements": [
             {
                 "type": "mrkdwn",
-                "text": ":zap: *Phase $phase of $total_phases* • :stopwatch: *ETA:* $eta minutes"
+                "text": ":zap: *Phase ${phase} of ${total_phases}* • :stopwatch: *ETA:* ${eta} minutes"
             }
         ]
     },
@@ -205,7 +208,7 @@ send_progress_update() {
         "elements": [
             {
                 "type": "mrkdwn",
-                "text": "_Note: This task might take up to $eta minutes depending on Terraform apply against the providers involved._"
+                "text": "_Note: This task might take up to ${eta} minutes depending on Terraform apply against the providers involved._"
             }
         ]
     }
@@ -213,7 +216,7 @@ send_progress_update() {
 EOF
 )"
 
-    update_slack_main_message "🚀 Deployment In Progress" "$status_message" "Currently in phase $phase of $total_phases."
+    update_slack_main_message "🚀 Deployment In Progress" "${status_message}" "Currently in phase ${phase} of ${total_phases}."
 }
 
 echo -e "\\n🔧 Let's get started!\\n"
@@ -234,28 +237,25 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     "text": "🚀 *Deployment Initiated for Workspace* \`{{ .workspace_name }}\`",
     "blocks": [
         {
-            "type": "header",
+            "type": "section",
             "text": {
-                "type": "plain_text",
-                "text": "🚀 Databricks Workspace Deployment Initiated",
-                "emoji": true
+                "type": "mrkdwn",
+                "text": "🚀 *Deployment Initiated for Workspace* \`{{ .workspace_name }}\` in region \`{{ .region }}\`.\n\n_Long running operation in progress, I will keep you updated on any progress._"
             }
         },
         {
-            "type": "section",
-            "fields": [
+            "type": "actions",
+            "elements": [
                 {
-                    "type": "mrkdwn",
-                    "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Region:*\\n\`{{ .region }}\`"
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "View Thread",
+                        "emoji": true
+                    },
+                    "url": "$THREAD_URL"
                 }
             ]
-        },
-        {
-            "type": "divider"
         }
     ]
 }
@@ -272,7 +272,9 @@ if [ "$ok" != "true" ] || [ -z "$THREAD_TS" ] || [ "$THREAD_TS" == "null" ]; the
     exit 1
 fi
 
-THREAD_URL="https://yourdomain.slack.com/archives/$SLACK_CHANNEL_ID/p${THREAD_TS//./}"
+# Build THREAD_URL safely by encoding it properly
+THREAD_TS_ENCODED=$(echo "$THREAD_TS" | sed 's/\./%2E/g')
+THREAD_URL="https://yourdomain.slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS_ENCODED}"
 
 # Send message to start thread
 send_slack_thread_message ":thread: *Deployment Log for Workspace* \`{{ .workspace_name }}\`" "[]"
@@ -284,7 +286,7 @@ update_slack_main_message "🚀 Deployment In Progress" "Initialization started.
 echo -e "\\n🔍 *Step 1: Cloning Infrastructure Repository...*"
 send_progress_update "1" "4" "🔍" "Cloning Infrastructure Repository..." "10"
 
-if git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git "$DIR" > /dev/null 2>&1; then
+if git clone -b "$BRANCH" "https://$PAT@$GIT_ORG/$GIT_REPO.git" "$DIR" > /dev/null 2>&1; then
     echo -e "✅ *Repository cloned successfully!*"
     send_slack_thread_message "✅ *Step 1 Completed:* Repository cloned successfully." "[]"
 else
@@ -321,7 +323,24 @@ address_prefixes_private_json={{ .address_prefixes_private }}
 if terraform apply -auto-approve \\
     -var "workspace_name={{ .workspace_name }}" \\
     -var "region={{ .region }}" \\
-    # ... other variables ...
+    -var "managed_services_cmk_key_vault_key_id={{ .managed_services_cmk_key_vault_key_id }}" \\
+    -var "managed_disk_cmk_key_vault_key_id={{ .managed_disk_cmk_key_vault_key_id }}" \\
+    -var "infrastructure_encryption_enabled={{ .infrastructure_encryption_enabled }}" \\
+    -var "no_public_ip={{ .no_public_ip }}" \\
+    -var "enable_vnet={{ .enable_vnet }}" \\
+    -var "virtual_network_id={{ .virtual_network_id }}" \\
+    -var "private_subnet_name={{ .private_subnet_name }}" \\
+    -var "public_subnet_name={{ .public_subnet_name }}" \\
+    -var "public_subnet_network_security_group_association_id={{ .public_subnet_network_security_group_association_id }}" \\
+    -var "private_subnet_network_security_group_association_id={{ .private_subnet_network_security_group_association_id }}" \\
+    -var "security_profile_enabled={{ .security_profile_enabled }}" \\
+    -var "enhanced_monitoring_enabled={{ .enhanced_monitoring_enabled }}" \\
+    -var "automatic_update={{ .automatic_update }}" \\
+    -var "restart_no_updates={{ .restart_no_updates }}" \\
+    -var "day_of_week={{ .day_of_week }}" \\
+    -var "frequency={{ .frequency }}" \\
+    -var "hours={{ .hours }}" \\
+    -var "minutes={{ .minutes }}" \\
     -var "address_space=${address_space_json}" \\
     -var "address_prefixes_public=${address_prefixes_public_json}" \\
     -var "address_prefixes_private=${address_prefixes_private_json}" \\
@@ -366,7 +385,7 @@ curl -s -X POST "https://slack.com/api/chat.postMessage" \\
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "Hey there! :wave: Your Databricks workspace *{{ .workspace_name }}* in region *{{ .region }}* has been successfully provisioned! You can access the workspace using the button below."
+                "text": "🎉 Deployment of *{{ .workspace_name }}* in region *{{ .region }}* completed successfully!\n\n_You can access the workspace or view the deployment thread for more details._"
             }
         },
         {
