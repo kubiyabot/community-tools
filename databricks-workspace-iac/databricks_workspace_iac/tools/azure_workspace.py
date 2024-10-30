@@ -259,27 +259,25 @@ fi
 export TF_CLI_ARGS="-no-color"
 export TF_IN_AUTOMATION="true"
 
-# Function to clean Terraform output
-clean_tf_output() {
-    # Remove ANSI color codes and clean up the output
-    sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
-}
+# Create a temporary directory for logs
+mkdir -p /tmp/terraform_logs
 
 # Apply Terraform configuration using vars file
-if terraform plan -var-file="terraform.tfvars.json" 2>&1 | clean_tf_output > /tmp/terraform_plan.log; then
+echo "Generating Terraform plan..."
+if terraform plan -var-file="terraform.tfvars.json" > /tmp/terraform_logs/plan.log 2>&1; then
     # Show the plan
     echo "Terraform Plan Output:"
-    cat /tmp/terraform_plan.log
+    cat /tmp/terraform_logs/plan.log
     
     echo -e "\\n🚀 Applying Terraform configuration..."
-    if terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | clean_tf_output > /tmp/terraform_apply.log; then
+    if terraform apply -auto-approve -var-file="terraform.tfvars.json" > /tmp/terraform_logs/apply.log 2>&1; then
         update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
     else
-        error_details=$(cat /tmp/terraform_apply.log)
+        error_details=$(cat /tmp/terraform_logs/apply.log)
         handle_error "Failed to apply Terraform configuration:\\n$error_details"
     fi
 else
-    error_details=$(cat /tmp/terraform_plan.log)
+    error_details=$(cat /tmp/terraform_logs/plan.log)
     handle_error "Failed to generate Terraform plan:\\n$error_details"
 fi
 
