@@ -11,7 +11,43 @@ handle_error() {
     local lineno="$1"
     local errmsg="An unexpected error occurred during the deployment process on line ${lineno}. Please check the logs for more information."
     echo -e "\\n❌ ${errmsg}"
+    
+    # Update the status message
     update_slack_status ":x: Deployment Failed" "$errmsg"
+    
+    # Send a visible notification in the main thread
+    curl -s -X POST "https://slack.com/api/chat.postMessage" \
+        -H "Authorization: Bearer $SLACK_API_TOKEN" \
+        -H "Content-Type: application/json; charset=utf-8" \
+        --data "{
+            \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
+            \\"text\\": \\"❌ *Deployment Failed:* $errmsg\\",
+            \\"blocks\\": [
+                {
+                    \\"type\\": \\"section\\",
+                    \\"text\\": {
+                        \\"type\\": \\"mrkdwn\\",
+                        \\"text\\": \\"❌ *Deployment Failed*\\n$errmsg\\"
+                    }
+                },
+                {
+                    \\"type\\": \\"actions\\",
+                    \\"elements\\": [
+                        {
+                            \\"type\\": \\"button\\",
+                            \\"text\\": {
+                                \\"type\\": \\"plain_text\\",
+                                \\"text\\": \\"View Details\\",
+                                \\"emoji\\": true
+                            },
+                            \\"style\\": \\"danger\\",
+                            \\"url\\": \\"https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//./}\\"
+                        }
+                    ]
+                }
+            ]
+        }" > /dev/null
+    
     exit 1
 }
 
@@ -195,13 +231,9 @@ cat > terraform.tfvars.json <<'EOF'
     {{- end }}
     {{- if .frequency }},
     "frequency": "{{ .frequency }}"
-    {{- end }}
-    {{- if ne .hours "1" }},
-    "hours": "{{ .hours }}"
-    {{- end }}
-    {{- if ne .minutes "0" }},
-    "minutes": "{{ .minutes }}"
-    {{- end }}
+    {{- end }},
+    "hours": {{ if .hours }}{{ .hours }}{{ else }}1{{ end }},
+    "minutes": {{ if .minutes }}{{ .minutes }}{{ else }}0{{ end }}
     {{- if .address_space }},
     "address_space": {{ .address_space }}
     {{- end }}
@@ -223,12 +255,32 @@ if ! jq '.' terraform.tfvars.json > /dev/null 2>&1; then
     handle_error "Invalid JSON in terraform.tfvars.json: $(cat terraform.tfvars.json)"
 fi
 
+# Set Terraform environment variables to disable color output
+export TF_CLI_ARGS="-no-color"
+export TF_IN_AUTOMATION="true"
+
+# Function to clean Terraform output
+clean_tf_output() {
+    # Remove ANSI color codes and clean up the output
+    sed 's/\x1b\[[0-9;]*m//g' | sed 's/\r//g'
+}
+
 # Apply Terraform configuration using vars file
-if terraform apply -auto-approve -var-file="terraform.tfvars.json" > /tmp/terraform_apply.log 2>&1; then
-    update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
+if terraform plan -var-file="terraform.tfvars.json" 2>&1 | clean_tf_output > /tmp/terraform_plan.log; then
+    # Show the plan
+    echo "Terraform Plan Output:"
+    cat /tmp/terraform_plan.log
+    
+    echo -e "\\n🚀 Applying Terraform configuration..."
+    if terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | clean_tf_output > /tmp/terraform_apply.log; then
+        update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
+    else
+        error_details=$(cat /tmp/terraform_apply.log)
+        handle_error "Failed to apply Terraform configuration:\\n$error_details"
+    fi
 else
-    error_details=$(cat /tmp/terraform_apply.log)
-    handle_error "Failed to apply Terraform configuration: $error_details"
+    error_details=$(cat /tmp/terraform_plan.log)
+    handle_error "Failed to generate Terraform plan:\\n$error_details"
 fi
 
 # Step 4: Retrieve and display workspace URL
