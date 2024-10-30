@@ -1,7 +1,7 @@
 from kubiya_sdk.tools.models import FileSpec
 
 
-COMMON_ENV = [
+COMMON_SECRETS = [
     "SLACK_API_TOKEN", # The Slack API Token (Set via Team Mate settings -> Integrations -> Slack)
 ]
 

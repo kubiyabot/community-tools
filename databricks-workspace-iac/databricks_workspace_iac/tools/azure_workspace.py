@@ -207,84 +207,34 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
         Arg(name="restart_no_updates", description="Enable restart even if there are no updates.", required=False, default="false"),
         Arg(name="day_of_week", description="Day of the week to apply updates.", required="false"),
         Arg(name="frequency", description="Frequency of updates.", required=False),
-        Arg(name="hours", description="Hours of window start time.", required=False, default="1 "),
-        Arg(name="minutes", description="Minutes of window start time.", required=False, default="0 "),
+        Arg(name="hours", description="Hours of window start time.", required=False, default="1"),
+        Arg(name="minutes", description="Minutes of window start time.", required=False, default="0"),
         Arg(name="address_space", description="The address space to be used for the virtual network.", required=False, default='["10.0.0.0/16"]'),
         Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False, default='["10.0.2.0/24"]'),
         Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False, default='["10.0.1.0/24"]')
     ],
     mermaid="""
-    flowchart TD
-        %% User Interaction Flow
-        User -->|🗨️ Request Azure Databricks Workspace| Teammate
-        Teammate -->|📋 Request Workspace Details| User
-        User -->|💼 Provide Configuration| Teammate
-        
-        %% Configuration Details
-        subgraph Configuration Details 🔧
-            WorkspaceConfig[Workspace Settings]
-            NetworkConfig[Network Settings]
-            SecurityConfig[Security Settings]
-            
-            WorkspaceConfig -->|Name & Region| ConfigValidation
-            NetworkConfig -->|VNET & Subnets| ConfigValidation
-            SecurityConfig -->|Encryption & Access| ConfigValidation
-        end
+    graph TD
+        A[💬 Message Kubiya] --> B[🤖 Validate Request]
+        B --> C[📋 Collect Workspace Details]
+        C --> D[🔄 Initialize Terraform]
+        D --> E[📊 Plan Infrastructure]
+        E --> F[🚀 Apply Changes]
+        F --> G[⚡ Create Azure Resources]
+        G --> H[🔍 Verify Deployment]
+        H --> I[📢 Notify in Slack Channel]
+        I --> J[✨ Workspace Ready!]
 
-        %% Terraform Execution Flow
-        subgraph Terraform Pipeline 🛠️
-            ConfigValidation[Validate Config ✔️]
-            TerraformInit[terraform init 🔄]
-            TerraformPlan[terraform plan 📋]
-            TerraformApply[terraform apply 🚀]
-            
-            ConfigValidation -->|Valid| TerraformInit
-            TerraformInit -->|Success| TerraformPlan
-            TerraformPlan -->|Approved| TerraformApply
-        end
-
-        %% Azure Resource Creation
-        subgraph Azure Resources 🏢
-            ResourceGroup[Resource Group]
-            VNET[Virtual Network]
-            Subnets[Public/Private Subnets]
-            NSG[Network Security Groups]
-            KeyVault[Key Vault]
-            DatabricksWorkspace[Databricks Workspace]
-            
-            ResourceGroup -->|Contains| VNET
-            VNET -->|Configured with| Subnets
-            Subnets -->|Secured by| NSG
-            KeyVault -->|Encrypts| DatabricksWorkspace
-        end
-
-        %% Dynamic Variables
-        subgraph Variables 📝
-            direction LR
-            Vars1[workspace_name]
-            Vars2[region]
-            Vars3[storage_account]
-            Vars4[vnet_config]
-            Vars5[security_settings]
-        end
-
-        %% Status Updates
-        TerraformApply -->|Creating Resources ⚙️| Azure Resources
-        Azure Resources -->|Provisioning| Status[Status Check 🔍]
-        Status -->|Success ✅| Complete[Workspace Ready! 🎉]
-        
-        %% Final Notification
-        Complete -->|Workspace URL & Access Details| Teammate
-        Teammate -->|🎯 Workspace Ready for Use!| User
-
-        %% Styling
-        classDef configNode fill:#f9f,stroke:#333,stroke-width:2px
-        classDef terraformNode fill:#bbf,stroke:#333,stroke-width:2px
-        classDef azureNode fill:#bfb,stroke:#333,stroke-width:2px
-        
-        class WorkspaceConfig,NetworkConfig,SecurityConfig configNode
-        class TerraformInit,TerraformPlan,TerraformApply terraformNode
-        class ResourceGroup,VNET,DatabricksWorkspace azureNode
+        style A fill:#f9d,stroke:#333,stroke-width:2px
+        style B fill:#ddf,stroke:#333,stroke-width:2px
+        style C fill:#ddf,stroke:#333,stroke-width:2px
+        style D fill:#9df,stroke:#333,stroke-width:2px
+        style E fill:#9df,stroke:#333,stroke-width:2px
+        style F fill:#9df,stroke:#333,stroke-width:2px
+        style G fill:#df9,stroke:#333,stroke-width:2px
+        style H fill:#df9,stroke:#333,stroke-width:2px
+        style I fill:#f9d,stroke:#333,stroke-width:2px
+        style J fill:#9f9,stroke:#333,stroke-width:2px
     """
 )
 
