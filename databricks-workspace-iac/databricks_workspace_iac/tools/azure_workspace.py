@@ -126,10 +126,17 @@ update_deployment_status "1/4" "Initializing Databricks Workspace deployment for
 
 # Step 1: Clone the infrastructure repository
 echo -e "\\n🔍 Cloning Infrastructure Repository..."
-if git clone -b "$BRANCH" "https://$PAT@$GIT_ORG/$GIT_REPO.git" "$DIR" > /dev/null 2>&1; then
+if [ -z "$BRANCH" ] || [ -z "$PAT" ] || [ -z "$GIT_ORG" ] || [ -z "$GIT_REPO" ] || [ -z "$DIR" ]; then
+    handle_error "Required git variables are not set (BRANCH, PAT, GIT_ORG, GIT_REPO, or DIR)"
+fi
+
+clone_output=$(git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "$DIR" 2>&1)
+clone_status=$?
+
+if [ $clone_status -eq 0 ]; then
     update_deployment_status "2/4" "✅ Repository cloned successfully"
 else
-    handle_error "Failed to clone repository"
+    handle_error "Failed to clone repository: $clone_output"
 fi
 
 # Step 2: Initialize Terraform
