@@ -28,7 +28,7 @@ class DatabricksAWSTerraformTool(DatabricksTerraformTool):
             long_running=long_running,
             with_files=AWS_FILES,
             env=AWS_ENV,
-            secrets=AWS_SECRETS + COMMON_SECRETS,
+            secrets=AWS_SECRETS,
             mermaid=mermaid,
         )
 
@@ -40,7 +40,7 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             content=content,
             args=args,
             env=AZURE_ENV,
-            secrets=AZURE_SECRETS + COMMON_SECRETS,
+            secrets=AZURE_SECRETS,
             long_running=long_running,
             mermaid=mermaid,
             #with_files=AZURE_FILES, ## Kubiya does not support native integration with Azure yet, it is possible to use environment variables / secrets to pass in the execution environment. (eg. Team mate settings)
