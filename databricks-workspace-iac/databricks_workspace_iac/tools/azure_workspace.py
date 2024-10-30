@@ -11,24 +11,27 @@ handle_error() {
     local lineno="$1"
     local errmsg="An unexpected error occurred during the deployment process on line ${lineno}. Please check the logs for more information."
     echo -e "\\n❌ ${errmsg}"
-    send_slack_message ":x: Deployment Failed" "$errmsg"
+    update_slack_status ":x: Deployment Failed" "$errmsg"
     exit 1
 }
 
 # Set error handling
 trap 'handle_error $LINENO' ERR
 
-# Function to send messages to Slack
-send_slack_message() {
+# Function to update status in the main DM thread
+update_slack_status() {
     local status="$1"
     local message="$2"
     
-    curl -s -X POST "https://slack.com/api/chat.postMessage" \\
+    # Construct thread URL using the original thread timestamp
+    local thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//.}"
+    
+    curl -s -X POST "https://slack.com/api/chat.update" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
         --data "{
             \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
-            \\"text\\": \\"$message\\",
+            \\"ts\\": \\"$SLACK_MESSAGE_TS\\",
             \\"blocks\\": [
                 {
                     \\"type\\": \\"section\\",
@@ -36,6 +39,20 @@ send_slack_message() {
                         \\"type\\": \\"mrkdwn\\",
                         \\"text\\": \\"$status\\n$message\\"
                     }
+                },
+                {
+                    \\"type\\": \\"actions\\",
+                    \\"elements\\": [
+                        {
+                            \\"type\\": \\"button\\",
+                            \\"text\\": {
+                                \\"type\\": \\"plain_text\\",
+                                \\"text\\": \\"View Thread\\",
+                                \\"emoji\\": true
+                            },
+                            \\"url\\": \\"$thread_url\\"
+                        }
+                    ]
                 }
             ]
         }" > /dev/null
@@ -47,7 +64,7 @@ update_deployment_status() {
     local message="$2"
     
     echo -e "\\n📢 $message"
-    send_slack_message "🚀 Phase $phase" "$message"
+    update_slack_status "🚀 Phase $phase" "$message"
 }
 
 # Main deployment process
@@ -87,7 +104,7 @@ START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
 echo -e "⏰ Start Time: $START_TIME\\n"
 
 # Initialize deployment
-update_deployment_status "1/4" "Initializing Databricks Workspace deployment for {{ .workspace_name }} in {{ .region }}"
+update_deployment_status "1/4" "Initializing Databricks Workspace deployment for {{ .workspace_name }} in {{ .region }}\\n_This is a long-running operation, you can follow the progress in the thread._"
 
 # Step 1: Clone the infrastructure repository
 echo -e "\\n🔍 Cloning Infrastructure Repository..."
@@ -163,8 +180,8 @@ workspace_url="https://$workspace_url"
 echo -e "\\n✅ Deployment completed successfully!"
 echo -e "🌐 Workspace URL: $workspace_url"
 
-# Send final success message
-send_slack_message "✅ Deployment Successful" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url"
+# Final success message
+update_slack_status "✅ Deployment Successful" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url"
 
 # Record end time
 END_TIME=$(date "+%Y-%m-%d %H:%M:%S")
