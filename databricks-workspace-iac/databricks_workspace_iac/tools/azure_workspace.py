@@ -4,6 +4,38 @@ from kubiya_sdk.tools.registry import tool_registry
 
 AZURE_WORKSPACE_TEMPLATE = """
 #!/bin/bash
+set -euo pipefail
+
+# Friendly message with emoji
+echo -e "\\n🔧 Starting the setup for Databricks Workspace provisioning..."
+
+# Check and install runtime dependencies silently
+check_dependencies() {
+    missing_deps=""
+    for cmd in curl jq git bash; do
+        if ! command -v "$cmd" > /dev/null 2>&1; then
+            missing_deps="$missing_deps $cmd"
+        fi
+    done
+
+    if [ -n "$missing_deps" ]; then
+        echo -e "⚙️  This workflow requires additional dependencies which haven't been cached yet."
+        echo -e "🚀 Installing missing dependencies: $missing_deps"
+        if apk update > /dev/null 2>&1 && apk add --no-cache $missing_deps > /dev/null 2>&1; then
+            echo -e "✅ Dependencies installed successfully!"
+        else
+            echo -e "❌ Failed to install dependencies: $missing_deps"
+            exit 1
+        fi
+    else
+        echo -e "✅ All dependencies are already installed!"
+    fi
+}
+
+# Ensure dependencies are installed
+check_dependencies
+
+# Main script starts here
 
 # Set strict error handling
 set -euo pipefail
@@ -46,7 +78,7 @@ send_slack_failure_message() {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "Unfortunately, the deployment failed during *'"$stage"'* stage.\\n*Error Details:*\\n\`\`\`'"$error_message"'\`\`\`"
+                "text": "Unfortunately, the deployment failed during *'"$stage"'* stage.\\n*Error Details:*\\n\`\`\`'"$error_message"'`\`\`"
             }
         },
         {
@@ -127,11 +159,13 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": "*Workspace Name:*\n\`{{ .workspace_name }}\`"
+                    "text": "*Workspace Name:*
+\`{{ .workspace_name }}\`"
                 },
                 {
                     "type": "mrkdwn",
-                    "text": "*Region:*\n\`{{ .region }}\`"
+                    "text": "*Region:*
+\`{{ .region }}\`"
                 }
             ]
         },
@@ -169,7 +203,7 @@ if git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git "
     echo -e "✅ *Repository cloned successfully!*\\n"
     send_slack_thread_message ":white_check_mark: *Step 1 Completed:* Repository cloned successfully." "[]"
 else
-    handle_failure "Repository Clone" "Failed to clone the repository."
+    handle_error
 fi
 
 # Update Slack message in thread
@@ -188,11 +222,13 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*\n\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*
+\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*\n\`{{ .region }}\`"
+                "text": "*Region:*
+\`{{ .region }}\`"
             }
         ]
     },
@@ -222,7 +258,7 @@ if terraform init \\
     echo -e "✅ *Terraform initialized successfully!*\\n"
     send_slack_thread_message ":white_check_mark: *Step 2 Completed:* Terraform initialized." "[]"
 else
-    handle_failure "Terraform Init" "Failed to initialize Terraform."
+    handle_error
 fi
 
 # Update Slack message in thread
@@ -241,11 +277,13 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*\n\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*
+\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*\n\`{{ .region }}\`"
+                "text": "*Region:*
+\`{{ .region }}\`"
             }
         ]
     },
@@ -299,7 +337,7 @@ if terraform apply -auto-approve \\
     send_slack_thread_message ":white_check_mark: *Step 3 Completed:* Terraform configuration applied." "[]"
 else
     error_details=$(cat /tmp/terraform_apply.log)
-    handle_failure "Terraform Apply" "$error_details"
+    handle_error
 fi
 
 # Update Slack message in thread
@@ -318,11 +356,13 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*\n\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*
+\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*\n\`{{ .region }}\`"
+                "text": "*Region:*
+\`{{ .region }}\`"
             }
         ]
     },
@@ -345,7 +385,7 @@ echo -e "🔍 *Step 4: Retrieving Databricks Workspace URL...*\\n"
 workspace_url=$(terraform output -raw databricks_host)
 
 if [ -z "$workspace_url" ]; then
-    handle_failure "Output Retrieval" "Failed to retrieve the workspace URL."
+    handle_error
 fi
 workspace_url="https://$workspace_url"
 echo -e "✅ *Workspace URL:* $workspace_url\\n"
@@ -369,11 +409,13 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*\n\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*
+\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*\n\`{{ .region }}\`"
+                "text": "*Region:*
+\`{{ .region }}\`"
             }
         ]
     },
