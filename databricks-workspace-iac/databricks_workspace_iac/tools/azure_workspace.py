@@ -31,7 +31,7 @@ update_slack_status() {
         -H "Content-Type: application/json; charset=utf-8" \\
         --data "{
             \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
-            \\"ts\\": \\"$SLACK_MESSAGE_TS\\",
+            \\"ts\\": \\"$MAIN_MESSAGE_TS\\",
             \\"blocks\\": [
                 {
                     \\"type\\": \\"section\\",
@@ -103,7 +103,25 @@ echo -e "✨ Databricks Workspace Provisioning on Azure is about to begin!\\n"
 START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
 echo -e "⏰ Start Time: $START_TIME\\n"
 
-# Initialize deployment
+# Send initial message and capture its timestamp
+echo -e "📣 Sending initial status message..."
+initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+    -H "Content-Type: application/json; charset=utf-8" \\
+    --data "{
+        \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
+        \\"text\\": \\"Initializing Databricks Workspace deployment...\\"
+    }")
+
+# Capture the timestamp of the message we'll be updating
+MAIN_MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
+
+if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
+    echo "❌ Failed to send initial message"
+    exit 1
+fi
+
+# Now we can start updating the status
 update_deployment_status "1/4" "Initializing Databricks Workspace deployment for {{ .workspace_name }} in {{ .region }}\\n_This is a long-running operation, you can follow the progress in the thread._"
 
 # Step 1: Clone the infrastructure repository
