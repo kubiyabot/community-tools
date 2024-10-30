@@ -263,10 +263,10 @@ update_slack_thread_main_message "$(cat <<EOF
 EOF
 )"
 
-# Prepare list variables properly
-address_space_json='{{ .address_space }}'
-address_prefixes_public_json='{{ .address_prefixes_public }}'
-address_prefixes_private_json='{{ .address_prefixes_private }}'
+# Prepare list variables properly by removing the extra quotes
+address_space_json={{ .address_space }}
+address_prefixes_public_json={{ .address_prefixes_public }}
+address_prefixes_private_json={{ .address_prefixes_private }}
 
 # Step 3: Apply Terraform configuration
 echo -e "🔍 *Step 3: Applying Terraform Configuration...*\\n"
@@ -291,9 +291,9 @@ if terraform apply -auto-approve \\
     -var "frequency={{ .frequency }}" \\
     -var "hours={{ .hours }}" \\
     -var "minutes={{ .minutes }}" \\
-    -var "address_space=$address_space_json" \\
-    -var "address_prefixes_public=$address_prefixes_public_json" \\
-    -var "address_prefixes_private=$address_prefixes_private_json" \\
+    -var "address_space=${address_space_json}" \\
+    -var "address_prefixes_public=${address_prefixes_public_json}" \\
+    -var "address_prefixes_private=${address_prefixes_private_json}" \\
     > /tmp/terraform_apply.log; then
     echo -e "✅ *Terraform configuration applied successfully!*\\n"
     send_slack_thread_message ":white_check_mark: *Step 3 Completed:* Terraform configuration applied." "[]"
