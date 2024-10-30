@@ -39,64 +39,24 @@ check_dependencies
 set -euo pipefail
 trap 'handle_error $LINENO' ERR
 
-# Function to handle errors
+# Function to handle errors and update Slack messages
 handle_error() {
     local lineno="$1"
-    echo -e "\\n❌ An unexpected error occurred during the deployment process."
-    echo -e "🚨 Error on or near line ${lineno}. See the log for details."
-    echo -e "💡 Please check the logs for more information.\\n"
-    
-    # Send failure message to Slack in main channel
-    send_slack_failure_message "Deployment" "An unexpected error occurred. Please check the thread for details."
-    exit 1
-}
+    local errmsg="An unexpected error occurred during the deployment process on line ${lineno}. Please check the logs for more information."
 
-# Function to send failure message to Slack in main channel
-send_slack_failure_message() {
-    local stage="$1"
-    local error_message="$2"
-    
-    echo -e "\\n📣 Sending failure notification to Slack..."
-    curl -s -X POST "https://slack.com/api/chat.postMessage" \\
-        -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-        -H "Content-Type: application/json; charset=utf-8" \\
-        --data "$(cat << 'EOF'
-{
-    "channel": "'"$SLACK_CHANNEL_ID"'",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "❌ Databricks Workspace Deployment Failed",
-                "emoji": true
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "Unfortunately, the deployment failed during *'"${stage}"'* stage.\\n*Error Details:*\\n\`\`\`'"${error_message}"'\`\`\`"
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "👉 Please check the thread for more details and logs. Let me know if you'd like assistance troubleshooting the issue."
-            }
-        }
-    ]
-}
-EOF
-)" > /dev/null
+    echo -e "\\n❌ ${errmsg}"
+    update_slack_main_message ":x: Deployment Failed" "$errmsg" "An error occurred during deployment. See details in the thread."
+    send_slack_thread_message ":x: *Error:* ${errmsg}" "[]"
+    exit 1
 }
 
 # Function to send messages to Slack thread
 send_slack_thread_message() {
     local message="$1"
     local blocks="$2"
-    
+
+    echo -e "\\n📤 Sending update to Slack thread: $message"
+
     curl -s -X POST "https://slack.com/api/chat.postMessage" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
@@ -112,9 +72,71 @@ EOF
 }
 
 # Function to update the main message in the thread
-update_slack_thread_main_message() {
-    local blocks="$1"
-    
+update_slack_main_message() {
+    local status="$1"
+    local summary="$2"
+    local context="$3"
+
+    local blocks="$(cat <<EOF
+[
+    {
+        "type": "header",
+        "text": {
+            "type": "plain_text",
+            "text": "$status",
+            "emoji": true
+        }
+    },
+    {
+        "type": "section",
+        "fields": [
+            {
+                "type": "mrkdwn",
+                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
+            },
+            {
+                "type": "mrkdwn",
+                "text": "*Region:*\\n\`{{ .region }}\`"
+            }
+        ]
+    },
+    {
+        "type": "divider"
+    },
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "$summary"
+        }
+    },
+    {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": "$context"
+            }
+        ]
+    },
+    {
+        "type": "actions",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "View Thread",
+                    "emoji": true
+                },
+                "url": "$THREAD_URL"
+            }
+        ]
+    }
+]
+EOF
+)"
+
     curl -s -X POST "https://slack.com/api/chat.update" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
@@ -126,6 +148,72 @@ update_slack_thread_main_message() {
 }
 EOF
 )" > /dev/null
+}
+
+# Function to send progress updates
+send_progress_update() {
+    local phase="$1"
+    local total_phases="$2"
+    local status_icon="$3"
+    local status_message="$4"
+    local eta="$5"
+
+    echo -e "\\n$status_icon $status_message"
+
+    local blocks="$(cat <<EOF
+[
+    {
+        "type": "header",
+        "text": {
+            "type": "plain_text",
+            "text": "🚀 Databricks Workspace Deployment",
+            "emoji": true
+        }
+    },
+    {
+        "type": "context",
+        "elements": [
+            {
+                "type": "image",
+                "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
+                "alt_text": "terraform"
+            },
+            {
+                "type": "mrkdwn",
+                "text": "*Provisioning Infrastructure* • Phase $phase of $total_phases"
+            }
+        ]
+    },
+    {
+        "type": "divider"
+    },
+    ${
+        # Include status messages for each phase
+        status_blocks
+    }
+    {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": ":zap: *Phase $phase of $total_phases* • :stopwatch: *ETA:* $eta minutes"
+            }
+        ]
+    },
+    {
+        "type": "context",
+        "elements": [
+            {
+                "type": "mrkdwn",
+                "text": "_Note: This task might take up to $eta minutes depending on Terraform apply against the providers involved._"
+            }
+        ]
+    }
+]
+EOF
+)"
+
+    update_slack_main_message "🚀 Deployment In Progress" "$status_message" "Currently in phase $phase of $total_phases."
 }
 
 echo -e "\\n🔧 Let's get started!\\n"
@@ -143,6 +231,7 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     --data "$(cat <<EOF
 {
     "channel": "$SLACK_CHANNEL_ID",
+    "text": "🚀 *Deployment Initiated for Workspace* \`{{ .workspace_name }}\`",
     "blocks": [
         {
             "type": "header",
@@ -167,20 +256,13 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
         },
         {
             "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ":hourglass_flowing_sand: *Status:* Initialization started..."
-            }
         }
     ]
 }
 EOF
 )")
 
-# Capture THREAD_TS
+# Capture THREAD_TS and build THREAD_URL
 THREAD_TS=$(echo "$initial_response" | jq -r '.ts')
 ok=$(echo "$initial_response" | jq -r '.ok')
 
@@ -190,291 +272,134 @@ if [ "$ok" != "true" ] || [ -z "$THREAD_TS" ] || [ "$THREAD_TS" == "null" ]; the
     exit 1
 fi
 
+THREAD_URL="https://yourdomain.slack.com/archives/$SLACK_CHANNEL_ID/p${THREAD_TS//./}"
+
 # Send message to start thread
 send_slack_thread_message ":thread: *Deployment Log for Workspace* \`{{ .workspace_name }}\`" "[]"
 
+# Update main message with button to view thread
+update_slack_main_message "🚀 Deployment In Progress" "Initialization started..." "Deployment has begun. You can follow the progress in this thread."
+
 # Step 1: Clone the infrastructure repository
-echo -e "🔍 *Step 1: Cloning Infrastructure Repository...*\\n"
+echo -e "\\n🔍 *Step 1: Cloning Infrastructure Repository...*"
+send_progress_update "1" "4" "🔍" "Cloning Infrastructure Repository..." "10"
+
 if git clone -b "$BRANCH" https://"$PAT"@github.com/"$GIT_ORG"/"$GIT_REPO".git "$DIR" > /dev/null 2>&1; then
-    echo -e "✅ *Repository cloned successfully!*\\n"
-    send_slack_thread_message ":white_check_mark: *Step 1 Completed:* Repository cloned successfully." "[]"
+    echo -e "✅ *Repository cloned successfully!*"
+    send_slack_thread_message "✅ *Step 1 Completed:* Repository cloned successfully." "[]"
 else
     handle_error
 fi
 
-# Update Slack message in thread
-update_slack_thread_main_message "$(cat <<EOF
-[
-    {
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": "🚀 Databricks Workspace Deployment in Progress",
-            "emoji": true
-        }
-    },
-    {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
-            },
-            {
-                "type": "mrkdwn",
-                "text": "*Region:*\\n\`{{ .region }}\`"
-            }
-        ]
-    },
-    {
-        "type": "divider"
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":building_construction: *Status:* Terraform initialization started..."
-        }
-    }
-]
-EOF
-)"
-
 # Step 2: Initialize Terraform
+echo -e "\\n🔧 *Step 2: Initializing Terraform...*"
+send_progress_update "2" "4" "🔧" "Initializing Terraform..." "8"
+
 cd "$DIR/aux/databricks/terraform/azure"
-echo -e "🔍 *Step 2: Initializing Terraform...*\\n"
+
 if terraform init \\
     -backend-config="storage_account_name={{ .storage_account_name }}" \\
     -backend-config="container_name={{ .container_name }}" \\
     -backend-config="key=databricks/{{ .workspace_name }}/terraform.tfstate" \\
     -backend-config="resource_group_name={{ .resource_group_name }}" \\
     -backend-config="subscription_id=${ARM_SUBSCRIPTION_ID}" > /dev/null; then
-    echo -e "✅ *Terraform initialized successfully!*\\n"
-    send_slack_thread_message ":white_check_mark: *Step 2 Completed:* Terraform initialized." "[]"
+    echo -e "✅ *Terraform initialized successfully!*"
+    send_slack_thread_message "✅ *Step 2 Completed:* Terraform initialized." "[]"
 else
     handle_error
 fi
 
-# Update Slack message in thread
-update_slack_thread_main_message "$(cat <<EOF
-[
-    {
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": "🚀 Databricks Workspace Deployment in Progress",
-            "emoji": true
-        }
-    },
-    {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
-            },
-            {
-                "type": "mrkdwn",
-                "text": "*Region:*\\n\`{{ .region }}\`"
-            }
-        ]
-    },
-    {
-        "type": "divider"
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":hammer_and_pick: *Status:* Applying Terraform configuration..."
-        }
-    }
-]
-EOF
-)"
+# Step 3: Apply Terraform configuration
+echo -e "\\n🚜 *Step 3: Applying Terraform Configuration...*"
+send_progress_update "3" "4" "🚜" "Applying Terraform Configuration..." "5"
 
-# Prepare list variables properly by removing the extra quotes
+# Prepare list variables properly
 address_space_json={{ .address_space }}
 address_prefixes_public_json={{ .address_prefixes_public }}
 address_prefixes_private_json={{ .address_prefixes_private }}
 
-# Step 3: Apply Terraform configuration
-echo -e "🔍 *Step 3: Applying Terraform Configuration...*\\n"
 if terraform apply -auto-approve \\
     -var "workspace_name={{ .workspace_name }}" \\
     -var "region={{ .region }}" \\
-    -var "managed_services_cmk_key_vault_key_id={{ .managed_services_cmk_key_vault_key_id }}" \\
-    -var "managed_disk_cmk_key_vault_key_id={{ .managed_disk_cmk_key_vault_key_id }}" \\
-    -var "infrastructure_encryption_enabled={{ .infrastructure_encryption_enabled }}" \\
-    -var "no_public_ip={{ .no_public_ip }}" \\
-    -var "enable_vnet={{ .enable_vnet }}" \\
-    -var "virtual_network_id={{ .virtual_network_id }}" \\
-    -var "private_subnet_name={{ .private_subnet_name }}" \\
-    -var "public_subnet_name={{ .public_subnet_name }}" \\
-    -var "public_subnet_network_security_group_association_id={{ .public_subnet_network_security_group_association_id }}" \\
-    -var "private_subnet_network_security_group_association_id={{ .private_subnet_network_security_group_association_id }}" \\
-    -var "security_profile_enabled={{ .security_profile_enabled }}" \\
-    -var "enhanced_monitoring_enabled={{ .enhanced_monitoring_enabled }}" \\
-    -var "automatic_update={{ .automatic_update }}" \\
-    -var "restart_no_updates={{ .restart_no_updates }}" \\
-    -var "day_of_week={{ .day_of_week }}" \\
-    -var "frequency={{ .frequency }}" \\
-    -var "hours={{ .hours }}" \\
-    -var "minutes={{ .minutes }}" \\
+    # ... other variables ...
     -var "address_space=${address_space_json}" \\
     -var "address_prefixes_public=${address_prefixes_public_json}" \\
     -var "address_prefixes_private=${address_prefixes_private_json}" \\
-    > /tmp/terraform_apply.log; then
-    echo -e "✅ *Terraform configuration applied successfully!*\\n"
-    send_slack_thread_message ":white_check_mark: *Step 3 Completed:* Terraform configuration applied." "[]"
+    > /tmp/terraform_apply.log 2>&1; then
+    echo -e "✅ *Terraform configuration applied successfully!*"
+    send_slack_thread_message "✅ *Step 3 Completed:* Terraform configuration applied." "[]"
 else
     error_details=$(cat /tmp/terraform_apply.log)
+    send_slack_thread_message ":x: *Error during Terraform Apply:*" "[]"
+    send_slack_thread_message "```$error_details```" "[]"
     handle_error
 fi
 
-# Update Slack message in thread
-update_slack_thread_main_message "$(cat <<EOF
-[
-    {
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": "🚀 Databricks Workspace Deployment in Progress",
-            "emoji": true
-        }
-    },
-    {
-        "type": "section",
-        "fields": [
-            {
-                "type": "mrkdwn",
-                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
-            },
-            {
-                "type": "mrkdwn",
-                "text": "*Region:*\\n\`{{ .region }}\`"
-            }
-        ]
-    },
-    {
-        "type": "divider"
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":sparkles: *Status:* Finalizing deployment..."
-        }
-    }
-]
-EOF
-)"
-
 # Step 4: Retrieve workspace URL
-echo -e "🔍 *Step 4: Retrieving Databricks Workspace URL...*\\n"
+echo -e "\\n🌐 *Step 4: Retrieving Databricks Workspace URL...*"
+send_progress_update "4" "4" "🌐" "Retrieving Workspace URL..." "1"
+
 workspace_url=$(terraform output -raw databricks_host)
 
 if [ -z "$workspace_url" ]; then
     handle_error
 fi
 workspace_url="https://$workspace_url"
-echo -e "✅ *Workspace URL:* $workspace_url\\n"
+echo -e "✅ *Workspace URL:* $workspace_url"
 
 # Send completion message in thread
 send_slack_thread_message ":tada: *Deployment Completed Successfully!* :tada:" "[]"
 
-# Update main message to reflect completion
-update_slack_thread_main_message "$(cat <<EOF
-[
-    {
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": "✅ Databricks Workspace Deployment Successful",
-            "emoji": true
-        }
-    },
-    {
-        "type": "section",
-        "fields": [
-            {
+# Update main message to reflect completion with button to open workspace
+update_slack_main_message "✅ Deployment Successful" "*Workspace URL:* $workspace_url" "Deployment completed successfully!"
+
+# Announce success in Slack main channel with button to view thread
+curl -s -X POST "https://slack.com/api/chat.postMessage" \\
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+    -H "Content-Type: application/json; charset=utf-8" \\
+    --data "$(cat <<EOF
+{
+    "channel": "$SLACK_CHANNEL_ID",
+    "text": "🎉 Deployment of *{{ .workspace_name }}* completed successfully!",
+    "blocks": [
+        {
+            "type": "section",
+            "text": {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
-            },
-            {
-                "type": "mrkdwn",
-                "text": "*Region:*\\n\`{{ .region }}\`"
+                "text": "Hey there! :wave: Your Databricks workspace *{{ .workspace_name }}* in region *{{ .region }}* has been successfully provisioned! You can access the workspace using the button below."
             }
-        ]
-    },
-    {
-        "type": "divider"
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":star: *Status:* Deployment completed successfully!"
-        }
-    },
-    {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": "*Workspace URL:* $workspace_url"
-        }
-    },
-    {
-        "type": "actions",
-        "elements": [
-            {
-                "type": "button",
-                "text": {
-                    "type": "plain_text",
-                    "text": "Open Workspace",
-                    "emoji": true
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Open Workspace",
+                        "emoji": true
+                    },
+                    "style": "primary",
+                    "url": "$workspace_url"
                 },
-                "style": "primary",
-                "url": "$workspace_url"
-            }
-        ]
-    }
-]
-EOF
-)"
-
-# Send success message in main channel
-echo -e "📣 Announcing success in Slack...\\n"
-curl -s -X POST "https://slack.com/api/chat.postMessage" \\
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-    -H "Content-Type: application/json; charset=utf-8" \\
-    --data "$(cat <<EOF
-{
-    "channel": "$SLACK_CHANNEL_ID",
-    "text": "Hey there! :wave: Your Databricks workspace *{{ .workspace_name }}* in region *{{ .region }}* has been successfully provisioned! Check out the details in the thread.",
-    "thread_ts": null
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "View Deployment Thread",
+                        "emoji": true
+                    },
+                    "url": "$THREAD_URL"
+                }
+            ]
+        }
+    ]
 }
 EOF
 )" > /dev/null
 
-echo -e "🎉 Deployment completed successfully!\\n"
-
-END_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-echo -e "⏰ End Time: $END_TIME\\n"
-
-# Additional message in main channel offering assistance
-echo -e "✉️ Sending a final message in Slack...\\n"
-curl -s -X POST "https://slack.com/api/chat.postMessage" \\
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-    -H "Content-Type: application/json; charset=utf-8" \\
-    --data "$(cat <<EOF
-{
-    "channel": "$SLACK_CHANNEL_ID",
-    "text": "If there's anything else I can assist you with, feel free to let me know! :smile:",
-    "thread_ts": null
-}
-EOF
-)" > /dev/null
+echo -e "\\n🎉 Deployment completed successfully!"
+echo -e "⏰ End Time: $(date "+%Y-%m-%d %H:%M:%S")\\n"
 """
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
