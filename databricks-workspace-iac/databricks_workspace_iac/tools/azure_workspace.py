@@ -35,8 +35,6 @@ check_dependencies() {
 # Ensure dependencies are installed
 check_dependencies
 
-# Main script starts here
-
 # Set strict error handling
 set -euo pipefail
 trap 'handle_error $LINENO' ERR
@@ -78,7 +76,7 @@ send_slack_failure_message() {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "Unfortunately, the deployment failed during *'"$stage"'* stage.\\n*Error Details:*\\n\`\`\`'"$error_message"'`\`\`"
+                "text": "Unfortunately, the deployment failed during *'"${stage}"'* stage.\\n*Error Details:*\\n\`\`\`'"${error_message}"'\`\`\`"
             }
         },
         {
@@ -102,12 +100,12 @@ send_slack_thread_message() {
     curl -s -X POST "https://slack.com/api/chat.postMessage" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
-        --data "$(cat << 'EOF'
+        --data "$(cat <<EOF
 {
-    "channel": "'"$SLACK_CHANNEL_ID"'",
-    "thread_ts": "'"$THREAD_TS"'",
-    "text": "'"$message"'",
-    "blocks": '"$blocks"'
+    "channel": "$SLACK_CHANNEL_ID",
+    "thread_ts": "$THREAD_TS",
+    "text": "$message",
+    "blocks": $blocks
 }
 EOF
 )" > /dev/null
@@ -120,11 +118,11 @@ update_slack_thread_main_message() {
     curl -s -X POST "https://slack.com/api/chat.update" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
         -H "Content-Type: application/json; charset=utf-8" \\
-        --data "$(cat << 'EOF'
+        --data "$(cat <<EOF
 {
-    "channel": "'"$SLACK_CHANNEL_ID"'",
-    "ts": "'"$THREAD_TS"'",
-    "blocks": '"$blocks"'
+    "channel": "$SLACK_CHANNEL_ID",
+    "ts": "$THREAD_TS",
+    "blocks": $blocks
 }
 EOF
 )" > /dev/null
@@ -159,13 +157,11 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": "*Workspace Name:*
-\`{{ .workspace_name }}\`"
+                    "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
                 },
                 {
                     "type": "mrkdwn",
-                    "text": "*Region:*
-\`{{ .region }}\`"
+                    "text": "*Region:*\\n\`{{ .region }}\`"
                 }
             ]
         },
@@ -222,13 +218,11 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*
-\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*
-\`{{ .region }}\`"
+                "text": "*Region:*\\n\`{{ .region }}\`"
             }
         ]
     },
@@ -277,13 +271,11 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*
-\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*
-\`{{ .region }}\`"
+                "text": "*Region:*\\n\`{{ .region }}\`"
             }
         ]
     },
@@ -356,13 +348,11 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*
-\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*
-\`{{ .region }}\`"
+                "text": "*Region:*\\n\`{{ .region }}\`"
             }
         ]
     },
@@ -409,13 +399,11 @@ update_slack_thread_main_message "$(cat <<EOF
         "fields": [
             {
                 "type": "mrkdwn",
-                "text": "*Workspace Name:*
-\`{{ .workspace_name }}\`"
+                "text": "*Workspace Name:*\\n\`{{ .workspace_name }}\`"
             },
             {
                 "type": "mrkdwn",
-                "text": "*Region:*
-\`{{ .region }}\`"
+                "text": "*Region:*\\n\`{{ .region }}\`"
             }
         ]
     },
