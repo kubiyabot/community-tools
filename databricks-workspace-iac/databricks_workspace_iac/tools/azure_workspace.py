@@ -197,16 +197,24 @@ update_deployment_status "3/4" "Applying Terraform configuration (this may take 
 print_progress() {
     local message="$1"
     local emoji="$2"
-    echo -e "\\n${emoji} ${message}"
+    # Force flush the output
+    echo -e "\\n${emoji} ${message}" >&2
 }
 
 # Function to stream Terraform output
 stream_terraform_output() {
     local log_file="$1"
-    local current_phase=""
     
-    # Stream the file as it's being written
-    tail -f "$log_file" | while read -r line; do
+    # Wait for the log file to exist
+    while [ ! -f "$log_file" ]; do
+        sleep 1
+    done
+    
+    # Use stdbuf to disable buffering
+    stdbuf -oL tail -f "$log_file" | while IFS= read -r line; do
+        # Print raw line for debugging
+        echo "$line" >&2
+        
         # Extract and display relevant information
         if [[ $line == *"Terraform will perform the following actions"* ]]; then
             print_progress "Analyzing changes to be made..." "🔍"
@@ -220,12 +228,10 @@ stream_terraform_output() {
             print_progress "Successfully created: $resource" "✅"
         elif [[ $line == *"Error:"* ]]; then
             print_progress "Error detected: $line" "❌"
-            # Kill the tail process as we encountered an error
-            pkill -P $$ tail
+            return 1
         elif [[ $line == *"Apply complete!"* ]]; then
             print_progress "Terraform apply completed successfully!" "🎉"
-            # Kill the tail process as we're done
-            pkill -P $$ tail
+            return 0
         fi
     done
 }
@@ -304,51 +310,55 @@ mkdir -p /tmp/terraform_logs
 
 # Apply Terraform configuration using vars file
 print_progress "Generating Terraform plan..." "📋"
-terraform plan -var-file="terraform.tfvars.json" > /tmp/terraform_logs/plan.log 2>&1 &
-stream_terraform_output "/tmp/terraform_logs/plan.log"
 
-# Check if plan was successful
-if [ $? -eq 0 ]; then
+# Run terraform plan and capture output in real-time
+terraform plan -var-file="terraform.tfvars.json" 2>&1 | tee /tmp/terraform_logs/plan.log | while IFS= read -r line; do
+    echo "$line" >&2
+    if [[ $line == *"Plan:"* ]]; then
+        print_progress "Plan Summary: $line" "📊"
+    fi
+done
+
+plan_status=${PIPESTATUS[0]}
+
+if [ $plan_status -eq 0 ]; then
     print_progress "Terraform plan generated successfully" "✅"
     print_progress "Applying Terraform configuration..." "🚀"
     
-    # Start apply in background and stream its output
-    terraform apply -auto-approve -var-file="terraform.tfvars.json" > /tmp/terraform_logs/apply.log 2>&1 &
-    stream_terraform_output "/tmp/terraform_logs/apply.log"
+    # Run terraform apply and capture output in real-time
+    terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | tee /tmp/terraform_logs/apply.log | while IFS= read -r line; do
+        echo "$line" >&2
+        if [[ $line == *"Creation complete"* ]]; then
+            resource=$(echo "$line" | awk -F'"' '{print $2}')
+            print_progress "Created: $resource" "✅"
+        fi
+    done
     
-    # Check apply status
-    if [ $? -eq 0 ]; then
+    apply_status=${PIPESTATUS[0]}
+    
+    if [ $apply_status -eq 0 ]; then
         print_progress "Terraform configuration applied successfully!" "🎉"
         update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
+        
+        # Display resource summary
+        print_progress "Resource Creation Summary:" "📊"
+        grep "Creation complete" /tmp/terraform_logs/apply.log | while read -r line; do
+            resource=$(echo "$line" | awk -F'"' '{print $2}')
+            echo "  ✅ $resource" >&2
+        done
     else
         error_details=$(cat /tmp/terraform_logs/apply.log)
         print_progress "Failed to apply Terraform configuration" "❌"
         print_progress "Error details:" "ℹ️"
-        echo "$error_details"
+        echo "$error_details" >&2
         handle_error "Failed to apply Terraform configuration:\\n$error_details"
     fi
 else
     error_details=$(cat /tmp/terraform_logs/plan.log)
     print_progress "Failed to generate Terraform plan" "❌"
     print_progress "Error details:" "ℹ️"
-    echo "$error_details"
+    echo "$error_details" >&2
     handle_error "Failed to generate Terraform plan:\\n$error_details"
-fi
-
-# Function to display resource creation summary
-display_resource_summary() {
-    local log_file="$1"
-    print_progress "Resource Creation Summary:" "📊"
-    echo -e "\\nResources created:"
-    grep "Creation complete" "$log_file" | while read -r line; do
-        resource=$(echo "$line" | awk -F'"' '{print $2}')
-        echo "  ✅ $resource"
-    done
-}
-
-# Show summary after successful apply
-if [ -f "/tmp/terraform_logs/apply.log" ]; then
-    display_resource_summary "/tmp/terraform_logs/apply.log"
 fi
 
 # Get workspace URL
@@ -369,8 +379,8 @@ update_deployment_status "4/4" "✅ Terraform configuration applied successfully
 # Display final timing information
 END_TIME=$(date "+%Y-%m-%d %H:%M:%S")
 print_progress "Deployment Timing:" "⏱️"
-echo "Start Time: $START_TIME"
-echo "End Time:   $END_TIME"
+echo "Start Time: $START_TIME" >&2
+echo "End Time:   $END_TIME" >&2
 
 # Final success message
 update_slack_status "✅ Deployment Successful" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url"
