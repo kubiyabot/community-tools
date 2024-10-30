@@ -207,8 +207,8 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
         Arg(name="restart_no_updates", description="Enable restart even if there are no updates.", required=False, default="false"),
         Arg(name="day_of_week", description="Day of the week to apply updates.", required="false"),
         Arg(name="frequency", description="Frequency of updates.", required=False),
-        Arg(name="hours", description="Hours of window start time.", required=False, default="1"),
-        Arg(name="minutes", description="Minutes of window start time.", required=False, default="0"),
+        Arg(name="hours", description="Hours of window start time.", required=False, default="1 "),
+        Arg(name="minutes", description="Minutes of window start time.", required=False, default="0 "),
         Arg(name="address_space", description="The address space to be used for the virtual network.", required=False, default='["10.0.0.0/16"]'),
         Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False, default='["10.0.2.0/24"]'),
         Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False, default='["10.0.1.0/24"]')
