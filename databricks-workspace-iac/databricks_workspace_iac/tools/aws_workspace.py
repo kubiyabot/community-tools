@@ -96,7 +96,10 @@ aws_db_apply_tool = DatabricksAWSTerraformTool(
         Arg(name="enable_cmk", description="Advanced: Enable Customer Managed Keys for the Databricks workspace.", required=False, default="false"),
     ],
     mermaid="""
-    // ... existing mermaid diagram ...
+    graph TD
+        A[Create Databricks Workspace on AWS] --> B[Terraform Init]
+        B --> C[Terraform Apply]
+        C --> D[Workspace Ready! 🎉]
     """
 )
 
