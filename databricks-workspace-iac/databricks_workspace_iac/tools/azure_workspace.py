@@ -3,8 +3,6 @@ from .base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 
 AZURE_WORKSPACE_TEMPLATE = """
-# Main script starts here
-
 # Set error handling
 set -euo pipefail
 trap 'handle_error $?' ERR
@@ -58,11 +56,11 @@ echo -e "\\n🔧 Starting Databricks Workspace provisioning on Azure..."
 
 # Record the start time
 START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-echo -e "⏰ Start Time: $START_TIME"
+echo -e "⏰ Start Time (Server Time): $START_TIME"
 
 # Send initial message to Slack
 echo -e "\\n📣 Sending initial provisioning message to Slack..."
-MESSAGE_TS=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
+initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     -H "Authorization: Bearer $SLACK_API_TOKEN" \\
     -H "Content-Type: application/json; charset=utf-8" \\
     --data '{
@@ -94,10 +92,15 @@ MESSAGE_TS=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
                 }
             }
         ]
-    }' | jq -r '.ts')
+    }')
 
-if [ -z "$MESSAGE_TS" ]; then
-    echo -e "❌ Failed to send initial message to Slack."
+# Capture MESSAGE_TS
+MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
+ok=$(echo "$initial_response" | jq -r '.ok')
+
+if [ "$ok" != "true" ] || [ -z "$MESSAGE_TS" ] || [ "$MESSAGE_TS" == "null" ]; then
+    error=$(echo "$initial_response" | jq -r '.error')
+    echo "❌ Failed to send initial Slack message: $error"
     exit 1
 fi
 
@@ -111,7 +114,7 @@ fi
 
 # Update Slack message
 echo -e "\\n📣 Updating Slack message: Repository cloned."
-curl -s -X POST "https://slack.com/api/chat.update" \\
+update_response=$(curl -s -X POST "https://slack.com/api/chat.update" \\
     -H "Authorization: Bearer $SLACK_API_TOKEN" \\
     -H "Content-Type: application/json; charset=utf-8" \\
     --data '{
@@ -144,7 +147,14 @@ curl -s -X POST "https://slack.com/api/chat.update" \\
                 }
             }
         ]
-    }' > /dev/null
+    }')
+
+update_ok=$(echo "$update_response" | jq -r '.ok')
+if [ "$update_ok" != "true" ]; then
+    error=$(echo "$update_response" | jq -r '.error')
+    echo "❌ Failed to update Slack message: $error"
+    exit 1
+fi
 
 # Navigate to the Terraform directory
 cd "$DIR/aux/databricks/terraform/azure"
@@ -164,7 +174,7 @@ fi
 
 # Update Slack message
 echo -e "\\n📣 Updating Slack message: Terraform initialized."
-curl -s -X POST "https://slack.com/api/chat.update" \\
+update_response=$(curl -s -X POST "https://slack.com/api/chat.update" \\
     -H "Authorization: Bearer $SLACK_API_TOKEN" \\
     -H "Content-Type: application/json; charset=utf-8" \\
     --data '{
@@ -197,7 +207,29 @@ curl -s -X POST "https://slack.com/api/chat.update" \\
                 }
             }
         ]
-    }' > /dev/null
+    }')
+
+update_ok=$(echo "$update_response" | jq -r '.ok')
+if [ "$update_ok" != "true" ]; then
+    error=$(echo "$update_response" | jq -r '.error')
+    echo "❌ Failed to update Slack message: $error"
+    exit 1
+fi
+
+# Prepare the list variables with proper JSON encoding
+address_space_json='{{ .address_space }}'
+address_prefixes_public_json='{{ .address_prefixes_public }}'
+address_prefixes_private_json='{{ .address_prefixes_private }}'
+
+# Ensure the variables are properly escaped
+address_space_json=$(echo "$address_space_json" | sed 's/"/\\"/g')
+address_prefixes_public_json=$(echo "$address_prefixes_public_json" | sed 's/"/\\"/g')
+address_prefixes_private_json=$(echo "$address_prefixes_private_json" | sed 's/"/\\"/g')
+
+# Debugging: Print the variables to ensure they're formatted correctly
+echo "Using address_space: $address_space_json"
+echo "Using address_prefixes_public: $address_prefixes_public_json"
+echo "Using address_prefixes_private: $address_prefixes_private_json"
 
 # Apply Terraform configuration
 echo -e "\\n🚀 Applying Terraform configuration..."
@@ -222,9 +254,10 @@ if terraform apply -auto-approve \\
     -var "frequency={{ .frequency }}" \\
     -var "hours={{ .hours }}" \\
     -var "minutes={{ .minutes }}" \\
-    -var 'address_space={{ .address_space }}' \\
-    -var 'address_prefixes_public={{ .address_prefixes_public }}' \\
-    -var 'address_prefixes_private={{ .address_prefixes_private }}' > /tmp/terraform_apply.log; then
+    -var "address_space=$address_space_json" \\
+    -var "address_prefixes_public=$address_prefixes_public_json" \\
+    -var "address_prefixes_private=$address_prefixes_private_json" \\
+    > /tmp/terraform_apply.log; then
     echo -e "✅ Terraform configuration applied successfully."
 else
     error_details=$(cat /tmp/terraform_apply.log)
@@ -233,7 +266,7 @@ fi
 
 # Update Slack message
 echo -e "\\n📣 Updating Slack message: Terraform configuration applied."
-curl -s -X POST "https://slack.com/api/chat.update" \\
+update_response=$(curl -s -X POST "https://slack.com/api/chat.update" \\
     -H "Authorization: Bearer $SLACK_API_TOKEN" \\
     -H "Content-Type: application/json; charset=utf-8" \\
     --data '{
@@ -266,7 +299,14 @@ curl -s -X POST "https://slack.com/api/chat.update" \\
                 }
             }
         ]
-    }' > /dev/null
+    }')
+
+update_ok=$(echo "$update_response" | jq -r '.ok')
+if [ "$update_ok" != "true" ]; then
+    error=$(echo "$update_response" | jq -r '.error')
+    echo "❌ Failed to update Slack message: $error"
+    exit 1
+fi
 
 # Retrieve workspace URL
 echo -e "\\n🌐 Retrieving Databricks workspace URL..."
@@ -370,9 +410,24 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
         Arg(name="frequency", description="Frequency of updates.", required=False),
         Arg(name="hours", description="Hours of window start time.", required=False, default="1"),
         Arg(name="minutes", description="Minutes of window start time.", required=False, default="0"),
-        Arg(name="address_space", description="The address space for the virtual network.", required=False, default='["10.0.0.0/16"]'),
-        Arg(name="address_prefixes_public", description="The address prefix for the public network.", required=False, default='["10.0.2.0/24"]'),
-        Arg(name="address_prefixes_private", description="The address prefix for the private network.", required=False, default='["10.0.1.0/24"]'),
+        Arg(
+            name="address_space",
+            description="The address space for the virtual network.",
+            required=False,
+            default='["10.0.0.0/16"]'
+        ),
+        Arg(
+            name="address_prefixes_public",
+            description="The address prefix for the public network.",
+            required=False,
+            default='["10.0.2.0/24"]'
+        ),
+        Arg(
+            name="address_prefixes_private",
+            description="The address prefix for the private network.",
+            required=False,
+            default='["10.0.1.0/24"]'
+        ),
     ],
     mermaid="""
 flowchart TD
