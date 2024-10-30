@@ -68,7 +68,7 @@ send_slack_thread_message() {
     "blocks": $blocks
 }
 EOF
-)" > /dev/null
+    )" > /dev/null
 }
 
 # Function to update the main message in the thread
@@ -135,7 +135,7 @@ update_slack_main_message() {
     }
 ]
 EOF
-)"
+    )"
 
     curl -s -X POST "https://slack.com/api/chat.update" \\
         -H "Authorization: Bearer $SLACK_API_TOKEN" \\
@@ -143,11 +143,11 @@ EOF
         --data "$(cat <<EOF
 {
     "channel": "$SLACK_CHANNEL_ID",
-    "ts": "$THREAD_TS",
+    "ts": "$MAIN_MESSAGE_TS",
     "blocks": $blocks
 }
 EOF
-)" > /dev/null
+    )" > /dev/null
 }
 
 # Function to send progress updates
@@ -211,10 +211,24 @@ send_progress_update() {
                 "text": "_Note: This task might take up to ${eta} minutes depending on Terraform apply against the providers involved._"
             }
         ]
+    },
+    {
+        "type": "actions",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "View Thread",
+                    "emoji": true
+                },
+                "url": "$THREAD_URL"
+            }
+        ]
     }
 ]
 EOF
-)"
+    )"
 
     update_slack_main_message "🚀 Deployment In Progress" "${status_message}" "Currently in phase ${phase} of ${total_phases}."
 }
@@ -226,7 +240,7 @@ echo -e "✨ Databricks Workspace Provisioning on Azure is about to begin!\\n"
 START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
 echo -e "⏰ Start Time: $START_TIME\\n"
 
-# Send initial message to Slack and capture THREAD_TS
+# Send initial message to Slack and capture MAIN_MESSAGE_TS
 echo -e "📣 Announcing the start of deployment in Slack...\\n"
 initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     -H "Authorization: Bearer $SLACK_API_TOKEN" \\
@@ -242,45 +256,72 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
                 "type": "mrkdwn",
                 "text": "🚀 *Deployment Initiated for Workspace* \`{{ .workspace_name }}\` in region \`{{ .region }}\`.\n\n_Long running operation in progress, I will keep you updated on any progress._"
             }
-        },
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "View Thread",
-                        "emoji": true
-                    },
-                    "url": "$THREAD_URL"
-                }
-            ]
         }
     ]
 }
 EOF
-)")
+    )")
 
-# Capture THREAD_TS and build THREAD_URL
-THREAD_TS=$(echo "$initial_response" | jq -r '.ts')
+# Capture MAIN_MESSAGE_TS and build THREAD_URL
+MAIN_MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
 ok=$(echo "$initial_response" | jq -r '.ok')
 
-if [ "$ok" != "true" ] || [ -z "$THREAD_TS" ] || [ "$THREAD_TS" == "null" ]; then
+if [ "$ok" != "true" ] || [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" == "null" ]; then
     error=$(echo "$initial_response" | jq -r '.error')
     echo -e "❌ Failed to send initial Slack message: $error\\n"
     exit 1
 fi
 
-# Build THREAD_URL safely by encoding it properly
-THREAD_TS_ENCODED=$(echo "$THREAD_TS" | sed 's/\./%2E/g')
+# Use MAIN_MESSAGE_TS as THREAD_TS
+THREAD_TS="$MAIN_MESSAGE_TS"
+
+# Build THREAD_URL safely by encoding THREAD_TS
+THREAD_TS_ENCODED=$(echo "$THREAD_TS" | sed 's/\\./%2E/g')
 THREAD_URL="https://yourdomain.slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS_ENCODED}"
+
+# Update the initial message to include the "View Thread" button now that THREAD_URL is available
+update_initial_message_blocks="$(cat <<EOF
+[
+    {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": "🚀 *Deployment Initiated for Workspace* \`{{ .workspace_name }}\` in region \`{{ .region }}\`.\n\n_Long running operation in progress, I will keep you updated on any progress._"
+        }
+    },
+    {
+        "type": "actions",
+        "elements": [
+            {
+                "type": "button",
+                "text": {
+                    "type": "plain_text",
+                    "text": "View Thread",
+                    "emoji": true
+                },
+                "url": "$THREAD_URL"
+            }
+        ]
+    }
+]
+EOF
+)"
+
+# Update the initial message with the "View Thread" button
+curl -s -X POST "https://slack.com/api/chat.update" \\
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
+    -H "Content-Type: application/json; charset=utf-8" \\
+    --data "$(cat <<EOF
+{
+    "channel": "$SLACK_CHANNEL_ID",
+    "ts": "$MAIN_MESSAGE_TS",
+    "blocks": $update_initial_message_blocks
+}
+EOF
+    )" > /dev/null
 
 # Send message to start thread
 send_slack_thread_message ":thread: *Deployment Log for Workspace* \`{{ .workspace_name }}\`" "[]"
-
-# Update main message with button to view thread
-update_slack_main_message "🚀 Deployment In Progress" "Initialization started..." "Deployment has begun. You can follow the progress in this thread."
 
 # Step 1: Clone the infrastructure repository
 echo -e "\\n🔍 *Step 1: Cloning Infrastructure Repository...*"
@@ -379,6 +420,7 @@ curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     --data "$(cat <<EOF
 {
     "channel": "$SLACK_CHANNEL_ID",
+    "ts": "$MAIN_MESSAGE_TS",
     "text": "🎉 Deployment of *{{ .workspace_name }}* completed successfully!",
     "blocks": [
         {
@@ -415,7 +457,7 @@ curl -s -X POST "https://slack.com/api/chat.postMessage" \\
     ]
 }
 EOF
-)" > /dev/null
+    )" > /dev/null
 
 echo -e "\\n🎉 Deployment completed successfully!"
 echo -e "⏰ End Time: $(date "+%Y-%m-%d %H:%M:%S")\\n"
