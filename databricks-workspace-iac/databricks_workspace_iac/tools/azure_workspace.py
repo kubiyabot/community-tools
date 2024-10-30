@@ -157,39 +157,39 @@ fi
 echo -e "\\n🚀 Applying Terraform Configuration..."
 update_deployment_status "3/4" "Applying Terraform configuration (this may take several minutes)..."
 
-# Prepare variables (ensure they're properly quoted)
-address_space_json="{{ .address_space }}"
-address_prefixes_public_json="{{ .address_prefixes_public }}"
-address_prefixes_private_json="{{ .address_prefixes_private }}"
-
 # Create terraform vars file to avoid command line length issues
-cat > terraform.tfvars.json <<EOF
+cat > terraform.tfvars.json <<'EOF'
 {
     "workspace_name": "{{ .workspace_name }}",
     "region": "{{ .region }}",
     "managed_services_cmk_key_vault_key_id": "{{ .managed_services_cmk_key_vault_key_id }}",
     "managed_disk_cmk_key_vault_key_id": "{{ .managed_disk_cmk_key_vault_key_id }}",
-    "infrastructure_encryption_enabled": {{ .infrastructure_encryption_enabled }},
-    "no_public_ip": {{ .no_public_ip }},
-    "enable_vnet": {{ .enable_vnet }},
+    "infrastructure_encryption_enabled": {{ if eq .infrastructure_encryption_enabled "true" }}true{{ else }}false{{ end }},
+    "no_public_ip": {{ if eq .no_public_ip "true" }}true{{ else }}false{{ end }},
+    "enable_vnet": {{ if eq .enable_vnet "true" }}true{{ else }}false{{ end }},
     "virtual_network_id": "{{ .virtual_network_id }}",
     "private_subnet_name": "{{ .private_subnet_name }}",
     "public_subnet_name": "{{ .public_subnet_name }}",
     "public_subnet_network_security_group_association_id": "{{ .public_subnet_network_security_group_association_id }}",
     "private_subnet_network_security_group_association_id": "{{ .private_subnet_network_security_group_association_id }}",
-    "security_profile_enabled": {{ .security_profile_enabled }},
-    "enhanced_monitoring_enabled": {{ .enhanced_monitoring_enabled }},
-    "automatic_update": {{ .automatic_update }},
-    "restart_no_updates": {{ .restart_no_updates }},
+    "security_profile_enabled": {{ if eq .security_profile_enabled "true" }}true{{ else }}false{{ end }},
+    "enhanced_monitoring_enabled": {{ if eq .enhanced_monitoring_enabled "true" }}true{{ else }}false{{ end }},
+    "automatic_update": {{ if eq .automatic_update "true" }}true{{ else }}false{{ end }},
+    "restart_no_updates": {{ if eq .restart_no_updates "true" }}true{{ else }}false{{ end }},
     "day_of_week": "{{ .day_of_week }}",
     "frequency": "{{ .frequency }}",
     "hours": "{{ .hours }}",
     "minutes": "{{ .minutes }}",
-    "address_space": ${address_space_json},
-    "address_prefixes_public": ${address_prefixes_public_json},
-    "address_prefixes_private": ${address_prefixes_private_json}
+    "address_space": {{ .address_space }},
+    "address_prefixes_public": {{ .address_prefixes_public }},
+    "address_prefixes_private": {{ .address_prefixes_private }}
 }
 EOF
+
+# Verify the JSON file is valid
+if ! jq '.' terraform.tfvars.json > /dev/null 2>&1; then
+    handle_error "Invalid JSON in terraform.tfvars.json: $(cat terraform.tfvars.json)"
+fi
 
 # Apply Terraform configuration using vars file
 if terraform apply -auto-approve -var-file="terraform.tfvars.json" > /tmp/terraform_apply.log 2>&1; then
