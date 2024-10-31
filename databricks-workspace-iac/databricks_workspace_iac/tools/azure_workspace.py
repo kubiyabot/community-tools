@@ -1,7 +1,6 @@
 from typing import Annotated, Optional, Dict
-from kubiya_sdk.tools.decorators import function_tool
+from kubiya_sdk.tools import function_tool
 from kubiya_sdk.tools.models import FileSpec
-import typer
 import pathlib
 
 # Read the Slack templates JSON file
