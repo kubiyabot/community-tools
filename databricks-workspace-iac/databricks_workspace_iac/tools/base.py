@@ -102,8 +102,7 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             args=args,
             env=AZURE_ENV,
             secrets=AZURE_SECRETS,
-            with_files=,
+            with_files=with_files,
             long_running=long_running,
             mermaid=mermaid,
-            # with_files=AZURE_FILES,
         )
