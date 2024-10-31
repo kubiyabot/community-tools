@@ -87,8 +87,8 @@ export PYTHONUNBUFFERED=1
 
 # Enhanced error handler with more descriptive messages
 error_handler() {
-    local line_no=$1
-    local error_code=$2
+    local line_no="$1"
+    local error_code="$2"
     echo -e "\\n❌ Deployment failed!"
     echo -e "   ╰─ Error occurred at line $line_no with exit code $error_code"
     
@@ -113,7 +113,7 @@ error_handler() {
 }
 
 # Set error trap with line number tracking
-trap 'error_handler ${{LINENO}} $?' ERR
+trap 'error_handler "$LINENO" "$?"' ERR
 
 # Define variables at the start
 VENV_PATH="/tmp/venv"
