@@ -48,11 +48,11 @@ create_initial_block_kit() {
                 "fields": [
                     {
                         "type": "mrkdwn",
-                        "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
+                        "text": "*Workspace:*\\n`{{ .workspace_name }}`"
                     },
                     {
                         "type": "mrkdwn",
-                        "text": "*Region:*\\n\`{{ .region }}\`"
+                        "text": "*Region:*\\n`{{ .region }}`"
                     }
                 ]
             },
@@ -128,11 +128,11 @@ update_slack_status() {
                 "fields": [
                     {
                         "type": "mrkdwn",
-                        "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
+                        "text": "*Workspace:*\\n`{{ .workspace_name }}`"
                     },
                     {
                         "type": "mrkdwn",
-                        "text": "*Region:*\\n\`{{ .region }}\`"
+                        "text": "*Region:*\\n`{{ .region }}`"
                     }
                 ]
             },
@@ -175,7 +175,7 @@ update_slack_status() {
                     \"url\": \"$THREAD_URL\"
                 }
             ]
-        }]}"
+        }]}'
 
     # Update thread message
     curl -s -X POST "https://slack.com/api/chat.update" \
