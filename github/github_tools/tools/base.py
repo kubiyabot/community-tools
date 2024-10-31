@@ -6,7 +6,7 @@ GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 class GitHubCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False):
+    def __init__(self, name, description, content, args, long_running=False, repoless=False):
         enhanced_content = f"""
 #!/bin/sh
 set -e
@@ -65,11 +65,12 @@ get_repo_context
 
 {content}
 """
-
+        orgarg = Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False)
+        repoarg = Arg(name="repo", type="str", description="Repository name. If org is provided or auto-detected, you can just specify the repo name. Otherwise, use the format 'owner/repo'.", required=False)
         updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
+        added_args = [orgarg] if repoless else [orgarg, repoarg] 
         updated_args.extend([
-            Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False),
-            Arg(name="repo", type="str", description="Repository name. If org is provided or auto-detected, you can just specify the repo name. Otherwise, use the format 'owner/repo'.", required=False)
+            added_args
         ])
 
         super().__init__(

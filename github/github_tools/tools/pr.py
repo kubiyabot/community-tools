@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Arg, Tool
+from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
@@ -17,7 +17,7 @@ pr_create = GitHubCliTool(
     ],
 )
 
-pr_list = Tool(
+pr_list = GitHubCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
     content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$org\" ]] && echo \"--owner $org\")",
@@ -29,6 +29,7 @@ pr_list = Tool(
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
         Arg(name="org", type="str", description="The github organization to look for prs in. Example: octocat", required=False),
     ],
+    repoless=True,
 )
 
 pr_view = GitHubCliTool(
