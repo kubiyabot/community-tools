@@ -12,8 +12,9 @@ from .constants import (
 SETUP_SCRIPT = """#!/bin/bash
 set -euo pipefail
 
-# Friendly message with emoji
+# Share context with the user on what's happening
 echo -e "\\n🔧 Starting the setup for Databricks Workspace provisioning..."
+echo -e "🔍 Performing pre-flight checks..."
 
 # Check and install runtime dependencies silently
 function check_dependencies {
@@ -25,23 +26,24 @@ function check_dependencies {
     done
 
     if [ -n "$missing_deps" ]; then
-        echo -e "⚙️  This workflow requires additional dependencies which haven't been cached yet."
-        echo -e "🚀 Installing missing dependencies: $missing_deps"
         if apk update > /dev/null 2>&1 && apk add --no-cache $missing_deps > /dev/null 2>&1; then
-            echo -e "✅ Dependencies installed successfully!"
+            echo -e "✅ Pre-flight checks passed!"
         else
             echo -e "❌ Failed to install dependencies: $missing_deps"
             exit 1
         fi
     else
-        echo -e "✅ All dependencies are already installed!"
+        echo -e "✅ Ready to proceed!"
     fi
 }
 
 # Ensure dependencies are installed
 check_dependencies
 
+echo -e "🚀 Buckle up! Your Databricks workspace is being crafted with care... ✨\nThis may take a few minutes, but great things are worth waiting for! 🌟"
+
 # Main script starts here
+echo -e "🚀 Initiating Databricks workspace creation sequence..."
 """
 
 class DatabricksTerraformTool(Tool):
