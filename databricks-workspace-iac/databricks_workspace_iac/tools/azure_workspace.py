@@ -4,6 +4,10 @@ from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
 
+REQUIREMENTS_FILE_CONTENT = """
+slack_sdk>=3.19.0
+"""
+
 # Define all possible Terraform variables as tool arguments
 TF_ARGS = [
     # Required arguments
@@ -52,6 +56,8 @@ TF_ARGS = [
 
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
+# Silent pip install for dependencies
+pip install -q -r /tmp/requirements.txt
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 # Create tfvars file from arguments
@@ -73,8 +79,11 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
             destination="/tmp/scripts/deploy_to_azure.py",
             content=inspect.getsource(deploy_to_azure),
         ),
+        FileSpec(
+            destination="/tmp/requirements.txt",
+            content=REQUIREMENTS_FILE_CONTENT,
+        ),
     ],
-    requirements=["slack_sdk>=3.19.0"],
     mermaid="""
     sequenceDiagram
         participant U as User 👤
