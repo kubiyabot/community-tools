@@ -13,7 +13,7 @@ print_progress() {
     echo -e "\\n${emoji} ${message}" >&2
 }
 
-# Function to update status in the main DM thread
+# Function to update status in both threads
 update_slack_status() {
     local status="$1"
     local message="$2"
@@ -22,13 +22,13 @@ update_slack_status() {
     
     # Construct thread URL safely
     local thread_url
-    thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p$(echo "$SLACK_THREAD_TS" | tr '.' '')"
+    thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//./}"
     
-    # Create JSON payload safely using a temporary file
-    local temp_file
-    temp_file=$(mktemp)
+    # Create JSON payload for main thread
+    local temp_file_main
+    temp_file_main=$(mktemp)
     
-    cat > "$temp_file" << 'EOF'
+    cat > "$temp_file_main" << 'EOF'
 {
     "channel": "%s",
     "ts": "%s",
@@ -75,14 +75,71 @@ update_slack_status() {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "%s"
+                "text": "%s\n\n_This is a long-running operation. Updates will be posted in both this thread and your DM for easy reference._"
+            }
+        }
+EOF
+
+    # Create JSON payload for DM
+    local temp_file_dm
+    temp_file_dm=$(mktemp)
+    
+    cat > "$temp_file_dm" << 'EOF'
+{
+    "channel": "%s",
+    "ts": "%s",
+    "blocks": [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "%s",
+                "emoji": true
+            }
+        },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "image",
+                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
+                    "alt_text": "terraform"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Phase %s of 4* • Databricks Workspace Deployment"
+                }
+            ]
+        },
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": "*Workspace:*\n`%s`"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Region:*\n`%s`"
+                }
+            ]
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "%s\n\n_This is a long-running operation. I'm keeping you updated here for easy reference._"
             }
         }
 EOF
 
     # Add plan output if available
     if [ -n "$plan_output" ]; then
-        cat >> "$temp_file" << 'EOF'
+        for temp_file in "$temp_file_main" "$temp_file_dm"; do
+            cat >> "$temp_file" << 'EOF'
         ,
         {
             "type": "section",
@@ -92,10 +149,11 @@ EOF
             }
         }
 EOF
+        done
     fi
 
-    # Add the view thread button
-    cat >> "$temp_file" << 'EOF'
+    # Add view thread button to DM message only
+    cat >> "$temp_file_dm" << 'EOF'
         ,
         {
             "type": "actions",
@@ -111,13 +169,31 @@ EOF
                 }
             ]
         }
+EOF
+
+    # Close the JSON for both files
+    for temp_file in "$temp_file_main" "$temp_file_dm"; do
+        cat >> "$temp_file" << 'EOF'
     ]
 }
 EOF
+    done
 
-    # Format the JSON with proper values
-    local formatted_json
-    formatted_json=$(printf "$(cat "$temp_file")" \
+    # Format and send the main thread message
+    local formatted_json_main
+    formatted_json_main=$(printf "$(cat "$temp_file_main")" \
+        "$SLACK_CHANNEL_ID" \
+        "$THREAD_TS" \
+        "$status" \
+        "$phase" \
+        "{{ .workspace_name }}" \
+        "{{ .region }}" \
+        "$message" \
+        "${plan_output:-}")
+
+    # Format and send the DM message
+    local formatted_json_dm
+    formatted_json_dm=$(printf "$(cat "$temp_file_dm")" \
         "$SLACK_CHANNEL_ID" \
         "$MAIN_MESSAGE_TS" \
         "$status" \
@@ -128,14 +204,19 @@ EOF
         "${plan_output:-}" \
         "$thread_url")
 
-    # Clean up temp file
-    rm -f "$temp_file"
-
-    # Send the update to Slack
+    # Send updates to both threads
     curl -s -X POST "https://slack.com/api/chat.update" \
         -H "Authorization: Bearer $SLACK_API_TOKEN" \
         -H "Content-Type: application/json; charset=utf-8" \
-        --data "$formatted_json"
+        --data "$formatted_json_main"
+
+    curl -s -X POST "https://slack.com/api/chat.update" \
+        -H "Authorization: Bearer $SLACK_API_TOKEN" \
+        -H "Content-Type: application/json; charset=utf-8" \
+        --data "$formatted_json_dm"
+
+    # Clean up temp files
+    rm -f "$temp_file_main" "$temp_file_dm"
 }
 
 # Function to handle errors
