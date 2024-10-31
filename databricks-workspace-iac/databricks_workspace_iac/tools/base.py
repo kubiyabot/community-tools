@@ -60,13 +60,9 @@ class DatabricksTerraformTool(Tool):
         image="hashicorp/terraform:latest",
         mermaid=None,
     ):
-        # Remove any shebang lines from content to prevent multiple shebangs
-        content_no_shebang = "\n".join(
-            line for line in content.splitlines() if not line.startswith("#!")
-        )
 
         # Prepend setup script to the content
-        full_content = SETUP_SCRIPT + content_no_shebang
+        full_content = SETUP_SCRIPT + content
 
         super().__init__(
             name=name,
@@ -106,7 +102,8 @@ class DatabricksAzureTerraformTool(DatabricksTerraformTool):
             args=args,
             env=AZURE_ENV,
             secrets=AZURE_SECRETS,
-            with_files=with_files,
+            with_files=,
             long_running=long_running,
             mermaid=mermaid,
+            # with_files=AZURE_FILES,
         )
