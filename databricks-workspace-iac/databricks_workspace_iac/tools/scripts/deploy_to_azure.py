@@ -337,12 +337,27 @@ def main():
         "REGION",
         "STORAGE_ACCOUNT_NAME",
         "CONTAINER_NAME",
-        "RESOURCE_GROUP_NAME"
+        "RESOURCE_GROUP_NAME",
+        "ARM_SUBSCRIPTION_ID"
     ]
-    
+
+    # List of placeholder values to check against
+    placeholder_values = {
+        "WORKSPACE_NAME": "{workspace_name}",
+        "REGION": "{region}",
+        "STORAGE_ACCOUNT_NAME": "{storage_account_name}",
+        "CONTAINER_NAME": "{container_name}",
+        "RESOURCE_GROUP_NAME": "{resource_group_name}",
+        "ARM_SUBSCRIPTION_ID": "{subscription_id}"
+    }
+
     for var in required_vars:
         if var not in os.environ:
             print(f"❌ Required environment variable {var} is not set")
+            sys.exit(1)
+        if os.environ[var] == placeholder_values.get(var):
+            print(f"❌ Environment variable {var} is set to a placeholder value: {os.environ[var]}")
+            print(f"   Please set {var} to the actual value.")
             sys.exit(1)
 
     # Set workspace name and region from environment
