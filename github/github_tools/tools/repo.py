@@ -80,16 +80,6 @@ repo_unarchive = GitHubCliTool(
     args=[Arg(name="repo", type="str", description="Repository name or URL to unarchive. Example: 'myusername/old-project'", required=True)],
 )
 
-repo_rename = GitHubCliTool(
-    name="github_repo_rename",
-    description="Rename a GitHub repository.",
-    content="gh repo rename $repo $new_name",
-    args=[
-        Arg(name="repo", type="str", description="Current repository name or URL. Example: 'myusername/old-name'", required=True),
-        Arg(name="new_name", type="str", description="New name for the repository. Example: 'new-awesome-name'", required=True),
-    ],
-)
-
 repo_readme = GitHubCliTool(
     name="github_repo_readme",
     description="View the README content of a GitHub repository.",
@@ -119,16 +109,6 @@ repo_search = GitHubCliTool(
         Arg(name="query", type="str", description="Search query for repositories. Example: 'tensorflow language:python'", required=True),
         Arg(name="limit", type="int", description="Maximum number of repositories to return. Example: 50", required=False),
         Arg(name="sort", type="str", description="Sort order for results (stars, forks, updated). Example: 'stars'", required=False),
-    ],
-)
-
-repo_search_files = GitHubCliTool(
-    name="github_repo_search_files",
-    description="Search for files within a specific GitHub repository.",
-    content="gh search code --repo $repo $query",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format to search in. Example: 'kubernetes/kubernetes'", required=True),
-        Arg(name="query", type="str", description="Search query for files. Example: 'filename:Dockerfile'", required=True),
     ],
 )
 
@@ -172,21 +152,6 @@ github_actions_logs = GitHubCliTool(
     ],
 )
 
-github_create_workflow = GitHubCliTool(
-    name="github_create_workflow",
-    description="Create a new GitHub Actions workflow in a repository.",
-    content="""
-    mkdir -p .github/workflows
-    echo "$workflow_content" > .github/workflows/$workflow_name.yml
-    gh workflow enable .github/workflows/$workflow_name.yml --repo $repo
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'myusername/my-project'", required=True),
-        Arg(name="workflow_name", type="str", description="Name of the new workflow. Example: 'ci-workflow'", required=True),
-        Arg(name="workflow_content", type="str", description="YAML content of the workflow. Example: 'name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v2\n      - run: npm test'", required=True),
-    ],
-)
-
 github_releases = GitHubCliTool(
     name="github_releases",
     description="List releases for a GitHub repository.",
@@ -208,25 +173,22 @@ github_create_issue = GitHubCliTool(
     ],
 )
 
-github_create_pr = GitHubCliTool(
-    name="github_create_pr",
-    description="Create a new pull request in a GitHub repository.",
-    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head",
+github_close_issue = GitHubCliTool(
+    name="github_close_issue",
+    description="Close an existing issue in a GitHub repository.",
+    content="gh issue close $issue_number --repo $repo",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
-        Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
-        Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
-        Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
+        Arg(name="issue_number", type="int", description="Issue number to close. Example: 42", required=True),
     ],
 )
 
 # Register all tools
 for tool in [
     repo_create, repo_clone, repo_view, repo_list, repo_delete, repo_fork,
-    repo_archive, repo_unarchive, repo_rename, repo_readme, repo_language,
-    repo_metadata, repo_search, repo_search_files, github_search,
+    repo_archive, repo_unarchive, repo_readme, repo_language,
+    repo_metadata, repo_search, github_search,
     github_actions_list, github_actions_status, github_actions_logs,
-    github_create_workflow, github_releases, github_create_issue, github_create_pr
+    github_releases, github_create_issue
 ]:
     tool_registry.register("github", tool)
