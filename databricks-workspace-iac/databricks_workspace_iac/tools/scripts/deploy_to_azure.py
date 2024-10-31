@@ -237,7 +237,7 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     """Create terraform.tfvars.json file from arguments"""
     tfvars = {
         "workspace_name": args["workspace_name"],
-        "location": args["region"],
+        "location": args["location"],
         "managed_services_cmk_key_vault_key_id": args.get("managed_services_cmk_key_vault_key_id"),
         "managed_disk_cmk_key_vault_key_id": args.get("managed_disk_cmk_key_vault_key_id"),
         "infrastructure_encryption_enabled": args.get("infrastructure_encryption_enabled") == "true",
