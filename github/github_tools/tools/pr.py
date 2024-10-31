@@ -137,7 +137,7 @@ pr_assign = GitHubCliTool(
 )
 
 
-pr_files = GitHubCliTool(
+pr_add_reviewer = GitHubCliTool(
     name="github_add_reviewer",
     description="Add a reviewer to a pull request",
     content="gh pr edit --repo $repo $number --add-reviewer $reviewer",
@@ -153,4 +153,4 @@ for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_rev
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
