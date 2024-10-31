@@ -229,25 +229,7 @@ fi
 deactivate
 
 echo -e "✅ Deployment completed successfully!"
-""".format(
-    tf_json=json.dumps(
-        {
-            # Include required arguments with their values
-            "workspace_name": os.environ["workspace_name"],
-            "location": os.environ["location"],
-            "storage_account_name": os.environ["storage_account_name"],
-            "container_name": os.environ["container_name"],
-            "resource_group_name": os.environ["resource_group_name"],
-            # Include optional arguments with defaults
-            **{
-                arg.name: _format_arg_value(arg)
-                for arg in TF_ARGS
-                if not arg.required and arg.default is not None
-            }
-        },
-        indent=4
-    )
-)
+"""
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
