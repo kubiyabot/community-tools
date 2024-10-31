@@ -6,53 +6,12 @@ AZURE_WORKSPACE_TEMPLATE = """
 #!/bin/bash
 set -euo pipefail
 
-# Function to handle errors and update Slack messages
-handle_error() {
-    local lineno="$1"
-    local errmsg="An unexpected error occurred during the deployment process on line ${lineno}. Please check the logs for more information."
-    echo -e "\\n❌ ${errmsg}"
-    
-    # Update the status message
-    update_slack_status ":x: Deployment Failed" "$errmsg"
-    
-    # Send a visible notification in the main thread
-    curl -s -X POST "https://slack.com/api/chat.postMessage" \
-        -H "Authorization: Bearer $SLACK_API_TOKEN" \
-        -H "Content-Type: application/json; charset=utf-8" \
-        --data "{
-            \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
-            \\"text\\": \\"❌ *Deployment Failed:* $errmsg\\",
-            \\"blocks\\": [
-                {
-                    \\"type\\": \\"section\\",
-                    \\"text\\": {
-                        \\"type\\": \\"mrkdwn\\",
-                        \\"text\\": \\"❌ *Deployment Failed*\\n$errmsg\\"
-                    }
-                },
-                {
-                    \\"type\\": \\"actions\\",
-                    \\"elements\\": [
-                        {
-                            \\"type\\": \\"button\\",
-                            \\"text\\": {
-                                \\"type\\": \\"plain_text\\",
-                                \\"text\\": \\"View Details\\",
-                                \\"emoji\\": true
-                            },
-                            \\"style\\": \\"danger\\",
-                            \\"url\\": \\"https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//./}\\"
-                        }
-                    ]
-                }
-            ]
-        }" > /dev/null
-    
-    exit 1
+# Function to print progress
+print_progress() {
+    local message="$1"
+    local emoji="$2"
+    echo -e "\\n${emoji} ${message}" >&2
 }
-
-# Set error handling
-trap 'handle_error $LINENO' ERR
 
 # Function to update status in the main DM thread
 update_slack_status() {
@@ -179,63 +138,41 @@ EOF
         --data "$formatted_json"
 }
 
+# Function to handle errors
+handle_error() {
+    local lineno="$1"
+    local errmsg="An unexpected error occurred during the deployment process on line ${lineno}. Please check the logs for more information."
+    echo -e "\\n❌ ${errmsg}"
+    update_slack_status "❌ Deployment Failed" "$errmsg" "0"
+    exit 1
+}
+
+# Set error handling
+trap 'handle_error $LINENO' ERR
+
 # Function to capture and format Terraform plan
 capture_terraform_plan() {
     local plan_output=""
     while IFS= read -r line; do
         echo "$line"  # Print to console
-        plan_output="${plan_output}${line}\n"
+        plan_output="${plan_output}${line}\\n"
     done
     echo "$plan_output"
 }
 
-# Main deployment process
-echo -e "\\n🔧 Starting the setup for Databricks Workspace provisioning..."
+# Start main script execution
+print_progress "Starting Databricks Workspace deployment..." "🚀"
 
-# Check and install runtime dependencies silently
-check_dependencies() {
-    missing_deps=""
-    for cmd in curl jq git bash; do
-        if ! command -v "$cmd" > /dev/null 2>&1; then
-            missing_deps="$missing_deps $cmd"
-        fi
-    done
-
-    if [ -n "$missing_deps" ]; then
-        echo -e "⚙️  This workflow requires additional dependencies which haven't been cached yet."
-        echo -e "🚀 Installing missing dependencies: $missing_deps"
-        if apk update > /dev/null 2>&1 && apk add --no-cache $missing_deps > /dev/null 2>&1; then
-            echo -e "✅ Dependencies installed successfully!"
-        else
-            echo -e "❌ Failed to install dependencies: $missing_deps"
-            exit 1
-        fi
-    else
-        echo -e "✅ All dependencies are already installed!"
-    fi
-}
-
-# Ensure dependencies are installed
-check_dependencies
-
-echo -e "\\n🔧 Let's get started!\\n"
-echo -e "✨ Databricks Workspace Provisioning on Azure is about to begin!\\n"
-
-# Record the start time
-START_TIME=$(date "+%Y-%m-%d %H:%M:%S")
-echo -e "⏰ Start Time: $START_TIME\\n"
-
-# Send initial message and capture its timestamp
+# Send initial message to Slack and capture MAIN_MESSAGE_TS
 echo -e "📣 Sending initial status message..."
-initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \\
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-    -H "Content-Type: application/json; charset=utf-8" \\
+initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \
+    -H "Content-Type: application/json; charset=utf-8" \
     --data "{
         \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
         \\"text\\": \\"Initializing Databricks Workspace deployment...\\"
     }")
 
-# Capture the timestamp of the message we'll be updating
 MAIN_MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
 
 if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
@@ -243,161 +180,36 @@ if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
     exit 1
 fi
 
-# Now we can start updating the status
-update_deployment_status "1/4" "Initializing Databricks Workspace deployment for {{ .workspace_name }} in {{ .region }}\\n_This is a long-running operation, you can follow the progress in the thread._"
+# Update initial status
+update_slack_status "🚀 Deployment Started" "Initializing Databricks Workspace deployment..." "1"
 
-# Step 1: Clone the infrastructure repository
-echo -e "\\n🔍 Cloning Infrastructure Repository..."
-if [ -z "$BRANCH" ] || [ -z "$PAT" ] || [ -z "$GIT_ORG" ] || [ -z "$GIT_REPO" ] || [ -z "$DIR" ]; then
-    handle_error "Required git variables are not set (BRANCH, PAT, GIT_ORG, GIT_REPO, or DIR)"
-fi
-
-clone_output=$(git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "$DIR" 2>&1)
-clone_status=$?
-
-if [ $clone_status -eq 0 ]; then
-    update_deployment_status "2/4" "✅ Repository cloned successfully"
+# Clone repository
+print_progress "Cloning Infrastructure Repository..." "📦"
+if git clone -b "$BRANCH" "https://$PAT@github.com/$GIT_ORG/$GIT_REPO.git" "$DIR" > /dev/null 2>&1; then
+    update_slack_status "📦 Repository Cloned" "Infrastructure repository cloned successfully" "1"
 else
-    handle_error "Failed to clone repository: $clone_output"
+    handle_error "Failed to clone repository"
 fi
 
-# Step 2: Initialize Terraform
+# Initialize Terraform
 cd "$DIR/aux/databricks/terraform/azure"
-echo -e "\\n🔧 Initializing Terraform..."
-if terraform init \\
-    -backend-config="storage_account_name={{ .storage_account_name }}" \\
-    -backend-config="container_name={{ .container_name }}" \\
-    -backend-config="key=databricks/{{ .workspace_name }}/terraform.tfstate" \\
-    -backend-config="resource_group_name={{ .resource_group_name }}" \\
+print_progress "Initializing Terraform..." "⚙️"
+if terraform init \
+    -backend-config="storage_account_name={{ .storage_account_name }}" \
+    -backend-config="container_name={{ .container_name }}" \
+    -backend-config="key=databricks/{{ .workspace_name }}/terraform.tfstate" \
+    -backend-config="resource_group_name={{ .resource_group_name }}" \
     -backend-config="subscription_id=${ARM_SUBSCRIPTION_ID}" > /dev/null; then
-    update_deployment_status "3/4" "✅ Terraform initialized successfully"
+    update_slack_status "⚙️ Terraform Initialized" "Terraform successfully initialized" "2"
 else
     handle_error "Failed to initialize Terraform"
 fi
 
 # Step 3: Apply Terraform configuration
 echo -e "\\n🚀 Applying Terraform Configuration..."
-update_deployment_status "3/4" "Applying Terraform configuration (this may take several minutes)..."
-
-# Function to print progress
-print_progress() {
-    local message="$1"
-    local emoji="$2"
-    echo -e "\\n${emoji} ${message}" >&2
-}
-
-# Function to format Terraform output
-format_terraform_output() {
-    while IFS= read -r line; do
-        # Skip empty lines
-        [ -z "$line" ] && continue
-        
-        # Print the raw line first for debugging
-        echo "$line"
-        
-        # Check for specific patterns and print formatted messages
-        case "$line" in
-            *"Terraform will perform the following actions"*)
-                print_progress "Analyzing changes to be made..." "📝"
-                ;;
-            *"Plan: "*" to add"*)
-                print_progress "Change Summary: $line" "📊"
-                ;;
-            *"Creating"*)
-                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
-                print_progress "Creating resource: $resource" "🔨"
-                ;;
-            *"Creation complete"*)
-                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
-                print_progress "Created resource: $resource" "✅"
-                ;;
-            *"Apply complete"*)
-                print_progress "Apply completed successfully" "🎉"
-                ;;
-            *"Error:"*)
-                print_progress "Error: $line" "❌"
-                ;;
-        esac
-    done
-}
-
-# Create terraform vars file
-print_progress "Preparing Terraform configuration..." "⚙️"
-
-# Create terraform vars file to avoid command line length issues
-cat > terraform.tfvars.json <<'EOF'
-{
-    "workspace_name": "{{ .workspace_name }}",
-    "region": "{{ .region }}"
-    {{- if .managed_services_cmk_key_vault_key_id }},
-    "managed_services_cmk_key_vault_key_id": "{{ .managed_services_cmk_key_vault_key_id }}"
-    {{- end }}
-    {{- if .managed_disk_cmk_key_vault_key_id }},
-    "managed_disk_cmk_key_vault_key_id": "{{ .managed_disk_cmk_key_vault_key_id }}"
-    {{- end }},
-    "infrastructure_encryption_enabled": {{ if eq .infrastructure_encryption_enabled "true" }}true{{ else }}false{{ end }},
-    "no_public_ip": {{ if eq .no_public_ip "true" }}true{{ else }}false{{ end }},
-    "enable_vnet": {{ if eq .enable_vnet "true" }}true{{ else }}false{{ end }}
-    {{- if .virtual_network_id }},
-    "virtual_network_id": "{{ .virtual_network_id }}"
-    {{- end }}
-    {{- if .private_subnet_name }},
-    "private_subnet_name": "{{ .private_subnet_name }}"
-    {{- end }}
-    {{- if .public_subnet_name }},
-    "public_subnet_name": "{{ .public_subnet_name }}"
-    {{- end }}
-    {{- if .public_subnet_network_security_group_association_id }},
-    "public_subnet_network_security_group_association_id": "{{ .public_subnet_network_security_group_association_id }}"
-    {{- end }}
-    {{- if .private_subnet_network_security_group_association_id }},
-    "private_subnet_network_security_group_association_id": "{{ .private_subnet_network_security_group_association_id }}"
-    {{- end }},
-    "security_profile_enabled": {{ if eq .security_profile_enabled "true" }}true{{ else }}false{{ end }},
-    "enhanced_monitoring_enabled": {{ if eq .enhanced_monitoring_enabled "true" }}true{{ else }}false{{ end }},
-    "automatic_update": {{ if eq .automatic_update "true" }}true{{ else }}false{{ end }},
-    "restart_no_updates": {{ if eq .restart_no_updates "true" }}true{{ else }}false{{ end }}
-    {{- if .day_of_week }},
-    "day_of_week": "{{ .day_of_week }}"
-    {{- end }}
-    {{- if .frequency }},
-    "frequency": "{{ .frequency }}"
-    {{- end }},
-    "hours": {{ if .hours }}{{ .hours }}{{ else }}1{{ end }},
-    "minutes": {{ if .minutes }}{{ .minutes }}{{ else }}0{{ end }}
-    {{- if .address_space }},
-    "address_space": {{ .address_space }}
-    {{- end }}
-    {{- if .address_prefixes_public }},
-    "address_prefixes_public": {{ .address_prefixes_public }}
-    {{- end }}
-    {{- if .address_prefixes_private }},
-    "address_prefixes_private": {{ .address_prefixes_private }}
-    {{- end }}
-}
-EOF
-
-# Debug: Show the generated JSON
-echo "Generated terraform.tfvars.json content:"
-cat terraform.tfvars.json
-
-# Verify the JSON file is valid
-if ! jq '.' terraform.tfvars.json > /dev/null 2>&1; then
-    handle_error "Invalid JSON in terraform.tfvars.json: $(cat terraform.tfvars.json)"
-fi
-
-# Set Terraform environment variables to disable color output
-export TF_CLI_ARGS="-no-color"
-export TF_IN_AUTOMATION="true"
-
-# Create a temporary directory for logs
-mkdir -p /tmp/terraform_logs
-
-# Apply Terraform configuration using vars file
 print_progress "Generating Terraform plan..." "📋"
 
 # Run terraform plan with real-time output
-print_progress "Generating Terraform plan..." "📋"
 plan_output=$(terraform plan -var-file="terraform.tfvars.json" 2>&1 | capture_terraform_plan)
 plan_exit_code=${PIPESTATUS[0]}
 
@@ -438,7 +250,7 @@ print_progress "Workspace URL: $workspace_url" "🔗"
 
 # Send completion message
 print_progress "Deployment completed successfully!" "🎉"
-update_deployment_status "4/4" "✅ Terraform configuration applied successfully\\n🌐 Workspace URL: $workspace_url"
+update_slack_status "✅ Deployment Complete" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url" "4"
 
 # Display final timing information
 END_TIME=$(date "+%Y-%m-%d %H:%M:%S")
@@ -447,7 +259,7 @@ echo "Start Time: $START_TIME" >&2
 echo "End Time:   $END_TIME" >&2
 
 # Final success message
-update_slack_status "✅ Deployment Successful" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url"
+update_slack_status "✅ Deployment Successful" "Databricks workspace *{{ .workspace_name }}* has been successfully provisioned!\\n🌐 *Workspace URL:* $workspace_url" "4"
 
 # Record end time
 END_TIME=$(date "+%Y-%m-%d %H:%M:%S")
