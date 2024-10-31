@@ -74,8 +74,8 @@ echo -e "🔧 Setting up deployment environment..."
 
 # Install pip and dependencies with better error handling
 echo -e "   ╰─ Installing Python dependencies"
-if ! apk add --no-cache python3-pip; then
-    echo -e "❌ Failed to install pip. Please check your container environment."
+if ! apk add --no-cache python3 py3-pip; then
+    echo -e "❌ Failed to install Python and pip. Please check your container environment."
     exit 1
 fi
 
