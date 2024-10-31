@@ -4,12 +4,18 @@ from kubiya_sdk.tools.registry import tool_registry
 
 repo_create = GitHubCliTool(
     name="github_repo_create",
-    description="Create a new GitHub repository with specified name, visibility, description, and homepage.",
+    description="Create a new GitHub repository with specified name, organization, visibility, description, and homepage.",
     content="""
-    gh repo create $name $([[ "$private" == "true" ]] && echo "--private" || echo "--public") $([[ -n "$description" ]] && echo "--description \"$description\"") $([[ -n "$homepage" ]] && echo "--homepage $homepage")
+    REPO_NAME="$([[ -n "$org" ]] && echo "$org/$name" || echo "$name")"
+
+    gh repo create "$REPO_NAME" \
+        $([[ "$private" == "true" ]] && echo "--private" || echo "--public") \
+        $([[ -n "$description" ]] && echo "--description \"$description\"") \
+        $([[ -n "$homepage" ]] && echo "--homepage $homepage")
     """,
     args=[
         Arg(name="name", type="str", description="New repository name. Example: 'my-awesome-project'", required=True),
+        Arg(name="org", type="str", description="Optional organization name if creating under an org. Example: 'my-organization'", required=False),
         Arg(name="private", type="bool", description="Create as private repository. Set to true for private, false for public. Example: true", required=False),
         Arg(name="description", type="str", description="Repository description. Example: 'This project does amazing things'", required=False),
         Arg(name="homepage", type="str", description="Repository homepage URL. Example: 'https://myproject.com'", required=False),
