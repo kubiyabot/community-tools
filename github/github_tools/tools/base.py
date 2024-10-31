@@ -69,9 +69,7 @@ get_repo_context
         repoarg = Arg(name="repo", type="str", description="Repository name. If org is provided or auto-detected, you can just specify the repo name. Otherwise, use the format 'owner/repo'.", required=False)
         updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
         added_args = [orgarg] if repoless else [orgarg, repoarg] 
-        updated_args.extend([
-            added_args
-        ])
+        updated_args.extend(added_args)
 
         super().__init__(
             name=name,
