@@ -278,7 +278,7 @@ class SlackNotifier:
 def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     """Create terraform.tfvars.json file from arguments"""
     # Sanitize the workspace_name
-    sanitized_workspace_name = re.sub(r"[^a-zA-Z0-9()._-]", "", args["workspace_name"])
+    sanitized_workspace_name = re.sub(r"[^a-zA-Z0-9()._-]", "", os.environ["WORKSPACE_NAME"])
 
     tfvars = {
         "workspace_name": sanitized_workspace_name,
