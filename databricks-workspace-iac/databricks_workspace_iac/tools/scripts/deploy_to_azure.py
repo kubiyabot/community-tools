@@ -59,6 +59,10 @@ def build_message_blocks(
     ]
 
     if plan_output:
+        # Truncate plan_output to avoid exceeding Slack's message size limit
+        max_length = 2900  # Slack block text limit is 3000 characters
+        if len(plan_output) > max_length:
+            plan_output = plan_output[:max_length] + "\n...(truncated)..."
         blocks.append({
             "type": "section",
             "text": {
@@ -90,6 +94,10 @@ def run_command(
     callback: Optional[Callable[[str], None]] = None
 ) -> Optional[str]:
     """Run a command with proper error handling and output control."""
+    # Set TF_IN_AUTOMATION environment variable to disable color codes
+    env = os.environ.copy()
+    env["TF_IN_AUTOMATION"] = "1"
+
     try:
         if capture_output:
             result = subprocess.run(
@@ -97,7 +105,8 @@ def run_command(
                 cwd=cwd,
                 check=True,
                 capture_output=True,
-                text=True
+                text=True,
+                env=env  # Pass the modified environment
             )
             return result.stdout
         elif stream_output:
@@ -108,7 +117,8 @@ def run_command(
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                env=env  # Pass the modified environment
             )
             
             while True:
@@ -124,7 +134,7 @@ def run_command(
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, cmd)
         else:
-            subprocess.run(cmd, cwd=cwd, check=True)
+            subprocess.run(cmd, cwd=cwd, check=True, env=env)
         
     except subprocess.CalledProcessError as e:
         error_msg = e.stderr if e.stderr else str(e)
@@ -260,6 +270,26 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     with open(tfvars_path, 'w') as f:
         json.dump(tfvars, f, indent=2)
 
+def handle_terraform_output(line: str) -> None:
+    """Handle and parse Terraform output lines."""
+    print(line, flush=True)
+    if "Creating..." in line:
+        # Extract resource name safely using regex
+        match = re.search(r'(\S+): Creating\.\.\.', line)
+        if match:
+            resource = match.group(1)
+            slack.update_progress(
+                "🚀 Deploying Resources",
+                f"Creating resource: {resource}",
+                "3"
+            )
+    elif "Apply complete!" in line:
+        slack.update_progress(
+            "✅ Resources Deployed",
+            "All resources have been successfully created",
+            "4"
+        )
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: deploy_to_azure.py <tfvars_file>")
@@ -337,14 +367,17 @@ def main():
             f"subscription_id={os.environ['ARM_SUBSCRIPTION_ID']}"
         ]
         
-        run_command(["terraform", "init"] + [f"-backend-config={c}" for c in backend_config], cwd=tf_dir)
+        run_command(
+            ["terraform", "init", "-no-color"] + [f"-backend-config={c}" for c in backend_config],
+            cwd=tf_dir
+        )
         slack.update_progress("⚙️ Terraform Initialized", "Terraform successfully initialized", "2")
 
         # Generate and show plan
         print_progress("Generating Terraform plan...", "📋")
         plan_output = run_command(
-            ["terraform", "plan", "-var-file=terraform.tfvars.json"], 
-            cwd=tf_dir, 
+            ["terraform", "plan", "-var-file=terraform.tfvars.json", "-no-color"],
+            cwd=tf_dir,
             capture_output=True
         )
         slack.update_progress(
@@ -356,24 +389,8 @@ def main():
 
         # Apply Terraform
         print_progress("Applying Terraform configuration...", "🚀")
-        def handle_terraform_output(line: str) -> None:
-            print(line, flush=True)
-            if "Creating..." in line:
-                resource = line.split('"')[1]
-                slack.update_progress(
-                    "🚀 Deploying Resources",
-                    f"Creating resource: {resource}",
-                    "3"
-                )
-            elif "Apply complete!" in line:
-                slack.update_progress(
-                    "✅ Resources Deployed",
-                    "All resources have been successfully created",
-                    "4"
-                )
-
         run_command(
-            ["terraform", "apply", "-auto-approve", "-var-file=terraform.tfvars.json"],
+            ["terraform", "apply", "-auto-approve", "-var-file=terraform.tfvars.json", "-no-color"],
             cwd=tf_dir,
             stream_output=True,
             callback=handle_terraform_output
