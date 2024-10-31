@@ -90,16 +90,51 @@ slack_add_reaction = SlackTool(
     ],
 )
 
+slack_delete_message = SlackTool(
+    name="slack_delete_message",
+    description="Delete a message from a Slack channel",
+    action="chat_delete",
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message to be deleted", required=True),
+        Arg(name="ts", type="str", description="Timestamp of the message to be deleted", required=True),
+    ],
+)
+
+slack_update_message = SlackTool(
+    name="slack_update_message",
+    description="Update an existing message in a Slack channel",
+    action="chat_update",
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message to be updated", required=True),
+        Arg(name="ts", type="str", description="Timestamp of the message to be updated", required=True),
+        Arg(name="text", type="str", description="New text for the message", required=True),
+    ],
+)
+
+slack_remove_reaction = SlackTool(
+    name="slack_remove_reaction",
+    description="Remove a reaction from a message",
+    action="reactions_remove",
+    args=[
+        Arg(name="channel", type="str", description="Channel containing the message", required=True),
+        Arg(name="timestamp", type="str", description="Timestamp of the message", required=True),
+        Arg(name="name", type="str", description="Name of the emoji to remove", required=True),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
+    slack_delete_message,
+    slack_update_message,
+    slack_add_reaction,
+    slack_remove_reaction,
     slack_upload_file,
     slack_list_channels,
     slack_create_channel,
     slack_invite_user,
     slack_get_channel_info,
     slack_get_user_info,
-    slack_add_reaction,
 ]
 
 # Register all Slack tools
