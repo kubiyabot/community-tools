@@ -308,10 +308,13 @@ def main():
         ])
         slack.update_progress("📦 Repository Cloned", "Infrastructure repository cloned successfully", "1")
 
-        # Copy tfvars file to terraform directory
+        # Navigate to terraform directory
         tf_dir = repo_dir / "aux/databricks/terraform/azure"
-        tf_tfvars = tf_dir / "terraform.tfvars.json"
-        tf_tfvars.write_text(tfvars_file.read_text())
+        if not tf_dir.exists():
+            raise RuntimeError(f"Terraform directory not found at expected location: {tf_dir}")
+            
+        # Create terraform.tfvars.json file in the terraform directory
+        create_tfvars(tfvars, tf_dir / "terraform.tfvars.json")
 
         # Initialize Terraform
         print_progress("Initializing Terraform...", "⚙️")
