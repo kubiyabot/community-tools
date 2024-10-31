@@ -104,7 +104,7 @@ echo -e "   ╰─ Generating terraform.tfvars.json"
 
 # Create tfvars file with proper JSON escaping
 # Using printf to ensure proper escaping of special characters
-printf '%s' "${{tfvars}}" > /tmp/terraform.tfvars.json
+printf '%s' "{TF_ARGS}" > /tmp/terraform.tfvars.json
 
 # Validate JSON format
 if ! jq '.' /tmp/terraform.tfvars.json >/dev/null 2>&1; then
@@ -127,7 +127,7 @@ fi
 deactivate
 
 echo -e "✅ Deployment completed successfully!"
-"""
+""".format(TF_ARGS="\n".join([f"{arg.name}={arg.default}" for arg in TF_ARGS]))
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
