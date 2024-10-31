@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool
+from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
 pr_create = GitHubCliTool(
@@ -12,21 +12,22 @@ pr_create = GitHubCliTool(
         Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
         Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
-        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
-        Arg(name="reviewer", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.", required=False),
+        Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
+        Arg(name="reviewer", type="str", description="The github user's login that should review this pr. Example: joe_doe.", required=False),
     ],
 )
 
-pr_list = GitHubCliTool(
+pr_list = GitHubRepolessCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
-    content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\")",
+    content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$org\" ]] && echo \"--owner $org\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
-        Arg(name="author", type="str", description="The github login who authored this pr. Example: joedoe. use `@me` to get prs authored by the user", required=False),
-        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
+        Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
+        Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
+        Arg(name="org", type="str", description="The github organization to look for prs in. Example: octocat", required=False),
     ],
 )
 
@@ -132,7 +133,7 @@ pr_assign = GitHubCliTool(
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
+        Arg(name="assignee", type="str", description="The github user's login to whom this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
     ],
 )
 
@@ -144,7 +145,7 @@ pr_add_reviewer = GitHubCliTool(
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-        Arg(name="reviewer", type="str", description="The github login who's this pr is to be reviewed by. Example: joe_doe.", required=True),
+        Arg(name="reviewer", type="str", description="The github user's login that should be added as a reviewer to this pr. Example: joe_doe.", required=True),
     ],
 )
 
