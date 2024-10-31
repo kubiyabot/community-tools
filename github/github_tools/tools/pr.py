@@ -5,13 +5,15 @@ from kubiya_sdk.tools.registry import tool_registry
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository.",
-    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head",
+    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$reviewer\" ]] && echo \"--reviewer $reviewer\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
         Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
         Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
+        Arg(name="reviewer", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.", required=False),
     ],
 )
 
@@ -20,11 +22,11 @@ pr_list = GitHubCliTool(
     description="List pull requests in a GitHub repository.",
     content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\")",
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
-        Arg(name="author", type="str", description="The github user who authored this pr. Example: joedoe", required=False),
-        Arg(name="assignee", type="str", description="The github user who's this pr is assigned to. Example: joe_doe", required=False),
+        Arg(name="author", type="str", description="The github login who authored this pr. Example: joedoe. use `@me` to get prs authored by the user", required=False),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
     ],
 )
 
@@ -92,16 +94,6 @@ pr_diff = GitHubCliTool(
     ],
 )
 
-pr_checkout = GitHubCliTool(
-    name="github_pr_checkout",
-    description="Check out a pull request locally.",
-    content="gh pr checkout --repo $repo $number",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-    ],
-)
-
 pr_ready = GitHubCliTool(
     name="github_pr_ready",
     description="Mark a pull request as ready for review.",
@@ -125,43 +117,40 @@ pr_checks = GitHubCliTool(
 pr_files = GitHubCliTool(
     name="github_pr_files",
     description="List files changed in a pull request.",
-    content="gh pr view --repo $repo $number --files",
+    content="gh pr diff --repo $repo $number --name-only",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
-# Add these new tools at the end of the file
 
-github_graphql = GitHubCliTool(
-    name="github_graphql",
-    description="Execute a custom GraphQL query against the GitHub API.",
-    content="""
-    echo '$query' | gh api graphql -f query=@- $([[ -n "$variables" ]] && echo "--raw-field $variables")
-    """,
+pr_assign = GitHubCliTool(
+    name="github_pr_assign",
+    description="Assign a pull request to a github",
+    content="gh pr edit --repo $repo $number --add-assignee $assignee",
     args=[
-        Arg(name="query", type="str", description="GraphQL query to execute. Example: 'query { viewer { login } }'", required=True),
-        Arg(name="variables", type="str", description="JSON string of variables for the GraphQL query. Example: '{\"owner\": \"octocat\", \"name\": \"Hello-World\"}'", required=False),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
     ],
 )
 
-github_rest = GitHubCliTool(
-    name="github_rest",
-    description="Make a custom REST API request to GitHub.",
-    content="""
-    gh api $endpoint $([[ -n "$method" ]] && echo "-X $method") $([[ -n "$data" ]] && echo "-f $data")
-    """,
+
+pr_add_reviewer = GitHubCliTool(
+    name="github_add_reviewer",
+    description="Add a reviewer to a pull request",
+    content="gh pr edit --repo $repo $number --add-reviewer $reviewer",
     args=[
-        Arg(name="endpoint", type="str", description="REST API endpoint. Example: '/repos/octocat/Hello-World'", required=True),
-        Arg(name="method", type="str", description="HTTP method (GET, POST, PATCH, DELETE, etc.). Default is GET. Example: 'POST'", required=False),
-        Arg(name="data", type="str", description="JSON string of data to send with the request. Example: '{\"name\": \"new-repo-name\"}'", required=False),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+        Arg(name="reviewer", type="str", description="The github login who's this pr is to be reviewed by. Example: joe_doe.", required=True),
     ],
 )
 
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_checkout, pr_ready, pr_checks, pr_files]:
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_checkout', 'pr_ready', 'pr_checks', 'pr_files']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
