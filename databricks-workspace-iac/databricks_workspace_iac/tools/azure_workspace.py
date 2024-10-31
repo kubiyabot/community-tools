@@ -59,30 +59,55 @@ DEPLOY_CMD = """
 # Exit immediately if any command fails
 set -euo pipefail
 
-# Function to handle errors
+# Enhanced error handler with more descriptive messages
 error_handler() {
     local line_no=$1
     local error_code=$2
-    echo -e "❌ Error occurred in script at line $line_no with exit code $error_code"
+    echo -e "\n❌ Deployment failed!"
+    echo -e "   ╰─ Error occurred at line $line_no with exit code $error_code"
+    
+    case $error_code in
+        1)
+            echo -e "   ╰─ General error - Check the logs above for details"
+            ;;
+        126|127)
+            echo -e "   ╰─ Command not found or permission denied"
+            ;;
+        137)
+            echo -e "   ╰─ Process terminated - Possible memory issues"
+            ;;
+        *)
+            echo -e "   ╰─ Unexpected error occurred"
+            ;;
+    esac
+    
+    # Cleanup
+    [ -d "$VENV_PATH" ] && rm -rf "$VENV_PATH"
     exit $error_code
 }
 
-# Set error trap
+# Set error trap with line number tracking
 trap 'error_handler ${LINENO} $?' ERR
+
+# Define variables at the start
+VENV_PATH="/tmp/venv"
+TFVARS_PATH="/tmp/terraform.tfvars.json"
+REQUIREMENTS_PATH="/tmp/requirements.txt"
 
 echo -e "🔧 Setting up deployment environment..."
 
-# Install system dependencies silently
+# Install system dependencies with better error checking
 if ! apk add --no-cache --quiet python3 py3-pip python3-dev py3-virtualenv > /dev/null 2>&1; then
-    echo -e "❌ Failed to install system dependencies."
+    echo -e "❌ Failed to install system dependencies"
+    echo -e "   ╰─ Check if you have sufficient permissions or internet connectivity"
     exit 1
 fi
 
-# Create and activate virtual environment
+# Create and activate virtual environment with error checking
 echo -e "   ╰─ Creating Python virtual environment"
-VENV_PATH="/tmp/venv"
 if ! python3 -m venv $VENV_PATH > /dev/null 2>&1; then
-    echo -e "❌ Failed to create virtual environment."
+    echo -e "❌ Failed to create virtual environment at $VENV_PATH"
+    echo -e "   ╰─ Check Python installation and permissions"
     exit 1
 fi
 
