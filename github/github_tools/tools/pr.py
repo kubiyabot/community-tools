@@ -18,11 +18,13 @@ pr_create = GitHubCliTool(
 pr_list = GitHubCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
-    content="gh pr list --repo $repo $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
+    content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
+        Arg(name="author", type="str", description="The github user who authored this pr. Example: joedoe", required=False),
+        Arg(name="assignee", type="str", description="The github user who's this pr is assigned to. Example: joe_doe", required=False),
     ],
 )
 
