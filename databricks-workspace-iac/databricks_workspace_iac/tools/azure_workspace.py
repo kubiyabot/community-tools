@@ -3,6 +3,7 @@ from databricks_workspace_iac.tools.base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
+import json
 
 REQUIREMENTS_FILE_CONTENT = """
 slack_sdk>=3.19.0
@@ -57,18 +58,23 @@ TF_ARGS = [
 def _format_arg_value(arg):
     """Helper function to properly format argument values for JSON."""
     if arg.default is None:
-        return '""'
+        return None
     
-    # If the default value looks like a JSON array or object, don't add extra quotes
+    # Handle boolean values
+    if arg.default.lower() == 'true':
+        return True
+    if arg.default.lower() == 'false':
+        return False
+    
+    # Handle JSON arrays and objects
     if arg.default.startswith('[') or arg.default.startswith('{'):
-        return arg.default
+        try:
+            return json.loads(arg.default)
+        except json.JSONDecodeError:
+            return arg.default
     
-    # For boolean values, convert string "true"/"false" to actual JSON booleans
-    if arg.default.lower() in ('true', 'false'):
-        return arg.default.lower()
-    
-    # For all other values, return them as strings
-    return f'"{arg.default}"'
+    # Return other values as strings
+    return arg.default
 
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
@@ -144,10 +150,8 @@ echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 
 # Create tfvars file with proper JSON formatting
-cat > $TFVARS_PATH << EOL
-{{
-{tf_args}
-}}
+cat > $TFVARS_PATH << 'EOL'
+{tf_json}
 EOL
 
 # Validate JSON format
@@ -172,11 +176,14 @@ deactivate
 
 echo -e "✅ Deployment completed successfully!"
 """.format(
-    tf_args=",\\n".join([
-        f'    "{arg.name}": {_format_arg_value(arg)}'
-        for arg in TF_ARGS
-        if not arg.required  # Only include non-required args with defaults
-    ])
+    tf_json=json.dumps(
+        {
+            arg.name: _format_arg_value(arg)
+            for arg in TF_ARGS
+            if not arg.required and arg.default is not None
+        },
+        indent=4
+    )
 )
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
