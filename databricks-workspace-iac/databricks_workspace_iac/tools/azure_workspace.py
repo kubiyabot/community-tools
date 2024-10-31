@@ -60,10 +60,10 @@ DEPLOY_CMD = """
 set -euo pipefail
 
 # Enhanced error handler with more descriptive messages
-error_handler() {
+error_handler() {{
     local line_no=$1
     local error_code=$2
-    echo -e "\n❌ Deployment failed!"
+    echo -e "\\n❌ Deployment failed!"
     echo -e "   ╰─ Error occurred at line $line_no with exit code $error_code"
     
     case $error_code in
@@ -84,10 +84,10 @@ error_handler() {
     # Cleanup
     [ -d "$VENV_PATH" ] && rm -rf "$VENV_PATH"
     exit $error_code
-}
+}}
 
 # Set error trap with line number tracking
-trap 'error_handler ${LINENO} $?' ERR
+trap 'error_handler ${{LINENO}} $?' ERR
 
 # Define variables at the start
 VENV_PATH="/tmp/venv"
@@ -119,7 +119,7 @@ pip install --quiet --upgrade pip > /dev/null 2>&1
 
 # Install requirements in virtual environment
 echo -e "   ╰─ Installing Python dependencies"
-if ! pip install --quiet -r /tmp/requirements.txt > /dev/null 2>&1; then
+if ! pip install --quiet -r $REQUIREMENTS_PATH > /dev/null 2>&1; then
     echo -e "❌ Failed to install Python requirements. Please check requirements.txt"
     exit 1
 fi
@@ -127,23 +127,26 @@ fi
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 
-# Create tfvars file with proper JSON escaping
-# Using printf to ensure proper escaping of special characters
-printf '%s' "{TF_ARGS}" > /tmp/terraform.tfvars.json
+# Create tfvars file with proper JSON formatting
+cat > $TFVARS_PATH << EOL
+{{
+{tf_args}
+}}
+EOL
 
 # Validate JSON format
-if ! jq '.' /tmp/terraform.tfvars.json >/dev/null 2>&1; then
+if ! jq '.' $TFVARS_PATH >/dev/null 2>&1; then
     echo -e "❌ Invalid JSON format in terraform.tfvars.json"
     echo -e "Content of terraform.tfvars.json:"
-    cat /tmp/terraform.tfvars.json
+    cat $TFVARS_PATH
     exit 1
 fi
 
-echo -e "\n🚀 Initiating Databricks workspace deployment..."
+echo -e "\\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
 
 # Run deployment script with full output
-if ! python /tmp/scripts/deploy_to_azure.py /tmp/terraform.tfvars.json; then
+if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
     echo -e "❌ Deployment script failed. Please check the logs above for details."
     exit 1
 fi
@@ -152,7 +155,13 @@ fi
 deactivate
 
 echo -e "✅ Deployment completed successfully!"
-""".format(TF_ARGS="\n".join([f"{arg.name}={arg.default}" for arg in TF_ARGS]))
+""".format(
+    tf_args=",\\n".join([
+        f'    "{arg.name}": "{arg.default}"' if arg.default is not None else f'    "{arg.name}": ""'
+        for arg in TF_ARGS
+        if not arg.required  # Only include non-required args with defaults
+    ])
+)
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
