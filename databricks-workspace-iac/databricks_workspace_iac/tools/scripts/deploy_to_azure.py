@@ -455,7 +455,11 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {str(e)}", file=sys.stderr)
         slack.send_error(str(e))
-        slack.update_progress("❌ Deployment Failed", str(e), "4")
+        slack.update_progress(
+            status="❌ Deployment Failed",
+            message=str(e),
+            current_step=4
+        )
         sys.exit(1)
 
     finally:
