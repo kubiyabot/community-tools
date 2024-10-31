@@ -1,12 +1,28 @@
 from typing import Annotated, Optional, Dict
-from kubiya_sdk.tools import function_tool
+from kubiya_sdk.tools.decorators import function_tool
+from kubiya_sdk.tools.models import FileSpec
 import typer
+import pathlib
+
+# Read the Slack templates JSON file
+current_dir = pathlib.Path(__file__).parent
+with open(current_dir / "templates" / "slack_templates.json", "r") as f:
+    slack_templates_content = f.read()
 
 @function_tool(
     description="Create a Databricks workspace on Azure using Infrastructure as Code (Terraform).",
-    requirements=["slack_sdk>=3.19.0"],
+    requirements=[
+        "slack_sdk>=3.19.0",
+        "typer>=0.9.0"
+    ],
     long_running=True,
     icon_url="https://raw.githubusercontent.com/databricks/databricks-sdk-py/main/docs/_static/databricks-icon.png",
+    with_files=[
+        FileSpec(
+            destination="/tmp/slack_templates.json",
+            content=slack_templates_content,
+        )
+    ],
     mermaid="""
     sequenceDiagram
         participant U as User 👤
@@ -69,71 +85,76 @@ def create_databricks_workspace(
     import subprocess
     from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
-    from databricks_workspace_iac.tools.templates.slack_blocks import build_message_blocks
+    from typing import List, Callable
 
-    def update_status(message: str, emoji: str = "ℹ️") -> None:
+    def run_command(
+        cmd: List[str],
+        cwd: Optional[str] = None,
+        capture_output: bool = False,
+        stream_output: bool = False,
+        callback: Optional[Callable[[str], None]] = None
+    ) -> Optional[str]:
+        """Run a command with proper error handling and output control."""
+        try:
+            if capture_output:
+                result = subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True)
+                return result.stdout
+            elif stream_output:
+                process = subprocess.Popen(
+                    cmd, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    text=True, bufsize=1, universal_newlines=True
+                )
+                while True:
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
+                        break
+                    if line and callback:
+                        callback(line.rstrip())
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, cmd)
+            else:
+                subprocess.run(cmd, cwd=cwd, check=True)
+        except subprocess.CalledProcessError as e:
+            error_msg = e.stderr if e.stderr else str(e)
+            raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{error_msg}")
+
+    def load_slack_templates() -> Dict:
+        """Load Slack block templates from JSON file"""
+        with open("/tmp/slack_templates.json", "r") as f:
+            return json.load(f)
+
+    def update_status(message: str, emoji: str = "ℹ️", phase: str = None) -> None:
         """Update both console and Slack with progress"""
         print(f"\n{emoji} {message}", flush=True)
         if slack and message_ts:
             try:
-                blocks = build_message_blocks(
-                    status=f"{emoji} {current_phase}",
-                    message=message,
-                    phase=str(current_step),
-                    workspace_name=workspace_name,
-                    region=region,
-                    workspace_url=workspace_url if 'workspace_url' in locals() else None
-                )
+                templates = load_slack_templates()
+                blocks = templates["status_update"]["blocks"]
+                
+                # Replace template variables
+                for block in blocks:
+                    if "${status}" in str(block):
+                        block["text"]["text"] = f"{emoji} {current_phase}"
+                    if "${message}" in str(block):
+                        block["text"]["text"] = message
+                    if "${phase}" in str(block):
+                        block["elements"][1]["text"] = f"*Phase {phase or current_step} of 7* • Databricks Workspace Deployment"
+                    if "${workspace_name}" in str(block):
+                        block["fields"][0]["text"] = f"*Workspace:*\n`{workspace_name}`"
+                    if "${region}" in str(block):
+                        block["fields"][1]["text"] = f"*Region:*\n`{region}`"
+                
+                if workspace_url and 'workspace_url' in locals():
+                    blocks.append(templates["workspace_button"])
+                    blocks[-1]["elements"][0]["url"] = workspace_url
+
                 slack.chat_update(
                     channel=channel_id,
                     ts=message_ts,
                     blocks=blocks
                 )
-            except SlackApiError as e:
-                print(f"⚠️ Failed to update Slack: {e.response['error']}", file=sys.stderr)
-
-    def run_command(cmd: list[str], cwd: Optional[str] = None, capture_output: bool = False) -> Optional[str]:
-        """Run command with live output"""
-        try:
-            if capture_output:
-                result = subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True)
-                return result.stdout
-            
-            process = subprocess.Popen(
-                cmd, 
-                cwd=cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            output = []
-            while True:
-                line = process.stdout.readline()
-                if not line and process.poll() is not None:
-                    break
-                if line:
-                    line = line.rstrip()
-                    print(line, flush=True)
-                    output.append(line)
-                    
-                    # Update status based on output
-                    if "Creating..." in line:
-                        resource = line.split('"')[1]
-                        update_status(f"Creating resource: {resource}", "🏗️")
-                    elif "Apply complete!" in line:
-                        update_status("Resources successfully created", "✅")
-            
-            if process.returncode != 0:
-                raise subprocess.CalledProcessError(process.returncode, cmd)
-            
-            return "\n".join(output) if capture_output else None
-            
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr if e.stderr else str(e)
-            raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{error_msg}")
+            except Exception as e:
+                print(f"⚠️ Failed to update Slack: {str(e)}", file=sys.stderr)
 
     # Initialize variables
     current_step = 1
@@ -280,13 +301,24 @@ def create_databricks_workspace(
     except Exception as e:
         print(f"\n❌ Error: {str(e)}", file=sys.stderr)
         if message_ts:
-            blocks = build_message_blocks(
-                status="❌ Deployment Failed",
-                message=f"*Error:*\n```{str(e)}```",
-                phase="Error",
-                workspace_name=workspace_name,
-                region=region
-            )
+            templates = load_slack_templates()
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "❌ Deployment Failed",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Error:*\n```{str(e)}```"
+                    }
+                }
+            ]
             try:
                 slack.chat_update(channel=channel_id, ts=message_ts, blocks=blocks)
             except SlackApiError:

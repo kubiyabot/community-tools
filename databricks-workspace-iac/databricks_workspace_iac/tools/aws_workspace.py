@@ -1,5 +1,5 @@
 from typing import Annotated, Optional
-from kubiya_sdk.tools.decorators import function_tool
+from kubiya_sdk.tools import function_tool
 import typer
 
 @function_tool(
