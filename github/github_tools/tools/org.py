@@ -1,8 +1,7 @@
-from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool
+from kubiya_sdk.tools import Arg, Tool
 from kubiya_sdk.tools.registry import tool_registry
 
-get_org_members = GitHubCliTool(
+get_org_members = Tool(
     name="get_org_members",
     description="Get a list of all org's users.",
     content="gh api orgs/$org/members?per_page=100 --paginate --slurp",
