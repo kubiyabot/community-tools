@@ -18,55 +18,58 @@ create_initial_block_kit() {
     local include_thread_button="$1"
     local thread_url="$2"
     
-    cat << EOF
-{
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚀 Databricks Workspace Deployment",
-                "emoji": true
-            }
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
-                    "alt_text": "terraform"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Phase 1 of 4* • Initializing Deployment"
+    local blocks='{
+        "channel": "'"$SLACK_CHANNEL_ID"'",
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Databricks Workspace Deployment",
+                    "emoji": true
                 }
-            ]
-        },
-        {
-            "type": "section",
-            "fields": [
-                {
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "image",
+                        "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
+                        "alt_text": "terraform"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Phase 1 of 4* • Initializing Deployment"
+                    }
+                ]
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Region:*\\n\`{{ .region }}\`"
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
                     "type": "mrkdwn",
-                    "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Region:*\\n\`{{ .region }}\`"
+                    "text": "_This is a long-running operation. You will be updated on the progress in both the thread and your DM._"
                 }
-            ]
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "_This is a long-running operation. You will be updated on the progress in both the thread and your DM._"
-            }
-        }$([ "$include_thread_button" = "true" ] && echo ',
-        {
+            }'
+
+    # Add thread button if requested
+    if [ "$include_thread_button" = "true" ] && [ -n "$thread_url" ]; then
+        blocks+=' ,{
             "type": "actions",
             "elements": [
                 {
@@ -79,8 +82,13 @@ create_initial_block_kit() {
                     "url": "'"$thread_url"'"
                 }
             ]
-        }')"
-    ]
+        }'
+    fi
+
+    # Close the blocks array and JSON object
+    blocks+=' ]}'
+    
+    echo "$blocks"
 }
 
 # Function to update status in both threads
@@ -91,7 +99,7 @@ update_slack_status() {
     local plan_output="${4:-}"
     
     # Create base blocks
-    local blocks='{
+    local base_blocks='{
         "blocks": [
             {
                 "type": "header",
@@ -141,7 +149,7 @@ update_slack_status() {
 
     # Add plan output if available
     if [ -n "$plan_output" ]; then
-        blocks+=',{
+        base_blocks+=',{
             "type": "section",
             "text": {
                 "type": "mrkdwn",
@@ -151,10 +159,10 @@ update_slack_status() {
     fi
 
     # Create thread message (without button)
-    local thread_blocks="$blocks]}"
+    local thread_blocks="$base_blocks ]}"
     
     # Create DM message (with button)
-    local dm_blocks="$blocks,{
+    local dm_blocks="$base_blocks,{
             \"type\": \"actions\",
             \"elements\": [
                 {
