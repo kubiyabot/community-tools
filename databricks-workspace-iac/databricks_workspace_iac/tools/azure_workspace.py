@@ -4,6 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
 import json
+import os
 
 REQUIREMENTS_FILE_CONTENT = """
 slack_sdk>=3.19.0
@@ -166,11 +167,11 @@ echo -e "\\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
 
 # Export required environment variables
-export WORKSPACE_NAME="${{workspace_name}}"
-export REGION="${{location}}"
-export STORAGE_ACCOUNT_NAME="${{storage_account_name}}"
-export CONTAINER_NAME="${{container_name}}"
-export RESOURCE_GROUP_NAME="${{resource_group_name}}"
+export WORKSPACE_NAME=${{workspace_name}}
+export REGION=${{location}}
+export STORAGE_ACCOUNT_NAME=${{storage_account_name}}
+export CONTAINER_NAME=${{container_name}}
+export RESOURCE_GROUP_NAME=${{resource_group_name}}
 
 # Run deployment script with full output
 if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
@@ -186,11 +187,11 @@ echo -e "✅ Deployment completed successfully!"
     tf_json=json.dumps(
         {
             # Include required arguments with their values
-            "workspace_name": "{workspace_name}",
-            "location": "{location}",
-            "storage_account_name": "{storage_account_name}",
-            "container_name": "{container_name}",
-            "resource_group_name": "{resource_group_name}",
+            "workspace_name": os.environ["workspace_name"],
+            "location": os.environ["location"],
+            "storage_account_name": os.environ["storage_account_name"],
+            "container_name": os.environ["container_name"],
+            "resource_group_name": os.environ["resource_group_name"],
             # Include optional arguments with defaults
             **{
                 arg.name: _format_arg_value(arg)
