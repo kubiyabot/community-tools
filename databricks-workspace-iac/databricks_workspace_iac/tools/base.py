@@ -62,7 +62,7 @@ class DatabricksTerraformTool(Tool):
     ):
 
         # Prepend setup script to the content
-        full_content = SETUP_SCRIPT + str(content)
+        full_content = SETUP_SCRIPT + content
 
         super().__init__(
             name=name,
