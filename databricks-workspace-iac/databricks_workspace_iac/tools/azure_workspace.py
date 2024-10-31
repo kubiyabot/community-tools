@@ -54,6 +54,22 @@ TF_ARGS = [
     Arg(name="tags", description="A JSON string of tags to apply to the workspace.", required=False, default="{}"),
 ]
 
+def _format_arg_value(arg):
+    """Helper function to properly format argument values for JSON."""
+    if arg.default is None:
+        return '""'
+    
+    # If the default value looks like a JSON array or object, don't add extra quotes
+    if arg.default.startswith('[') or arg.default.startswith('{'):
+        return arg.default
+    
+    # For boolean values, convert string "true"/"false" to actual JSON booleans
+    if arg.default.lower() in ('true', 'false'):
+        return arg.default.lower()
+    
+    # For all other values, return them as strings
+    return f'"{arg.default}"'
+
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
 # Exit immediately if any command fails
@@ -162,22 +178,6 @@ echo -e "✅ Deployment completed successfully!"
         if not arg.required  # Only include non-required args with defaults
     ])
 )
-
-def _format_arg_value(arg):
-    """Helper function to properly format argument values for JSON."""
-    if arg.default is None:
-        return '""'
-    
-    # If the default value looks like a JSON array or object, don't add extra quotes
-    if arg.default.startswith('[') or arg.default.startswith('{'):
-        return arg.default
-    
-    # For boolean values, convert string "true"/"false" to actual JSON booleans
-    if arg.default.lower() in ('true', 'false'):
-        return arg.default.lower()
-    
-    # For all other values, return them as strings
-    return f'"{arg.default}"'
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
