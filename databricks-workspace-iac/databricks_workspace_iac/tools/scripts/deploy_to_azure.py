@@ -116,6 +116,7 @@ def build_message_blocks(
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
     print(f"\n{emoji} {message}", flush=True)
+    sys.stdout.flush()
 
 def run_command(
     cmd: List[str],
@@ -125,6 +126,8 @@ def run_command(
     callback: Optional[Callable[[str], None]] = None
 ) -> Optional[str]:
     """Run a command with proper error handling and output control."""
+    print_progress(f"Running command: {' '.join(cmd)}", "🔄")
+    
     # Set TF_IN_AUTOMATION environment variable to disable color codes
     env = os.environ.copy()
     env["TF_IN_AUTOMATION"] = "1"
@@ -137,8 +140,9 @@ def run_command(
                 check=True,
                 capture_output=True,
                 text=True,
-                env=env  # Pass the modified environment
+                env=env
             )
+            print(result.stdout, flush=True)
             return result.stdout
         elif stream_output:
             process = subprocess.Popen(
@@ -149,7 +153,35 @@ def run_command(
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                env=env  # Pass the modified environment
+                env=env
+            )
+            
+            output_buffer = []
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                if line:
+                    output_buffer.append(line.rstrip())
+                    if callback:
+                        callback(line.rstrip())
+                    print(line.rstrip(), flush=True)
+                    sys.stdout.flush()
+            
+            if process.returncode != 0:
+                error_msg = "\n".join(output_buffer[-10:])
+                raise subprocess.CalledProcessError(process.returncode, cmd, error_msg)
+        else:
+            # For non-captured output, use subprocess.run with real-time output
+            process = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
+                env=env
             )
             
             while True:
@@ -157,18 +189,15 @@ def run_command(
                 if not line and process.poll() is not None:
                     break
                 if line:
-                    if callback:
-                        callback(line.rstrip())
-                    else:
-                        print(line.rstrip(), flush=True)
+                    print(line.rstrip(), flush=True)
+                    sys.stdout.flush()
             
             if process.returncode != 0:
                 raise subprocess.CalledProcessError(process.returncode, cmd)
-        else:
-            subprocess.run(cmd, cwd=cwd, check=True, env=env)
         
     except subprocess.CalledProcessError as e:
-        error_msg = e.stderr if e.stderr else str(e)
+        error_msg = e.stderr if hasattr(e, 'stderr') and e.stderr else str(e)
+        print(f"❌ Command failed: {' '.join(cmd)}\n{error_msg}", file=sys.stderr, flush=True)
         raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{error_msg}")
 
 class SlackNotifier:
@@ -321,14 +350,29 @@ def handle_terraform_output(line: str, slack: 'SlackNotifier') -> None:
         )
 
 def main():
+    print_progress("All checks passed, starting deployment...", "✅")
+    
     if len(sys.argv) != 2:
-        print("Usage: deploy_to_azure.py <tfvars_file>")
+        print("Usage: deploy_to_azure.py <tfvars_file>", file=sys.stderr)
         sys.exit(1)
 
     # Read tfvars file
     tfvars_file = Path(sys.argv[1])
-    with open(tfvars_file) as f:
-        tfvars = json.load(f)
+    print_progress(f"Reading tfvars file: {tfvars_file}", "📄")
+    
+    try:
+        with open(tfvars_file) as f:
+            tfvars = json.load(f)
+            print_progress("Successfully loaded tfvars", "✅")
+    except Exception as e:
+        print(f"❌ Failed to read tfvars file: {str(e)}", file=sys.stderr)
+        sys.exit(1)
+
+    # Print environment variables for debugging (excluding sensitive data)
+    print_progress("Environment variables:", "🔍")
+    safe_vars = ["WORKSPACE_NAME", "REGION", "STORAGE_ACCOUNT_NAME", "CONTAINER_NAME", "RESOURCE_GROUP_NAME"]
+    for var in safe_vars:
+        print(f"  {var}: {os.environ.get(var, 'NOT SET')}")
 
     # Get required values from environment variables
     required_vars = [

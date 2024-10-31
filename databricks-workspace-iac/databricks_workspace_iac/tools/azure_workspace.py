@@ -82,8 +82,11 @@ DEPLOY_CMD = """
 # Exit immediately if any command fails
 set -euo pipefail
 
+# Ensure Python output isn't buffered
+export PYTHONUNBUFFERED=1
+
 # Enhanced error handler with more descriptive messages
-error_handler() {{
+error_handler() {
     local line_no=$1
     local error_code=$2
     echo -e "\\n❌ Deployment failed!"
@@ -107,7 +110,7 @@ error_handler() {{
     # Cleanup
     [ -d "$VENV_PATH" ] && rm -rf "$VENV_PATH"
     exit $error_code
-}}
+}
 
 # Set error trap with line number tracking
 trap 'error_handler ${{LINENO}} $?' ERR
