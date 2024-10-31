@@ -13,31 +13,19 @@ print_progress() {
     echo -e "\\n${emoji} ${message}" >&2
 }
 
-# Function to update status in both threads
-update_slack_status() {
-    local status="$1"
-    local message="$2"
-    local phase="$3"
-    local plan_output="${4:-}"
+# Function to create initial Block Kit message
+create_initial_block_kit() {
+    local include_thread_button="$1"
+    local thread_url="$2"
     
-    # Construct thread URL safely
-    local thread_url
-    thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//./}"
-    
-    # Create JSON payload for main thread
-    local temp_file_main
-    temp_file_main=$(mktemp)
-    
-    cat > "$temp_file_main" << 'EOF'
+    cat << EOF
 {
-    "channel": "%s",
-    "ts": "%s",
     "blocks": [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "%s",
+                "text": "🚀 Databricks Workspace Deployment",
                 "emoji": true
             }
         },
@@ -51,7 +39,7 @@ update_slack_status() {
                 },
                 {
                     "type": "mrkdwn",
-                    "text": "*Phase %s of 4* • Databricks Workspace Deployment"
+                    "text": "*Phase 1 of 4* • Initializing Deployment"
                 }
             ]
         },
@@ -60,11 +48,11 @@ update_slack_status() {
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": "*Workspace:*\n`%s`"
+                    "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
                 },
                 {
                     "type": "mrkdwn",
-                    "text": "*Region:*\n`%s`"
+                    "text": "*Region:*\\n\`{{ .region }}\`"
                 }
             ]
         },
@@ -75,86 +63,9 @@ update_slack_status() {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "%s\n\n_This is a long-running operation. Updates will be posted in both this thread and your DM for easy reference._"
+                "text": "_This is a long-running operation. You will be updated on the progress in both the thread and your DM._"
             }
-        }
-EOF
-
-    # Create JSON payload for DM
-    local temp_file_dm
-    temp_file_dm=$(mktemp)
-    
-    cat > "$temp_file_dm" << 'EOF'
-{
-    "channel": "%s",
-    "ts": "%s",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "%s",
-                "emoji": true
-            }
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
-                    "alt_text": "terraform"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Phase %s of 4* • Databricks Workspace Deployment"
-                }
-            ]
-        },
-        {
-            "type": "section",
-            "fields": [
-                {
-                    "type": "mrkdwn",
-                    "text": "*Workspace:*\n`%s`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Region:*\n`%s`"
-                }
-            ]
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "%s\n\n_This is a long-running operation. I'm keeping you updated here for easy reference._"
-            }
-        }
-EOF
-
-    # Add plan output if available
-    if [ -n "$plan_output" ]; then
-        for temp_file in "$temp_file_main" "$temp_file_dm"; do
-            cat >> "$temp_file" << 'EOF'
-        ,
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Terraform Plan:*\n```%s```"
-            }
-        }
-EOF
-        done
-    fi
-
-    # Add view thread button to DM message only
-    cat >> "$temp_file_dm" << 'EOF'
-        ,
+        }$([ "$include_thread_button" = "true" ] && echo ',
         {
             "type": "actions",
             "elements": [
@@ -165,58 +76,118 @@ EOF
                         "text": "View Thread",
                         "emoji": true
                     },
-                    "url": "%s"
+                    "url": "'"$thread_url"'"
                 }
             ]
-        }
-EOF
-
-    # Close the JSON for both files
-    for temp_file in "$temp_file_main" "$temp_file_dm"; do
-        cat >> "$temp_file" << 'EOF'
+        }')"
     ]
 }
-EOF
-    done
 
-    # Format and send the main thread message
-    local formatted_json_main
-    formatted_json_main=$(printf "$(cat "$temp_file_main")" \
-        "$SLACK_CHANNEL_ID" \
-        "$THREAD_TS" \
-        "$status" \
-        "$phase" \
-        "{{ .workspace_name }}" \
-        "{{ .region }}" \
-        "$message" \
-        "${plan_output:-}")
+# Function to update status in both threads
+update_slack_status() {
+    local status="$1"
+    local message="$2"
+    local phase="$3"
+    local plan_output="${4:-}"
+    
+    # Create base blocks
+    local blocks='{
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "'"$status"'",
+                    "emoji": true
+                }
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "image",
+                        "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
+                        "alt_text": "terraform"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Phase '"$phase"' of 4* • Databricks Workspace Deployment"
+                    }
+                ]
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Workspace:*\\n\`{{ .workspace_name }}\`"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": "*Region:*\\n\`{{ .region }}\`"
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "'"$message"'"
+                }
+            }'
 
-    # Format and send the DM message
-    local formatted_json_dm
-    formatted_json_dm=$(printf "$(cat "$temp_file_dm")" \
-        "$SLACK_CHANNEL_ID" \
-        "$MAIN_MESSAGE_TS" \
-        "$status" \
-        "$phase" \
-        "{{ .workspace_name }}" \
-        "{{ .region }}" \
-        "$message" \
-        "${plan_output:-}" \
-        "$thread_url")
+    # Add plan output if available
+    if [ -n "$plan_output" ]; then
+        blocks+=',{
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Terraform Plan:*\\n```'"$plan_output"'```"
+            }
+        }'
+    fi
 
-    # Send updates to both threads
+    # Create thread message (without button)
+    local thread_blocks="$blocks]}"
+    
+    # Create DM message (with button)
+    local dm_blocks="$blocks,{
+            \"type\": \"actions\",
+            \"elements\": [
+                {
+                    \"type\": \"button\",
+                    \"text\": {
+                        \"type\": \"plain_text\",
+                        \"text\": \"View Thread\",
+                        \"emoji\": true
+                    },
+                    \"url\": \"$THREAD_URL\"
+                }
+            ]
+        }]}"
+
+    # Update thread message
     curl -s -X POST "https://slack.com/api/chat.update" \
         -H "Authorization: Bearer $SLACK_API_TOKEN" \
         -H "Content-Type: application/json; charset=utf-8" \
-        --data "$formatted_json_main"
+        --data "{
+            \"channel\": \"$SLACK_CHANNEL_ID\",
+            \"ts\": \"$THREAD_TS\",
+            $thread_blocks
+        }"
 
+    # Update DM message
     curl -s -X POST "https://slack.com/api/chat.update" \
         -H "Authorization: Bearer $SLACK_API_TOKEN" \
         -H "Content-Type: application/json; charset=utf-8" \
-        --data "$formatted_json_dm"
-
-    # Clean up temp files
-    rm -f "$temp_file_main" "$temp_file_dm"
+        --data "{
+            \"channel\": \"$SLACK_CHANNEL_ID\",
+            \"ts\": \"$MAIN_MESSAGE_TS\",
+            $dm_blocks
+        }"
 }
 
 # Function to handle errors
@@ -244,27 +215,37 @@ capture_terraform_plan() {
 # Start main script execution
 print_progress "Starting Databricks Workspace deployment..." "🚀"
 
-# Send initial message to Slack and capture MAIN_MESSAGE_TS
+# Send initial messages to both threads
 echo -e "📣 Sending initial status message..."
-initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
+
+# Send initial message to main thread
+initial_thread_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
     -H "Authorization: Bearer $SLACK_API_TOKEN" \
     -H "Content-Type: application/json; charset=utf-8" \
-    --data "{
-        \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
-        \\"text\\": \\"Initializing Databricks Workspace deployment...\\"
-    }")
+    --data "$(create_initial_block_kit "false" "")")
 
-# Capture both timestamps
-MAIN_MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
-THREAD_TS="$SLACK_THREAD_TS"  # This should be provided as an environment variable
+# Get thread timestamp
+THREAD_TS=$(echo "$initial_thread_response" | jq -r '.ts')
 
-if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
-    echo "❌ Failed to send initial message"
+if [ -z "$THREAD_TS" ] || [ "$THREAD_TS" = "null" ]; then
+    echo "❌ Failed to send initial thread message"
     exit 1
 fi
 
-if [ -z "$THREAD_TS" ]; then
-    echo "❌ SLACK_THREAD_TS environment variable is not set"
+# Construct thread URL
+THREAD_URL="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
+
+# Send initial message to DM
+initial_dm_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
+    -H "Authorization: Bearer $SLACK_API_TOKEN" \
+    -H "Content-Type: application/json; charset=utf-8" \
+    --data "$(create_initial_block_kit "true" "$THREAD_URL")")
+
+# Get DM message timestamp
+MAIN_MESSAGE_TS=$(echo "$initial_dm_response" | jq -r '.ts')
+
+if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
+    echo "❌ Failed to send initial DM message"
     exit 1
 fi
 
