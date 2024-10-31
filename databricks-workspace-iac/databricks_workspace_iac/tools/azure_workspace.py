@@ -11,7 +11,7 @@ handle_error() {
     local lineno="$1"
     local errmsg="$2"
     echo -e "\\n❌ An unexpected error occurred on line ${lineno}: ${errmsg}"
-    update_slack_status "❌ Deployment Failed" "${errmsg}" "0"
+    send_slack_message "❌ Deployment Failed" "${errmsg}"
     exit 1
 }
 
@@ -25,12 +25,11 @@ print_progress() {
     echo -e "\\n${emoji} ${message}"
 }
 
-# Function to update Slack status in both the main thread and the parent message
-update_slack_status() {
+# Function to send Slack message to the thread
+send_slack_message() {
     local status="$1"
     local message="$2"
-    local phase="$3"
-    local plan_output="${4:-}"
+    local plan_output="${3:-}"
 
     # Ensure SLACK_THREAD_TS is set
     if [ -z "${SLACK_THREAD_TS:-}" ]; then
@@ -38,193 +37,119 @@ update_slack_status() {
         exit 1
     fi
 
-    # Use SLACK_THREAD_TS as the thread timestamp
-    THREAD_TS="${SLACK_THREAD_TS}"
-
     # Construct thread URL safely
-    local thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
+    local thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//./}"
 
-    # Create the JSON payload for the main thread
+    # Create the JSON payload for the thread message
     local thread_payload
     thread_payload=$(cat <<EOF
 {
     "channel": "${SLACK_CHANNEL_ID}",
-    "ts": "${THREAD_TS}",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "${status}",
-                "emoji": true
-            }
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
-                    "alt_text": "terraform"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Phase ${phase} of 4* • Databricks Workspace Deployment"
-                }
-            ]
-        },
-        {
-            "type": "section",
-            "fields": [
-                {
-                    "type": "mrkdwn",
-                    "text": "*Workspace:*\n\`{{ .workspace_name }}\`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Region:*\n\`{{ .region }}\`"
-                }
-            ]
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "${message}"
-            }
-        }$(if [ -n "${plan_output}" ]; then
-cat <<EOP
-,
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Terraform Plan:*\n\`\`\`${plan_output}\`\`\`"
-            }
-        }
-EOP
-fi)
-    ]
+    "thread_ts": "${SLACK_THREAD_TS}",
+    "mrkdwn": true,
+    "text": "${status}\\n${message}"
 }
 EOF
 )
 
-    # Create the JSON payload for the parent message (includes the View Thread button)
-    local parent_payload
-    parent_payload=$(cat <<EOF
+    # If plan output is provided, include it in the message
+    if [ -n "${plan_output}" ]; then
+        thread_payload=$(cat <<EOF
 {
     "channel": "${SLACK_CHANNEL_ID}",
-    "ts": "${SLACK_MESSAGE_TS}",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "${status}",
-                "emoji": true
-            }
-        },
-        {
-            "type": "context",
-            "elements": [
-                {
-                    "type": "image",
-                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
-                    "alt_text": "terraform"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Phase ${phase} of 4* • Databricks Workspace Deployment"
-                }
-            ]
-        },
-        {
-            "type": "section",
-            "fields": [
-                {
-                    "type": "mrkdwn",
-                    "text": "*Workspace:*\n\`{{ .workspace_name }}\`"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": "*Region:*\n\`{{ .region }}\`"
-                }
-            ]
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "${message}\n\n_This is a long-running operation. Updates will be posted here and in the thread for easy reference._"
-            }
-        }$(if [ -n "${plan_output}" ]; then
-cat <<EOP
-,
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Terraform Plan:*\n\`\`\`${plan_output}\`\`\`"
-            }
-        }
-EOP
-fi),
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "View Thread",
-                        "emoji": true
-                    },
-                    "url": "${thread_url}"
-                }
-            ]
-        }
-    ]
+    "thread_ts": "${SLACK_THREAD_TS}",
+    "mrkdwn": true,
+    "text": "${status}\\n${message}\\n\\n*Terraform Plan:*\\n\`\`\`${plan_output}\`\`\`"
 }
 EOF
 )
+    fi
 
-    # Update the main thread message
-    curl -s -X POST "https://slack.com/api/chat.update" \
-        -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-        -H "Content-Type: application/json; charset=utf-8" \
+    # Send the message to the thread
+    curl -s -X POST "https://slack.com/api/chat.postMessage" \\
+        -H "Authorization: Bearer ${SLACK_API_TOKEN}" \\
+        -H "Content-Type: application/json; charset=utf-8" \\
         --data "${thread_payload}" > /dev/null
-
-    # Update the parent message
-    curl -s -X POST "https://slack.com/api/chat.update" \
-        -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-        -H "Content-Type: application/json; charset=utf-8" \
-        --data "${parent_payload}" > /dev/null
 }
 
 # Main script execution starts here
 print_progress "Starting Databricks Workspace deployment..." "🚀"
 
 # Ensure required environment variables are set
-if [ -z "${SLACK_API_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ] || [ -z "${SLACK_THREAD_TS:-}" ] || [ -z "${SLACK_MESSAGE_TS:-}" ]; then
-    echo "❌ Required environment variables SLACK_API_TOKEN, SLACK_CHANNEL_ID, SLACK_THREAD_TS, or SLACK_MESSAGE_TS are not set."
+if [ -z "${SLACK_API_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ] || [ -z "${SLACK_THREAD_TS:-}" ]; then
+    echo "❌ Required environment variables SLACK_API_TOKEN, SLACK_CHANNEL_ID, or SLACK_THREAD_TS are not set."
     exit 1
 fi
 
-# Use SLACK_THREAD_TS as the thread timestamp
-THREAD_TS="${SLACK_THREAD_TS}"
-
 # Proceed with deployment steps
 
-# Example of updating the status
-update_slack_status "🚀 Deployment Started" "Initializing Databricks Workspace deployment..." "1"
+# Example of sending a message to the thread
+send_slack_message "🚀 Deployment Started" "Initializing Databricks Workspace deployment..."
 
-# Rest of your script...
+# Step 1: Clone Infrastructure Repository
+print_progress "Cloning Infrastructure Repository..." "📦"
+send_slack_message "📦 Cloning Repository" "Cloning the infrastructure repository..."
+
+# ... your cloning logic here ...
+
+# Step 2: Initialize Terraform
+print_progress "Initializing Terraform..." "⚙️"
+send_slack_message "⚙️ Initializing Terraform" "Initializing Terraform configuration..."
+
+# ... your Terraform initialization logic here ...
+
+# Step 3: Generate Terraform Plan
+print_progress "Generating Terraform plan..." "📋"
+send_slack_message "📋 Generating Terraform Plan" "Generating Terraform plan..."
+
+# Capture Terraform plan output
+plan_output=$(terraform plan -no-color -input=false -var-file="terraform.tfvars.json")
+
+# Check if plan was successful
+if [ $? -eq 0 ]; then
+    print_progress "Terraform plan generated successfully" "✅"
+    send_slack_message "✅ Terraform Plan Generated" "Terraform plan generated successfully." "${plan_output}"
+else
+    error_message="Failed to generate Terraform plan"
+    print_progress "${error_message}" "❌"
+    send_slack_message "❌ ${error_message}" "Please check the logs for details."
+    exit 1
+fi
+
+# Step 4: Apply Terraform Configuration
+print_progress "Applying Terraform configuration..." "🚀"
+send_slack_message "🚀 Applying Terraform Configuration" "Applying Terraform configuration..."
+
+# Apply the Terraform configuration
+apply_output=$(terraform apply -auto-approve -no-color -input=false -var-file="terraform.tfvars.json")
+
+# Check if apply was successful
+if [ $? -eq 0 ]; then
+    print_progress "Terraform configuration applied successfully!" "🎉"
+    send_slack_message "🎉 Deployment Successful" "Terraform configuration applied successfully!"
+else
+    error_message="Failed to apply Terraform configuration"
+    print_progress "${error_message}" "❌"
+    send_slack_message "❌ ${error_message}" "Please check the logs for details."
+    exit 1
+fi
+
+# Step 5: Retrieve Workspace URL
+print_progress "Retrieving Databricks Workspace URL..." "🌐"
+workspace_url=$(terraform output -raw databricks_host)
+
+if [ -z "${workspace_url}" ]; then
+    handle_error ${LINENO} "Failed to retrieve workspace URL"
+fi
+
+workspace_url="https://${workspace_url}"
+print_progress "Workspace URL: ${workspace_url}" "🔗"
+send_slack_message "🔗 Workspace URL" "Databricks Workspace is available at: ${workspace_url}"
+
+# Deployment completed
+print_progress "Deployment completed successfully!" "🎉"
+send_slack_message "🎉 Deployment Completed" "Databricks Workspace deployment completed successfully!"
+
 """
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
