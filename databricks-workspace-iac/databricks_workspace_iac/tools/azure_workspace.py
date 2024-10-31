@@ -4,6 +4,8 @@ from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
 import json
+import os
+from pathlib import Path
 
 REQUIREMENTS_FILE_CONTENT = """
 slack_sdk>=3.19.0
@@ -202,6 +204,43 @@ echo -e "✅ Deployment completed successfully!"
     )
 )
 
+# Add Terraform files content
+TERRAFORM_FILES = {
+    "main.tf": """
+provider "azurerm" {
+  features {}
+}
+
+provider "databricks" {
+  host = azurerm_databricks_workspace.workspace.workspace_url
+}
+
+resource "azurerm_databricks_workspace" "workspace" {
+  name                = var.workspace_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  sku                = "premium"
+  
+  # ... rest of the workspace configuration ...
+}
+
+output "databricks_host" {
+  value = azurerm_databricks_workspace.workspace.workspace_url
+}
+""",
+    "variables.tf": """
+variable "workspace_name" {
+  type = string
+}
+
+variable "location" {
+  type = string
+}
+
+# ... rest of the variables ...
+""",
+}
+
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
     description="Create a Databricks workspace on Azure using Infrastructure as Code (Terraform).",
@@ -216,6 +255,14 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
             destination="/tmp/requirements.txt",
             content=REQUIREMENTS_FILE_CONTENT,
         ),
+        # Add Terraform files
+        *[
+            FileSpec(
+                destination=f"/tmp/terraform/azure/{filename}",
+                content=content
+            )
+            for filename, content in TERRAFORM_FILES.items()
+        ],
     ],
     mermaid="""
     sequenceDiagram
