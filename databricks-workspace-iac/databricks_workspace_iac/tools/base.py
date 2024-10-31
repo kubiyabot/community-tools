@@ -55,7 +55,7 @@ class DatabricksTerraformTool(Tool):
         args,
         env,
         secrets,
-        long_running=True,
+        long_running=False,
         with_files=None,
         image="hashicorp/terraform:latest",
         mermaid=None,
