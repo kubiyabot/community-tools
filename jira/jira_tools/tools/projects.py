@@ -127,6 +127,8 @@ print(f"Updated sprint: {updated_sprint.id}")
 )
 
 # Register new tools
+register_jira_tool(project_list)
+register_jira_tool(project_get)
 register_jira_tool(board_get)
 register_jira_tool(board_list)
 register_jira_tool(sprint_get)
