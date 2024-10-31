@@ -5,6 +5,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
+import re
 
 # At the top of the file, modify the imports to handle missing slack_sdk
 try:
@@ -235,8 +236,11 @@ class SlackNotifier:
 
 def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     """Create terraform.tfvars.json file from arguments"""
+    # Sanitize the workspace_name
+    sanitized_workspace_name = re.sub(r"[^a-zA-Z0-9()._-]", "", args["workspace_name"])
+
     tfvars = {
-        "workspace_name": args["workspace_name"],
+        "workspace_name": sanitized_workspace_name,
         "location": args["location"],
         "managed_services_cmk_key_vault_key_id": args.get("managed_services_cmk_key_vault_key_id"),
         "managed_disk_cmk_key_vault_key_id": args.get("managed_disk_cmk_key_vault_key_id"),
