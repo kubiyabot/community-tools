@@ -368,6 +368,10 @@ def main():
         print(f"❌ Failed to read tfvars file: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
+    # print the TFVARS
+    print_progress("TFVARS:", "📄")
+    print(tfvars)
+
     # Print environment variables for debugging (excluding sensitive data)
     print_progress("Environment variables:", "🔍")
     safe_vars = ["WORKSPACE_NAME", "REGION", "STORAGE_ACCOUNT_NAME", "CONTAINER_NAME", "RESOURCE_GROUP_NAME"]
