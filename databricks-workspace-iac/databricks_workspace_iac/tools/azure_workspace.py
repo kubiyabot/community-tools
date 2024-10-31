@@ -22,6 +22,9 @@ TF_ARGS = [
     Arg(name="container_name", description="The name of the container to use for the backend.", required=True),
     Arg(name="resource_group_name", description="The name of the resource group to use for the backend.", required=True),
     
+    # Add ARM_SUBSCRIPTION_ID as a required argument
+    Arg(name="arm_subscription_id", description="The Azure subscription ID.", required=True),
+    
     # Encryption settings
     Arg(name="managed_services_cmk_key_vault_key_id", description="The ID of the key vault key for managed services encryption.", required=False),
     Arg(name="managed_disk_cmk_key_vault_key_id", description="The ID of the key vault key for managed disk encryption.", required=False),
@@ -63,188 +66,161 @@ def _format_arg_value(arg):
         return None
     
     # Handle boolean values
-    if arg.default.lower() == 'true':
-        return True
-    if arg.default.lower() == 'false':
-        return False
+    if isinstance(arg.default, str):
+        if arg.default.lower() == 'true':
+            return True
+        if arg.default.lower() == 'false':
+            return False
     
     # Handle JSON arrays and objects
-    if arg.default.startswith('[') or arg.default.startswith('{'):
+    if isinstance(arg.default, str) and (arg.default.startswith('[') or arg.default.startswith('{')):
         try:
             return json.loads(arg.default)
         except json.JSONDecodeError:
             return arg.default
     
-    # Return other values as strings
+    # Return other values as is
     return arg.default
 
-# Create a command that will generate the tfvars file and then run the deployment
-DEPLOY_CMD = """
-# Exit immediately if any command fails
-set -euo pipefail
+def create_deploy_cmd(args):
+    """Generate DEPLOY_CMD with placeholders replaced by actual argument values."""
+    # Build a dictionary of argument values
+    arg_values = {arg.name: args.get(arg.name) or arg.default for arg in TF_ARGS}
 
-# Enhanced error handler with more descriptive messages
-error_handler() {{
-    local line_no=$1
-    local error_code=$2
-    echo -e "\\n❌ Deployment failed!"
-    echo -e "   ╰─ Error occurred at line $line_no with exit code $error_code"
+    # Create tf_json content
+    tf_vars = {k: v for k, v in arg_values.items() if v is not None and k not in [
+        "storage_account_name",
+        "container_name",
+        "resource_group_name",
+        "arm_subscription_id",
+    ]}
+    tf_json = json.dumps(tf_vars, indent=4)
+
+    # Define the deployment command template
+    deploy_cmd_template = '''
+    # Exit immediately if any command fails
+    set -euo pipefail
     
-    case $error_code in
-        1)
-            echo -e "   ╰─ General error - Check the logs above for details"
-            ;;
-        126|127)
-            echo -e "   ╰─ Command not found or permission denied"
-            ;;
-        137)
-            echo -e "   ╰─ Process terminated - Possible memory issues"
-            ;;
-        *)
-            echo -e "   ╰─ Unexpected error occurred"
-            ;;
-    esac
+    # Enhanced error handler with more descriptive messages
+    error_handler() {{
+        local line_no=$1
+        local error_code=$2
+        echo -e "\\n❌ Deployment failed!"
+        echo -e "   ╰─ Error occurred at line $line_no with exit code $error_code"
+        
+        case $error_code in
+            1)
+                echo -e "   ╰─ General error - Check the logs above for details"
+                ;;
+            126|127)
+                echo -e "   ╰─ Command not found or permission denied"
+                ;;
+            137)
+                echo -e "   ╰─ Process terminated - Possible memory issues"
+                ;;
+            *)
+                echo -e "   ╰─ Unexpected error occurred"
+                ;;
+        esac
+        
+        # Cleanup
+        [ -d "$VENV_PATH" ] && rm -rf "$VENV_PATH"
+        exit $error_code
+    }}
     
-    # Cleanup
-    [ -d "$VENV_PATH" ] && rm -rf "$VENV_PATH"
-    exit $error_code
-}}
-
-# Set error trap with line number tracking
-trap 'error_handler ${{LINENO}} $?' ERR
-
-# Define variables at the start
-VENV_PATH="/tmp/venv"
-TFVARS_PATH="/tmp/terraform.tfvars.json"
-REQUIREMENTS_PATH="/tmp/requirements.txt"
-
-echo -e "🔧 Setting up deployment environment..."
-
-# Install system dependencies with better error checking
-if ! apk add --no-cache --quiet python3 py3-pip python3-dev py3-virtualenv > /dev/null 2>&1; then
-    echo -e "❌ Failed to install system dependencies"
-    echo -e "   ╰─ Check if you have sufficient permissions or internet connectivity"
-    exit 1
-fi
-
-# Create and activate virtual environment with error checking
-echo -e "   ╰─ Creating Python virtual environment"
-if ! python3 -m venv $VENV_PATH > /dev/null 2>&1; then
-    echo -e "❌ Failed to create virtual environment at $VENV_PATH"
-    echo -e "   ╰─ Check Python installation and permissions"
-    exit 1
-fi
-
-# Source the virtual environment
-. $VENV_PATH/bin/activate
-
-# Upgrade pip silently
-pip install --quiet --upgrade pip > /dev/null 2>&1
-
-# Install requirements in virtual environment
-echo -e "   ╰─ Installing Python dependencies"
-if ! pip install --quiet -r $REQUIREMENTS_PATH > /dev/null 2>&1; then
-    echo -e "❌ Failed to install Python requirements. Please check requirements.txt"
-    exit 1
-fi
-
-echo -e "📝 Preparing configuration files..."
-echo -e "   ╰─ Generating terraform.tfvars.json"
-
-# Create tfvars file with proper JSON formatting
-cat > $TFVARS_PATH << 'EOL'
-{tf_json}
-EOL
-
-# Validate JSON format
-if ! jq '.' $TFVARS_PATH >/dev/null 2>&1; then
-    echo -e "❌ Invalid JSON format in terraform.tfvars.json"
-    echo -e "Content of terraform.tfvars.json:"
-    cat $TFVARS_PATH
-    exit 1
-fi
-
-echo -e "\\n🚀 Initiating Databricks workspace deployment..."
-echo -e "   ╰─ Launching deployment script"
-
-# Export required environment variables
-export WORKSPACE_NAME=${{workspace_name}}
-export REGION=${{location}}
-export STORAGE_ACCOUNT_NAME=${{storage_account_name}}
-export CONTAINER_NAME=${{container_name}}
-export RESOURCE_GROUP_NAME="{{resource_group_name}}"
-
-# Run deployment script with full output
-if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
-    echo -e "❌ Deployment script failed. Please check the logs above for details."
-    exit 1
-fi
-
-# Deactivate virtual environment
-deactivate
-
-echo -e "✅ Deployment completed successfully!"
-""".format(
-    tf_json=json.dumps(
-        {
-            # Include required arguments with their values
-            "workspace_name": "{workspace_name}",
-            "location": "{location}",
-            "storage_account_name": "{storage_account_name}",
-            "container_name": "{container_name}",
-            "resource_group_name": "{resource_group_name}",
-            # Include optional arguments with defaults
-            **{
-                arg.name: _format_arg_value(arg)
-                for arg in TF_ARGS
-                if not arg.required and arg.default is not None
-            }
-        },
-        indent=4
+    # Set error trap with line number tracking
+    trap 'error_handler ${{LINENO}} $?' ERR
+    
+    # Define variables at the start
+    VENV_PATH="/tmp/venv"
+    TFVARS_PATH="/tmp/terraform.tfvars.json"
+    REQUIREMENTS_PATH="/tmp/requirements.txt"
+    
+    echo -e "🔧 Setting up deployment environment..."
+    
+    # Install system dependencies with better error checking
+    if ! apk add --no-cache --quiet python3 py3-pip python3-dev py3-virtualenv jq git > /dev/null 2>&1; then
+        echo -e "❌ Failed to install system dependencies"
+        echo -e "   ╰─ Check if you have sufficient permissions or internet connectivity"
+        exit 1
+    fi
+    
+    # Create and activate virtual environment with error checking
+    echo -e "   ╰─ Creating Python virtual environment"
+    if ! python3 -m venv $VENV_PATH > /dev/null 2>&1; then
+        echo -e "❌ Failed to create virtual environment at $VENV_PATH"
+        echo -e "   ╰─ Check Python installation and permissions"
+        exit 1
+    fi
+    
+    # Source the virtual environment
+    . $VENV_PATH/bin/activate
+    
+    # Upgrade pip silently
+    pip install --quiet --upgrade pip > /dev/null 2>&1
+    
+    # Install requirements in virtual environment
+    echo -e "   ╰─ Installing Python dependencies"
+    if ! pip install --quiet -r $REQUIREMENTS_PATH > /dev/null 2>&1; then
+        echo -e "❌ Failed to install Python requirements. Please check requirements.txt"
+        exit 1
+    fi
+    
+    echo -e "📝 Preparing configuration files..."
+    echo -e "   ╰─ Generating terraform.tfvars.json"
+    
+    # Create tfvars file with proper JSON formatting
+    cat > $TFVARS_PATH << 'EOL'
+    {tf_json}
+    EOL
+    
+    # Validate JSON format
+    if ! jq '.' $TFVARS_PATH >/dev/null 2>&1; then
+        echo -e "❌ Invalid JSON format in terraform.tfvars.json"
+        echo -e "Content of terraform.tfvars.json:"
+        cat $TFVARS_PATH
+        exit 1
+    fi
+    
+    echo -e "\\n🚀 Initiating Databricks workspace deployment..."
+    echo -e "   ╰─ Launching deployment script"
+    
+    # Export required environment variables
+    export WORKSPACE_NAME="{workspace_name}"
+    export REGION="{location}"
+    export STORAGE_ACCOUNT_NAME="{storage_account_name}"
+    export CONTAINER_NAME="{container_name}"
+    export RESOURCE_GROUP_NAME="{resource_group_name}"
+    export ARM_SUBSCRIPTION_ID="{arm_subscription_id}"
+    
+    # Run deployment script with full output
+    if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
+        echo -e "❌ Deployment script failed. Please check the logs above for details."
+        exit 1
+    fi
+    
+    # Deactivate virtual environment
+    deactivate
+    
+    echo -e "✅ Deployment completed successfully!"
+    '''
+    # Replace placeholders in deploy_cmd_template
+    deploy_cmd = deploy_cmd_template.format(
+        tf_json=tf_json,
+        workspace_name=arg_values["workspace_name"],
+        location=arg_values["location"],
+        storage_account_name=arg_values["storage_account_name"],
+        container_name=arg_values["container_name"],
+        resource_group_name=arg_values["resource_group_name"],
+        arm_subscription_id=arg_values["arm_subscription_id"]
     )
-)
+    return deploy_cmd
 
-# Add Terraform files content
-TERRAFORM_FILES = {
-    "main.tf": """
-provider "azurerm" {
-  features {}
-}
-
-provider "databricks" {
-  host = azurerm_databricks_workspace.workspace.workspace_url
-}
-
-resource "azurerm_databricks_workspace" "workspace" {
-  name                = var.workspace_name
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  sku                = "premium"
-  
-  # ... rest of the workspace configuration ...
-}
-
-output "databricks_host" {
-  value = azurerm_databricks_workspace.workspace.workspace_url
-}
-""",
-    "variables.tf": """
-variable "workspace_name" {
-  type = string
-}
-
-variable "location" {
-  type = string
-}
-
-# ... rest of the variables ...
-""",
-}
-
+# Create the tool using the create_deploy_cmd function
 azure_db_apply_tool = DatabricksAzureTerraformTool(
     name="create-databricks-workspace-on-azure",
     description="Create a Databricks workspace on Azure using Infrastructure as Code (Terraform).",
-    content=DEPLOY_CMD,
+    content=create_deploy_cmd,
     args=TF_ARGS,
     with_files=[
         FileSpec(
@@ -275,7 +251,6 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
         U ->> S: Start Deployment 🎬
         Note over S: Generate tfvars from input
 
-        S ->> S: Clone repository 📦
         S ->> T: Initialize Terraform backend
 
         T ->> A: Request resources 🏗️
