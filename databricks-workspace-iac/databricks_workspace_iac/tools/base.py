@@ -16,7 +16,7 @@ set -euo pipefail
 echo -e "\\n🔧 Starting the setup for Databricks Workspace provisioning..."
 
 # Check and install runtime dependencies silently
-check_dependencies() {
+function check_dependencies {
     missing_deps=""
     for cmd in curl jq git bash; do
         if ! command -v "$cmd" > /dev/null 2>&1; then
