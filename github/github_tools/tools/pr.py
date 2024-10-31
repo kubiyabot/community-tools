@@ -144,7 +144,7 @@ pr_add_reviewer = GitHubCliTool(
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-        arg(name="reviewer", type="str", description="The github login who's this pr is to be reviewed by. Example: joe_doe.", required=True),
+        Arg(name="reviewer", type="str", description="The github login who's this pr is to be reviewed by. Example: joe_doe.", required=True),
     ],
 )
 
