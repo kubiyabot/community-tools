@@ -254,10 +254,17 @@ initial_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
         \\"text\\": \\"Initializing Databricks Workspace deployment...\\"
     }")
 
+# Capture both timestamps
 MAIN_MESSAGE_TS=$(echo "$initial_response" | jq -r '.ts')
+THREAD_TS="$SLACK_THREAD_TS"  # This should be provided as an environment variable
 
 if [ -z "$MAIN_MESSAGE_TS" ] || [ "$MAIN_MESSAGE_TS" = "null" ]; then
     echo "❌ Failed to send initial message"
+    exit 1
+fi
+
+if [ -z "$THREAD_TS" ]; then
+    echo "❌ SLACK_THREAD_TS environment variable is not set"
     exit 1
 fi
 
