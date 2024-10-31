@@ -118,8 +118,12 @@ def create_databricks_workspace(
 
     def load_slack_templates() -> Dict:
         """Load Slack block templates from JSON file"""
-        with open("/tmp/slack_templates.json", "r") as f:
-            return json.load(f)
+        try:
+            with open("/tmp/slack_templates.json", "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"⚠️ Failed to load Slack templates: {str(e)}", file=sys.stderr)
+            return {"status_update": {"blocks": []}, "workspace_button": {}}
 
     def update_status(message: str, emoji: str = "ℹ️", phase: str = None) -> None:
         """Update both console and Slack with progress"""
@@ -127,7 +131,7 @@ def create_databricks_workspace(
         if slack and message_ts:
             try:
                 templates = load_slack_templates()
-                blocks = templates["status_update"]["blocks"]
+                blocks = templates.get("status_update", {}).get("blocks", [])
                 
                 # Replace template variables
                 for block in blocks:
@@ -143,8 +147,10 @@ def create_databricks_workspace(
                         block["fields"][1]["text"] = f"*Region:*\n`{region}`"
                 
                 if workspace_url and 'workspace_url' in locals():
-                    blocks.append(templates["workspace_button"])
-                    blocks[-1]["elements"][0]["url"] = workspace_url
+                    workspace_button = templates.get("workspace_button", {})
+                    if workspace_button:
+                        blocks.append(workspace_button)
+                        blocks[-1]["elements"][0]["url"] = workspace_url
 
                 slack.chat_update(
                     channel=channel_id,

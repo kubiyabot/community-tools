@@ -1,6 +1,5 @@
 from typing import Annotated, Optional
 from kubiya_sdk.tools import function_tool
-import typer
 
 @function_tool(
     description="Create a Databricks workspace on AWS using Infrastructure as Code (Terraform).",
