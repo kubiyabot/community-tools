@@ -4,7 +4,6 @@ from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
 import json
-import os
 
 REQUIREMENTS_FILE_CONTENT = """
 slack_sdk>=3.19.0
@@ -154,33 +153,33 @@ echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 
 # Generate terraform.tfvars.json with proper JSON formatting and environment variables
-cat > $TFVARS_PATH << EOL
-{{
-    "workspace_name": "${{workspace_name}}",
-    "location": "${{location}}",
-    "managed_services_cmk_key_vault_key_id": ${{managed_services_cmk_key_vault_key_id:=null}},
-    "managed_disk_cmk_key_vault_key_id": ${{managed_disk_cmk_key_vault_key_id:=null}},
-    "infrastructure_encryption_enabled": ${{infrastructure_encryption_enabled:-false}},
-    "no_public_ip": ${{no_public_ip:-false}},
-    "enable_vnet": ${{enable_vnet:-false}},
-    "virtual_network_id": ${{virtual_network_id:=null}},
-    "private_subnet_name": ${{private_subnet_name:=null}},
-    "public_subnet_name": ${{public_subnet_name:=null}},
-    "public_subnet_network_security_group_association_id": ${{public_subnet_network_security_group_association_id:=null}},
-    "private_subnet_network_security_group_association_id": ${{private_subnet_network_security_group_association_id:=null}},
-    "security_profile_enabled": ${{security_profile_enabled:-false}},
-    "enhanced_monitoring_enabled": ${{enhanced_monitoring_enabled:-false}},
-    "automatic_update": ${{automatic_update:-false}},
-    "restart_no_updates": ${{restart_no_updates:-false}},
-    "day_of_week": ${{day_of_week:=null}},
-    "frequency": ${{frequency:=null}},
-    "hours": ${{hours:-1}},
-    "minutes": ${{minutes:-0}},
-    "address_space": ${{address_space:-["10.0.0.0/16"]}},
-    "address_prefixes_public": ${{address_prefixes_public:-["10.0.2.0/24"]}},
-    "address_prefixes_private": ${{address_prefixes_private:-["10.0.1.0/24"]}},
-    "tags": ${{tags:-{{}}}}
-}}
+cat > $TFVARS_PATH << 'EOL'
+{
+    "workspace_name": "${workspace_name}",
+    "location": "${location}",
+    "managed_services_cmk_key_vault_key_id": ${managed_services_cmk_key_vault_key_id:-null},
+    "managed_disk_cmk_key_vault_key_id": ${managed_disk_cmk_key_vault_key_id:-null},
+    "infrastructure_encryption_enabled": ${infrastructure_encryption_enabled:-false},
+    "no_public_ip": ${no_public_ip:-false},
+    "enable_vnet": ${enable_vnet:-false},
+    "virtual_network_id": ${virtual_network_id:-null},
+    "private_subnet_name": ${private_subnet_name:-null},
+    "public_subnet_name": ${public_subnet_name:-null},
+    "public_subnet_network_security_group_association_id": ${public_subnet_network_security_group_association_id:-null},
+    "private_subnet_network_security_group_association_id": ${private_subnet_network_security_group_association_id:-null},
+    "security_profile_enabled": ${security_profile_enabled:-false},
+    "enhanced_monitoring_enabled": ${enhanced_monitoring_enabled:-false},
+    "automatic_update": ${automatic_update:-false},
+    "restart_no_updates": ${restart_no_updates:-false},
+    "day_of_week": ${day_of_week:-null},
+    "frequency": ${frequency:-null},
+    "hours": ${hours:-1},
+    "minutes": ${minutes:-0},
+    "address_space": ${address_space:-["10.0.0.0/16"]},
+    "address_prefixes_public": ${address_prefixes_public:-["10.0.2.0/24"]},
+    "address_prefixes_private": ${address_prefixes_private:-["10.0.1.0/24"]},
+    "tags": ${tags:-{}}
+}
 EOL
 
 # Format the JSON file properly using jq
