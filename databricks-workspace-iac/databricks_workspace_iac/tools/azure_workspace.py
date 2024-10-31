@@ -170,7 +170,7 @@ export WORKSPACE_NAME=${{workspace_name}}
 export REGION=${{location}}
 export STORAGE_ACCOUNT_NAME=${{storage_account_name}}
 export CONTAINER_NAME=${{container_name}}
-export RESOURCE_GROUP_NAME="{{resource_group_name}}"
+export RESOURCE_GROUP_NAME="${{resource_group_name}}"
 
 # Run deployment script with full output
 if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
