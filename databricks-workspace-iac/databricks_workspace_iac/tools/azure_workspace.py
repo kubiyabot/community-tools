@@ -1,4 +1,4 @@
-from typing import Annotated, Optional, Dict
+from typing import Optional, Dict, List
 from kubiya_sdk.tools import function_tool
 from kubiya_sdk.tools.models import FileSpec
 import pathlib
@@ -11,33 +11,32 @@ with open(current_dir / "templates" / "slack_templates.json", "r") as f:
 @function_tool(
     description="Create a Databricks workspace on Azure using Infrastructure as Code (Terraform).",
     requirements=[
-        "slack_sdk>=3.19.0",
-        "typer>=0.9.0"
+        "slack_sdk>=3.19.0"
     ],
    # long_running=True,
    # icon_url="https://raw.githubusercontent.com/databricks/databricks-sdk-py/main/docs/_static/databricks-icon.png",
-    with_files=[
-        FileSpec(
-            destination="/tmp/slack_templates.json",
-            content=slack_templates_content,
-        )
-    ],
-    mermaid="""
-    sequenceDiagram
-        participant U as User 👤
-        participant S as System 🖥️
-        participant T as Terraform ⚙️
-        participant A as Azure ☁️
-        participant D as Databricks 🚀
+   # with_files=[
+   #     FileSpec(
+   #         destination="/tmp/slack_templates.json",
+   #         content=slack_templates_content,
+   #     )
+   # ],
+   # mermaid="""
+   # sequenceDiagram
+   #     participant U as User 👤
+   #     participant S as System 🖥️
+   #     participant T as Terraform ⚙️
+   #     participant A as Azure ☁️
+   #     participant D as Databricks 🚀
 
-        U ->> S: Start Deployment 🎬
-        S ->> T: Initialize Terraform
-        T ->> A: Request resources 🏗️
-        A -->> T: Resources provisioned ✅
-        T ->> D: Configure workspace 🔧
-        D -->> T: Workspace ready 🌟
-        S -->> U: Success! Here's your workspace URL 🎉
-    """
+    #    U ->> S: Start Deployment 🎬
+    #    S ->> T: Initialize Terraform
+    #    T ->> A: Request resources 🏗️
+    #    A -->> T: Resources provisioned ✅
+    #    T ->> D: Configure workspace 🔧
+    #    D -->> T: Workspace ready 🌟
+    #    S -->> U: Success! Here's your workspace URL 🎉
+    #"""
 )
 def create_databricks_workspace(
     workspace_name: str,
@@ -46,33 +45,33 @@ def create_databricks_workspace(
     container_name: str,
     resource_group_name: str,
     # Network Configuration
-    enable_vnet: Annotated[bool, typer.Option()] = False,
+    enable_vnet: bool = False,
     virtual_network_id: Optional[str] = None,
     private_subnet_name: Optional[str] = None,
     public_subnet_name: Optional[str] = None,
     public_subnet_network_security_group_association_id: Optional[str] = None,
     private_subnet_network_security_group_association_id: Optional[str] = None,
-    no_public_ip: Annotated[bool, typer.Option()] = False,
+    no_public_ip: bool = False,
     # Security Configuration
     managed_services_cmk_key_vault_key_id: Optional[str] = None,
     managed_disk_cmk_key_vault_key_id: Optional[str] = None,
-    infrastructure_encryption_enabled: Annotated[bool, typer.Option()] = False,
-    security_profile_enabled: Annotated[bool, typer.Option()] = False,
+    infrastructure_encryption_enabled: bool = False,
+    security_profile_enabled: bool = False,
     # Monitoring Configuration
-    enhanced_monitoring_enabled: Annotated[bool, typer.Option()] = False,
+    enhanced_monitoring_enabled: bool = False,
     # Update Configuration
-    automatic_update: Annotated[bool, typer.Option()] = False,
-    restart_no_updates: Annotated[bool, typer.Option()] = False,
+    automatic_update: bool = False,
+    restart_no_updates: bool = False,
     day_of_week: Optional[str] = None,
     frequency: Optional[str] = None,
-    hours: Annotated[int, typer.Option()] = 1,
-    minutes: Annotated[int, typer.Option()] = 0,
+    hours: int = 1,
+    minutes: int = 0,
     # Network CIDR Configuration
-    address_space: Annotated[list[str], typer.Option()] = ["10.0.0.0/16"],
-    address_prefixes_public: Annotated[list[str], typer.Option()] = ["10.0.2.0/24"],
-    address_prefixes_private: Annotated[list[str], typer.Option()] = ["10.0.1.0/24"],
+    address_space: List[str] = ["10.0.0.0/16"],
+    address_prefixes_public: List[str] = ["10.0.2.0/24"],
+    address_prefixes_private: List[str] = ["10.0.1.0/24"],
     # Tags
-    tags: Annotated[Dict[str, str], typer.Option()] = None
+    tags: Optional[Dict[str, str]] = None
 ) -> str:
     """Create a Databricks workspace on Azure using Infrastructure as Code (Terraform)."""
     # Import required packages inside the function
