@@ -107,7 +107,7 @@ EOF
     local dm_payload
     dm_payload=$(cat <<EOF
 {
-    "channel": "${SLACK_CHANNEL_ID}",
+    "channel": "${SLACK_DM_CHANNEL_ID}",
     "ts": "${MAIN_MESSAGE_TS}",
     "blocks": [
         {
@@ -201,8 +201,15 @@ EOF
 # Main script execution starts here
 print_progress "Starting Databricks Workspace deployment..." "🚀"
 
+# Ensure required environment variables are set
+if [ -z "${SLACK_API_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ] || [ -z "${SLACK_DM_CHANNEL_ID:-}" ]; then
+    echo "❌ Required environment variables SLACK_API_TOKEN, SLACK_CHANNEL_ID, or SLACK_DM_CHANNEL_ID are not set."
+    exit 1
+fi
+
 # Send initial message to main thread
 echo -e "📣 Sending initial status message..."
+
 initial_thread_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
     -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
     -H "Content-Type: application/json; charset=utf-8" \
@@ -232,7 +239,7 @@ if [ -z "${THREAD_TS}" ] || [ "${THREAD_TS}" = "null" ]; then
 fi
 
 # Construct thread URL
-THREAD_URL="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
+thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
 
 # Send initial message to DM
 initial_dm_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
@@ -240,7 +247,7 @@ initial_dm_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
     -H "Content-Type: application/json; charset=utf-8" \
     --data "$(cat <<EOF
 {
-    "channel": "${SLACK_CHANNEL_ID}",
+    "channel": "${SLACK_DM_CHANNEL_ID}",
     "text": "🚀 Starting Databricks Workspace Deployment",
     "blocks": [
         {
@@ -278,7 +285,6 @@ if [ -z "${MAIN_MESSAGE_TS}" ] || [ "${MAIN_MESSAGE_TS}" = "null" ]; then
 fi
 
 # Proceed with deployment steps
-# ...
 
 # Example of updating the status
 update_slack_status "🚀 Deployment Started" "Initializing Databricks Workspace deployment..." "1"
