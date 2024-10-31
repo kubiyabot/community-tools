@@ -399,7 +399,7 @@ def main():
             f"storage_account_name={os.environ['STORAGE_ACCOUNT_NAME']}",
             f"container_name={os.environ['CONTAINER_NAME']}",
             f"key=databricks/{os.environ['WORKSPACE_NAME']}/terraform.tfstate",
-            f"resource_group_name={os.environ['RESOURCE_GROUP_NAME']}",
+            f"resource_group_name={os.environ['WORKSPACE_NAME']}"
             f"subscription_id={os.environ['ARM_SUBSCRIPTION_ID']}"
         ]
         
