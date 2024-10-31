@@ -14,7 +14,7 @@ with open(current_dir / "templates" / "slack_templates.json", "r") as f:
         "slack_sdk>=3.19.0",
         "typer>=0.9.0"
     ],
-    long_running=True,
+   # long_running=True,
     icon_url="https://raw.githubusercontent.com/databricks/databricks-sdk-py/main/docs/_static/databricks-icon.png",
     with_files=[
         FileSpec(
