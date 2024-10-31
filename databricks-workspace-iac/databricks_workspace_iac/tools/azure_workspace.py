@@ -203,28 +203,35 @@ print_progress() {
 # Function to format Terraform output
 format_terraform_output() {
     while IFS= read -r line; do
-        # Remove ANSI color codes
-        line=$(echo "$line" | sed 's/\x1B\[[0-9;]*[JKmsu]//g')
+        # Skip empty lines
+        [ -z "$line" ] && continue
         
-        # Format different types of Terraform output
-        if [[ $line == *"Terraform will perform the following actions"* ]]; then
-            print_progress "Terraform will perform the following actions:" "📝"
-        elif [[ $line == "Plan:"* ]]; then
-            print_progress "Plan Summary: $line" "📊"
-        elif [[ $line == *"Creating..."* ]]; then
-            resource=$(echo "$line" | grep -o '".*"' | sed 's/"//g')
-            print_progress "Creating resource: $resource" "🔨"
-        elif [[ $line == *"Creation complete"* ]]; then
-            resource=$(echo "$line" | grep -o '".*"' | sed 's/"//g')
-            print_progress "Created resource: $resource" "✅"
-        elif [[ $line == *"Apply complete"* ]]; then
-            print_progress "Apply completed successfully" "🎉"
-        elif [[ $line == *"Error:"* ]]; then
-            print_progress "Error: $line" "❌"
-        else
-            # Print other lines without formatting
-            echo "$line" >&2
-        fi
+        # Print the raw line first for debugging
+        echo "$line"
+        
+        # Check for specific patterns and print formatted messages
+        case "$line" in
+            *"Terraform will perform the following actions"*)
+                print_progress "Analyzing changes to be made..." "📝"
+                ;;
+            *"Plan: "*" to add"*)
+                print_progress "Change Summary: $line" "📊"
+                ;;
+            *"Creating"*)
+                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
+                print_progress "Creating resource: $resource" "🔨"
+                ;;
+            *"Creation complete"*)
+                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
+                print_progress "Created resource: $resource" "✅"
+                ;;
+            *"Apply complete"*)
+                print_progress "Apply completed successfully" "🎉"
+                ;;
+            *"Error:"*)
+                print_progress "Error: $line" "❌"
+                ;;
+        esac
     done
 }
 
@@ -304,7 +311,15 @@ mkdir -p /tmp/terraform_logs
 print_progress "Generating Terraform plan..." "📋"
 
 # Run terraform plan with real-time output
-terraform plan -var-file="terraform.tfvars.json" 2>&1 | format_terraform_output
+terraform plan -var-file="terraform.tfvars.json" 2>&1 | while IFS= read -r line; do
+    echo "$line"
+    case "$line" in
+        *"Plan: "*" to add"*)
+            print_progress "Plan Summary: $line" "📊"
+            ;;
+    esac
+done
+
 plan_exit_code=${PIPESTATUS[0]}
 
 if [ $plan_exit_code -eq 0 ]; then
@@ -312,7 +327,26 @@ if [ $plan_exit_code -eq 0 ]; then
     print_progress "Applying Terraform configuration..." "🚀"
     
     # Run terraform apply with real-time output
-    terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | format_terraform_output
+    terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | while IFS= read -r line; do
+        echo "$line"
+        case "$line" in
+            *"Creating"*)
+                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
+                [ ! -z "$resource" ] && print_progress "Creating resource: $resource" "🔨"
+                ;;
+            *"Creation complete"*)
+                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
+                [ ! -z "$resource" ] && print_progress "Created resource: $resource" "✅"
+                ;;
+            *"Apply complete"*)
+                print_progress "Apply completed successfully" "🎉"
+                ;;
+            *"Error:"*)
+                print_progress "Error: $line" "❌"
+                ;;
+        esac
+    done
+    
     apply_exit_code=${PIPESTATUS[0]}
     
     if [ $apply_exit_code -eq 0 ]; then
