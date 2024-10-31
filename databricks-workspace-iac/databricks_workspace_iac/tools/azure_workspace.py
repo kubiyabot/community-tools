@@ -56,21 +56,59 @@ TF_ARGS = [
 
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
-# Exit on error
-set -e
-# Silent pip install for dependencies
-# Install pip (alpine) - SILENT
-apk add --no-cache python3-pip > /dev/null 2>&1
-# Install requirements - SILENT
-pip install -q -r /tmp/requirements.txt > /dev/null 2>&1
+# Exit immediately if any command fails
+set -euo pipefail
+
+# Function to handle errors
+error_handler() {
+    local line_no=$1
+    local error_code=$2
+    echo -e "❌ Error occurred in script at line $line_no with exit code $error_code"
+    exit $error_code
+}
+
+# Set error trap
+trap 'error_handler ${LINENO} $?' ERR
+
+echo -e "🔧 Setting up deployment environment..."
+
+# Install pip and dependencies with better error handling
+echo -e "   ╰─ Installing Python dependencies"
+if ! apk add --no-cache python3-pip; then
+    echo -e "❌ Failed to install pip. Please check your container environment."
+    exit 1
+fi
+
+if ! pip install -r /tmp/requirements.txt; then
+    echo -e "❌ Failed to install Python requirements. Please check requirements.txt"
+    exit 1
+fi
+
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
-# Create tfvars file from arguments
-echo '{tfvars}' > /tmp/terraform.tfvars.json
+
+# Create tfvars file with proper JSON escaping
+# Using printf to ensure proper escaping of special characters
+printf '%s' "${tfvars}" > /tmp/terraform.tfvars.json
+
+# Validate JSON format
+if ! jq '.' /tmp/terraform.tfvars.json >/dev/null 2>&1; then
+    echo -e "❌ Invalid JSON format in terraform.tfvars.json"
+    echo -e "Content of terraform.tfvars.json:"
+    cat /tmp/terraform.tfvars.json
+    exit 1
+fi
+
 echo -e "\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
-# Run deployment script
-python /tmp/scripts/deploy_to_azure.py /tmp/terraform.tfvars.json
+
+# Run deployment script with full output
+if ! python /tmp/scripts/deploy_to_azure.py /tmp/terraform.tfvars.json; then
+    echo -e "❌ Deployment script failed. Please check the logs above for details."
+    exit 1
+fi
+
+echo -e "✅ Deployment completed successfully!"
 """
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(
