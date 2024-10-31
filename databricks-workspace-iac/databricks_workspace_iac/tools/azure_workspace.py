@@ -58,49 +58,135 @@ trap 'handle_error $LINENO' ERR
 update_slack_status() {
     local status="$1"
     local message="$2"
+    local phase="$3"
+    local plan_output="${4:-}"
     
-    # Construct thread URL using the original thread timestamp
-    local thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${SLACK_THREAD_TS//.}"
+    # Construct thread URL safely
+    local thread_url
+    thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p$(echo "$SLACK_THREAD_TS" | tr '.' '')"
     
-    curl -s -X POST "https://slack.com/api/chat.update" \\
-        -H "Authorization: Bearer $SLACK_API_TOKEN" \\
-        -H "Content-Type: application/json; charset=utf-8" \\
-        --data "{
-            \\"channel\\": \\"$SLACK_CHANNEL_ID\\",
-            \\"ts\\": \\"$MAIN_MESSAGE_TS\\",
-            \\"blocks\\": [
+    # Create JSON payload safely using a temporary file
+    local temp_file
+    temp_file=$(mktemp)
+    
+    cat > "$temp_file" << 'EOF'
+{
+    "channel": "%s",
+    "ts": "%s",
+    "blocks": [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "%s",
+                "emoji": true
+            }
+        },
+        {
+            "type": "context",
+            "elements": [
                 {
-                    \\"type\\": \\"section\\",
-                    \\"text\\": {
-                        \\"type\\": \\"mrkdwn\\",
-                        \\"text\\": \\"$status\\n$message\\"
-                    }
+                    "type": "image",
+                    "image_url": "https://static-00.iconduck.com/assets.00/terraform-icon-452x512-ildgg5fd.png",
+                    "alt_text": "terraform"
                 },
                 {
-                    \\"type\\": \\"actions\\",
-                    \\"elements\\": [
-                        {
-                            \\"type\\": \\"button\\",
-                            \\"text\\": {
-                                \\"type\\": \\"plain_text\\",
-                                \\"text\\": \\"View Thread\\",
-                                \\"emoji\\": true
-                            },
-                            \\"url\\": \\"$thread_url\\"
-                        }
-                    ]
+                    "type": "mrkdwn",
+                    "text": "*Phase %s of 4* • Databricks Workspace Deployment"
                 }
             ]
-        }" > /dev/null
+        },
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": "*Workspace:*\n`%s`"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Region:*\n`%s`"
+                }
+            ]
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "%s"
+            }
+        }
+EOF
+
+    # Add plan output if available
+    if [ -n "$plan_output" ]; then
+        cat >> "$temp_file" << 'EOF'
+        ,
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Terraform Plan:*\n```%s```"
+            }
+        }
+EOF
+    fi
+
+    # Add the view thread button
+    cat >> "$temp_file" << 'EOF'
+        ,
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "View Thread",
+                        "emoji": true
+                    },
+                    "url": "%s"
+                }
+            ]
+        }
+    ]
+}
+EOF
+
+    # Format the JSON with proper values
+    local formatted_json
+    formatted_json=$(printf "$(cat "$temp_file")" \
+        "$SLACK_CHANNEL_ID" \
+        "$MAIN_MESSAGE_TS" \
+        "$status" \
+        "$phase" \
+        "{{ .workspace_name }}" \
+        "{{ .region }}" \
+        "$message" \
+        "${plan_output:-}" \
+        "$thread_url")
+
+    # Clean up temp file
+    rm -f "$temp_file"
+
+    # Send the update to Slack
+    curl -s -X POST "https://slack.com/api/chat.update" \
+        -H "Authorization: Bearer $SLACK_API_TOKEN" \
+        -H "Content-Type: application/json; charset=utf-8" \
+        --data "$formatted_json"
 }
 
-# Function to update deployment status
-update_deployment_status() {
-    local phase="$1"
-    local message="$2"
-    
-    echo -e "\\n📢 $message"
-    update_slack_status "🚀 Phase $phase" "$message"
+# Function to capture and format Terraform plan
+capture_terraform_plan() {
+    local plan_output=""
+    while IFS= read -r line; do
+        echo "$line"  # Print to console
+        plan_output="${plan_output}${line}\n"
+    done
+    echo "$plan_output"
 }
 
 # Main deployment process
@@ -311,56 +397,32 @@ mkdir -p /tmp/terraform_logs
 print_progress "Generating Terraform plan..." "📋"
 
 # Run terraform plan with real-time output
-terraform plan -var-file="terraform.tfvars.json" 2>&1 | while IFS= read -r line; do
-    echo "$line"
-    case "$line" in
-        *"Plan: "*" to add"*)
-            print_progress "Plan Summary: $line" "📊"
-            ;;
-    esac
-done
-
+print_progress "Generating Terraform plan..." "📋"
+plan_output=$(terraform plan -var-file="terraform.tfvars.json" 2>&1 | capture_terraform_plan)
 plan_exit_code=${PIPESTATUS[0]}
 
 if [ $plan_exit_code -eq 0 ]; then
     print_progress "Terraform plan generated successfully" "✅"
-    print_progress "Applying Terraform configuration..." "🚀"
+    update_slack_status "🚀 Terraform Plan Generated" "Reviewing changes to be made..." "2" "$plan_output"
     
-    # Run terraform apply with real-time output
+    print_progress "Applying Terraform configuration..." "🚀"
     terraform apply -auto-approve -var-file="terraform.tfvars.json" 2>&1 | while IFS= read -r line; do
         echo "$line"
-        case "$line" in
-            *"Creating"*)
-                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
-                [ ! -z "$resource" ] && print_progress "Creating resource: $resource" "🔨"
-                ;;
-            *"Creation complete"*)
-                resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
-                [ ! -z "$resource" ] && print_progress "Created resource: $resource" "✅"
-                ;;
-            *"Apply complete"*)
-                print_progress "Apply completed successfully" "🎉"
-                ;;
-            *"Error:"*)
-                print_progress "Error: $line" "❌"
-                ;;
-        esac
+        if [[ $line == *"Creating"* ]]; then
+            resource=$(echo "$line" | grep -o '"[^"]*"' | head -1)
+            [ -n "$resource" ] && update_slack_status "🚀 Deploying Resources" "Creating resource: $resource" "3"
+        elif [[ $line == *"Apply complete"* ]]; then
+            update_slack_status "✅ Deployment Complete" "All resources have been successfully created" "4"
+        fi
     done
     
     apply_exit_code=${PIPESTATUS[0]}
     
-    if [ $apply_exit_code -eq 0 ]; then
-        print_progress "Terraform configuration applied successfully!" "🎉"
-        update_deployment_status "4/4" "✅ Terraform configuration applied successfully"
-    else
-        error_message="Failed to apply Terraform configuration"
-        print_progress "$error_message" "❌"
-        handle_error "$error_message"
+    if [ $apply_exit_code -ne 0 ]; then
+        handle_error "Failed to apply Terraform configuration"
     fi
 else
-    error_message="Failed to generate Terraform plan"
-    print_progress "$error_message" "❌"
-    handle_error "$error_message"
+    handle_error "Failed to generate Terraform plan"
 fi
 
 # Get workspace URL
