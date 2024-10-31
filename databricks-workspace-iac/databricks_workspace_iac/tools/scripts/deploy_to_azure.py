@@ -301,11 +301,18 @@ def main():
         # Clone repository
         print_progress("Cloning Infrastructure Repository...", "📦")
         repo_dir = workspace_dir / "repo"
-        run_command([
+        # Clone repository
+        clone_cmd = [
             "git", "clone",
             f"https://{os.environ['PAT']}@github.com/{os.environ['GIT_ORG']}/{os.environ['GIT_REPO']}.git",
             str(repo_dir)
-        ])
+        ]
+        run_command(clone_cmd)
+
+        # Checkout specific branch if specified
+        if 'BRANCH' in os.environ:
+            print_progress(f"Checking out branch: {os.environ['BRANCH']}", "🔄")
+            run_command(["git", "checkout", os.environ['BRANCH']], cwd=repo_dir)
         slack.update_progress("📦 Repository Cloned", "Infrastructure repository cloned successfully", "1")
 
         # Navigate to terraform directory
