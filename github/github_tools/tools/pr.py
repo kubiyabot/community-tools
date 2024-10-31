@@ -5,13 +5,15 @@ from kubiya_sdk.tools.registry import tool_registry
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository.",
-    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head",
+    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$reviewer\" ]] && echo \"--reviewer $reviewer\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
         Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
         Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
+        Arg(name="reviewer", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.", required=False),
     ],
 )
 
@@ -23,8 +25,8 @@ pr_list = GitHubCliTool(
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
-        Arg(name="author", type="str", description="The github user who authored this pr. Example: joedoe. use `@me` to get prs authored by the user", required=False),
-        Arg(name="assignee", type="str", description="The github user who's this pr is assigned to. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
+        Arg(name="author", type="str", description="The github login who authored this pr. Example: joedoe. use `@me` to get prs authored by the user", required=False),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
     ],
 )
 
@@ -119,6 +121,30 @@ pr_files = GitHubCliTool(
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+    ],
+)
+
+
+pr_assign = GitHubCliTool(
+    name="github_pr_assign",
+    description="Assign a pull request to a github",
+    content="gh pr edit --repo $repo $number --add-assignee $assignee",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+        arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
+    ],
+)
+
+
+pr_files = GitHubCliTool(
+    name="github_add_reviewer",
+    description="Add a reviewer to a pull request",
+    content="gh pr edit --repo $repo $number --add-reviewer $reviewer",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+        arg(name="reviewer", type="str", description="The github login who's this pr is to be reviewed by. Example: joe_doe.", required=True),
     ],
 )
 
