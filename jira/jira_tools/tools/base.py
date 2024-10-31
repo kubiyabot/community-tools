@@ -14,7 +14,8 @@ class JiraTool(Tool):
             image=JIRA_DOCKER_IMAGE,
             content=content,
             args=args,
-            env=["JIRA_OAUTH_TOKEN"],
+            env=["JIRA_WORKSPACE_NAME"],
+            secrets=["JIRA_OAUTH_TOKEN"],
             mermaid=mermaid_diagram
         )
 
