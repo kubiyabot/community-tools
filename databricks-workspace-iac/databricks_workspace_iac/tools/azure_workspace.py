@@ -152,62 +152,81 @@ fi
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 
-# Generate terraform.tfvars.json with proper JSON formatting and environment variables
-cat > $TFVARS_PATH << 'EOL'
-{
-    "workspace_name": "${workspace_name}",
-    "location": "${location}",
-    "managed_services_cmk_key_vault_key_id": ${managed_services_cmk_key_vault_key_id:-null},
-    "managed_disk_cmk_key_vault_key_id": ${managed_disk_cmk_key_vault_key_id:-null},
-    "infrastructure_encryption_enabled": ${infrastructure_encryption_enabled:-false},
-    "no_public_ip": ${no_public_ip:-false},
-    "enable_vnet": ${enable_vnet:-false},
-    "virtual_network_id": ${virtual_network_id:-null},
-    "private_subnet_name": ${private_subnet_name:-null},
-    "public_subnet_name": ${public_subnet_name:-null},
-    "public_subnet_network_security_group_association_id": ${public_subnet_network_security_group_association_id:-null},
-    "private_subnet_network_security_group_association_id": ${private_subnet_network_security_group_association_id:-null},
-    "security_profile_enabled": ${security_profile_enabled:-false},
-    "enhanced_monitoring_enabled": ${enhanced_monitoring_enabled:-false},
-    "automatic_update": ${automatic_update:-false},
-    "restart_no_updates": ${restart_no_updates:-false},
-    "day_of_week": ${day_of_week:-null},
-    "frequency": ${frequency:-null},
-    "hours": ${hours:-1},
-    "minutes": ${minutes:-0},
-    "address_space": ${address_space:-["10.0.0.0/16"]},
-    "address_prefixes_public": ${address_prefixes_public:-["10.0.2.0/24"]},
-    "address_prefixes_private": ${address_prefixes_private:-["10.0.1.0/24"]},
-    "tags": ${tags:-{}}
-}
-EOL
+# Export all arguments as environment variables for Python accessibility
+export TFVARS_PATH
+export workspace_name
+export location
+export storage_account_name
+export container_name
+export resource_group_name
+export managed_services_cmk_key_vault_key_id=${managed_services_cmk_key_vault_key_id:-}
+export managed_disk_cmk_key_vault_key_id=${managed_disk_cmk_key_vault_key_id:-}
+export infrastructure_encryption_enabled=${infrastructure_encryption_enabled:-false}
+export no_public_ip=${no_public_ip:-false}
+export enable_vnet=${enable_vnet:-false}
+export virtual_network_id=${virtual_network_id:-}
+export private_subnet_name=${private_subnet_name:-}
+export public_subnet_name=${public_subnet_name:-}
+export public_subnet_network_security_group_association_id=${public_subnet_network_security_group_association_id:-}
+export private_subnet_network_security_group_association_id=${private_subnet_network_security_group_association_id:-}
+export security_profile_enabled=${security_profile_enabled:-false}
+export enhanced_monitoring_enabled=${enhanced_monitoring_enabled:-false}
+export automatic_update=${automatic_update:-false}
+export restart_no_updates=${restart_no_updates:-false}
+export day_of_week=${day_of_week:-}
+export frequency=${frequency:-}
+export hours=${hours:-1}
+export minutes=${minutes:-0}
+export address_space=${address_space:-'["10.0.0.0/16"]'}
+export address_prefixes_public=${address_prefixes_public:-'["10.0.2.0/24"]'}
+export address_prefixes_private=${address_prefixes_private:-'["10.0.1.0/24"]'}
+export tags=${tags:-'{}'}
 
-# Format the JSON file properly using jq
-if command -v jq >/dev/null 2>&1; then
-    # Create a temporary file for the formatted JSON
-    TEMP_TFVARS=$(mktemp)
-    
-    # Format the JSON and handle null values correctly
-    jq '
-        def cleanup:
-            if type == "object" then
-                with_entries(
-                    select(.value != null)
-                )
-            else
-                .
-            end;
-        cleanup
-    ' $TFVARS_PATH > $TEMP_TFVARS && mv $TEMP_TFVARS $TFVARS_PATH
-else
-    echo "Warning: jq not found. Continuing with unformatted JSON."
-fi
+# Use a Python script to generate terraform.tfvars.json
+python - << 'EOF'
+import json
+import os
+
+tfvars = {
+    "workspace_name": os.environ.get("workspace_name"),
+    "location": os.environ.get("location"),
+    "managed_services_cmk_key_vault_key_id": os.environ.get("managed_services_cmk_key_vault_key_id") or None,
+    "managed_disk_cmk_key_vault_key_id": os.environ.get("managed_disk_cmk_key_vault_key_id") or None,
+    "infrastructure_encryption_enabled": os.environ.get("infrastructure_encryption_enabled", "false").lower() == "true",
+    "no_public_ip": os.environ.get("no_public_ip", "false").lower() == "true",
+    "enable_vnet": os.environ.get("enable_vnet", "false").lower() == "true",
+    "virtual_network_id": os.environ.get("virtual_network_id") or None,
+    "private_subnet_name": os.environ.get("private_subnet_name") or None,
+    "public_subnet_name": os.environ.get("public_subnet_name") or None,
+    "public_subnet_network_security_group_association_id": os.environ.get("public_subnet_network_security_group_association_id") or None,
+    "private_subnet_network_security_group_association_id": os.environ.get("private_subnet_network_security_group_association_id") or None,
+    "security_profile_enabled": os.environ.get("security_profile_enabled", "false").lower() == "true",
+    "enhanced_monitoring_enabled": os.environ.get("enhanced_monitoring_enabled", "false").lower() == "true",
+    "automatic_update": os.environ.get("automatic_update", "false").lower() == "true",
+    "restart_no_updates": os.environ.get("restart_no_updates", "false").lower() == "true",
+    "day_of_week": os.environ.get("day_of_week") or None,
+    "frequency": os.environ.get("frequency") or None,
+    "hours": int(os.environ.get("hours", "1")),
+    "minutes": int(os.environ.get("minutes", "0")),
+    "address_space": json.loads(os.environ.get("address_space", '["10.0.0.0/16"]')),
+    "address_prefixes_public": json.loads(os.environ.get("address_prefixes_public", '["10.0.2.0/24"]')),
+    "address_prefixes_private": json.loads(os.environ.get("address_prefixes_private", '["10.0.1.0/24"]')),
+    "tags": json.loads(os.environ.get("tags", '{}')),
+}
+
+# Remove keys with None values
+tfvars = {k: v for k, v in tfvars.items() if v is not None}
+
+# Write to terraform.tfvars.json
+with open(os.environ['TFVARS_PATH'], 'w') as f:
+    json.dump(tfvars, f, indent=2)
+EOF
 
 # Validate JSON format
-if ! jq '.' $TFVARS_PATH >/dev/null 2>&1; then
+if ! jq '.' "$TFVARS_PATH" >/dev/null 2>&1; then
     echo -e "❌ Invalid JSON format in terraform.tfvars.json"
     echo -e "Content of terraform.tfvars.json:"
-    cat $TFVARS_PATH
+    cat "$TFVARS_PATH"
     exit 1
 fi
 
@@ -215,14 +234,14 @@ echo -e "\\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
 
 # Export required environment variables
-export WORKSPACE_NAME=$workspace_name
-export REGION=$location
-export STORAGE_ACCOUNT_NAME=$storage_account_name
-export CONTAINER_NAME=$container_name
-export RESOURCE_GROUP_NAME=$resource_group_name
+export WORKSPACE_NAME="$workspace_name"
+export REGION="$location"
+export STORAGE_ACCOUNT_NAME="$storage_account_name"
+export CONTAINER_NAME="$container_name"
+export RESOURCE_GROUP_NAME="$resource_group_name"
 
 # Run deployment script with full output
-if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
+if ! python /tmp/scripts/deploy_to_azure.py "$TFVARS_PATH"; then
     echo -e "❌ Deployment script failed. Please check the logs above for details."
     exit 1
 fi
