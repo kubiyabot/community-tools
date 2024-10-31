@@ -56,13 +56,17 @@ TF_ARGS = [
 
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
+# Exit on error
+set -e
 # Silent pip install for dependencies
-pip install -q -r /tmp/requirements.txt
+# Install pip (alpine) - SILENT
+apk add --no-cache python3-pip > /dev/null 2>&1
+# Install requirements - SILENT
+pip install -q -r /tmp/requirements.txt > /dev/null 2>&1
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 # Create tfvars file from arguments
 echo '{tfvars}' > /tmp/terraform.tfvars.json
-
 echo -e "\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
 # Run deployment script
