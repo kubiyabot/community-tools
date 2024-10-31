@@ -231,14 +231,6 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
             destination="/tmp/requirements.txt",
             content=REQUIREMENTS_FILE_CONTENT,
         ),
-        # Add Terraform files
-        *[
-            FileSpec(
-                destination=f"/tmp/terraform/azure/{filename}",
-                content=content
-            )
-            for filename, content in TERRAFORM_FILES.items()
-        ],
     ],
     mermaid="""
     sequenceDiagram
