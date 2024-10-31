@@ -132,7 +132,7 @@ pr_assign = GitHubCliTool(
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-        arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
+        Arg(name="assignee", type="str", description="The github login who's this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
     ],
 )
 
