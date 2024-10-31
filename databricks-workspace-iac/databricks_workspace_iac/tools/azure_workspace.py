@@ -150,10 +150,56 @@ fi
 echo -e "📝 Preparing configuration files..."
 echo -e "   ╰─ Generating terraform.tfvars.json"
 
-# Create tfvars file with proper JSON formatting
-cat > $TFVARS_PATH << 'EOL'
-{tf_json}
+# Generate terraform.tfvars.json with proper JSON formatting and environment variables
+cat > $TFVARS_PATH << EOL
+{{
+    "workspace_name": "${{workspace_name}}",
+    "location": "${{location}}",
+    "managed_services_cmk_key_vault_key_id": ${{managed_services_cmk_key_vault_key_id:=null}},
+    "managed_disk_cmk_key_vault_key_id": ${{managed_disk_cmk_key_vault_key_id:=null}},
+    "infrastructure_encryption_enabled": ${{infrastructure_encryption_enabled:-false}},
+    "no_public_ip": ${{no_public_ip:-false}},
+    "enable_vnet": ${{enable_vnet:-false}},
+    "virtual_network_id": ${{virtual_network_id:=null}},
+    "private_subnet_name": ${{private_subnet_name:=null}},
+    "public_subnet_name": ${{public_subnet_name:=null}},
+    "public_subnet_network_security_group_association_id": ${{public_subnet_network_security_group_association_id:=null}},
+    "private_subnet_network_security_group_association_id": ${{private_subnet_network_security_group_association_id:=null}},
+    "security_profile_enabled": ${{security_profile_enabled:-false}},
+    "enhanced_monitoring_enabled": ${{enhanced_monitoring_enabled:-false}},
+    "automatic_update": ${{automatic_update:-false}},
+    "restart_no_updates": ${{restart_no_updates:-false}},
+    "day_of_week": ${{day_of_week:=null}},
+    "frequency": ${{frequency:=null}},
+    "hours": ${{hours:-1}},
+    "minutes": ${{minutes:-0}},
+    "address_space": ${{address_space:-["10.0.0.0/16"]}},
+    "address_prefixes_public": ${{address_prefixes_public:-["10.0.2.0/24"]}},
+    "address_prefixes_private": ${{address_prefixes_private:-["10.0.1.0/24"]}},
+    "tags": ${{tags:-{{}}}}
+}}
 EOL
+
+# Format the JSON file properly using jq
+if command -v jq >/dev/null 2>&1; then
+    # Create a temporary file for the formatted JSON
+    TEMP_TFVARS=$(mktemp)
+    
+    # Format the JSON and handle null values correctly
+    jq '
+        def cleanup:
+            if type == "object" then
+                with_entries(
+                    select(.value != null)
+                )
+            else
+                .
+            end;
+        cleanup
+    ' $TFVARS_PATH > $TEMP_TFVARS && mv $TEMP_TFVARS $TFVARS_PATH
+else
+    echo "Warning: jq not found. Continuing with unformatted JSON."
+fi
 
 # Validate JSON format
 if ! jq '.' $TFVARS_PATH >/dev/null 2>&1; then
