@@ -25,12 +25,21 @@ print_progress() {
     echo -e "\\n${emoji} ${message}"
 }
 
-# Function to update Slack status in both the main thread and DM
+# Function to update Slack status in both the main thread and the parent message
 update_slack_status() {
     local status="$1"
     local message="$2"
     local phase="$3"
     local plan_output="${4:-}"
+
+    # Ensure SLACK_THREAD_TS is set
+    if [ -z "${SLACK_THREAD_TS:-}" ]; then
+        echo "❌ SLACK_THREAD_TS environment variable is not set."
+        exit 1
+    fi
+
+    # Use SLACK_THREAD_TS as the thread timestamp
+    THREAD_TS="${SLACK_THREAD_TS}"
 
     # Construct thread URL safely
     local thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
@@ -103,12 +112,12 @@ fi)
 EOF
 )
 
-    # Create the JSON payload for the DM (includes the View Thread button)
-    local dm_payload
-    dm_payload=$(cat <<EOF
+    # Create the JSON payload for the parent message (includes the View Thread button)
+    local parent_payload
+    parent_payload=$(cat <<EOF
 {
-    "channel": "${SLACK_DM_CHANNEL_ID}",
-    "ts": "${MAIN_MESSAGE_TS}",
+    "channel": "${SLACK_CHANNEL_ID}",
+    "ts": "${SLACK_MESSAGE_TS}",
     "blocks": [
         {
             "type": "header",
@@ -191,98 +200,24 @@ EOF
         -H "Content-Type: application/json; charset=utf-8" \
         --data "${thread_payload}" > /dev/null
 
-    # Update the DM message
+    # Update the parent message
     curl -s -X POST "https://slack.com/api/chat.update" \
         -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
         -H "Content-Type: application/json; charset=utf-8" \
-        --data "${dm_payload}" > /dev/null
+        --data "${parent_payload}" > /dev/null
 }
 
 # Main script execution starts here
 print_progress "Starting Databricks Workspace deployment..." "🚀"
 
 # Ensure required environment variables are set
-if [ -z "${SLACK_API_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ] || [ -z "${SLACK_DM_CHANNEL_ID:-}" ]; then
-    echo "❌ Required environment variables SLACK_API_TOKEN, SLACK_CHANNEL_ID, or SLACK_DM_CHANNEL_ID are not set."
+if [ -z "${SLACK_API_TOKEN:-}" ] || [ -z "${SLACK_CHANNEL_ID:-}" ] || [ -z "${SLACK_THREAD_TS:-}" ] || [ -z "${SLACK_MESSAGE_TS:-}" ]; then
+    echo "❌ Required environment variables SLACK_API_TOKEN, SLACK_CHANNEL_ID, SLACK_THREAD_TS, or SLACK_MESSAGE_TS are not set."
     exit 1
 fi
 
-# Send initial message to main thread
-echo -e "📣 Sending initial status message..."
-
-initial_thread_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
-    -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-    -H "Content-Type: application/json; charset=utf-8" \
-    --data "$(cat <<EOF
-{
-    "channel": "${SLACK_CHANNEL_ID}",
-    "text": "🚀 Starting Databricks Workspace Deployment",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚀 Databricks Workspace Deployment",
-                "emoji": true
-            }
-        }
-    ]
-}
-EOF
-)")
-
-# Get thread timestamp
-THREAD_TS=$(echo "${initial_thread_response}" | jq -r '.ts')
-if [ -z "${THREAD_TS}" ] || [ "${THREAD_TS}" = "null" ]; then
-    echo "❌ Failed to send initial thread message"
-    exit 1
-fi
-
-# Construct thread URL
-thread_url="https://slack.com/archives/${SLACK_CHANNEL_ID}/p${THREAD_TS//./}"
-
-# Send initial message to DM
-initial_dm_response=$(curl -s -X POST "https://slack.com/api/chat.postMessage" \
-    -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-    -H "Content-Type: application/json; charset=utf-8" \
-    --data "$(cat <<EOF
-{
-    "channel": "${SLACK_DM_CHANNEL_ID}",
-    "text": "🚀 Starting Databricks Workspace Deployment",
-    "blocks": [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚀 Databricks Workspace Deployment",
-                "emoji": true
-            }
-        },
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "View Thread",
-                        "emoji": true
-                    },
-                    "url": "${thread_url}"
-                }
-            ]
-        }
-    ]
-}
-EOF
-)")
-
-# Get DM message timestamp
-MAIN_MESSAGE_TS=$(echo "${initial_dm_response}" | jq -r '.ts')
-if [ -z "${MAIN_MESSAGE_TS}" ] || [ "${MAIN_MESSAGE_TS}" = "null" ]; then
-    echo "❌ Failed to send initial DM message"
-    exit 1
-fi
+# Use SLACK_THREAD_TS as the thread timestamp
+THREAD_TS="${SLACK_THREAD_TS}"
 
 # Proceed with deployment steps
 
