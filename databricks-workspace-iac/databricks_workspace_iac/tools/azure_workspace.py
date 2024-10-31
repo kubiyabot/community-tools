@@ -68,7 +68,7 @@ azure_db_apply_tool = DatabricksAzureTerraformTool(
     description="Create a Databricks workspace on Azure using Infrastructure as Code (Terraform).",
     content=DEPLOY_CMD,
     args=TF_ARGS,
-    with_files=[
+    files=[
         FileSpec(
             destination="/tmp/scripts/deploy_to_azure.py",
             content=inspect.getsource(deploy_to_azure),
