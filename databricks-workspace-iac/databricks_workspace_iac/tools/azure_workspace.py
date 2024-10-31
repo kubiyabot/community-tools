@@ -45,61 +45,40 @@ send_slack_message() {
 # Function to build Slack blocks representing the deployment steps
 build_slack_blocks() {
     local current_step="$1"
-    local status="$2"
+    local status=("${@:2}")
 
     # Define the steps
     local steps=("Clone Repository" "Initialize Terraform" "Generate Terraform Plan" "Apply Terraform Configuration" "Retrieve Workspace URL" "Deployment Completed")
 
     # Initialize blocks
     local blocks='[
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚀 Databricks Workspace Deployment",
-                "emoji": true
-            }
-        },
-        {
-            "type": "divider"
-        }'
+    {
+        "type": "header",
+        "text": {
+            "type": "plain_text",
+            "text": "🚀 Databricks Workspace Deployment",
+            "emoji": true
+        }
+    },
+    {
+        "type": "divider"
+    }'
 
     # Add each step to the blocks
     for step in "${steps[@]}"; do
         if [ "$step" == "$current_step" ]; then
             # Highlight the current step
-            blocks+=',
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ":arrow_right: *'"$step"'*"
-            }
-        }'
+            blocks+=$',\n    {\n        "type": "section",\n        "text": {\n            "type": "mrkdwn",\n            "text": ":arrow_right: *'"$step"'*"\n        }\n    }'
         elif [[ " ${status[@]} " =~ " $step " ]]; then
             # Mark completed steps
-            blocks+=',
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ":white_check_mark: ~'"$step"'~"
-            }
-        }'
+            blocks+=$',\n    {\n        "type": "section",\n        "text": {\n            "type": "mrkdwn",\n            "text": ":white_check_mark: ~'"$step"'~"\n        }\n    }'
         else
             # Pending steps
-            blocks+=',
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": ":black_large_square: '"$step"'"
-            }
-        }'
+            blocks+=$',\n    {\n        "type": "section",\n        "text": {\n            "type": "mrkdwn",\n            "text": ":black_large_square: '"$step"'\n        }\n    }'
         fi
     done
 
-    blocks+=' ]'
+    blocks+=$'\n]'
 
     echo "$blocks"
 }
@@ -110,7 +89,7 @@ handle_error() {
     local errmsg="$2"
     echo -e "\\n❌ An unexpected error occurred on line ${lineno}: ${errmsg}"
     current_step="Error"
-    status=("${status[@]}" "$current_step")
+    status+=("$current_step")
     blocks=$(build_slack_blocks "$current_step" "${status[@]}")
     send_slack_message "$blocks"
     exit 1
