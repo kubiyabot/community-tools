@@ -7,9 +7,9 @@ get_org_members = GitHubCliTool(
     description="Get a list of all org's users.",
     content="gh api orgs/$org/members?per_page=100 --paginate --slurp",
     args=[
-        Arg(name="org", type="str", description="The github organization name. Example: 'octocat'", required=True),
-        repoless=True,
+        Arg(name="org", type="str", description="The github organization name. Example: 'octocat'", required=True,),
     ],
+    repoless=True,
 )
 
 # Register all org tools
