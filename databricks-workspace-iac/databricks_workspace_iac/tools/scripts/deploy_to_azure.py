@@ -20,13 +20,27 @@ except ImportError:
 def build_message_blocks(
     status: str,
     message: str,
-    phase: str,
+    current_step: int,
     workspace_name: str,
     region: str,
     plan_output: Optional[str] = None,
     workspace_url: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Build Slack message blocks for deployment updates."""
+    steps = [
+        "1️⃣ Preparing to create workspace",
+        "2️⃣ Initializing Terraform and generating plan",
+        "3️⃣ Applying Terraform configuration",
+        "4️⃣ Finalizing deployment"
+    ]
+
+    # Mark completed steps with a checkmark
+    for i in range(len(steps)):
+        if i < current_step - 1:
+            steps[i] = f"✅ {steps[i]}"
+        elif i == current_step - 1:
+            steps[i] = f"> *{steps[i]}*"  # Highlight current step
+
     blocks = [
         {
             "type": "header",
@@ -55,6 +69,23 @@ def build_message_blocks(
                 "type": "mrkdwn",
                 "text": message
             }
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*Deployment Progress:*"
+            }
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "\n".join(steps)
+            }
         }
     ]
 
@@ -67,10 +98,10 @@ def build_message_blocks(
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"```{plan_output}```"
+                "text": f"*Terraform Plan Output:*\n```{plan_output}```"
             }
         })
-
+    
     if workspace_url:
         blocks.append({
             "type": "section",
@@ -176,7 +207,7 @@ class SlackNotifier:
         self,
         status: str,
         message: str,
-        phase: str,
+        current_step: int,
         plan_output: Optional[str] = None,
         workspace_url: Optional[str] = None
     ) -> None:
@@ -188,7 +219,7 @@ class SlackNotifier:
             blocks = build_message_blocks(
                 status=status,
                 message=message,
-                phase=phase,
+                current_step=current_step,
                 workspace_name=os.environ["WORKSPACE_NAME"],
                 region=os.environ["REGION"],
                 plan_output=plan_output,
@@ -270,7 +301,7 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     with open(tfvars_path, 'w') as f:
         json.dump(tfvars, f, indent=2)
 
-def handle_terraform_output(line: str) -> None:
+def handle_terraform_output(line: str, slack: 'SlackNotifier') -> None:
     """Handle and parse Terraform output lines."""
     print(line, flush=True)
     if "Creating..." in line:
@@ -279,15 +310,15 @@ def handle_terraform_output(line: str) -> None:
         if match:
             resource = match.group(1)
             slack.update_progress(
-                "🚀 Deploying Resources",
-                f"Creating resource: {resource}",
-                "3"
+                status="🚀 Deploying Resources",
+                message=f"Creating resource: `{resource}`",
+                current_step=3
             )
     elif "Apply complete!" in line:
         slack.update_progress(
-            "✅ Resources Deployed",
-            "All resources have been successfully created",
-            "4"
+            status="✅ Resources Deployed",
+            message="All resources have been successfully created",
+            current_step=4
         )
 
 def main():
@@ -327,9 +358,9 @@ def main():
         print_progress("Starting Databricks Workspace deployment...", "🚀")
         slack.send_initial_message("Initializing Databricks Workspace deployment...")
         slack.update_progress(
-            "🚀 Deployment Started",
-            "Preparing to create workspace...",
-            "1"
+            status="🚀 Deployment Started",
+            message="Preparing to create workspace...",
+            current_step=1
         )
 
         # Clone repository
@@ -347,7 +378,11 @@ def main():
         if 'BRANCH' in os.environ:
             print_progress(f"Checking out branch: {os.environ['BRANCH']}", "🔄")
             run_command(["git", "checkout", os.environ['BRANCH']], cwd=repo_dir)
-        slack.update_progress("📦 Repository Cloned", "Infrastructure repository cloned successfully", "1")
+        slack.update_progress(
+            status="📦 Repository Cloned",
+            message="Infrastructure repository cloned successfully",
+            current_step=2
+        )
 
         # Navigate to terraform directory
         tf_dir = repo_dir / "aux/databricks/terraform/azure"
@@ -371,7 +406,11 @@ def main():
             ["terraform", "init", "-no-color"] + [f"-backend-config={c}" for c in backend_config],
             cwd=tf_dir
         )
-        slack.update_progress("⚙️ Terraform Initialized", "Terraform successfully initialized", "2")
+        slack.update_progress(
+            status="⚙️ Terraform Initialized",
+            message="Terraform successfully initialized",
+            current_step=2
+        )
 
         # Generate and show plan
         print_progress("Generating Terraform plan...", "📋")
@@ -381,9 +420,9 @@ def main():
             capture_output=True
         )
         slack.update_progress(
-            "📋 Terraform Plan Generated",
-            "Reviewing changes to be made...",
-            "2",
+            status="📋 Terraform Plan Generated",
+            message="Reviewing changes to be made...",
+            current_step=2,
             plan_output=plan_output
         )
 
@@ -393,7 +432,7 @@ def main():
             ["terraform", "apply", "-auto-approve", "-var-file=terraform.tfvars.json", "-no-color"],
             cwd=tf_dir,
             stream_output=True,
-            callback=handle_terraform_output
+            callback=lambda line: handle_terraform_output(line, slack)
         )
 
         # Get workspace URL
@@ -407,9 +446,9 @@ def main():
         # Final success message
         print_progress(f"Workspace URL: {workspace_url}", "🔗")
         slack.update_progress(
-            "✅ Deployment Successful",
-            f"Databricks workspace *{os.environ['WORKSPACE_NAME']}* has been successfully provisioned!",
-            "4",
+            status="✅ Deployment Successful",
+            message=f"Databricks workspace *{os.environ['WORKSPACE_NAME']}* has been successfully provisioned!",
+            current_step=4,
             workspace_url=workspace_url
         )
 
