@@ -104,7 +104,7 @@ echo -e "   ╰─ Generating terraform.tfvars.json"
 
 # Create tfvars file with proper JSON escaping
 # Using printf to ensure proper escaping of special characters
-printf '%s' "${tfvars}" > /tmp/terraform.tfvars.json
+printf '%s' "${{tfvars}}" > /tmp/terraform.tfvars.json
 
 # Validate JSON format
 if ! jq '.' /tmp/terraform.tfvars.json >/dev/null 2>&1; then
