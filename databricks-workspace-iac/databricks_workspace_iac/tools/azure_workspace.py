@@ -3,7 +3,6 @@ from databricks_workspace_iac.tools.base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_workspace_iac.tools.scripts import deploy_to_azure
-import json
 
 # Define all possible Terraform variables as tool arguments
 TF_ARGS = [
