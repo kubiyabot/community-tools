@@ -282,22 +282,21 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
 
     tfvars = {
         "workspace_name": sanitized_workspace_name,
-        "location": args["location"],
-        "managed_services_cmk_key_vault_key_id": args.get("managed_services_cmk_key_vault_key_id"),
-        "managed_disk_cmk_key_vault_key_id": args.get("managed_disk_cmk_key_vault_key_id"),
-        "infrastructure_encryption_enabled": args.get("infrastructure_encryption_enabled") == "true",
-        "no_public_ip": args.get("no_public_ip") == "true",
-        "enable_vnet": args.get("enable_vnet") == "true",
-        "virtual_network_id": args.get("virtual_network_id"),
-        "private_subnet_name": args.get("private_subnet_name"),
-        "public_subnet_name": args.get("public_subnet_name"),
+        "location": os.environ['region'],
+        "managed_services_cmk_key_vault_key_id": os.environ.get("managed_services_cmk_key_vault_key_id"),
+        "managed_disk_cmk_key_vault_key_id": os.environ.get("managed_disk_cmk_key_vault_key_id"), 
+        "infrastructure_encryption_enabled": os.environ.get("infrastructure_encryption_enabled") == "true",
+        "no_public_ip": os.environ.get("no_public_ip") == "true",
+        "enable_vnet": os.environ.get("enable_vnet") == "true",
+        "virtual_network_id": os.environ.get("virtual_network_id"),
+        "private_subnet_name": os.environ.get("private_subnet_name"),
+        "public_subnet_name": os.environ.get("public_subnet_name"),
         # Remove None values
         **{k: v for k, v in args.items() if v is not None and k not in {
             "workspace_name", "region", "storage_account_name", 
             "container_name", "resource_group_name"
         }}
     }
-    
     with open(tfvars_path, 'w') as f:
         json.dump(tfvars, f, indent=2)
 
