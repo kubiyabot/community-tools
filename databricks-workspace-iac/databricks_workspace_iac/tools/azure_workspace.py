@@ -165,6 +165,13 @@ fi
 echo -e "\\n🚀 Initiating Databricks workspace deployment..."
 echo -e "   ╰─ Launching deployment script"
 
+# Export required environment variables
+export WORKSPACE_NAME="{workspace_name}"
+export REGION="{location}"
+export STORAGE_ACCOUNT_NAME="{storage_account_name}"
+export CONTAINER_NAME="{container_name}"
+export RESOURCE_GROUP_NAME="{resource_group_name}"
+
 # Run deployment script with full output
 if ! python /tmp/scripts/deploy_to_azure.py $TFVARS_PATH; then
     echo -e "❌ Deployment script failed. Please check the logs above for details."
@@ -178,12 +185,27 @@ echo -e "✅ Deployment completed successfully!"
 """.format(
     tf_json=json.dumps(
         {
-            arg.name: _format_arg_value(arg)
-            for arg in TF_ARGS
-            if not arg.required and arg.default is not None
+            # Include required arguments
+            "workspace_name": "${{WORKSPACE_NAME}}",
+            "location": "${{REGION}}",
+            "storage_account_name": "${{STORAGE_ACCOUNT_NAME}}",
+            "container_name": "${{CONTAINER_NAME}}",
+            "resource_group_name": "${{RESOURCE_GROUP_NAME}}",
+            # Include optional arguments with defaults
+            **{
+                arg.name: _format_arg_value(arg)
+                for arg in TF_ARGS
+                if not arg.required and arg.default is not None
+            }
         },
         indent=4
-    )
+    ),
+    # Pass environment variables for required arguments
+    workspace_name="${WORKSPACE_NAME}",
+    location="${REGION}",
+    storage_account_name="${STORAGE_ACCOUNT_NAME}",
+    container_name="${CONTAINER_NAME}",
+    resource_group_name="${RESOURCE_GROUP_NAME}"
 )
 
 azure_db_apply_tool = DatabricksAzureTerraformTool(

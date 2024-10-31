@@ -266,9 +266,23 @@ def main():
     with open(tfvars_file) as f:
         tfvars = json.load(f)
 
-    # Set required environment variables
-    os.environ["WORKSPACE_NAME"] = tfvars["workspace_name"]
-    os.environ["REGION"] = tfvars["location"]
+    # Get required values from environment variables
+    required_vars = [
+        "WORKSPACE_NAME",
+        "REGION",
+        "STORAGE_ACCOUNT_NAME",
+        "CONTAINER_NAME",
+        "RESOURCE_GROUP_NAME"
+    ]
+    
+    for var in required_vars:
+        if var not in os.environ:
+            print(f"❌ Required environment variable {var} is not set")
+            sys.exit(1)
+
+    # Set workspace name and region from environment
+    os.environ["WORKSPACE_NAME"] = os.environ["WORKSPACE_NAME"]
+    os.environ["REGION"] = os.environ["REGION"]
 
     # Set up workspace
     workspace_dir = Path(tempfile.mkdtemp())
