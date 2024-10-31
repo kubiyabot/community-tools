@@ -6,7 +6,9 @@ repo_create = GitHubCliTool(
     name="github_repo_create",
     description="Create a new GitHub repository with specified name, organization, visibility, description, and homepage.",
     content="""
-    gh repo create "$([[ -n "$org" ]] && echo "$org/$name" || echo "$name")" \
+    REPO_NAME="$([[ -n "$org" ]] && echo "$org/$name" || echo "$name")"
+
+    gh repo create "$REPO_NAME" \
         $([[ "$private" == "true" ]] && echo "--private" || echo "--public") \
         $([[ -n "$description" ]] && echo "--description \"$description\"") \
         $([[ -n "$homepage" ]] && echo "--homepage $homepage")
