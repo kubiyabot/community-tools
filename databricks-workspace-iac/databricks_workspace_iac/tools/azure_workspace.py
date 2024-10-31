@@ -55,27 +55,6 @@ TF_ARGS = [
     Arg(name="tags", description="A JSON string of tags to apply to the workspace.", required=False, default="{}"),
 ]
 
-def _format_arg_value(arg):
-    """Helper function to properly format argument values for JSON."""
-    if arg.default is None:
-        return None
-    
-    # Handle boolean values
-    if arg.default.lower() == 'true':
-        return True
-    if arg.default.lower() == 'false':
-        return False
-    
-    # Handle JSON arrays and objects
-    if arg.default.startswith('[') or arg.default.startswith('{'):
-        try:
-            return json.loads(arg.default)
-        except json.JSONDecodeError:
-            return arg.default
-    
-    # Return other values as strings
-    return arg.default
-
 # Create a command that will generate the tfvars file and then run the deployment
 DEPLOY_CMD = """
 # Exit immediately if any command fails
