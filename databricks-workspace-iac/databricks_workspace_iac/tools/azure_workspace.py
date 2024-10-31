@@ -72,14 +72,29 @@ trap 'error_handler ${LINENO} $?' ERR
 
 echo -e "🔧 Setting up deployment environment..."
 
-# Install pip and dependencies with better error handling
-echo -e "   ╰─ Installing Python dependencies"
-if ! apk add --no-cache python3 py3-pip; then
-    echo -e "❌ Failed to install Python and pip. Please check your container environment."
+# Install system dependencies silently
+if ! apk add --no-cache --quiet python3 py3-pip python3-dev py3-virtualenv > /dev/null 2>&1; then
+    echo -e "❌ Failed to install system dependencies."
     exit 1
 fi
 
-if ! pip install -r /tmp/requirements.txt; then
+# Create and activate virtual environment
+echo -e "   ╰─ Creating Python virtual environment"
+VENV_PATH="/tmp/venv"
+if ! python3 -m venv $VENV_PATH > /dev/null 2>&1; then
+    echo -e "❌ Failed to create virtual environment."
+    exit 1
+fi
+
+# Source the virtual environment
+. $VENV_PATH/bin/activate
+
+# Upgrade pip silently
+pip install --quiet --upgrade pip > /dev/null 2>&1
+
+# Install requirements in virtual environment
+echo -e "   ╰─ Installing Python dependencies"
+if ! pip install --quiet -r /tmp/requirements.txt > /dev/null 2>&1; then
     echo -e "❌ Failed to install Python requirements. Please check requirements.txt"
     exit 1
 fi
@@ -107,6 +122,9 @@ if ! python /tmp/scripts/deploy_to_azure.py /tmp/terraform.tfvars.json; then
     echo -e "❌ Deployment script failed. Please check the logs above for details."
     exit 1
 fi
+
+# Deactivate virtual environment
+deactivate
 
 echo -e "✅ Deployment completed successfully!"
 """
