@@ -1,15 +1,14 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool
+from .base import GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
-get_org_members = GitHubCliTool(
+get_org_members = GitHubRepolessCliTool(
     name="get_org_members",
     description="Get a list of all org's users.",
     content="gh api orgs/$org/members?per_page=100 --paginate --slurp",
     args=[
-        Arg(name="org", type="str", description="The github organization name. Example: 'octocat'", required=True,),
+        Arg(name="org", type="str", description="The github organization name. Example: 'octocat'", required=True),
     ],
-    repoless=True,
 )
 
 # Register all org tools
