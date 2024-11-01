@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools.registry import tool_registry
 from databricks_tools.tools.api.base import DatabricksApiTool
 
 # Unity Catalog Operations
@@ -305,3 +306,6 @@ databricks_tools = [
     create_secret_scope_tool,
     optimize_table_tool,
 ]
+
+for tool in databricks_tools:
+    tool_registry.register("databricks", tool)
