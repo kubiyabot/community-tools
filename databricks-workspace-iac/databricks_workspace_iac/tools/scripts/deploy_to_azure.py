@@ -22,7 +22,7 @@ def build_message_blocks(
     message: str,
     current_step: int,
     workspace_name: str,
-    region: str,
+    location: str,
     plan_output: Optional[str] = None,
     workspace_url: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -59,7 +59,7 @@ def build_message_blocks(
                 },
                 {
                     "type": "mrkdwn",
-                    "text": f"*Region:*\n{region}"
+                    "text": f"*Region:*\n{location}"
                 }
             ]
         },
@@ -250,7 +250,7 @@ class SlackNotifier:
                 message=message,
                 current_step=current_step,
                 workspace_name=os.environ["WORKSPACE_NAME"],
-                region=os.environ["REGION"],
+                location=os.environ["LOCATION"],
                 plan_output=plan_output,
                 workspace_url=workspace_url
             )
@@ -311,7 +311,7 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
 
     tfvars = {
         "workspace_name": sanitized_workspace_name,
-        "location": os.environ['region'],
+        "location": os.environ['LOCATION'],
         "managed_services_cmk_key_vault_key_id": os.environ.get("managed_services_cmk_key_vault_key_id"),
         "managed_disk_cmk_key_vault_key_id": os.environ.get("managed_disk_cmk_key_vault_key_id"), 
         "infrastructure_encryption_enabled": os.environ.get("infrastructure_encryption_enabled") == "true",
@@ -374,14 +374,14 @@ def main():
 
     # Print environment variables for debugging (excluding sensitive data)
     print_progress("Environment variables:", "🔍")
-    safe_vars = ["WORKSPACE_NAME", "REGION", "STORAGE_ACCOUNT_NAME", "CONTAINER_NAME", "RESOURCE_GROUP_NAME"]
+    safe_vars = ["WORKSPACE_NAME", "LOCATION", "STORAGE_ACCOUNT_NAME", "CONTAINER_NAME", "RESOURCE_GROUP_NAME"]
     for var in safe_vars:
         print(f"  {var}: {os.environ.get(var, 'NOT SET')}")
 
     # Get required values from environment variables
     required_vars = [
         "WORKSPACE_NAME",
-        "REGION",
+        "LOCATION",
         "STORAGE_ACCOUNT_NAME",
         "CONTAINER_NAME",
         "RESOURCE_GROUP_NAME",
@@ -393,9 +393,9 @@ def main():
             print(f"❌ Required environment variable {var} is not set")
             sys.exit(1)
 
-    # Set workspace name and region from environment
+    # Set workspace name and location from environment
     os.environ["WORKSPACE_NAME"] = os.environ["WORKSPACE_NAME"]
-    os.environ["REGION"] = os.environ["REGION"]
+    os.environ["LOCATION"] = os.environ["LOCATION"]
 
     # Set up workspace
     workspace_dir = Path(tempfile.mkdtemp())

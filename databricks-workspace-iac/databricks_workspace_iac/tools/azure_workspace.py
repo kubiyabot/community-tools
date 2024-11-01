@@ -215,6 +215,7 @@ echo -e "   ╰─ Launching deployment script"
 # Export required environment variables
 export WORKSPACE_NAME="$workspace_name"
 export LOCATION="$location"
+export REGION="$location"
 export STORAGE_ACCOUNT_NAME="$storage_account_name"
 export CONTAINER_NAME="$container_name"
 export RESOURCE_GROUP_NAME="$resource_group_name"
