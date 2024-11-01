@@ -1,9 +1,8 @@
 from kubiya_sdk.tools import Arg, FileSpec
-from databricks_workspace_iac.tools.base import DatabricksAzureTerraformTool
+from databricks_tools.tools.base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
-from databricks_workspace_iac.tools.scripts import deploy_to_azure
-import json
+from databricks_tools.tools.scripts import deploy_to_azure
 
 REQUIREMENTS_FILE_CONTENT = """
 slack_sdk>=3.19.0

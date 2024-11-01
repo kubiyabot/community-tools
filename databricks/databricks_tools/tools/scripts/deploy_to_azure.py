@@ -27,7 +27,9 @@ def build_message_blocks(
     plan_output: Optional[str] = None,
     workspace_url: Optional[str] = None,
     current_resource: Optional[str] = None,
-    start_time: Optional[float] = None
+    start_time: Optional[float] = None,
+    error_message: Optional[str] = None,
+    failed_step: Optional[int] = None
 ) -> List[Dict[str, Any]]:
     """Build enhanced Slack message blocks for deployment updates."""
     
@@ -133,7 +135,16 @@ def build_message_blocks(
 
     # Add status for each step
     for step_name, step_num in steps:
-        if step_num < current_step:
+        if failed_step and step_num == failed_step:
+            # Failed step
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "mrkdwn",
+                    "text": f":x: *Failed:* {step_name}"
+                }]
+            })
+        elif step_num < current_step:
             # Completed step
             blocks.append({
                 "type": "context",
@@ -142,8 +153,8 @@ def build_message_blocks(
                     "text": f":white_check_mark: *Completed:* {step_name}"
                 }]
             })
-        elif step_num == current_step:
-            # Current step - show spinner
+        elif step_num == current_step and not failed_step:
+            # Current step - show spinner only if not failed
             blocks.append({
                 "type": "context",
                 "elements": [
@@ -169,20 +180,40 @@ def build_message_blocks(
                     }
                 })
         else:
-            # Pending step
-            blocks.append({
-                "type": "context",
-                "elements": [{
-                    "type": "mrkdwn",
-                    "text": f":hourglass_flowing_sand: *Pending:* {step_name}"
-                }]
-            })
+            # Pending step (only show if not failed)
+            if not failed_step:
+                blocks.append({
+                    "type": "context",
+                    "elements": [{
+                        "type": "mrkdwn",
+                        "text": f":hourglass_flowing_sand: *Pending:* {step_name}"
+                    }]
+                })
 
     # Add divider
     blocks.append({"type": "divider"})
 
-    # Add progress indicator
-    if start_time:
+    # Add error message if present
+    if error_message:
+        blocks.extend([
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*:warning: Error Details*"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"```{error_message}```"
+                }
+            }
+        ])
+
+    # Add progress indicator (only if not failed)
+    if start_time and not failed_step:
         elapsed = int((time.time() - start_time) / 60)
         blocks.append({
             "type": "context",
@@ -359,17 +390,15 @@ class SlackNotifier:
         workspace_url: Optional[str] = None,
         current_resource: Optional[str] = None,
         start_time: Optional[float] = None,
-        is_complete: bool = False
+        is_complete: bool = False,
+        error_message: Optional[str] = None,
+        failed_step: Optional[int] = None
     ) -> None:
-        """Enhanced progress update with timing and completion status."""
+        """Enhanced progress update with error handling."""
         if not self.enabled:
             return
 
         try:
-            # If complete, force current_step to 4 and mark all steps done
-            if is_complete:
-                current_step = 4
-
             blocks = build_message_blocks(
                 status=status,
                 message=message,
@@ -379,7 +408,9 @@ class SlackNotifier:
                 plan_output=plan_output,
                 workspace_url=workspace_url,
                 current_resource=current_resource,
-                start_time=start_time or self.start_time
+                start_time=start_time or self.start_time,
+                error_message=error_message,
+                failed_step=failed_step
             )
 
             self.client.chat_update(
@@ -392,55 +423,20 @@ class SlackNotifier:
             self.enabled = False
 
     def send_error(self, error_message: str) -> None:
-        """Enhanced error message with visual indicators."""
+        """Send error message and update UI to reflect failure."""
         if not self.enabled:
             return
 
         try:
-            blocks = [
-                {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "❌ Deployment Failed",
-                        "emoji": True
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*Error Details*"
-                    }
-                },
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"```{error_message}```"
-                    }
-                },
-                {
-                    "type": "context",
-                    "elements": [{
-                        "type": "mrkdwn",
-                        "text": ":warning: Deployment stopped due to an error. Please check the logs for details."
-                    }]
-                }
-            ]
-
-            if self.message_ts:
-                self.client.chat_update(
-                    channel=self.channel,
-                    ts=self.message_ts,
-                    blocks=blocks
-                )
-            else:
-                self.client.chat_postMessage(
-                    channel=self.channel,
-                    thread_ts=self.thread_ts,
-                    blocks=blocks
-                )
+            # Update the progress UI to show failure
+            self.update_progress(
+                status="❌ Deployment Failed",
+                message="Deployment failed due to an error",
+                current_step=4,  # Set to current step when error occurred
+                error_message=error_message,
+                failed_step=3,  # Mark the current step as failed
+                start_time=self.start_time
+            )
         except Exception as e:
             print(f"Warning: Failed to send error message to Slack: {str(e)}")
             self.enabled = False
@@ -484,8 +480,16 @@ def handle_terraform_output(line: str, slack: 'SlackNotifier', start_time: float
                 current_resource=resource,
                 start_time=start_time
             )
+    elif "Error:" in line or "Error applying plan:" in line:
+        slack.update_progress(
+            status="❌ Deployment Failed",
+            message="Error during resource creation",
+            current_step=3,
+            start_time=start_time,
+            error_message=line,
+            failed_step=3
+        )
     elif "Apply complete!" in line:
-        # Mark all steps as complete
         slack.update_progress(
             status="✅ Deployment Successful",
             message="All resources have been successfully created",
