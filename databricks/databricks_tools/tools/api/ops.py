@@ -6,6 +6,26 @@ from databricks_tools.tools.api.base import DatabricksApiTool
 list_catalogs_tool = DatabricksApiTool(
     name="list-unity-catalogs",
     description="List all Unity Catalogs in the workspace with detailed metadata",
+    mermaid="""
+    flowchart TD
+        W[Workspace 🏢] --> C1[production_catalog 📚]
+        W --> C2[analytics_catalog 📊]
+        W --> C3[ml_features_catalog 🤖]
+        
+        C1 --> |Owner|O1[data_platform_admin 👤]
+        C1 --> |Contains|T1[156 Tables 📑]
+        
+        C2 --> |Owner|O2[analytics_team 👥]
+        C2 --> |Contains|T2[89 Tables 📑]
+        
+        C3 --> |Owner|O3[ml_platform_team 👥]
+        C3 --> |Contains|T3[45 Tables 📑]
+
+        style W fill:#f9f,stroke:#333,stroke-width:4px
+        style C1 fill:#bbf,stroke:#333,stroke-width:2px
+        style C2 fill:#bbf,stroke:#333,stroke-width:2px
+        style C3 fill:#bbf,stroke:#333,stroke-width:2px
+    """,
     content="""
         echo "🔍 Fetching Unity Catalogs..."
         sleep 2
@@ -32,6 +52,22 @@ list_catalogs_tool = DatabricksApiTool(
 create_schema_tool = DatabricksApiTool(
     name="create-schema",
     description="Create a new schema in Unity Catalog",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant C as Catalog 📚
+        participant S as Schema 📁
+        participant P as Permissions 🔐
+
+        U->>+C: Request Schema Creation
+        C->>+S: Initialize Schema
+        S->>+P: Set Default Permissions
+        P-->>-S: Permissions Set ✅
+        S-->>-C: Schema Created
+        C-->>-U: Success Response 🎉
+
+        Note over U,P: Schema created with<br/>default permissions
+    """,
     content="""
         echo "📁 Creating new schema '$schema_name' in catalog '$catalog_name'..."
         sleep 1
@@ -49,10 +85,32 @@ create_schema_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# Cluster Operations
 create_cluster_tool = DatabricksApiTool(
     name="create-cluster",
     description="Create a new Databricks cluster with specified configuration",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant API as Databricks API 🔌
+        participant C as Cluster Manager 🎛️
+        participant R as Resources 💻
+
+        U->>+API: Create Cluster Request 🚀
+        Note over U,API: Specify name, workers, runtime
+        
+        API->>+C: Initialize Cluster 🔄
+        C->>+R: Allocate Resources
+        
+        R-->>-C: Resources Ready ✅
+        
+        C->>C: Configure Runtime 📦
+        Note over C: Install Dependencies
+        
+        C-->>-API: Cluster ID Generated
+        API-->>-U: Success Response 🎉
+        
+        Note over U,R: Cluster starts in PENDING state
+    """,
     content="""
         echo "🚀 Creating new Databricks cluster..."
         echo "⚙️ Configuring cluster with:"
@@ -80,6 +138,23 @@ create_cluster_tool = DatabricksApiTool(
 terminate_cluster_tool = DatabricksApiTool(
     name="terminate-cluster",
     description="Terminate a running Databricks cluster",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant API as API 🔌
+        participant C as Cluster 💻
+        participant R as Resources ♻️
+
+        U->>+API: Terminate Request 🛑
+        API->>+C: Stop All Jobs
+        C->>C: Save State 💾
+        C->>+R: Release Resources
+        R-->>-C: Resources Released
+        C-->>-API: Cleanup Complete
+        API-->>-U: Cluster Terminated ✅
+
+        Note over U,R: Resources are released<br/>back to the pool
+    """,
     content="""
         echo "🛑 Terminating cluster '$cluster_id'..."
         sleep 2
@@ -100,10 +175,28 @@ terminate_cluster_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# Job Operations
 submit_job_tool = DatabricksApiTool(
     name="submit-notebook-job",
     description="Submit a notebook job to Databricks workspace",
+    mermaid="""
+    stateDiagram-v2
+        [*] --> SUBMITTED: Submit Job 📝
+        SUBMITTED --> QUEUED: Process Request
+        QUEUED --> RUNNING: Start Execution 🚀
+        
+        RUNNING --> SUCCEEDED: Complete Successfully ✅
+        RUNNING --> FAILED: Error Occurs ❌
+        RUNNING --> CANCELED: User Cancels 🛑
+        
+        SUCCEEDED --> [*]
+        FAILED --> [*]
+        CANCELED --> [*]
+
+        note right of RUNNING
+            Job execution on
+            specified cluster
+        end note
+    """,
     content="""
         echo "📝 Preparing to submit notebook job..."
         echo "📋 Job configuration:"
@@ -132,6 +225,22 @@ submit_job_tool = DatabricksApiTool(
 cancel_job_run_tool = DatabricksApiTool(
     name="cancel-job-run",
     description="Cancel a running job",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant J as Job Manager 📋
+        participant C as Cluster 🖥️
+        participant S as Storage 💾
+
+        U->>+J: Cancel Job Request ⛔
+        J->>+C: Stop Execution
+        C->>S: Save Current State
+        S-->>C: State Saved
+        C-->>-J: Execution Stopped
+        J-->>-U: Job Canceled ✅
+
+        Note over U,S: Job state is preserved<br/>for debugging
+    """,
     content="""
         echo "🛑 Canceling job run '$run_id'..."
         sleep 1
@@ -147,10 +256,28 @@ cancel_job_run_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# Workspace Operations
 list_notebooks_tool = DatabricksApiTool(
     name="list-workspace-notebooks",
     description="List all notebooks in a specified workspace path",
+    mermaid="""
+    flowchart TD
+        W[Workspace Root 📂] --> D1[Data Pipeline]
+        W --> D2[ML Models]
+        W --> D3[Analytics]
+        
+        D1 --> N1[data_ingestion.py]
+        D1 --> N2[feature_engineering.py]
+        
+        D2 --> N3[model_training.ipynb]
+        D2 --> N4[evaluation.py]
+        
+        D3 --> N5[dashboards.py]
+        
+        style W fill:#f96,stroke:#333,stroke-width:4px
+        style D1 fill:#bbf,stroke:#333
+        style D2 fill:#bbf,stroke:#333
+        style D3 fill:#bbf,stroke:#333
+    """,
     content="""
         echo "🔍 Scanning workspace path: $workspace_path"
         sleep 1
@@ -175,6 +302,22 @@ list_notebooks_tool = DatabricksApiTool(
 import_notebook_tool = DatabricksApiTool(
     name="import-notebook",
     description="Import a notebook into the workspace",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant W as Workspace 📂
+        participant C as Converter 🔄
+        participant S as Storage 💾
+
+        U->>+W: Import Request 📤
+        W->>+C: Convert Format
+        C-->>-W: Format Converted
+        W->>+S: Save Notebook
+        S-->>-W: Save Complete
+        W-->>-U: Import Success ✅
+
+        Note over U,S: Supports Jupyter, HTML,<br/>and Source formats
+    """,
     content="""
         echo "📥 Importing notebook..."
         echo "📋 Details:"
@@ -194,15 +337,34 @@ import_notebook_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# MLflow Operations
 list_mlflow_experiments_tool = DatabricksApiTool(
     name="list-mlflow-experiments",
     description="List MLflow experiments and their recent runs",
+    mermaid="""
+    flowchart LR
+        MLF[MLflow Tracking 📊] --> E1[Customer Churn]
+        MLF --> E2[Fraud Detection]
+        MLF --> E3[Recommendation Engine]
+        
+        E1 --> M1[Accuracy: 0.89]
+        E1 --> R1[15 Runs]
+        
+        E2 --> M2[F1-Score: 0.95]
+        E2 --> R2[23 Runs]
+        
+        E3 --> M3[NDCG: 0.76]
+        E3 --> R3[8 Runs]
+        
+        style MLF fill:#f96,stroke:#333,stroke-width:4px
+        style E1 fill:#bbf,stroke:#333
+        style E2 fill:#bbf,stroke:#333
+        style E3 fill:#bbf,stroke:#333
+    """,
     content="""
         echo "🔬 Fetching MLflow experiments..."
         sleep 1
         echo "📊 Active experiments:"
-        echo "├─ 🧪 /Users/data_science/customer_churn"
+echo "├─ 🧪 /Users/data_science/customer_churn"
         echo "│  ├─ Recent runs: 15"
         echo "│  ├─ Best metric (accuracy): 0.89"
         echo "│  └─ Last run: $(date -d "@$(($(date +%s) - RANDOM % 86400))" "+%Y-%m-%d %H:%M")"
@@ -224,6 +386,22 @@ list_mlflow_experiments_tool = DatabricksApiTool(
 register_model_tool = DatabricksApiTool(
     name="register-mlflow-model",
     description="Register an MLflow model in the Model Registry",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant R as Registry 📦
+        participant V as Version Control 🔄
+        participant S as Storage 💾
+
+        U->>+R: Register Model Request
+        R->>+V: Create New Version
+        V->>+S: Store Model Artifacts
+        S-->>-V: Storage Complete
+        V-->>-R: Version Created
+        R-->>-U: Model Registered ✅
+
+        Note over U,S: Model versioning and<br/>artifact storage handled
+    """,
     content="""
         echo "📦 Registering model '$model_name'..."
         echo "📋 Model details:"
@@ -246,10 +424,25 @@ register_model_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# Secrets Management
 create_secret_scope_tool = DatabricksApiTool(
     name="create-secret-scope",
     description="Create a new secret scope",
+    mermaid="""
+    flowchart TD
+        U[User 👤] --> S[Secret Scope Creation]
+        S --> P[Permission Setup]
+        S --> E[Encryption Setup]
+        
+        P --> A[Access Control]
+        E --> K[Key Vault]
+        
+        A --> G[Group Permissions]
+        A --> I[Individual Permissions]
+        
+        style U fill:#f96,stroke:#333,stroke-width:4px
+        style S fill:#bbf,stroke:#333,stroke-width:2px
+        style K fill:#ada,stroke:#333
+    """,
     content="""
         echo "🔒 Creating new secret scope '$scope_name'..."
         sleep 1
@@ -266,10 +459,27 @@ create_secret_scope_tool = DatabricksApiTool(
     secrets=[]
 )
 
-# Delta Lake Operations
 optimize_table_tool = DatabricksApiTool(
     name="optimize-delta-table",
     description="Optimize a Delta table and manage its history",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant D as Delta Table 📊
+        participant O as Optimizer 🔄
+        participant C as Cleaner 🧹
+
+        U->>+D: Optimize Request
+        D->>+O: Begin Optimization
+        O->>O: Compact Files
+        O->>O: Z-Order Data
+        O-->>-D: Optimization Complete
+        D->>+C: Clean History
+        C-->>-D: History Cleaned
+        D-->>-U: Process Complete ✅
+
+        Note over U,C: Optimizes storage and<br/>query performance
+    """,
     content="""
         echo "🔄 Optimizing Delta table '$table_name'..."
         echo "📋 Operation details:"
@@ -307,5 +517,6 @@ databricks_tools = [
     optimize_table_tool,
 ]
 
+# Register all tools with the registry
 for tool in databricks_tools:
     tool_registry.register("databricks", tool)
