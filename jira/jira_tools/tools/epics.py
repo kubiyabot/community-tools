@@ -28,9 +28,9 @@ epic_create = JiraTool(
     name="epic_create",
     description="Create a new Jira epic",
     content="""
-    jira epic create -n"$name" -s"$summary" -y"$priority" $([[ -n "$labels" ]] && echo "$labels") \
+    jira epic create -n"$name" -s"$summary" -y"$priority" -p"$project_key" $([[ -n "$labels" ]] && echo "$labels") \
                      $([[ -n "$components" ]] && echo "$components") -b"$description" \
-                     $([[ "$no_input" == "true" ]] && echo "--no-input")
+                     $([[ "$no_input" == "true" ]] && echo "--no-input") 
     """,
     args=[
         Arg(name="name", type="str", description="Epic name", required=True),
@@ -40,6 +40,7 @@ epic_create = JiraTool(
         Arg(name="components", type="str", description="Epic components", required=False),
         Arg(name="description", type="str", description="Epic description", required=True),
         Arg(name="no_input", type="bool", description="Skip interactive prompt", required=False),
+        Arg(name="project_key", type="str", description="Jira project key", required=True),
     ],
 )
 
