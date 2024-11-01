@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg, FileSpec
-from databricks_tools.tools.base import DatabricksAzureTerraformTool
+from databricks_tools.tools.workspace_creation.base import DatabricksAzureTerraformTool
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from databricks_tools.tools.scripts import deploy_to_azure
