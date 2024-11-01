@@ -7,17 +7,16 @@ DATABRICKS_ICON_URL = "https://www.databricks.com/wp-content/themes/databricks/a
 class DatabricksApiTool(Tool):
     def __init__(
         self,
-        *,
-        name: str,
-        description: str,
-        content: str,
-        args: List[Any],
-        env: List[Any],
-        secrets: List[Any],
-        long_running: bool = False,
-        with_files: Optional[Dict[str, Any]] = None,
-        image: str = "alpine:latest",
-        mermaid: Optional[str] = None,
+        name,
+        description,
+        content,
+        args=[],
+        env=[],
+        secrets=[],
+        long_running=False,
+        with_files=None,
+        image="alpine:latest",
+        mermaid=None,
     ):
         super().__init__(
             name=name,
