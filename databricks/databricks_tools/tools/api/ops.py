@@ -25,18 +25,7 @@ list_catalogs_tool = DatabricksApiTool(
     """,
     args=[],
     env=[],
-    secrets=[],
-    mermaid="""
-    sequenceDiagram
-        participant U as User
-        participant API as Databricks API
-        participant UC as Unity Catalog
-        
-        U->>API: Request Catalogs
-        API->>UC: Query Metadata
-        UC-->>API: Return Catalog List
-        API-->>U: Display Results
-    """
+    secrets=[]
 )
 
 create_schema_tool = DatabricksApiTool(
@@ -83,6 +72,8 @@ create_cluster_tool = DatabricksApiTool(
         Arg("num_workers", "Number of worker nodes", required=True),
         Arg("runtime_version", "DBR version (e.g., 13.3.x-scala2.12)", required=True),
     ],
+    env=[],
+    secrets=[]
 )
 
 terminate_cluster_tool = DatabricksApiTool(
