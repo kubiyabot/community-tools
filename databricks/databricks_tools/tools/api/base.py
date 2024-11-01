@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Tool
+from typing import Optional, List, Dict, Any
 
 DATABRICKS_ICON_URL = "https://www.databricks.com/wp-content/themes/databricks/assets/images/databricks-logo.svg"
 
@@ -6,28 +7,19 @@ DATABRICKS_ICON_URL = "https://www.databricks.com/wp-content/themes/databricks/a
 class DatabricksApiTool(Tool):
     def __init__(
         self,
-        name,
-        description,
-        content,
-        args=None,
-        env=None,
-        secrets=None,
-        long_running=False,
-        with_files=None,
-        image="alpine:latest",
-        mermaid=None,
+        **kwargs
     ):
-        super().__init__(
-            name=name,
-            description=description,
-            icon_url=DATABRICKS_ICON_URL,
-            type="docker",
-            image=image,
-            content=content,
-            args=args or [],
-            env=env or [],
-            secrets=secrets or [],
-            long_running=long_running,
-            with_files=with_files,
-            mermaid=mermaid,
-        )
+        # Set default values
+        kwargs.setdefault('args', [])
+        kwargs.setdefault('env', [])
+        kwargs.setdefault('secrets', [])
+        kwargs.setdefault('long_running', False)
+        kwargs.setdefault('with_files', None)
+        kwargs.setdefault('image', "alpine:latest")
+        
+        # Add required Databricks-specific attributes
+        kwargs['icon_url'] = DATABRICKS_ICON_URL
+        kwargs['type'] = "docker"
+
+        # Initialize the parent class with all kwargs
+        super().__init__(**kwargs)

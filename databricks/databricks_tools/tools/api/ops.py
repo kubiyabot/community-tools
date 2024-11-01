@@ -83,8 +83,6 @@ create_cluster_tool = DatabricksApiTool(
         Arg("num_workers", "Number of worker nodes", required=True),
         Arg("runtime_version", "DBR version (e.g., 13.3.x-scala2.12)", required=True),
     ],
-    env=[],
-    secrets=[]
 )
 
 terminate_cluster_tool = DatabricksApiTool(
