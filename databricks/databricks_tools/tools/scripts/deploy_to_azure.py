@@ -144,8 +144,8 @@ def build_message_blocks(
                     "text": f":x: *Failed:* {step_name}"
                 }]
             })
-        elif step_num < current_step:
-            # Completed step
+        elif step_num <= current_step and (status.startswith("✅") or status.startswith("❌")):
+            # Completed step (when workflow is done)
             blocks.append({
                 "type": "context",
                 "elements": [{
@@ -153,8 +153,17 @@ def build_message_blocks(
                     "text": f":white_check_mark: *Completed:* {step_name}"
                 }]
             })
-        elif step_num == current_step and not failed_step:
-            # Current step - show spinner only if not failed
+        elif step_num < current_step:
+            # Completed step (during workflow)
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "mrkdwn",
+                    "text": f":white_check_mark: *Completed:* {step_name}"
+                }]
+            })
+        elif step_num == current_step and not (status.startswith("✅") or status.startswith("❌")):
+            # Current step - show spinner only if workflow is still in progress
             blocks.append({
                 "type": "context",
                 "elements": [
@@ -180,8 +189,8 @@ def build_message_blocks(
                     }
                 })
         else:
-            # Pending step (only show if not failed)
-            if not failed_step:
+            # Pending step (only show if not failed and not completed)
+            if not failed_step and not status.startswith("✅"):
                 blocks.append({
                     "type": "context",
                     "elements": [{

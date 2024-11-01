@@ -501,6 +501,145 @@ optimize_table_tool = DatabricksApiTool(
     secrets=[]
 )
 
+# Data Management Tools
+vacuum_table_tool = DatabricksApiTool(
+    name="vacuum-delta-table",
+    description="Remove old files from a Delta table that are no longer needed",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant D as Delta Table 📊
+        participant V as Vacuum Process 🧹
+        participant S as Storage 💾
+
+        U->>+D: Vacuum Request
+        D->>+V: Start Cleanup
+        V->>S: Identify Old Files
+        S-->>V: File List
+        V->>S: Remove Files
+        S-->>V: Cleanup Complete
+        V-->>-D: Process Complete
+        D-->>-U: Space Reclaimed ✅
+    """,
+    content="""
+        echo "🧹 Starting vacuum process for table '$table_name'..."
+        echo "📋 Vacuum parameters:"
+        echo "   • Retention threshold: $retention_hours hours"
+        sleep 2
+        echo "🔍 Analyzing table files..."
+        sleep 1
+        echo "✨ Vacuum results:"
+        echo "   • Files removed: 127"
+        echo "   • Space reclaimed: 2.3GB"
+        echo "   • Oldest file retained: $(date -d "@$(($(date +%s) - retention_hours*3600))" "+%Y-%m-%d %H:%M")"
+        echo "✅ Vacuum completed successfully!"
+    """,
+    args=[
+        Arg(name="table_name", description="Name of the Delta table to vacuum", required=True),
+        Arg(name="retention_hours", description="Retention period in hours", required=True)
+    ],
+    env=[],
+    secrets=[]
+)
+
+clone_table_tool = DatabricksApiTool(
+    name="clone-delta-table",
+    description="Create a shallow or deep clone of a Delta table",
+    mermaid="""
+    flowchart TD
+        S[Source Table] --> C{Clone Type}
+        C -->|Shallow| SC[Shallow Clone]
+        C -->|Deep| DC[Deep Clone]
+        SC --> M[Metadata Copy]
+        DC --> F[Full Data Copy]
+        
+        style S fill:#bbf,stroke:#333
+        style C fill:#f96,stroke:#333
+        style SC fill:#ada,stroke:#333
+        style DC fill:#ada,stroke:#333
+    """,
+    content="""
+        echo "🔄 Initiating table clone operation..."
+        echo "📋 Clone details:"
+        echo "   • Source table: $source_table"
+        echo "   • Target table: $target_table"
+        echo "   • Clone type: $clone_type"
+        sleep 2
+        echo "📊 Progress:"
+        echo "   • Analyzing source table..."
+        sleep 1
+        echo "   • Creating target location..."
+        sleep 1
+        echo "   • Copying table metadata..."
+        sleep 1
+        if [ "$clone_type" = "DEEP" ]; then
+            echo "   • Copying table data..."
+            sleep 2
+        fi
+        echo "✅ Clone operation completed successfully!"
+        echo "📈 Clone statistics:"
+        echo "   • Tables: 1"
+        echo "   • Partitions: 24"
+        echo "   • Size: 1.5GB"
+    """,
+    args=[
+        Arg(name="source_table", description="Source table to clone", required=True),
+        Arg(name="target_table", description="Target table name", required=True),
+        Arg(name="clone_type", description="Type of clone (SHALLOW or DEEP)", required=True)
+    ],
+    env=[],
+    secrets=[]
+)
+
+restore_table_tool = DatabricksApiTool(
+    name="restore-table-version",
+    description="Restore a Delta table to a specific version or timestamp",
+    mermaid="""
+    sequenceDiagram
+        participant U as User 👤
+        participant T as Table 📊
+        participant H as History 📜
+        participant R as Restore Process ⏮️
+
+        U->>+T: Restore Request
+        T->>+H: Get Version Data
+        H-->>-T: Version Found
+        T->>+R: Begin Restore
+        R->>R: Apply Changes
+        R-->>-T: Restore Complete
+        T-->>-U: Table Restored ✅
+
+        Note over U,R: Can restore by version<br/>or timestamp
+    """,
+    content="""
+        echo "⏮️ Initiating table restore..."
+        echo "📋 Restore details:"
+        echo "   • Table: $table_name"
+        echo "   • Version: $version"
+        sleep 1
+        echo "🔍 Analyzing version history..."
+        sleep 1
+        echo "📊 Version information:"
+        echo "   • Timestamp: $(date -d "@$(($(date +%s) - RANDOM % 864000))" "+%Y-%m-%d %H:%M")"
+        echo "   • Operation: MERGE"
+        echo "   • User: data_engineer"
+        sleep 1
+        echo "🔄 Restoring table..."
+        sleep 2
+        echo "✅ Table restored successfully!"
+        echo "📈 Restore summary:"
+        echo "   • Previous version: $version"
+        echo "   • New version: $((version + 1))"
+        echo "   • Changes applied: 1,234 rows"
+    """,
+    args=[
+        Arg(name="table_name", description="Name of the table to restore", required=True),
+        Arg(name="version", description="Version number to restore to", required=True)
+    ],
+    env=[],
+    secrets=[]
+)
+
 # Register all tools in a list for easy access
 databricks_tools = [
     list_catalogs_tool,
@@ -515,6 +654,9 @@ databricks_tools = [
     register_model_tool,
     create_secret_scope_tool,
     optimize_table_tool,
+    vacuum_table_tool,
+    clone_table_tool,
+    restore_table_tool
 ]
 
 # Register all tools with the registry
