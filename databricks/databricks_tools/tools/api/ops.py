@@ -41,8 +41,8 @@ create_schema_tool = DatabricksApiTool(
         echo "   • Created: $(date '+%Y-%m-%d %H:%M:%S')"
     """,
     args=[
-        Arg("catalog_name", "Name of the catalog", required=True),
-        Arg("schema_name", "Name of the schema to create", required=True),
+        Arg(name="catalog_name", description="Name of the catalog", required=True),
+        Arg(name="schema_name", description="Name of the schema to create", required=True),
     ],
     env=[],
     secrets=[]
@@ -68,9 +68,9 @@ create_cluster_tool = DatabricksApiTool(
         echo "⏳ The cluster will be ready in approximately 5-7 minutes"
     """,
     args=[
-        Arg("cluster_name", "Name of the cluster", required=True),
-        Arg("num_workers", "Number of worker nodes", required=True),
-        Arg("runtime_version", "DBR version (e.g., 13.3.x-scala2.12)", required=True),
+        Arg(name="cluster_name", description="Name of the cluster", required=True),
+        Arg(name="num_workers", description="Number of worker nodes", required=True),
+        Arg(name="runtime_version", description="DBR version (e.g., 13.3.x-scala2.12)", required=True),
     ],
     env=[],
     secrets=[]
@@ -93,7 +93,7 @@ terminate_cluster_tool = DatabricksApiTool(
         echo "🏁 Cluster terminated successfully"
     """,
     args=[
-        Arg("cluster_id", "ID of the cluster to terminate", required=True)
+        Arg(name="cluster_id", description="ID of the cluster to terminate", required=True)
     ],
     env=[],
     secrets=[]
@@ -121,8 +121,8 @@ submit_job_tool = DatabricksApiTool(
         echo "   • Web URL: https://kubiya-awesome-workspace.cloud.databricks.com/?o=12345#job/$JOB_ID/run/$RUN_ID"
     """,
     args=[
-        Arg("notebook_path", "Path to the notebook in workspace", required=True),
-        Arg("cluster_name", "Name of the cluster to run on", required=True),
+        Arg(name="notebook_path", description="Path to the notebook in workspace", required=True),
+        Arg(name="cluster_name", description="Name of the cluster to run on", required=True),
     ],
     env=[],
     secrets=[]
@@ -140,7 +140,7 @@ cancel_job_run_tool = DatabricksApiTool(
         echo "   • End Time: $(date '+%Y-%m-%d %H:%M:%S')"
     """,
     args=[
-        Arg("run_id", "ID of the job run to cancel", required=True)
+        Arg(name="run_id", description="ID of the job run to cancel", required=True)
     ],
     env=[],
     secrets=[]
@@ -165,7 +165,7 @@ list_notebooks_tool = DatabricksApiTool(
         echo "✨ Total notebooks: 4"
     """,
     args=[
-        Arg("workspace_path", "Path in the workspace to list notebooks from", required=True),
+        Arg(name="workspace_path", description="Path in the workspace to list notebooks from", required=True),
     ],
     env=[],
     secrets=[]
@@ -185,9 +185,9 @@ import_notebook_tool = DatabricksApiTool(
         echo "🔗 Access at: https://kubiya-awesome-workspace.cloud.databricks.com/?o=12345#notebook/$workspace_path"
     """,
     args=[
-        Arg("source_path", "Path to source notebook file", required=True),
-        Arg("workspace_path", "Destination path in workspace", required=True),
-        Arg("format", "Notebook format (JUPYTER, SOURCE, HTML)", required=True)
+        Arg(name="source_path", description="Path to source notebook file", required=True),
+        Arg(name="workspace_path", description="Destination path in workspace", required=True),
+        Arg(name="format", description="Notebook format (JUPYTER, SOURCE, HTML)", required=True)
     ],
     env=[],
     secrets=[]
@@ -237,9 +237,9 @@ register_model_tool = DatabricksApiTool(
         echo "   • Registered by: $CURRENT_USER"
     """,
     args=[
-        Arg("model_name", "Name for the registered model", required=True),
-        Arg("run_id", "MLflow run ID containing the model", required=True),
-        Arg("model_path", "Path to the model in the run", required=True)
+        Arg(name="model_name", description="Name for the registered model", required=True),
+        Arg(name="run_id", description="MLflow run ID containing the model", required=True),
+        Arg(name="model_path", description="Path to the model in the run", required=True)
     ],
     env=[],
     secrets=[]
@@ -259,7 +259,7 @@ create_secret_scope_tool = DatabricksApiTool(
         echo "   • Created: $(date '+%Y-%m-%d %H:%M:%S')"
     """,
     args=[
-        Arg("scope_name", "Name of the secret scope", required=True)
+        Arg(name="scope_name", description="Name of the secret scope", required=True)
     ],
     env=[],
     secrets=[]
@@ -282,9 +282,9 @@ optimize_table_tool = DatabricksApiTool(
         echo "   • History cleaned up: $(date -d "@$(($(date +%s) - retention_hours*3600))" "+%Y-%m-%d %H:%M") and older"
     """,
     args=[
-        Arg("table_name", "Full name of the Delta table", required=True),
-        Arg("zorder_columns", "Columns to Z-ORDER by (comma-separated)", required=True),
-        Arg("retention_hours", "History retention in hours", required=True)
+        Arg(name="table_name", description="Full name of the Delta table", required=True),
+        Arg(name="zorder_columns", description="Columns to Z-ORDER by (comma-separated)", required=True),
+        Arg(name="retention_hours", description="History retention in hours", required=True)
     ],
     env=[],
     secrets=[]
