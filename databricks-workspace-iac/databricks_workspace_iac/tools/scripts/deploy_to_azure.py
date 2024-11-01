@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Callable
 import re
+import time
 
 # At the top of the file, modify the imports to handle missing slack_sdk
 try:
@@ -24,29 +25,18 @@ def build_message_blocks(
     workspace_name: str,
     location: str,
     plan_output: Optional[str] = None,
-    workspace_url: Optional[str] = None
+    workspace_url: Optional[str] = None,
+    current_resource: Optional[str] = None,
+    start_time: Optional[float] = None
 ) -> List[Dict[str, Any]]:
-    """Build Slack message blocks for deployment updates."""
-    steps = [
-        "1️⃣ Preparing to create workspace",
-        "2️⃣ Initializing Terraform and generating plan",
-        "3️⃣ Applying Terraform configuration",
-        "4️⃣ Finalizing deployment"
-    ]
-
-    # Mark completed steps with a checkmark
-    for i in range(len(steps)):
-        if i < current_step - 1:
-            steps[i] = f"✅ {steps[i]}"
-        elif i == current_step - 1:
-            steps[i] = f"> *{steps[i]}*"  # Highlight current step
-
+    """Build enhanced Slack message blocks for deployment updates."""
+    
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": status,
+                "text": "⚡ Databricks Workspace Deployment",
                 "emoji": True
             }
         },
@@ -55,61 +45,188 @@ def build_message_blocks(
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Workspace:*\n{workspace_name}"
-                },
-                {
-                    "type": "mrkdwn",
-                    "text": f"*Region:*\n{location}"
+                    "text": "*Deployment Details*"
                 }
             ]
         },
         {
             "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": message
-            }
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "*Deployment Progress:*"
-            }
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "\n".join(steps)
-            }
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Name*\n`{workspace_name}`"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Provider*\n`Azure`"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": f"*Region*\n`{location}`"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Mode*\n`terraform apply`"
+                }
+            ]
         }
     ]
 
+    # If we have plan output, add the changes summary
     if plan_output:
-        # Truncate plan_output to avoid exceeding Slack's message size limit
-        max_length = 2900  # Slack block text limit is 3000 characters
-        if len(plan_output) > max_length:
-            plan_output = plan_output[:max_length] + "\n...(truncated)..."
+        # Parse plan output to get resource counts
+        add_count = re.search(r'Plan: (\d+) to add', plan_output)
+        change_count = re.search(r'(\d+) to change', plan_output)
+        destroy_count = re.search(r'(\d+) to destroy', plan_output)
+        
+        adds = add_count.group(1) if add_count else "0"
+        changes = change_count.group(1) if change_count else "0"
+        destroys = destroy_count.group(1) if destroy_count else "0"
+
         blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Terraform Plan Output:*\n```{plan_output}```"
-            }
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": f":bar_chart: Changes Summary: `+{adds}` new | `~{changes}` modified | `-{destroys}` removed"
+                }
+            ]
         })
-    
+
+        # Extract and format a sample of the most relevant resource changes
+        resource_changes = []
+        for line in plan_output.split('\n'):
+            if any(x in line for x in ['+ resource', '~ resource', '- resource']):
+                resource_changes.append(line)
+        
+        if resource_changes:
+            # Get up to 3 most relevant changes
+            sample_changes = '\n'.join(resource_changes[:3])
+            # Add ellipsis if there are more changes
+            if len(resource_changes) > 3:
+                sample_changes += '\n...'
+
+            blocks.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"```\nPlan: {adds} to add, {changes} to change, {destroys} to destroy.\n\n{sample_changes}```"
+                }
+            })
+
+    # Add deployment progress section
+    blocks.append({
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":rocket: *Deployment Progress*"
+        }
+    })
+
+    # Define steps with their status
+    steps = [
+        ("Repository Cloning", 1),
+        ("Terraform Init & Plan", 2),
+        ("Infrastructure Apply", 3),
+        ("Workspace Configuration", 4)
+    ]
+
+    # Add status for each step
+    for step_name, step_num in steps:
+        if step_num < current_step:
+            # Completed step
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "mrkdwn",
+                    "text": f":white_check_mark: *Completed:* {step_name}"
+                }]
+            })
+        elif step_num == current_step:
+            # Current step - show spinner
+            blocks.append({
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "image",
+                        "image_url": "https://kubiya-public-20221113173935726800000003.s3.us-east-1.amazonaws.com/spinner.gif",
+                        "alt_text": "in progress"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*In Progress:* {message}"
+                    }
+                ]
+            })
+            
+            # If there's a current resource being created, show it
+            if current_resource:
+                blocks.append({
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"```Creating: {current_resource}```"
+                    }
+                })
+        else:
+            # Pending step
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "mrkdwn",
+                    "text": f":hourglass_flowing_sand: *Pending:* {step_name}"
+                }]
+            })
+
+    # Add divider
+    blocks.append({"type": "divider"})
+
+    # Add progress indicator
+    if start_time:
+        elapsed = int((time.time() - start_time) / 60)
+        blocks.append({
+            "type": "context",
+            "elements": [{
+                "type": "mrkdwn",
+                "text": f":zap: *Progress:* Phase {current_step}/4 • :clock1: Started {elapsed}m ago"
+            }]
+        })
+
+    # Add workspace URL and buttons if available
     if workspace_url:
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Workspace URL:* {workspace_url}"
+        blocks.extend([
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*:link: Access Links*"
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "🚀 Open Workspace",
+                            "emoji": True
+                        },
+                        "url": workspace_url,
+                        "style": "primary"
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "📦 Terraform Backend",
+                            "emoji": True
+                        },
+                        "url": f"https://portal.azure.com/#@/resource/subscriptions/{os.environ['ARM_SUBSCRIPTION_ID']}/resourceGroups/{os.environ['RESOURCE_GROUP_NAME']}/providers/Microsoft.Storage/storageAccounts/{os.environ['STORAGE_ACCOUNT_NAME']}/overview"
+                    }
+                ]
             }
-        })
+        ])
 
     return blocks
 
@@ -202,8 +319,9 @@ def run_command(
 
 class SlackNotifier:
     def __init__(self):
-        """Initialize Slack client with error handling."""
+        """Initialize Slack client with error handling and timing."""
         self.enabled = SLACK_AVAILABLE
+        self.start_time = time.time()
         if not self.enabled:
             return
 
@@ -238,13 +356,20 @@ class SlackNotifier:
         message: str,
         current_step: int,
         plan_output: Optional[str] = None,
-        workspace_url: Optional[str] = None
+        workspace_url: Optional[str] = None,
+        current_resource: Optional[str] = None,
+        start_time: Optional[float] = None,
+        is_complete: bool = False
     ) -> None:
-        """Update progress message with rich formatting."""
+        """Enhanced progress update with timing and completion status."""
         if not self.enabled:
             return
 
         try:
+            # If complete, force current_step to 4 and mark all steps done
+            if is_complete:
+                current_step = 4
+
             blocks = build_message_blocks(
                 status=status,
                 message=message,
@@ -252,7 +377,9 @@ class SlackNotifier:
                 workspace_name=os.environ["WORKSPACE_NAME"],
                 location=os.environ["LOCATION"],
                 plan_output=plan_output,
-                workspace_url=workspace_url
+                workspace_url=workspace_url,
+                current_resource=current_resource,
+                start_time=start_time or self.start_time
             )
 
             self.client.chat_update(
@@ -265,7 +392,7 @@ class SlackNotifier:
             self.enabled = False
 
     def send_error(self, error_message: str) -> None:
-        """Send error message with proper formatting."""
+        """Enhanced error message with visual indicators."""
         if not self.enabled:
             return
 
@@ -283,8 +410,22 @@ class SlackNotifier:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": f"*Error:*\n```{error_message}```"
+                        "text": "*Error Details*"
                     }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"```{error_message}```"
+                    }
+                },
+                {
+                    "type": "context",
+                    "elements": [{
+                        "type": "mrkdwn",
+                        "text": ":warning: Deployment stopped due to an error. Please check the logs for details."
+                    }]
                 }
             ]
 
@@ -329,24 +470,28 @@ def create_tfvars(args: Dict[str, Any], tfvars_path: Path) -> None:
     with open(tfvars_path, 'w') as f:
         json.dump(tfvars, f, indent=2)
 
-def handle_terraform_output(line: str, slack: 'SlackNotifier') -> None:
-    """Handle and parse Terraform output lines."""
+def handle_terraform_output(line: str, slack: 'SlackNotifier', start_time: float) -> None:
+    """Enhanced handler for Terraform output lines."""
     print(line, flush=True)
     if "Creating..." in line:
-        # Extract resource name safely using regex
         match = re.search(r'(\S+): Creating\.\.\.', line)
         if match:
             resource = match.group(1)
             slack.update_progress(
                 status="🚀 Deploying Resources",
-                message=f"Creating resource: `{resource}`",
-                current_step=3
+                message="Applying infrastructure changes",
+                current_step=3,
+                current_resource=resource,
+                start_time=start_time
             )
     elif "Apply complete!" in line:
+        # Mark all steps as complete
         slack.update_progress(
-            status="✅ Resources Deployed",
+            status="✅ Deployment Successful",
             message="All resources have been successfully created",
-            current_step=4
+            current_step=4,
+            start_time=start_time,
+            is_complete=True
         )
 
 def main():
@@ -467,6 +612,8 @@ def main():
             cwd=tf_dir,
             capture_output=True
         )
+        
+        # Keep the plan visible throughout the deployment
         slack.update_progress(
             status="📋 Terraform Plan Generated",
             message="Reviewing changes to be made...",
@@ -474,13 +621,13 @@ def main():
             plan_output=plan_output
         )
 
-        # Apply Terraform
+        # The plan summary will now stay visible in subsequent updates
         print_progress("Applying Terraform configuration...", "🚀")
         run_command(
             ["terraform", "apply", "-auto-approve", "-var-file=terraform.tfvars.json", "-no-color"],
             cwd=tf_dir,
             stream_output=True,
-            callback=lambda line: handle_terraform_output(line, slack)
+            callback=lambda line: handle_terraform_output(line, slack, time.time())
         )
 
         # Get workspace URL
