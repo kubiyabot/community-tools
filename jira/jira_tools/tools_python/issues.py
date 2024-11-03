@@ -31,7 +31,7 @@ create_issue_tool = JiraPythonTool(
         ),
         FileSpec(
             destination="/tmp/requirements.txt",
-            content=basic_funcs.get_file_content("requirements.txt"),
+            content=basic_funcs.get_file_content("jira/requirements.txt"),
         )
     ]
 
