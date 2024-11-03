@@ -31,7 +31,7 @@ create_issue_tool = JiraPythonTool(
             content=inspect.getsource(create_issue),
         ),
         FileSpec(
-            destination="/tmp/basic_funcs.py",
+            destination="/basic_funcs.py",
             content=inspect.getsource(basic_funcs),
         ),
         # FileSpec(

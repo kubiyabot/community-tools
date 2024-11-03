@@ -5,7 +5,7 @@ print(os.system('ls'))
 import requests
 import json
 
-from .basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
+from ..basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
 
 cloud_id = get_jira_cloud_id()
 headers = get_jira_basic_headers()
