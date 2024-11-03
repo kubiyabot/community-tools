@@ -8,6 +8,7 @@ create_issue = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
+    import os
     print(os.system('ls'))
 
     import requests
