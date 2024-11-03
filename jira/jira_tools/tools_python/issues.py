@@ -10,15 +10,8 @@ create_issue_tool = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
-    curl -LsSf https://astral.sh/uv/install.sh | sh > /dev/null 2>&1
-
-    uv venv > /dev/null 2>&1
-    . .venv/bin/activate > /dev/null 2>&1
-    
-    uv pip add requests > /dev/null 2>&1
-    uv pip add kubiya-sdk > /dev/null 2>&1
-    uv sync > /dev/null 2>&1
-
+    pip install requests > /dev/null 2>&1
+    pip install kubiya-sdk > /dev/null 2>&1
     python /tmp/create_issue.py
     """,
 
