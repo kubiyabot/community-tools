@@ -33,7 +33,7 @@ create_task_tool = JiraPythonTool(
 
 )
 create_bug_tool = JiraPythonTool(
-    name="create_task",
+    name="create_bug_tool",
     description="Create new jira bug",
     content="""
     python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" Bug "{{ .priority }}" "{{ .assignee_email }}" --label="{{ .label }}" --environment="{{ .environment }}"
