@@ -10,7 +10,7 @@ class BaseCreationTool(JiraPythonTool):
     def __init__(self, name, description, issue_type, content=None, extra_args=None):
         if extra_args is None:
             extra_args = []
-        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} "{{{{ .priority }}}}" "{{{{ .assignee_email }}}}" --label="{{{{ .label }}}} {content}"""
+        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} "{{{{ .priority }}}}" "{{{{ .assignee_email }}}}" --label="{{{{ .label }}}}" {content}"""
         args = [
                 Arg(name="project_key", type="str", description="Jira project key", required=True),
                 Arg(name="name", type="str", description=f"{issue_type} name", required=True),
