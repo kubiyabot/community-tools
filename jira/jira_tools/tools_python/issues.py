@@ -68,7 +68,7 @@ create_subtask_tool = BaseCreationTool(
     description="Create new jira Sub-task",
     issue_type="Sub-task",
     extra_args=[Arg(name="parent_id", default="", type="str", description=f"Task parent id, like: JRA-817", required=True)],
-    content="""--parent={{ .parent_id }}"""
+    content=f"""--parent={{ .parent_id }}"""
 )
 
 register_jira_tool(create_task_tool)
