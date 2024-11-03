@@ -11,6 +11,7 @@ class BaseCreationTool(JiraPythonTool):
         if extra_args is None:
             extra_args = []
         content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} "{{{{ .priority }}}}" "{{{{ .assignee_email }}}}" --label="{{{{ .label }}}} {content}"""
+        print(content)
         args = [
                 Arg(name="project_key", type="str", description="Jira project key", required=True),
                 Arg(name="name", type="str", description=f"{issue_type} name", required=True),
@@ -67,7 +68,7 @@ create_subtask_tool = BaseCreationTool(
     description="Create new jira Sub-task",
     issue_type="Sub-task",
     extra_args=[Arg(name="parent_id", default="", type="str", description=f"Task parent id, like: JRA-817", required=True)],
-    content="""--parent={{{{ .parent_id }}}}"""
+    content="""--parent={{ .parent_id }}"""
 )
 
 register_jira_tool(create_task_tool)
