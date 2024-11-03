@@ -58,7 +58,7 @@ def main():
         label=args.label
     )
 
-    if args.parent: # especially for subtasks
+    if args.parent_id: # especially for subtasks
         payload["fields"]["parent"] = {"key": args.parent_id}
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
