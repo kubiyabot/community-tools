@@ -30,11 +30,11 @@ create_issue_tool = JiraPythonTool(
             destination="/tmp/basic_funcs.py",
             content=inspect.getsource(basic_funcs),
         ),
-        FileSpec(
-            destination="/tmp/requirements.txt",
-            # content=basic_funcs.get_file_content("requirements.txt"),
-            context="kubiya-sdk\nrequests"
-        )
+        # FileSpec(
+        #     destination="/tmp/requirements.txt",
+        #     # content=basic_funcs.get_file_content("requirements.txt"),
+        #     context="kubiya-sdk\nrequests"
+        # )
     ]
 
 )

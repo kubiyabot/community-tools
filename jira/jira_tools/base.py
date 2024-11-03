@@ -20,7 +20,7 @@ class JiraTool(Tool):
             mermaid=mermaid_diagram
         )
 
-
+#             uv pip install -r /tmp/requirements.txt > /dev/null 2>&1
 class JiraPythonTool(Tool):
     def __init__(self, name, description, content, args, with_files=None, mermaid_diagram=None):
         if with_files is None:
@@ -36,7 +36,8 @@ class JiraPythonTool(Tool):
             uv venv > /dev/null 2>&1
             . .venv/bin/activate > /dev/null 2>&1
             
-            uv pip install -r /tmp/requirements.txt > /dev/null 2>&1
+            uv pip add requests > /dev/null 2>&1
+            uv pip add kubiya-sdk > /dev/null 2>&1
             """,
             content=content,
             args=args,
