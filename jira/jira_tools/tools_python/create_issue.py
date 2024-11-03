@@ -6,7 +6,7 @@ from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIR
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="create jira issue")
+    parser = argparse.ArgumentParser(description="Create jira issue")
     parser.add_argument("project_key")
     parser.add_argument("name")
     parser.add_argument("description")
@@ -14,13 +14,12 @@ if __name__ == "__main__":
     parser.add_argument("priority", default=None)
     parser.add_argument("assignee_id", default=None)
     args = parser.parse_args()
-
+    print(args)
     project_key, name, description, issue_type, priority, assignee_id = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_id
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
 
-    print("hi hi {{ .project_key }}")
     payload = {
         "fields": {
             "project": {
