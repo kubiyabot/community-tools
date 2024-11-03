@@ -26,15 +26,14 @@ class JiraPythonTool(Tool):
     def __init__(self, name, description, content, args, with_files=None, mermaid_diagram=None):
         if with_files is None:
             with_files = []
-        content = f"""
-pip install requests > /dev/null 2>&1
-pip install kubiya-sdk > /dev/null 2>&1
-{content}
-        """
         super().__init__(
             name=name,
             description=description,
             image="python:3.12-slim",
+            on_build="""
+pip install requests > /dev/null 2>&1
+pip install kubiya-sdk > /dev/null 2>&1
+            """,
             content=content,
             args=args,
             with_files=with_files,

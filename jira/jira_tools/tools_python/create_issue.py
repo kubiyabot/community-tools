@@ -43,6 +43,7 @@ def main():
     parser.add_argument("priority", help="Priority of the issue", default=None)
     parser.add_argument("assignee_email", help="Assignee's email address", default=None)
     parser.add_argument("--label", help="Label for the issue", default="")
+    parser.add_argument("--parent", help="parent id for the task", default="")
     args = parser.parse_args()
 
     cloud_id = get_jira_cloud_id()
@@ -57,9 +58,8 @@ def main():
         label=args.label
     )
 
-    # if args.environment: # especially for bugs
-    #     payload["fields"]["environment"] = args.environment
-
+    if args.parent: # especially for subtasks
+        payload["fields"]["parent"] = {"key": args.parent}
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
