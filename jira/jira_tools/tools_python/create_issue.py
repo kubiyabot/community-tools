@@ -10,6 +10,7 @@ from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIR
 cloud_id = get_jira_cloud_id()
 headers = get_jira_basic_headers()
 
+print("hi hi {{ .project_key }}")
 payload = {
     "fields": {
         "project": {
