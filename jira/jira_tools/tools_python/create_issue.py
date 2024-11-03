@@ -40,9 +40,9 @@ def main():
     parser.add_argument("name", help="Summary or name of the issue")
     parser.add_argument("description", help="Description of the issue")
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
-    parser.add_argument("--priority", help="Priority of the issue", default=None)
-    parser.add_argument("--assignee_email", help="Assignee's email address", default=None)
-    parser.add_argument("--label", help="Label for the issue", default=None)
+    parser.add_argument("priority", help="Priority of the issue", default=None)
+    parser.add_argument("assignee_email", help="Assignee's email address", default=None)
+    parser.add_argument("label", help="Label for the issue", default=None)
     args = parser.parse_args()
 
     cloud_id = get_jira_cloud_id()
