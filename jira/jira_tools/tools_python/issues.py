@@ -17,8 +17,7 @@ create_issue_tool = JiraPythonTool(
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
         Arg(name="name", type="str", description="Issue name", required=True),
-        Arg(name="issue_type", type="str", description="Issue type, such as Task, Sub-Task, Epic, Bug etc.",
-            required=True),
+        Arg(name="issue_type", type="str", description="Issue type, such as Task, Sub-Task, Epic, Bug etc.",required=True),
         Arg(name="description", type="str", description="Issue description", required=True),
         Arg(name="priority", type="str", description="Issue priority can be Low Medium or High", required=False),
         Arg(name="assignee_email", type="str", description="Issue assignee user", required=False),

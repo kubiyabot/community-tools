@@ -1,6 +1,5 @@
 from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, get_jira_user_id, ATLASSIAN_JIRA_API_URL
 
-import argparse
 import json
 import requests
 
@@ -34,6 +33,8 @@ def create_jira_payload(project_key, name, description, issue_type, priority=Non
     return payload
 
 def main():
+    import argparse
+
     parser = argparse.ArgumentParser(description="Create Jira issue")
     parser.add_argument("project_key", help="Project key for the Jira issue")
     parser.add_argument("name", help="Summary or name of the issue")
