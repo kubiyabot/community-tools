@@ -1,8 +1,4 @@
 import argparse
-import os
-
-print(os.system('ls'))
-
 import requests
 import json
 
