@@ -8,9 +8,9 @@ create_issue = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
-    from basic_funcs import get_jira_client_id, get_jira_basic_headers
+    from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
     
-    client_id = get_jira_client_id()
+    cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
 
     payload = {
@@ -50,6 +50,14 @@ create_issue = JiraPythonTool(
     }
     if labels:
         payload["fields"]["labels"] = labels  
+        
+    post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
+    
+    try:
+        response = requests.post(post_issue_url, headers=headers, data=json.dumps(payload))
+        print(response.json())
+    except Exception as e:
+        print(f"Failed to create issue: {e}")     
     .....
     """,
     args=[
