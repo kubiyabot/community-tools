@@ -1,3 +1,4 @@
+import argparse
 import os
 
 print(os.system('ls'))
@@ -7,56 +8,77 @@ import json
 
 from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
 
-cloud_id = get_jira_cloud_id()
-headers = get_jira_basic_headers()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="create jira issue")
+    parser.add_argument("project_key")
+    parser.add_argument("name")
+    parser.add_argument("description")
+    parser.add_argument("issue_type")
+    parser.add_argument("priority")
+    parser.add_argument("assignee_id")
 
-print("hi hi {{ .project_key }}")
-payload = {
-    "fields": {
-        "project": {
-            "key": "{{ .project_key }}"
-        },
-        "summary": "{{ .name }}",
-        "description": {
-            "type": "doc",
-            "version": 1,
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [
-                        {
-                            "text": "{{ .description }}",
-                            "type": "text"
-                        }
-                    ]
-                }
-            ]
-        },
-        "issuetype": {
-            "name": "{{ .issue_type }}"
-        },
-    }
-}
+    cloud_id = get_jira_cloud_id()
+    headers = get_jira_basic_headers()
 
-priority, assignee_id, labels = "{{ .priority }}", "{{ .assignee_id }}", "{{ .labels }}"
 
-if priority:
-    payload["fields"]["priority"] = {
-        "name": priority
-    }
-
-if assignee_id:
-    payload["fields"]["assignee"] = {
-        "id": assignee_id
+    print("hi hi {{ .project_key }}")
+    payload = {
+        "fields": {
+            "project": {
+                "key": "{{ .project_key }}"
+            },
+            "summary": "{{ .name }}",
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [
+                            {
+                                "text": "{{ .description }}",
+                                "type": "text"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "issuetype": {
+                "name": "{{ .issue_type }}"
+            },
+        }
     }
 
-if labels:
-    payload["fields"]["labels"] = labels
+    priority, assignee_id, labels = "{{ .priority }}", "{{ .assignee_id }}", "{{ .labels }}"
 
-post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
+    if priority:
+        payload["fields"]["priority"] = {
+            "name": priority
+        }
 
-try:
-    response = requests.post(post_issue_url, headers=headers, data=json.dumps(payload))
-    print(response.json())
-except Exception as e:
-    print(f"Failed to create issue: {e}")
+    if assignee_id:
+        payload["fields"]["assignee"] = {
+            "id": assignee_id
+        }
+
+    if labels:
+        payload["fields"]["labels"] = labels
+
+    post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
+
+    try:
+        response = requests.post(post_issue_url, headers=headers, data=json.dumps(payload))
+        print(response.json())
+    except Exception as e:
+        print(f"Failed to create issue: {e}")
+
+    parser = argparse.ArgumentParser(description="Print hello {name}!")
+    parser.add_argument("name", help="Name to say hello to")
+
+    # Parse command-line arguments
+    args = parser.parse_args()
+
+    # Get coordinates for the given city
+    name = args.name
+
+    hello_world(name)
