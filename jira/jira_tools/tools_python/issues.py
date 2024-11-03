@@ -59,7 +59,7 @@ create_issue = JiraPythonTool(
         Arg(name="description", type="str", description="Issue description", required=True),
         Arg(name="priority", type="str", description="Issue priority can be Low Medium or High", required=False),
         Arg(name="assignee_email", type="str", description="Issue assignee user", required=False),
-        Arg(name="labels", type="array", description="Issue labels", required=False),
+        # Arg(name="labels", type="array", description="Issue labels", required=False),
     ],
     with_files=[
         FileSpec(
