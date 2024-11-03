@@ -36,7 +36,7 @@ create_bug_tool = JiraPythonTool(
     name="create_bug_tool",
     description="Create new jira bug",
     content="""
-    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" Bug "{{ .priority }}" "{{ .assignee_email }}" --label="{{ .label }}" --environment="{{ .environment }}"
+    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" Bug "{{ .priority }}" "{{ .assignee_email }}" --label="{{ .label }}"
     """,
 
     args=[
@@ -46,7 +46,6 @@ create_bug_tool = JiraPythonTool(
         Arg(name="priority", type="str", description="Bug priority can be Low Medium or High", required=False),
         Arg(name="assignee_email", type="str", description="Bug assignee user", required=False),
         Arg(name="label",default="", type="str", description="Bug label", required=False),
-        Arg(name="environment", type="str", description="Bug environment", required=False),
     ],
     with_files=[
         FileSpec(
