@@ -1,8 +1,8 @@
 import inspect
 from kubiya_sdk.tools import Arg, FileSpec
 
-from jira.jira_tools.base import JiraPythonTool
-import jira.jira_tools.basic_funcs as basic_funcs
+from ..base import JiraPythonTool
+from .. import basic_funcs
 
 project_get = JiraPythonTool(
     name="create_issue",
@@ -49,8 +49,7 @@ project_get = JiraPythonTool(
             "id": assignee_id
     }
     if labels:
-        payload["fields"]["labels"] = labels
-    
+        payload["fields"]["labels"] = labels  
     .....
     """,
     args=[
