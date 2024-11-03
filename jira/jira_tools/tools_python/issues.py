@@ -5,12 +5,11 @@ from ..base import JiraPythonTool, register_jira_tool
 from .. import basic_funcs
 from . import create_issue
 
-
-
 create_issue_tool = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""python /tmp/create_issue.py""",
+
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
         Arg(name="name", type="str", description="Issue name", required=True),
@@ -32,7 +31,7 @@ create_issue_tool = JiraPythonTool(
         ),
         FileSpec(
             destination="/tmp/requirements.txt",
-            content="/jira_tools/requirements.txt",
+            content=basic_funcs.get_file_content("jira/requirements.txt"),
         )
     ]
 

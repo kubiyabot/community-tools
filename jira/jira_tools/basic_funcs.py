@@ -1,4 +1,5 @@
 import os
+
 import requests
 from requests.exceptions import HTTPError
 
@@ -55,3 +56,9 @@ def get_jira_basic_headers() -> dict:
         "Accept": "application/json",
         "Content-Type": "application/json"
     }
+
+def get_file_content(path) -> bytes:
+    with open(path, "rb") as f:
+        return f.read()
+
+

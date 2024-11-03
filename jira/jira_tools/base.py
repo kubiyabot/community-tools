@@ -36,9 +36,7 @@ class JiraPythonTool(Tool):
             uv venv > /dev/null 2>&1
             . .venv/bin/activate > /dev/null 2>&1
             
-            if [ -f /tmp/requirements.txt ]; then
-                uv pip install -r /tmp/requirements.txt > /dev/null 2>&1
-            fi
+            uv pip install -r /tmp/requirements.txt > /dev/null 2>&1
             """,
             content=content,
             args=args,
