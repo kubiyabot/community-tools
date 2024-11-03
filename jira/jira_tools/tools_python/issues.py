@@ -8,9 +8,10 @@ create_issue = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
+    print(os.system('ls'))
+
     import requests
     import json
-    print(os.system('ls'))
     
     from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
     
@@ -73,11 +74,11 @@ create_issue = JiraPythonTool(
         Arg(name="assignee_email", type="str", description="Issue assignee user", required=False),
         # Arg(name="labels", type="array", description="Issue labels", required=False),
     ],
-    with_files=[
-        FileSpec(
-            destination="/tmp/basic_funcs.py",
-            content=inspect.getsource(basic_funcs),
-        )]
+    # with_files=[
+    #     FileSpec(
+    #         destination="/tmp/basic_funcs.py",
+    #         content=inspect.getsource(basic_funcs),
+    #     )]
 
 )
 
