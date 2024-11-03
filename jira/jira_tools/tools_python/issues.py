@@ -11,7 +11,6 @@ create_issue_tool = JiraPythonTool(
     description="Create new jira issue",
     content="""
     curl -LsSf https://astral.sh/uv/install.sh | sh > /dev/null 2>&1
-    . $HOME/.cargo/env
 
     uv venv > /dev/null 2>&1
     . .venv/bin/activate > /dev/null 2>&1
