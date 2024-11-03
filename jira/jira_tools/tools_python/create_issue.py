@@ -16,18 +16,20 @@ if __name__ == "__main__":
     parser.add_argument("issue_type")
     parser.add_argument("priority")
     parser.add_argument("assignee_id")
+    args = parser.parse_args()
+
+    project_key, name, description, issue_type, priority, assignee_id = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_id
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
-
 
     print("hi hi {{ .project_key }}")
     payload = {
         "fields": {
             "project": {
-                "key": "{{ .project_key }}"
+                "key": project_key
             },
-            "summary": "{{ .name }}",
+            "summary": name,
             "description": {
                 "type": "doc",
                 "version": 1,
@@ -36,7 +38,7 @@ if __name__ == "__main__":
                         "type": "paragraph",
                         "content": [
                             {
-                                "text": "{{ .description }}",
+                                "text": description,
                                 "type": "text"
                             }
                         ]
@@ -44,12 +46,10 @@ if __name__ == "__main__":
                 ]
             },
             "issuetype": {
-                "name": "{{ .issue_type }}"
+                "name": issue_type
             },
         }
     }
-
-    priority, assignee_id, labels = "{{ .priority }}", "{{ .assignee_id }}", "{{ .labels }}"
 
     if priority:
         payload["fields"]["priority"] = {
@@ -61,8 +61,8 @@ if __name__ == "__main__":
             "id": assignee_id
         }
 
-    if labels:
-        payload["fields"]["labels"] = labels
+    # if labels:
+    #     payload["fields"]["labels"] = labels
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
@@ -72,13 +72,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Failed to create issue: {e}")
 
-    parser = argparse.ArgumentParser(description="Print hello {name}!")
-    parser.add_argument("name", help="Name to say hello to")
-
-    # Parse command-line arguments
-    args = parser.parse_args()
-
-    # Get coordinates for the given city
-    name = args.name
-
-    hello_world(name)
