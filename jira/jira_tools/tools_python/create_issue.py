@@ -12,10 +12,10 @@ if __name__ == "__main__":
     parser.add_argument("description")
     parser.add_argument("issue_type")
     parser.add_argument("priority", default=None)
-    parser.add_argument("assignee_id", default=None)
+    # parser.add_argument("assignee_id", default=None)
     args = parser.parse_args()
     print(args)
-    project_key, name, description, issue_type, priority, assignee_id = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_id
+    project_key, name, description, issue_type, priority = args.project_key, args.name, args.description, args.issue_type, args.priority
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
@@ -52,10 +52,10 @@ if __name__ == "__main__":
             "name": priority
         }
 
-    if assignee_id:
-        payload["fields"]["assignee"] = {
-            "id": assignee_id
-        }
+    # if assignee_id:
+    #     payload["fields"]["assignee"] = {
+    #         "id": assignee_id
+    #     }
 
     # if labels:
     #     payload["fields"]["labels"] = labels
