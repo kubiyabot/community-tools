@@ -3,8 +3,7 @@ import inspect
 from kubiya_sdk.tools import Arg, FileSpec
 
 from ..base import JiraPythonTool, register_jira_tool
-from .. import basic_funcs
-from . import create_issue
+from . import create_issue, basic_funcs
 
 create_issue_tool = JiraPythonTool(
     name="create_issue",
