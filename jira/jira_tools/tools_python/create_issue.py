@@ -12,7 +12,7 @@ if __name__ == "__main__":
     parser.add_argument("description")
     parser.add_argument("issue_type")
     parser.add_argument("priority", default=None)
-    # parser.add_argument("assignee_id", default=None)
+    parser.add_argument("assignee_id", default=None)
     args = parser.parse_args()
     print(args)
     project_key, name, description, issue_type, priority = args.project_key, args.name, args.description, args.issue_type, args.priority
