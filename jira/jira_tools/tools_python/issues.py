@@ -9,7 +9,19 @@ from . import create_issue
 create_issue_tool = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
-    content="""python /tmp/create_issue.py""",
+    content="""
+    curl -LsSf https://astral.sh/uv/install.sh | sh > /dev/null 2>&1
+    . $HOME/.cargo/env
+
+    uv venv > /dev/null 2>&1
+    . .venv/bin/activate > /dev/null 2>&1
+    
+    uv pip add requests > /dev/null 2>&1
+    uv pip add kubiya-sdk > /dev/null 2>&1
+    uv sync > /dev/null 2>&1
+
+    python /tmp/create_issue.py
+    """,
 
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),

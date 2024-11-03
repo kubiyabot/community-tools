@@ -29,19 +29,6 @@ class JiraPythonTool(Tool):
             name=name,
             description=description,
             image="python:3.12-slim",
-            on_build="""
-            curl -LsSf https://astral.sh/uv/install.sh | sh > /dev/null 2>&1
-            . $HOME/.cargo/env
-        
-            uv venv > /dev/null 2>&1
-            . .venv/bin/activate > /dev/null 2>&1
-            
-            uv pip add requests > /dev/null 2>&1
-            uv pip add kubiya-sdk > /dev/null 2>&1
-            uv sync > /dev/null 2>&1
-            
-            
-            """,
             content=content,
             args=args,
             with_files=with_files,
