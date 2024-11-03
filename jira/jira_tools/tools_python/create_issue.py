@@ -17,7 +17,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     project_key, name, description, issue_type, priority, assignee_email, label = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_email, args.label
-    print(args.label)
+    # print(args.label)
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
@@ -59,8 +59,8 @@ if __name__ == "__main__":
             "id": get_jira_user_id(assignee_email)
         }
 
-    if label:
-        payload["fields"]["labels"] = [label]
+    # if label:
+    #     payload["fields"]["labels"] = [label]
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
