@@ -62,33 +62,3 @@ def get_file_content(path) -> bytes:
     with open(path, "rb") as f:
         return f.read()
 
-
-def create_jira_payload(project_key: str, name: str, description: str, issue_type: str, priority: str = None,
-                        assignee_email: str = None, label: str = None):
-    payload = {
-        "fields": {
-            "project": {"key": project_key},
-            "summary": name,
-            "description": {
-                "type": "doc",
-                "version": 1,
-                "content": [{
-                    "type": "paragraph",
-                    "content": [{
-                        "text": description,
-                        "type": "text"
-                    }]
-                }]
-            },
-            "issuetype": {"name": issue_type}
-        }
-    }
-
-    if priority:
-        payload["fields"]["priority"] = {"name": priority}
-    if assignee_email:
-        payload["fields"]["assignee"] = {"id": get_jira_user_id(assignee_email)}
-    if label:
-        payload["fields"]["labels"] = [label]
-
-    return payload

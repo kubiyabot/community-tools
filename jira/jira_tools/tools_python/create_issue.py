@@ -1,10 +1,37 @@
-from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL, \
-    create_jira_payload
+from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL, get_jira_user_id
 
 import json
 import requests
 
+def create_jira_payload(project_key: str, name: str, description: str, issue_type: str, priority: str = None,
+                        assignee_email: str = None, label: str = None):
+    payload = {
+        "fields": {
+            "project": {"key": project_key},
+            "summary": name,
+            "description": {
+                "type": "doc",
+                "version": 1,
+                "content": [{
+                    "type": "paragraph",
+                    "content": [{
+                        "text": description,
+                        "type": "text"
+                    }]
+                }]
+            },
+            "issuetype": {"name": issue_type}
+        }
+    }
 
+    if priority:
+        payload["fields"]["priority"] = {"name": priority}
+    if assignee_email:
+        payload["fields"]["assignee"] = {"id": get_jira_user_id(assignee_email)}
+    if label:
+        payload["fields"]["labels"] = [label]
+
+    return payload
 
 def main():
     import argparse

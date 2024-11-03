@@ -1,5 +1,4 @@
 import inspect
-from distutils.command.install import value
 
 from kubiya_sdk.tools import Arg, FileSpec
 
@@ -19,7 +18,7 @@ create_issue_tool = JiraPythonTool(
         Arg(name="description", type="str", description="Task description", required=True),
         Arg(name="priority", type="str", description="Task priority can be Low Medium or High", required=False),
         Arg(name="assignee_email", type="str", description="Task assignee user", required=False),
-        Arg(name="label",value="", type="str", description="Task label", required=False),
+        Arg(name="label",default="", type="str", description="Task label", required=False),
     ],
     with_files=[
         FileSpec(
