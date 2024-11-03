@@ -10,13 +10,13 @@ import requests
 
 
 def base_jira_payload(
-    project_key: str,
-    name: str,
-    description: str,
-    issue_type: str,
-    priority: str = None,
-    assignee_email: str = None,
-    label: str = None,
+        project_key: str,
+        name: str,
+        description: str,
+        issue_type: str,
+        priority: str = None,
+        assignee_email: str = None,
+        label: str = None,
 ) -> dict:
     payload = {
         "fields": {
@@ -58,8 +58,6 @@ def main():
     parser.add_argument("--parent_id", help="parent id for the task", default="")
     args = parser.parse_args()
 
-    cloud_id = get_jira_cloud_id()
-    headers = get_jira_basic_headers()
     payload = base_jira_payload(
         project_key=args.project_key,
         name=args.name,
@@ -73,11 +71,11 @@ def main():
     if args.parent_id:  # especially for subtasks
         payload["fields"]["parent"] = {"key": args.parent_id}
 
-    post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
+    post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/issue"
 
     try:
         response = requests.post(
-            post_issue_url, headers=headers, data=json.dumps(payload)
+            post_issue_url, headers=get_jira_basic_headers(), data=json.dumps(payload)
         )
         print(response.json())
     except Exception as e:
