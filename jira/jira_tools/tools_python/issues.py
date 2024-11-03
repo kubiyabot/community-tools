@@ -8,6 +8,11 @@ create_issue = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
+    import requests
+    import json
+    import sys
+    sys.path.append('/tmp')
+    
     from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
     
     cloud_id = get_jira_cloud_id()
@@ -71,7 +76,7 @@ create_issue = JiraPythonTool(
     ],
     with_files=[
         FileSpec(
-            destination="basic_funcs.py",
+            destination="/tmp/basic_funcs.py",
             content=inspect.getsource(basic_funcs),
         )]
 
