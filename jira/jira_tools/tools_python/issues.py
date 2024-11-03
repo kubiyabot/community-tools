@@ -11,8 +11,7 @@ create_issue_tool = JiraPythonTool(
     content="""
     pip install requests > /dev/null 2>&1
     pip install kubiya-sdk > /dev/null 2>&1
-    pip install argparse > /dev/null 2>&1
-    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .issue_type }}" "{{ .description }}" "{{ .priority }}" "{{ .assignee_email }}"
+    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" "{{ .issue_type }}" "{{ .priority }}" "{{ .assignee_email }}"
     """,
 
     args=[

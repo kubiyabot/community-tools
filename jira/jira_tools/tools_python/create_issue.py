@@ -1,6 +1,6 @@
-import argparse
 import requests
 import json
+import argparse
 
 from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
 
@@ -10,8 +10,8 @@ if __name__ == "__main__":
     parser.add_argument("name")
     parser.add_argument("description")
     parser.add_argument("issue_type")
-    parser.add_argument("priority")
-    parser.add_argument("assignee_id")
+    parser.add_argument("priority", default=None)
+    parser.add_argument("assignee_id", default=None)
     args = parser.parse_args()
 
     project_key, name, description, issue_type, priority, assignee_id = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_id
@@ -67,4 +67,3 @@ if __name__ == "__main__":
         print(response.json())
     except Exception as e:
         print(f"Failed to create issue: {e}")
-
