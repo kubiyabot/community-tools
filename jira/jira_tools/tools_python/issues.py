@@ -1,10 +1,10 @@
 import inspect
 from kubiya_sdk.tools import Arg, FileSpec
 
-from ..base import JiraPythonTool
+from ..base import JiraPythonTool, register_jira_tool
 from .. import basic_funcs
 
-project_get = JiraPythonTool(
+create_issue = JiraPythonTool(
     name="create_issue",
     description="Create new jira issue",
     content="""
@@ -68,3 +68,5 @@ project_get = JiraPythonTool(
         )]
 
 )
+
+register_jira_tool(create_issue)
