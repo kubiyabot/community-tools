@@ -1,7 +1,7 @@
 import requests
 import json
 
-from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
+from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, get_jira_user_id, ATLASSIAN_JIRA_API_URL
 
 if __name__ == "__main__":
     import argparse
@@ -12,10 +12,12 @@ if __name__ == "__main__":
     parser.add_argument("description")
     parser.add_argument("issue_type")
     parser.add_argument("priority", default=None)
-    parser.add_argument("assignee_id", default=None)
+    parser.add_argument("assignee_email", default=None)
     parser.add_argument("label", default=None)
     args = parser.parse_args()
-    project_key, name, description, issue_type, priority, assignee_id, label = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_id, args.label
+
+    project_key, name, description, issue_type, priority, assignee_email, label = args.project_key, args.name, args.description, args.issue_type, args.priority, args.assignee_email, args.label
+    print(args.label)
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
@@ -52,13 +54,13 @@ if __name__ == "__main__":
             "name": priority
         }
 
-    if assignee_id:
+    if assignee_email:
         payload["fields"]["assignee"] = {
-            "id": assignee_id
+            "id": get_jira_user_id(assignee_email)
         }
 
     if label:
-        payload["fields"]["labels"] = label
+        payload["fields"]["labels"] = [label]
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
