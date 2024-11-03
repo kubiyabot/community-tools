@@ -3,8 +3,8 @@ from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIR
 import json
 import requests
 
-def create_jira_payload(project_key: str, name: str, description: str, issue_type: str, priority: str = None,
-                        assignee_email: str = None, label: str = None):
+def base_jira_payload(project_key: str, name: str, description: str, issue_type: str, priority: str = None,
+                      assignee_email: str = None, label: str = None) -> dict:
     payload = {
         "fields": {
             "project": {"key": project_key},
@@ -30,7 +30,6 @@ def create_jira_payload(project_key: str, name: str, description: str, issue_typ
         payload["fields"]["assignee"] = {"id": get_jira_user_id(assignee_email)}
     if label:
         payload["fields"]["labels"] = [label]
-
     return payload
 
 def main():
@@ -43,12 +42,13 @@ def main():
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
     parser.add_argument("priority", help="Priority of the issue", default=None)
     parser.add_argument("assignee_email", help="Assignee's email address", default=None)
-    parser.add_argument("label", help="Label for the issue", default="")
+    parser.add_argument("--label", help="Label for the issue", default="")
+    parser.add_argument("--environment", help="environment for the issue", default="")
     args = parser.parse_args()
 
     cloud_id = get_jira_cloud_id()
     headers = get_jira_basic_headers()
-    payload = create_jira_payload(
+    payload = base_jira_payload(
         project_key=args.project_key,
         name=args.name,
         description=args.description,
@@ -57,6 +57,10 @@ def main():
         assignee_email=args.assignee_email,
         label=args.label
     )
+
+    if args.environment: # especially for bugs
+        payload["fields"]["environment"] = args.environment
+
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
