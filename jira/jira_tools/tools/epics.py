@@ -1,4 +1,4 @@
-from .base import JiraTool, register_jira_tool
+from jira.jira_tools.base import JiraTool, register_jira_tool
 from kubiya_sdk.tools import Arg
 
 epic_list = JiraTool(
@@ -52,7 +52,7 @@ epic_add = JiraTool(
         Arg(name="epic_key", type="str", description="Epic key", required=True),
         Arg(name="issues", type="str", description="Space-separated list of issue keys", required=True),
     ],
-)
+    )
 
 epic_remove = JiraTool(
     name="epic_remove",

@@ -1,4 +1,4 @@
-from .base import JiraTool, register_jira_tool
+from jira.jira_tools.base import JiraTool, register_jira_tool
 from kubiya_sdk.tools import Arg
 
 search_issues = JiraTool(
