@@ -1,10 +1,23 @@
-from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL, get_jira_user_id
+from basic_funcs import (
+    get_jira_cloud_id,
+    get_jira_basic_headers,
+    ATLASSIAN_JIRA_API_URL,
+    get_jira_user_id,
+)
 
 import json
 import requests
 
-def base_jira_payload(project_key: str, name: str, description: str, issue_type: str, priority: str = None,
-                      assignee_email: str = None, label: str = None) -> dict:
+
+def base_jira_payload(
+    project_key: str,
+    name: str,
+    description: str,
+    issue_type: str,
+    priority: str = None,
+    assignee_email: str = None,
+    label: str = None,
+) -> dict:
     payload = {
         "fields": {
             "project": {"key": project_key},
@@ -12,15 +25,14 @@ def base_jira_payload(project_key: str, name: str, description: str, issue_type:
             "description": {
                 "type": "doc",
                 "version": 1,
-                "content": [{
-                    "type": "paragraph",
-                    "content": [{
-                        "text": description,
-                        "type": "text"
-                    }]
-                }]
+                "content": [
+                    {
+                        "type": "paragraph",
+                        "content": [{"text": description, "type": "text"}],
+                    }
+                ],
             },
-            "issuetype": {"name": issue_type}
+            "issuetype": {"name": issue_type},
         }
     }
 
@@ -28,9 +40,9 @@ def base_jira_payload(project_key: str, name: str, description: str, issue_type:
         payload["fields"]["priority"] = {"name": priority}
     if assignee_email:
         payload["fields"]["assignee"] = {"id": get_jira_user_id(assignee_email)}
-    if label:
-        payload["fields"]["labels"] = [label]
+    payload["fields"]["labels"] = [label] if label else [""]
     return payload
+
 
 def main():
     import argparse
@@ -55,19 +67,22 @@ def main():
         issue_type=args.issue_type,
         priority=args.priority,
         assignee_email=args.assignee_email,
-        label=args.label
+        label=args.label,
     )
 
-    if args.parent_id: # especially for subtasks
+    if args.parent_id:  # especially for subtasks
         payload["fields"]["parent"] = {"key": args.parent_id}
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/issue"
 
     try:
-        response = requests.post(post_issue_url, headers=headers, data=json.dumps(payload))
+        response = requests.post(
+            post_issue_url, headers=headers, data=json.dumps(payload)
+        )
         print(response.json())
     except Exception as e:
         print(f"Failed to create issue: {e}")
+
 
 if __name__ == "__main__":
     main()

@@ -101,8 +101,18 @@ print(f"Created sprint: {new_sprint.id}")
     args=[
         Arg(name="name", type="str", description="Sprint name", required=True),
         Arg(name="board_id", type="int", description="Board ID", required=True),
-        Arg(name="startDate", type="str", description="Start date (YYYY-MM-DD)", required=True),
-        Arg(name="endDate", type="str", description="End date (YYYY-MM-DD)", required=True),
+        Arg(
+            name="startDate",
+            type="str",
+            description="Start date (YYYY-MM-DD)",
+            required=True,
+        ),
+        Arg(
+            name="endDate",
+            type="str",
+            description="End date (YYYY-MM-DD)",
+            required=True,
+        ),
     ],
 )
 
@@ -121,8 +131,18 @@ print(f"Updated sprint: {updated_sprint.id}")
     args=[
         Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
         Arg(name="name", type="str", description="New sprint name", required=False),
-        Arg(name="startDate", type="str", description="New start date (YYYY-MM-DD)", required=False),
-        Arg(name="endDate", type="str", description="New end date (YYYY-MM-DD)", required=False),
+        Arg(
+            name="startDate",
+            type="str",
+            description="New start date (YYYY-MM-DD)",
+            required=False,
+        ),
+        Arg(
+            name="endDate",
+            type="str",
+            description="New end date (YYYY-MM-DD)",
+            required=False,
+        ),
     ],
 )
 

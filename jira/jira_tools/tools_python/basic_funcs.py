@@ -22,7 +22,9 @@ def get_jira_cloud_id() -> str:
         resources = response.json()
 
         if len(resources) > 1:
-            warnings.warn("You have more than one workspace, the first one will be used...")
+            warnings.warn(
+                "You have more than one workspace, the first one will be used..."
+            )
         return resources[0]["id"]
 
     except HTTPError as e:
@@ -32,7 +34,9 @@ def get_jira_cloud_id() -> str:
 
 def get_jira_user_id(email: str) -> str:
     jira_cloud_id = get_jira_cloud_id()
-    user_search_url = f"{ATLASSIAN_JIRA_API_URL}/{jira_cloud_id}/rest/api/3/user/search?query={email}"
+    user_search_url = (
+        f"{ATLASSIAN_JIRA_API_URL}/{jira_cloud_id}/rest/api/3/user/search?query={email}"
+    )
 
     token = os.getenv("JIRA_OAUTH_TOKEN", "")
 
@@ -54,11 +58,10 @@ def get_jira_basic_headers() -> dict:
     return {
         "Authorization": f"Bearer {token}",
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
 
 def get_file_content(path) -> bytes:
     with open(path, "rb") as f:
         return f.read()
-
