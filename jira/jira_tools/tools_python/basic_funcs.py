@@ -43,7 +43,7 @@ def get_jira_user_id(email: str) -> str:
     try:
         response = requests.get(user_search_url, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return response.json()[0]["accountId"]
     except HTTPError as e:
         print(f"Failed to get Jira server: {e}")
         return ""
