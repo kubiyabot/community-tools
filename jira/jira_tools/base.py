@@ -20,11 +20,17 @@ class JiraTool(Tool):
             mermaid=mermaid_diagram
         )
 
+
 #             uv pip install -r /tmp/requirements.txt > /dev/null 2>&1
 class JiraPythonTool(Tool):
     def __init__(self, name, description, content, args, with_files=None, mermaid_diagram=None):
         if with_files is None:
             with_files = []
+        content = f"""
+pip install requests > /dev/null 2>&1
+pip install kubiya-sdk > /dev/null 2>&1
+{content}
+        """
         super().__init__(
             name=name,
             description=description,
@@ -36,7 +42,6 @@ class JiraPythonTool(Tool):
             secrets=["JIRA_OAUTH_TOKEN"],
             mermaid=mermaid_diagram
         )
-
 
 
 def register_jira_tool(tool):
