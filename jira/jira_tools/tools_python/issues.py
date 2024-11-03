@@ -1,4 +1,6 @@
 import inspect
+from lib2to3.fixes.fix_input import context
+
 from kubiya_sdk.tools import Arg, FileSpec
 
 from ..base import JiraPythonTool, register_jira_tool
@@ -31,7 +33,8 @@ create_issue_tool = JiraPythonTool(
         ),
         FileSpec(
             destination="/tmp/requirements.txt",
-            content=basic_funcs.get_file_content("jira/requirements.txt"),
+            # content=basic_funcs.get_file_content("requirements.txt"),
+            context="kubiya-sdk\nrequests"
         )
     ]
 
