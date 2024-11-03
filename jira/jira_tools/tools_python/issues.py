@@ -11,7 +11,7 @@ create_issue_tool = JiraPythonTool(
     content="""
     pip install requests > /dev/null 2>&1
     pip install kubiya-sdk > /dev/null 2>&1
-    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" "{{ .issue_type }}" "{{ .priority }}" "{{ .assignee_email }}"
+    python /tmp/create_issue.py "{{ .project_key }}" "{{ .name }}" "{{ .description }}" "{{ .issue_type }}" "{{ .priority }}" "{{ .assignee_email }}" "{{ .label }}"
     """,
 
     args=[
@@ -22,7 +22,7 @@ create_issue_tool = JiraPythonTool(
         Arg(name="description", type="str", description="Issue description", required=True),
         Arg(name="priority", type="str", description="Issue priority can be Low Medium or High", required=False),
         Arg(name="assignee_email", type="str", description="Issue assignee user", required=False),
-        # Arg(name="labels", type="array", description="Issue labels", required=False),
+        Arg(name="label", type="str", description="Issue label", required=False),
     ],
     with_files=[
         FileSpec(
