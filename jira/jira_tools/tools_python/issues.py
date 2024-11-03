@@ -10,8 +10,7 @@ create_issue = JiraPythonTool(
     content="""
     import requests
     import json
-    import sys
-    sys.path.append('/tmp')
+    print(os.system('ls'))
     
     from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
     
