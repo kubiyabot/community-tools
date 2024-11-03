@@ -1,10 +1,11 @@
 import requests
 import json
-import argparse
 
 from basic_funcs import get_jira_cloud_id, get_jira_basic_headers, ATLASSIAN_JIRA_API_URL
 
 if __name__ == "__main__":
+    import argparse
+
     parser = argparse.ArgumentParser(description="create jira issue")
     parser.add_argument("project_key")
     parser.add_argument("name")
