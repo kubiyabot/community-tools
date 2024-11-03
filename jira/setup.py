@@ -6,5 +6,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "kubiya-sdk",
+        "argparse"
     ],
 )
