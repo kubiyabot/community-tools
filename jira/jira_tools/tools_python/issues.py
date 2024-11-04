@@ -4,10 +4,10 @@ from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs
+from . import create_issue, basic_funcs, get_issue
 
 
-class BaseCreationTool(JiraPythonTool):
+class BaseCreationIssueTool(JiraPythonTool):
     def __init__(self, name: str, description: str, issue_type: str, extra_content: str = None,
                  extra_args: List[Arg] = None):
         if extra_args is None:
@@ -41,32 +41,31 @@ class BaseCreationTool(JiraPythonTool):
                 )
             ])
 
-
-create_epic_tool = BaseCreationTool(
+create_epic_tool = BaseCreationIssueTool(
     name="create_epic",
     description="Create new jira epic",
     issue_type="Epic"
 )
 
-create_task_tool = BaseCreationTool(
+create_task_tool = BaseCreationIssueTool(
     name="create_epic",
     description="Create new jira Task",
     issue_type="Task"
 )
 
-create_bug_tool = BaseCreationTool(
+create_bug_tool = BaseCreationIssueTool(
     name="create_bug_tool",
     description="Create new jira bug",
     issue_type="Bug"
 )
 
-create_story_tool = BaseCreationTool(
+create_story_tool = BaseCreationIssueTool(
     name="create_story_tool",
     description="Create new jira story",
     issue_type="Story"
 )
 
-create_subtask_tool = BaseCreationTool(
+create_subtask_tool = BaseCreationIssueTool(
     name="create_sub_task_tool",
     description="Create new jira Sub-task",
     issue_type="Sub-task",
@@ -76,8 +75,28 @@ create_subtask_tool = BaseCreationTool(
     extra_content=f"""--parent_id="{{{{ .parent_id }}}}" """
 )
 
+get_issue_tool = JiraPythonTool(
+    name="get_issue_information",
+    description="Get Jira issue information",
+    content="python /tmp/create_issue.py {{ .issue_key }}",
+    args=[
+        Arg(name="issue_key", default="", type="str", description=f"Issue id, like: JRA-817", required=True)
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/get_issue.py",
+            content=inspect.getsource(get_issue),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+
 register_jira_tool(create_task_tool)
 register_jira_tool(create_subtask_tool)
 register_jira_tool(create_bug_tool)
 register_jira_tool(create_epic_tool)
 register_jira_tool(create_story_tool)
+register_jira_tool(get_issue_tool)
