@@ -42,7 +42,6 @@ def list_issues_in_project(
         response.raise_for_status()
 
         issues = response.json().get("issues", [])
-        print(issues)
         latest_issues = [
             {
                 "key": issue["key"],
@@ -86,7 +85,7 @@ def main():
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if args.issues_number != no_value else 5,
+            int(args.issues_number) if args.issues_number != no_value else 5,
             args.status if args.issues_number != no_value else None,
             args.assignee if args.issues_number != no_value else None,
             args.priority if args.issues_number != no_value else None,
