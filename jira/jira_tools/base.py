@@ -23,7 +23,7 @@ class JiraTool(Tool):
 
 class JiraPythonTool(Tool):
     def __init__(
-        self, name, description, content, args, with_files=None, mermaid_diagram=None
+            self, name, description, content, args, with_files=None, mermaid_diagram=None
     ):
         if with_files is None:
             with_files = []

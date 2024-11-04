@@ -1,3 +1,0 @@
-kubiya-sdk
-requests
-argparse
