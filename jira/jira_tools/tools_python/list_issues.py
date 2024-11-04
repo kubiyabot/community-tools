@@ -59,9 +59,21 @@ def main():
     parser.add_argument("--reporter", default=None,type=str, help="including assignee reporter")
     args = parser.parse_args()
 
+    num = args.num if args.num else 5
+    status = args.status if args.status else None
+    assignee = args.assignee if args.assignee else None
+    priority = args.priority if args.priority else None
+    reporter = args.reporter if args.reporter else None
+
     try:
-        latest_issues = list_issues_in_project(args.project_key, args.num, args.status, args.assignee, args.priority,
-                                               args.reporter)
+        latest_issues = list_issues_in_project(
+            args.project_key,
+            num,
+            status,
+            assignee,
+            priority,
+            reporter
+        )
         for issue in latest_issues:
             print(f"{issue['key']}: {issue['summary']} (Created on {issue['created']})")
     except Exception as e:
