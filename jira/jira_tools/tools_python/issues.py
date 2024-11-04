@@ -6,7 +6,7 @@ from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_c
 
 
 class BaseCreationIssueTool(JiraPythonTool):
-    def __init__(self, name: str, issue_type: str, extra_content: str = None,
+    def __init__(self, name: str, issue_type: str, extra_content: str = "",
                  extra_args: List[Arg] = None):
         if extra_args is None:
             extra_args = []
