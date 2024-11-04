@@ -31,7 +31,6 @@ def list_issues_in_project(
         "maxResults": num_issues,
         "fields": "summary,created",
     }
-    print(params)
     try:
         search_url = (
             f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
@@ -85,11 +84,11 @@ def main():
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if args.issues_number != no_value else 5,
-            args.status if args.issues_number != no_value else None,
-            args.assignee if args.issues_number != no_value else None,
-            args.priority if args.issues_number != no_value else None,
-            args.reporter if args.issues_number != no_value else None,
+            5 if args.issues_number == no_value else args.issues_number,
+            None if args.status == no_value else args.status,
+            None if args.assignee == no_value else args.assignee,
+            None if args.priority == no_value else args.priority,
+            None if args.reporter == no_value else args.reporter,
         )
         for issue in latest_issues:
             print(
