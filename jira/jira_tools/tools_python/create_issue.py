@@ -58,6 +58,8 @@ def main():
     parser.add_argument("--parent_id", help="parent id for the task", default="")
     args = parser.parse_args()
 
+    no_value ='<no value>'
+
     payload = base_jira_payload(
         project_key=args.project_key,
         name=args.name,
@@ -65,7 +67,7 @@ def main():
         issue_type=args.issue_type,
         priority=args.priority,
         assignee_email=args.assignee_email,
-        label=args.label,
+        label=args.label if not no_value else None,
     )
 
     if args.parent_id:  # especially for subtasks

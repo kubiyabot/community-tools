@@ -5,7 +5,7 @@ from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, get_issue,list_issues
+from . import create_issue, basic_funcs, get_issue, list_issues,create_issue_comment
 
 
 class BaseCreationIssueTool(JiraPythonTool):
@@ -22,7 +22,6 @@ class BaseCreationIssueTool(JiraPythonTool):
                 required=False),
             Arg(name="assignee_email", type="str", description=f"{issue_type} assignee user", required=False),
             Arg(name="label", default="", type="str", description=f"{issue_type} label", required=False),
-            # TODO: understand why label make rerun sometimes
         ]
         args.extend(extra_args)
 
@@ -41,6 +40,7 @@ class BaseCreationIssueTool(JiraPythonTool):
                     content=inspect.getsource(basic_funcs),
                 )
             ])
+
 
 create_epic_tool = BaseCreationIssueTool(
     name="create_epic",
@@ -75,7 +75,6 @@ create_subtask_tool = BaseCreationIssueTool(
     ],
     extra_content=f"""--parent_id="{{{{ .parent_id }}}}" """
 )
-
 
 get_issue_tool = JiraPythonTool(
     name="get_issue_view",
@@ -118,6 +117,25 @@ list_issue_tool = JiraPythonTool(
         )
     ])
 
+add_comment_issue_tool = JiraPythonTool(
+    name="add_comment_issue",
+    description="Add a comment to a Jira issue, optionally using a template.",
+    content="""python /tmp/create_issue_comment.py "{{ .issue_key }}" "{{ .comment }}" """,
+    args=[
+        Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
+        Arg(name="comment", type="str", description="Comment body", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/create_issue_comment.py",
+            content=inspect.getsource(create_issue_comment),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 register_jira_tool(create_task_tool)
 register_jira_tool(create_subtask_tool)
 register_jira_tool(create_bug_tool)
@@ -125,7 +143,7 @@ register_jira_tool(create_epic_tool)
 register_jira_tool(create_story_tool)
 register_jira_tool(get_issue_tool)
 register_jira_tool(list_issue_tool)
-
+register_jira_tool(add_comment_issue_tool)
 
 # for tool in [issue_list, issue_create, issue_edit, issue_assign, issue_move, issue_view,
 #              issue_comment_add, issue_link, issue_watch, issue_attachments, issue_transitions]:
