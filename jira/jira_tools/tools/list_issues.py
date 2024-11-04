@@ -82,14 +82,10 @@ def main():
 
     no_value = "<no value>"  # when no value is injected
 
-    print(int(args.issues_number) )
-    print(args.issues_number)
-    print(type(args.issues_number) )
-
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            int(args.issues_number) if args.issues_number != no_value else 5,
+            args.issues_number if args.issues_number != no_value else 5,
             args.status if args.issues_number != no_value else None,
             args.assignee if args.issues_number != no_value else None,
             args.priority if args.issues_number != no_value else None,
