@@ -55,7 +55,7 @@ def main():
     parser.add_argument("priority", help="Priority of the issue", default=None)
     parser.add_argument("assignee_email", help="Assignee's email address", default=None)
     parser.add_argument("--label", help="Label for the issue", default="")
-    # parser.add_argument("--parent_id", help="parent id for the task", default="")
+    parser.add_argument("--parent_id", help="parent id for the task", default="")
     args = parser.parse_args()
 
     no_value ='<no value>'
@@ -70,8 +70,8 @@ def main():
         label=args.label if not no_value else None,
     )
 
-    # if args.parent_id:  # especially for subtasks
-    #     payload["fields"]["parent"] = {"key": args.parent_id}
+    if args.parent_id:  # especially for subtasks
+        payload["fields"]["parent"] = {"key": args.parent_id}
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/issue"
 
