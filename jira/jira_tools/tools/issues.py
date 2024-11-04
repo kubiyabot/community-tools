@@ -92,7 +92,7 @@ list_issue_tool = JiraPythonTool(
     content="""python /tmp/list_issues.py "{{ .project_key }}" --issues_number="{{ .issues_number }}" --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
-        Arg(name="issues_number", type="int", description="Number of issue to list", required=False),
+        Arg(name="issues_number", type="str", description="Number of issue to list", required=False),
         Arg(name="status", type="str", description="filtering by issues status, such as Done", required=False),
         Arg(name="assignee", type="str", description="filtering assignee user", required=False),
         Arg(name="priority", type="str", description="filtering issues priority", required=False),
