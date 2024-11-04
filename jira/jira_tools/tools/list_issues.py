@@ -1,3 +1,5 @@
+from typing import List
+
 from basic_funcs import (
     get_jira_cloud_id,
     get_jira_basic_headers,
@@ -14,7 +16,7 @@ def list_issues_in_project(
     assignee: str = None,
     priority: str = None,
     reporter: str = None,
-):
+)-> List[dict]:
 
     jql_query = f"project = {project_key}"
     if status:

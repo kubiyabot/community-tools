@@ -10,13 +10,13 @@ import requests
 
 
 def base_jira_payload(
-    project_key: str,
-    name: str,
-    description: str,
-    issue_type: str,
-    priority: str = None,
-    assignee_email: str = None,
-    label: str = None,
+        project_key: str,
+        name: str,
+        description: str,
+        issue_type: str,
+        priority: str = None,
+        assignee_email: str = None,
+        label: str = None,
 ) -> dict:
     payload = {
         "fields": {
@@ -70,9 +70,9 @@ def main():
         name=args.name,
         description=args.description,
         issue_type=args.issue_type,
-        priority=args.priority if not no_value else None,
-        assignee_email=args.assignee_email if not no_value else None,
-        label=args.label if not no_value else None,
+        priority=args.priority if args.priority != no_value else None,
+        assignee_email=args.assignee_email if args.assignee_email != no_value else None,
+        label=args.label if args.label != no_value else None,
     )
 
     if args.parent_id:  # especially for subtasks
