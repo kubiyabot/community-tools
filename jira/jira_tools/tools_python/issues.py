@@ -11,7 +11,7 @@ class BaseCreationIssueTool(JiraPythonTool):
         if extra_args is None:
             extra_args = []
         description = f"Create new jira {issue_type}"
-        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} "{{{{ .priority }}}}" "{{{{ .assignee_email }}}}" --label="{{{{ .label }}}}" {extra_content}"""
+        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} --priority="{{{{ .priority }}}}" --assignee_email="{{{{ .assignee_email }}}}" --label="{{{{ .label }}}}" {extra_content}"""
         args = [
             Arg(name="project_key", type="str", description="Jira project key", required=True),
             Arg(name="name", type="str", description=f"{issue_type} name", required=True),

@@ -52,8 +52,8 @@ def main():
     parser.add_argument("name", help="Summary or name of the issue")
     parser.add_argument("description", help="Description of the issue")
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
-    parser.add_argument("priority", help="Priority of the issue", default=None)
-    parser.add_argument("assignee_email", help="Assignee's email address", default=None)
+    parser.add_argument("--priority", help="Priority of the issue", default=None)
+    parser.add_argument("--assignee_email", help="Assignee's email address", default=None)
     parser.add_argument("--label", help="Label for the issue", default="")
     parser.add_argument("--parent_id", help="parent id for the task", default="")
     args = parser.parse_args()
@@ -65,8 +65,8 @@ def main():
         name=args.name,
         description=args.description,
         issue_type=args.issue_type,
-        priority=args.priority,
-        assignee_email=args.assignee_email,
+        priority=args.priority if not no_value else None,
+        assignee_email=args.assignee_email if not no_value else None,
         label=args.label if not no_value else None,
     )
 
