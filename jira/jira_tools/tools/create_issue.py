@@ -10,13 +10,13 @@ import requests
 
 
 def base_jira_payload(
-        project_key: str,
-        name: str,
-        description: str,
-        issue_type: str,
-        priority: str = None,
-        assignee_email: str = None,
-        label: str = None,
+    project_key: str,
+    name: str,
+    description: str,
+    issue_type: str,
+    priority: str = None,
+    assignee_email: str = None,
+    label: str = None,
 ) -> dict:
     payload = {
         "fields": {
@@ -38,9 +38,12 @@ def base_jira_payload(
 
     if priority:
         payload["fields"]["priority"] = {"name": priority}
+
     if assignee_email:
         payload["fields"]["assignee"] = {"id": get_jira_user_id(assignee_email)}
+
     payload["fields"]["labels"] = [label] if label else [""]
+
     return payload
 
 
@@ -53,12 +56,14 @@ def main():
     parser.add_argument("description", help="Description of the issue")
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
     parser.add_argument("--priority", help="Priority of the issue", default=None)
-    parser.add_argument("--assignee_email", help="Assignee's email address", default=None)
+    parser.add_argument(
+        "--assignee_email", help="Assignee's email address", default=None
+    )
     parser.add_argument("--label", help="Label for the issue", default="")
     parser.add_argument("--parent_id", help="parent id for the task", default="")
     args = parser.parse_args()
 
-    no_value ='<no value>'
+    no_value = "<no value>"  # when no value is injected
 
     payload = base_jira_payload(
         project_key=args.project_key,

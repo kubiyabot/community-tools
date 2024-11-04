@@ -6,10 +6,10 @@ from basic_funcs import (
 
 import requests
 
-def extract_relevant_fields(data):
-    fields = data.get('fields', {})
 
-    # Extract the required fields
+def extract_relevant_fields(data):
+    fields = data.get("fields", {})
+
     filtered_data = {
         "issuetype_name": fields.get("issuetype", {}).get("name"),
         "description_content": fields.get("description", {}).get("content", []),
@@ -26,6 +26,7 @@ def extract_relevant_fields(data):
     }
 
     return filtered_data
+
 
 def main():
     import argparse

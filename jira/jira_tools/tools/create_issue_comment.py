@@ -7,6 +7,7 @@ from basic_funcs import (
 import json
 import requests
 
+
 def main():
     import argparse
 
@@ -16,25 +17,24 @@ def main():
 
     args = parser.parse_args()
 
-    payload = json.dumps({
+    payload = {
         "body": {
             "content": [
                 {
-                    "content": [
-                        {
-                            "text": args.comment,
-                            "type": "text"
-                        }
-                    ],
-                    "type": "paragraph"
+                    "content": [{"text": args.comment, "type": "text"}],
+                    "type": "paragraph",
                 }
             ],
             "type": "doc",
-            "version": 1
-        }})
+            "version": 1,
+        }
+    }
+
     comment_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/issue/{args.issue_key}/comment"
     try:
-        response = requests.post(comment_url, headers=get_jira_basic_headers(), data=payload)
+        response = requests.post(
+            comment_url, headers=get_jira_basic_headers(), data=json.dumps(payload)
+        )
         response.raise_for_status()
         print(f"Comment added to issue {args.issue_key} successfully.")
     except Exception as e:
