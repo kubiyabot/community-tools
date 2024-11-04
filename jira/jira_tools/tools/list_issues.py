@@ -15,8 +15,6 @@ def list_issues_in_project(
     priority: str = None,
     reporter: str = None,
 ):
-    print(f"num_issues: {num_issues}")
-    print(f"assignee: {assignee}")
 
     jql_query = f"project = {project_key}"
     if status:
@@ -44,7 +42,7 @@ def list_issues_in_project(
         response.raise_for_status()
 
         issues = response.json().get("issues", [])
-
+        print(issues)
         latest_issues = [
             {
                 "key": issue["key"],
