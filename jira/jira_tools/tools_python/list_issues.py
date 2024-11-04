@@ -39,9 +39,7 @@ def list_issues_in_project(project_key, num_issues=5, status=None, assignee=None
             }
             for issue in issues
         ]
-
-        for issue in latest_issues:
-            print(f"{issue['key']}: {issue['summary']} (Created on {issue['created']})")
+        return latest_issues
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
@@ -61,8 +59,10 @@ def main():
     args = parser.parse_args()
 
     try:
-        list_issues_in_project(args.project_key, args.num, args.status, args.assignee, args.priority,
-                               args.reporter)
+        latest_issues = list_issues_in_project(args.project_key, args.num, args.status, args.assignee, args.priority,
+                                               args.reporter)
+        for issue in latest_issues:
+            print(f"{issue['key']}: {issue['summary']} (Created on {issue['created']})")
     except Exception as e:
         print(f"Failed to create issue: {e}")
 
