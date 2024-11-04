@@ -12,7 +12,7 @@ def extract_relevant_fields(data):
     # Extract the required fields
     filtered_data = {
         "issuetype_name": fields.get("issuetype", {}).get("name"),
-        "description_content": fields.get("description", {}).get("content", [])
+        "description_content": fields.get("description", {}).get("content", []),
         "project_self": fields.get("project", {}).get("self"),
         "project_key": fields.get("project", {}).get("key"),
         "project_name": fields.get("project", {}).get("name"),
