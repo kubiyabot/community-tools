@@ -62,7 +62,7 @@ def main():
     assignee = args.assignee if args.assignee else None
     priority = args.priority if args.priority else None
     reporter = args.reporter if args.reporter else None
-
+    print(assignee)
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
