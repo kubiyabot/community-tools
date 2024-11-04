@@ -8,8 +8,6 @@ ATLASSIAN_JIRA_API_URL = "https://api.atlassian.com/ex/jira"
 
 
 def get_jira_cloud_id() -> str:
-    import warnings
-
     token = os.getenv("JIRA_OAUTH_TOKEN", "")
 
     headers = {
@@ -20,11 +18,10 @@ def get_jira_cloud_id() -> str:
         response = requests.get(ATLASSIAN_RESOURCES_URL, headers=headers)
         response.raise_for_status()
         resources = response.json()
-
+        workspaces = [resources["name"] for resources in resources]
         if len(resources) > 1:
-            warnings.warn(
-                "You have more than one workspace, the first one will be used..."
-            )
+            print(f"WARNING: You have more than one workspace, available workspaces: {workspaces}. "
+                  f"The first one will be used...")
         return resources[0]["id"]
 
     except HTTPError as e:
