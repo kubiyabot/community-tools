@@ -68,11 +68,11 @@ def main():
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            num,
-            status,
-            assignee,
-            priority,
-            reporter
+            # num,
+            # status,
+            # assignee,
+            # priority,
+            # reporter
         )
         for issue in latest_issues:
             print(f"{issue['key']}: {issue['summary']} (Created on {issue['created']})")
