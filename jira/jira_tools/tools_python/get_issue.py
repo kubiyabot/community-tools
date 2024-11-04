@@ -11,18 +11,18 @@ def extract_relevant_fields(data):
 
     # Extract the required fields
     filtered_data = {
-        "created": fields.get("created"),
+        "issuetype_name": fields.get("issuetype", {}).get("name"),
+        "description_content": fields.get("description", {}).get("content", [])
         "project_self": fields.get("project", {}).get("self"),
         "project_key": fields.get("project", {}).get("key"),
         "project_name": fields.get("project", {}).get("name"),
         "project_type": fields.get("project", {}).get("projectTypeKey"),
         "priority_name": fields.get("priority", {}).get("name"),
-        "issuetype_name": fields.get("issuetype", {}).get("name"),
+        "created": fields.get("created"),
         "assignee_email": fields.get("assignee", {}).get("emailAddress"),
         "assignee_displayName": fields.get("assignee", {}).get("displayName"),
         "reporter_email": fields.get("reporter", {}).get("emailAddress"),
         "reporter_displayName": fields.get("reporter", {}).get("displayName"),
-        "description_content": fields.get("description", {}).get("content", [])
     }
 
     return filtered_data
