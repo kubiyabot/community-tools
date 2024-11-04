@@ -137,7 +137,3 @@ register_jira_tool(create_story_tool)
 register_jira_tool(view_issue)
 register_jira_tool(list_issue_tool)
 register_jira_tool(add_comment_issue_tool)
-
-for tool in [create_task_tool, create_subtask_tool, create_bug_tool, create_epic_tool, create_story_tool,
-             view_issue_tool, list_issue_tool, add_comment_issue_tool]:
-    register_jira_tool(tool)
