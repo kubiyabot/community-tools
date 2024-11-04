@@ -70,8 +70,8 @@ def main():
         label=args.label if not no_value else None,
     )
 
-    if args.parent_id:  # especially for subtasks
-        payload["fields"]["parent"] = {"key": args.parent_id}
+    # if args.parent_id:  # especially for subtasks
+    #     payload["fields"]["parent"] = {"key": args.parent_id}
 
     post_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/issue"
 
