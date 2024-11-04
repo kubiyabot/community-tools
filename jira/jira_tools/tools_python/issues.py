@@ -1,10 +1,11 @@
 import inspect
+from email.policy import default
 from typing import List
 
 from kubiya_sdk.tools import Arg, FileSpec
 
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, get_issue
+from . import create_issue, basic_funcs, get_issue,list_issues
 
 
 class BaseCreationIssueTool(JiraPythonTool):
@@ -75,9 +76,10 @@ create_subtask_tool = BaseCreationIssueTool(
     extra_content=f"""--parent_id="{{{{ .parent_id }}}}" """
 )
 
+
 get_issue_tool = JiraPythonTool(
-    name="get_issue_information",
-    description="Get Jira issue information",
+    name="get_issue_view",
+    description="View details of a Jira issue",
     content="""python /tmp/get_issue.py "{{ .issue_key }}" """,
     args=[
         Arg(name="issue_key", default="", type="str", description=f"Issue id, like: JRA-817", required=True)
@@ -93,6 +95,28 @@ get_issue_tool = JiraPythonTool(
         )
     ])
 
+list_issue_tool = JiraPythonTool(
+    name="issue_list",
+    description="List Jira issues",
+    content="""python /tmp/list_issues.py "{{ .project_key }}" --num="{{ .num }}" --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" """,
+    args=[
+        Arg(name="project_key", type="str", description="Jira project key", required=True),
+        Arg(name="num", default=5, type="str", description="Number of issue to list", required=False),
+        Arg(name="status", type="str", description="Issues status, such as Done", required=False),
+        Arg(name="assignee", type="str", description="including assignee user", required=False),
+        Arg(name="priority", type="str", description="including issues priority", required=False),
+        Arg(name="reporter", type="str", description="including assignee reporter", required=False),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/list_issues.py",
+            content=inspect.getsource(list_issues),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
 
 register_jira_tool(create_task_tool)
 register_jira_tool(create_subtask_tool)
@@ -100,3 +124,8 @@ register_jira_tool(create_bug_tool)
 register_jira_tool(create_epic_tool)
 register_jira_tool(create_story_tool)
 register_jira_tool(get_issue_tool)
+
+
+# for tool in [issue_list, issue_create, issue_edit, issue_assign, issue_move, issue_view,
+#              issue_comment_add, issue_link, issue_watch, issue_attachments, issue_transitions]:
+#     register_jira_tool(tool)
