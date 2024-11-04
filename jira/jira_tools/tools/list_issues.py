@@ -15,6 +15,9 @@ def list_issues_in_project(
     priority: str = None,
     reporter: str = None,
 ):
+    print(f"num_issues: {num_issues}")
+    print(f"assignee: {assignee}")
+
     jql_query = f"project = {project_key}"
     if status:
         jql_query += f" AND status = '{status}'"
