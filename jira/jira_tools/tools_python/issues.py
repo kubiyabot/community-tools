@@ -124,6 +124,7 @@ register_jira_tool(create_bug_tool)
 register_jira_tool(create_epic_tool)
 register_jira_tool(create_story_tool)
 register_jira_tool(get_issue_tool)
+register_jira_tool(list_issue_tool)
 
 
 # for tool in [issue_list, issue_create, issue_edit, issue_assign, issue_move, issue_view,
