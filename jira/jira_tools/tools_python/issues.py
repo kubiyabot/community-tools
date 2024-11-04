@@ -1,18 +1,16 @@
 import inspect
-from email.policy import default
 from typing import List
-
 from kubiya_sdk.tools import Arg, FileSpec
-
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, get_issue, list_issues,create_issue_comment
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment
 
 
 class BaseCreationIssueTool(JiraPythonTool):
-    def __init__(self, name: str, description: str, issue_type: str, extra_content: str = None,
+    def __init__(self, name: str, issue_type: str, extra_content: str = None,
                  extra_args: List[Arg] = None):
         if extra_args is None:
             extra_args = []
+        description = f"Create new jira {issue_type}"
         content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} "{{{{ .priority }}}}" "{{{{ .assignee_email }}}}" --label="{{{{ .label }}}}" {extra_content}"""
         args = [
             Arg(name="project_key", type="str", description="Jira project key", required=True),
@@ -44,31 +42,26 @@ class BaseCreationIssueTool(JiraPythonTool):
 
 create_epic_tool = BaseCreationIssueTool(
     name="create_epic",
-    description="Create new jira epic",
     issue_type="Epic"
 )
 
 create_task_tool = BaseCreationIssueTool(
     name="create_epic",
-    description="Create new jira Task",
     issue_type="Task"
 )
 
 create_bug_tool = BaseCreationIssueTool(
     name="create_bug_tool",
-    description="Create new jira bug",
     issue_type="Bug"
 )
 
 create_story_tool = BaseCreationIssueTool(
     name="create_story_tool",
-    description="Create new jira story",
     issue_type="Story"
 )
 
 create_subtask_tool = BaseCreationIssueTool(
     name="create_sub_task_tool",
-    description="Create new jira Sub-task",
     issue_type="Sub-task",
     extra_args=[
         Arg(name="parent_id", default="", type="str", description=f"Task parent id, like: JRA-817", required=True)
@@ -76,17 +69,17 @@ create_subtask_tool = BaseCreationIssueTool(
     extra_content=f"""--parent_id="{{{{ .parent_id }}}}" """
 )
 
-get_issue_tool = JiraPythonTool(
-    name="get_issue_view",
+view_issue_tool = JiraPythonTool(
+    name="issue_view",
     description="View details of a Jira issue",
-    content="""python /tmp/get_issue.py "{{ .issue_key }}" """,
+    content="""python /tmp/view_issue.py "{{ .issue_key }}" """,
     args=[
         Arg(name="issue_key", default="", type="str", description=f"Issue id, like: JRA-817", required=True)
     ],
     with_files=[
         FileSpec(
-            destination="/tmp/get_issue.py",
-            content=inspect.getsource(get_issue),
+            destination="/tmp/view_issue.py",
+            content=inspect.getsource(view_issue),
         ),
         FileSpec(
             destination="/tmp/basic_funcs.py",
@@ -101,10 +94,10 @@ list_issue_tool = JiraPythonTool(
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
         Arg(name="issues_number", type="int", description="Number of issue to list", required=False),
-        Arg(name="status", type="str", description="Issues status, such as Done", required=False),
-        Arg(name="assignee", type="str", description="including assignee user", required=False),
-        Arg(name="priority", type="str", description="including issues priority", required=False),
-        Arg(name="reporter", type="str", description="including assignee reporter", required=False),
+        Arg(name="status", type="str", description="filtering by issues status, such as Done", required=False),
+        Arg(name="assignee", type="str", description="filtering assignee user", required=False),
+        Arg(name="priority", type="str", description="filtering issues priority", required=False),
+        Arg(name="reporter", type="str", description="filtering assignee reporter", required=False),
     ],
     with_files=[
         FileSpec(
@@ -118,8 +111,8 @@ list_issue_tool = JiraPythonTool(
     ])
 
 add_comment_issue_tool = JiraPythonTool(
-    name="add_comment_issue",
-    description="Add a comment to a Jira issue, optionally using a template.",
+    name="issue_add_comment",
+    description="Add a comment to a Jira issue",
     content="""python /tmp/create_issue_comment.py "{{ .issue_key }}" "{{ .comment }}" """,
     args=[
         Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
@@ -141,10 +134,10 @@ register_jira_tool(create_subtask_tool)
 register_jira_tool(create_bug_tool)
 register_jira_tool(create_epic_tool)
 register_jira_tool(create_story_tool)
-register_jira_tool(get_issue_tool)
+register_jira_tool(view_issue)
 register_jira_tool(list_issue_tool)
 register_jira_tool(add_comment_issue_tool)
 
-# for tool in [issue_list, issue_create, issue_edit, issue_assign, issue_move, issue_view,
-#              issue_comment_add, issue_link, issue_watch, issue_attachments, issue_transitions]:
-#     register_jira_tool(tool)
+for tool in [create_task_tool, create_subtask_tool, create_bug_tool, create_epic_tool, create_story_tool,
+             view_issue_tool, list_issue_tool, add_comment_issue_tool]:
+    register_jira_tool(tool)

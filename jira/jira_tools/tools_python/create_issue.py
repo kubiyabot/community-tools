@@ -79,7 +79,9 @@ def main():
         response = requests.post(
             post_issue_url, headers=get_jira_basic_headers(), data=json.dumps(payload)
         )
+        response.raise_for_status()
         print(response.json())
+        print("Issue created successfully.")
     except Exception as e:
         print(f"Failed to create issue: {e}")
 
