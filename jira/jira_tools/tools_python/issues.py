@@ -100,14 +100,16 @@ list_issue_tool = JiraPythonTool(
     description="List Jira issues",
     content="""
 python /tmp/list_issues.py "{{ .project_key }}" --num="{{ .num }}" --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" 
+echo $("{{ .num }})"
+echo $("{{ .status }})"
 """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
-        Arg(name="num", type="int", default=5, description="Number of issue to list", required=False),
-        Arg(name="status", type="str",default="", description="Issues status, such as Done", required=False),
-        Arg(name="assignee", type="str",default="", description="including assignee user", required=False),
-        Arg(name="priority", type="str",default="", description="including issues priority", required=False),
-        Arg(name="reporter", type="str",default="", description="including assignee reporter", required=False),
+        Arg(name="num", type="int", description="Number of issue to list", required=False),
+        Arg(name="status", type="str", description="Issues status, such as Done", required=False),
+        Arg(name="assignee", type="str", description="including assignee user", required=False),
+        Arg(name="priority", type="str", description="including issues priority", required=False),
+        Arg(name="reporter", type="str", description="including assignee reporter", required=False),
     ],
     with_files=[
         FileSpec(
