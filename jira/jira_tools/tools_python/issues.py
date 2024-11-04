@@ -99,7 +99,7 @@ list_issue_tool = JiraPythonTool(
     name="issue_list",
     description="List Jira issues",
     content="""python /tmp/list_issues.py "{{ .project_key }}" --num="{{ .num }}" --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" 
-    ;echo history 
+    && echo history 
     """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
