@@ -73,7 +73,7 @@ def main():
             reporter
         )
         for issue in latest_issues:
-            print(f"{issue['key']}: {issue['summary']} (Created on {issue['created']})")
+            print(f"{issue['key']}: {issue['summary']} - Created on {issue['created']})")
     except Exception as e:
         print(f"Failed to create issue: {e}")
 
