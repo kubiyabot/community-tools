@@ -84,7 +84,7 @@ def main():
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if not no_value else 5,
+            int(args.issues_number) if not no_value else 5,
             args.status if not no_value else None,
             args.assignee if not no_value else None,
             args.priority if not no_value else None,
