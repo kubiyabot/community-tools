@@ -58,7 +58,6 @@ def main():
     args = parser.parse_args()
 
     issues_number = args.issues_number if not '<no value>' else 5
-    print("issues_number" + issues_number)
     status = args.status if not '<no value>' else None
     assignee = args.assignee if not '<no value>' else None
     priority = args.priority if not '<no value>' else None
