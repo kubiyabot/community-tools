@@ -78,7 +78,7 @@ create_subtask_tool = BaseCreationIssueTool(
 get_issue_tool = JiraPythonTool(
     name="get_issue_information",
     description="Get Jira issue information",
-    content="python /tmp/create_issue.py {{ .issue_key }}",
+    content="""python /tmp/create_issue.py "{{ .issue_key }}" """,
     args=[
         Arg(name="issue_key", default="", type="str", description=f"Issue id, like: JRA-817", required=True)
     ],
