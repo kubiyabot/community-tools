@@ -36,6 +36,7 @@ def list_issues_in_project(
         search_url = (
             f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
         )
+        print(search_url)
         response = requests.get(
             search_url, headers=get_jira_basic_headers(), params=params
         )
