@@ -1,3 +1,5 @@
+from typing import Dict
+
 from basic_funcs import (
     get_jira_cloud_id,
     get_jira_basic_headers,
@@ -17,7 +19,7 @@ def base_jira_payload(
         priority: str = None,
         assignee_email: str = None,
         label: str = None,
-) -> dict:
+) -> Dict:
     payload = {
         "fields": {
             "project": {"key": project_key},
