@@ -23,7 +23,7 @@ def list_issues_in_project(project_key, num_issues=5, status=None, assignee=None
         "maxResults": num_issues,
         "fields": "summary,created",
     }
-
+    print("jql_query: "+ jql_query)
     try:
         search_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
         response = requests.get(search_url, headers=get_jira_basic_headers(), params=params)
