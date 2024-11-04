@@ -86,10 +86,10 @@ def main():
         latest_issues = list_issues_in_project(
             args.project_key,
             5,
-            args.status if args.issues_number != no_value else None,
-            args.assignee if args.issues_number != no_value else None,
-            args.priority if args.issues_number != no_value else None,
-            args.reporter if args.issues_number != no_value else None,
+            # args.status if args.issues_number != no_value else None,
+            # args.assignee if args.issues_number != no_value else None,
+            # args.priority if args.issues_number != no_value else None,
+            # args.reporter if args.issues_number != no_value else None,
         )
         for issue in latest_issues:
             print(
