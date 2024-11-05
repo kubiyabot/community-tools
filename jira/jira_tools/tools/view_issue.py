@@ -7,22 +7,29 @@ from basic_funcs import (
 import requests
 
 
+def get_or_default(dictionary, *keys, default=None):
+    for key in keys:
+        dictionary = dictionary.get(key)
+        if dictionary is None:
+            return default
+    return dictionary
+
 def extract_relevant_fields(data):
     fields = data.get("fields", {})
 
     filtered_data = {
-        "issuetype_name": fields.get("issuetype", {}).get("name"),
-        "description_content": fields.get("description", {}),
-        "project_self": fields.get("project", {}).get("self"),
-        "project_key": fields.get("project", {}).get("key"),
-        "project_name": fields.get("project", {}).get("name"),
-        "project_type": fields.get("project", {}).get("projectTypeKey"),
-        "priority_name": fields.get("priority", {}).get("name"),
-        "created": fields.get("created"),
-        "assignee_email": fields.get("assignee", {}).get("emailAddress"),
-        "assignee_displayName": fields.get("assignee", {}).get("displayName"),
-        "reporter_email": fields.get("reporter", {}).get("emailAddress"),
-        "reporter_displayName": fields.get("reporter", {}).get("displayName"),
+        "issuetype_name": get_or_default(fields, "issuetype", "name"),
+        "description_content": get_or_default(fields, "description"),
+        "project_self": get_or_default(fields, "project", "self"),
+        "project_key": get_or_default(fields, "project", "key"),
+        "project_name": get_or_default(fields, "project", "name"),
+        "project_type": get_or_default(fields, "project", "projectTypeKey"),
+        "priority_name": get_or_default(fields, "priority", "name"),
+        "created": get_or_default(fields, "created"),
+        "assignee_email": get_or_default(fields, "assignee", "emailAddress"),
+        "assignee_displayName": get_or_default(fields, "assignee", "displayName"),
+        "reporter_email": get_or_default(fields, "reporter", "emailAddress"),
+        "reporter_displayName": get_or_default(fields, "reporter", "displayName"),
     }
 
     return filtered_data
