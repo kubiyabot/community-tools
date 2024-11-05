@@ -98,7 +98,8 @@ def main():
             )
 
     except Exception as e:
-        print(f"Failed to create issue: {e}")
+        print(f"Failed to list issues: {e}")
+        raise RuntimeError(f"Failed to list issues: {e}")
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ def extract_relevant_fields(data):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Get Jira issue")
+    parser = argparse.ArgumentParser(description="Get Jira issues")
     parser.add_argument("issue_key", help="Issue key for the Jira issue")
     args = parser.parse_args()
     get_issue_url = f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/issue/{args.issue_key}"
@@ -40,7 +40,8 @@ def main():
         response = requests.get(get_issue_url, headers=get_jira_basic_headers())
         print(extract_relevant_fields(response.json()))
     except Exception as e:
-        print(f"Failed to create issue: {e}")
+        print(f"Failed to view issues: {e}")
+        raise RuntimeError(f"Failed to view issues: {e}")
 
 
 if __name__ == "__main__":

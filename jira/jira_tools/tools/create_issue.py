@@ -90,6 +90,7 @@ def main():
         print("Issue created successfully.")
     except Exception as e:
         print(f"Failed to create issue: {e}")
+        raise RuntimeError(f"Failed to create issue: {e}")
 
 
 if __name__ == "__main__":

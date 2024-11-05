@@ -6,6 +6,7 @@ from requests.exceptions import HTTPError
 ATLASSIAN_RESOURCES_URL = "https://api.atlassian.com/oauth/token/accessible-resources"
 ATLASSIAN_JIRA_API_URL = "https://api.atlassian.com/ex/jira"
 
+
 def _get_jira_token() -> str:
     token = os.getenv("JIRA_OAUTH_TOKEN", "")
 
@@ -15,6 +16,7 @@ def _get_jira_token() -> str:
             "You need to set up jira integration for your teammate agent...")
 
     return token
+
 
 def get_jira_cloud_id() -> str:
     headers = {
@@ -32,6 +34,7 @@ def get_jira_cloud_id() -> str:
         return resources[0]["id"]
 
     except HTTPError as e:
+        print(f"Failed from Jira api server: {e}")
         raise RuntimeError(f"Failed from Jira api server: {e}")
 
 
@@ -50,6 +53,7 @@ def get_jira_user_id(email: str) -> str:
         response.raise_for_status()
         return response.json()[0]["accountId"]
     except HTTPError as e:
+        print(f"Failed from Jira api server: {e}")
         raise RuntimeError(f"Failed from Jira api server: {e}")
 
 

@@ -38,7 +38,8 @@ def main():
         response.raise_for_status()
         print(f"Comment added to issue {args.issue_key} successfully.")
     except Exception as e:
-        print(f"Failed to create issue: {e}")
+        print(f"Failed to added to comment issue: {e}")
+        raise RuntimeError(f"Failed to added to comment issue: {e}")
 
 
 if __name__ == "__main__":
