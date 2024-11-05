@@ -31,7 +31,6 @@ class JiraPythonTool(Tool):
             name=name,
             description=description,
             image="python:3.12-slim",
-            icon_url="https://logos-world.net/wp-content/uploads/2021/02/Jira-Emblem.png",
             on_build="""
 pip install requests > /dev/null
 pip install kubiya-sdk > /dev/null
