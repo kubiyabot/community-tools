@@ -5,6 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 # This custom image was designed to work with Kubiya
 JIRA_DOCKER_IMAGE = "ghcr.io/kubiyabot/jira-cli:latest"
 
+
 class JiraTool(Tool):
     def __init__(self, name, description, content, args, mermaid_diagram=None):
         super().__init__(
@@ -16,8 +17,32 @@ class JiraTool(Tool):
             args=args,
             env=["JIRA_WORKSPACE_NAME"],
             secrets=["JIRA_OAUTH_TOKEN"],
-            mermaid=mermaid_diagram
+            mermaid=mermaid_diagram,
         )
+
+
+class JiraPythonTool(Tool):
+    def __init__(
+            self, name, description, content, args, with_files=None, mermaid_diagram=None
+    ):
+        if with_files is None:
+            with_files = []
+        super().__init__(
+            name=name,
+            description=description,
+            image="python:3.12-slim",
+            on_build="""
+pip install requests > /dev/null
+pip install kubiya-sdk > /dev/null
+            """,
+            content=content,
+            args=args,
+            with_files=with_files,
+            env=["JIRA_WORKSPACE_NAME"],
+            secrets=["JIRA_OAUTH_TOKEN"],
+            mermaid=mermaid_diagram,
+        )
+
 
 def register_jira_tool(tool):
     tool_registry.register("jira", tool)
