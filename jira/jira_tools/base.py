@@ -32,8 +32,8 @@ class JiraPythonTool(Tool):
             description=description,
             image="python:3.12-slim",
             on_build="""
-pip install requests > /dev/null 2>&1
-pip install kubiya-sdk > /dev/null 2>&1
+pip install requests > /dev/null
+pip install kubiya-sdk > /dev/null
             """,
             content=content,
             args=args,

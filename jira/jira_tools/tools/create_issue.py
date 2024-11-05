@@ -1,3 +1,5 @@
+import json
+import requests
 from typing import Dict
 
 from basic_funcs import (
@@ -6,9 +8,6 @@ from basic_funcs import (
     ATLASSIAN_JIRA_API_URL,
     get_jira_user_id,
 )
-
-import json
-import requests
 
 
 def base_jira_payload(
