@@ -4,30 +4,96 @@ from kubiya_sdk.tools.registry import tool_registry
 
 resource_usage_tool = KubernetesTool(
     name="resource_usage",
-    description="Gathers resource usage insights for the cluster",
+    description="Shows resource usage of nodes or pods in a specific namespace for pods",
     content="""
     #!/bin/bash
     set -e
-    kubectl top nodes
-    kubectl top pods $([[ -n "$namespace" ]] && echo "-n $namespace")
+
+    # Ensure resource type is either 'nodes' or 'pods'
+    if [ "$resource_type" != "nodes" ] && [ "$resource_type" != "pods" ]; then
+        echo "❌ Invalid resource type. Use 'nodes' or 'pods'."
+        exit 1
+    fi
+
+    if [ "$resource_type" = "nodes" ]; then
+        echo "🖥️  Node Resource Usage:"
+        echo "======================="
+        kubectl top nodes | awk 'NR>1 {print "  💻 " $0}'
+    elif [ "$resource_type" = "pods" ]; then
+        echo "🛠️  Pod Resource Usage:"
+        echo "====================="
+        # If no namespace is provided, search in all namespaces
+        if [ -z "$namespace" ]; then
+            kubectl top pods --all-namespaces | awk 'NR>1 {print "  🔧 " $0}'
+        else
+            kubectl top pods -n $namespace | awk 'NR>1 {print "  🔧 " $0}'
+        fi
+    fi
     """,
     args=[
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
+        Arg(name="resource_type", type="str", description="Resource type to show usage for (nodes or pods)", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace (for pods only, optional)", required=False),
     ],
 )
 
+
+
 cluster_health_tool = KubernetesTool(
     name="cluster_health",
-    description="Checks overall cluster health",
+    description="Provides a summary of the Kubernetes cluster health",
     content="""
     #!/bin/bash
     set -e
-    kubectl get nodes
-    kubectl get pods --all-namespaces
-    kubectl get events --all-namespaces
+    echo "🏥 Cluster Health Summary:"
+    echo "========================="
+    echo "🖥️  Node Status:"
+    kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason | 
+    awk 'NR>1 {
+        status = $2;
+        emoji = "❓";
+        if (status == "Ready") emoji = "✅";
+        else if (status == "NotReady") emoji = "❌";
+        else if (status == "SchedulingDisabled") emoji = "🚫";
+        print "  " emoji " " $0;
+    }'
+    echo "\n🛠️  Pod Status:"
+    kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase,NODE:.spec.nodeName | 
+    awk 'NR>1 {
+        status = $3;
+        emoji = "❓";
+        if (status == "Running") emoji = "✅";
+        else if (status == "Pending") emoji = "⏳";
+        else if (status == "Succeeded") emoji = "🎉";
+        else if (status == "Failed") emoji = "❌";
+        else if (status == "Unknown") emoji = "❔";
+        print "  " emoji " " $0;
+    }'
+    echo "\n🚀 Deployment Status:"
+    kubectl get deployments --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,DESIRED:.spec.replicas,AVAILABLE:.status.availableReplicas,UP-TO-DATE:.status.updatedReplicas | 
+    awk 'NR>1 {
+        if ($3 == $4 && $3 == $5) emoji = "✅";
+        else if ($4 == "0") emoji = "❌";
+        else emoji = "⚠️";
+        print "  " emoji " " $0;
+    }'
+    echo "\n💾 Persistent Volume Status:"
+    kubectl get pv -o custom-columns=NAME:.metadata.name,CAPACITY:.spec.capacity.storage,STATUS:.status.phase,CLAIM:.spec.claimRef.name | 
+    awk 'NR>1 {
+        status = $3;
+        emoji = "❓";
+        if (status == "Bound") emoji = "✅";
+        else if (status == "Available") emoji = "🆓";
+        else if (status == "Released") emoji = "🔓";
+        else if (status == "Failed") emoji = "❌";
+        print "  " emoji " " $0;
+    }'
     """,
     args=[],
 )
 
-tool_registry.register("kubernetes", resource_usage_tool)
-tool_registry.register("kubernetes", cluster_health_tool)
+# Register all tools
+for tool in [
+    resource_usage_tool,
+    cluster_health_tool,
+]:
+    tool_registry.register("kubernetes", tool)
