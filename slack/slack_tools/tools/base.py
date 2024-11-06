@@ -4,7 +4,7 @@ import json
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
 class SlackTool(Tool):
-    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+    def __init__(self, name, description, action, args,env = [], long_running=False, mermaid_diagram=None):
         env = ["KUBIYA_USER_EMAIL", *env]
         secrets = ["SLACK_API_TOKEN"]
         
@@ -113,13 +113,8 @@ def execute_slack_action(token, action, operation, **kwargs):
             if 'text' not in kwargs:
                 logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
                 return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
-            if operation == "slack_send_message_to_predefined_channel":
-                result = send_slack_message(client, os.environ["NOTIFICATION_CHANNEL"], kwargs['text'])
-            else:
-                if 'channel' not in kwargs:
-                    logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
-                    return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
-                result = send_slack_message(client, kwargs['channel'], kwargs['text'])    
+            
+            result = send_slack_message(client, os.environ["NOTIFICATION_CHANNEL"], kwargs['text'])
         else:
             logger.info(f"Executing action: {{action}}")
             method = getattr(client, action)

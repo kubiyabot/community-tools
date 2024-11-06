@@ -9,16 +9,6 @@ slack_send_message = SlackTool(
     action="chat_postMessage",
     args=[
         Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
-        Arg(name="channel", type="str", description="The channel name (with or without # prefix) or ID to send the message to", required=True),
-    ],
-)
-
-slack_send_message_to_predefined_channel = SlackTool(
-    name="slack_send_message_to_predefined_channel",
-    description="Send a message to predefined channel",
-    action="chat_postMessage",
-    args=[
-        Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
     ],
     env=["NOTIFICATION_CHANNEL"]
 )
@@ -157,7 +147,6 @@ all_tools = [
     slack_get_channel_info,
     slack_get_user_info,
     slack_get_channel_history,
-    slack_send_message_to_predefined_channel,
 ]
 
 # Register all Slack tools
