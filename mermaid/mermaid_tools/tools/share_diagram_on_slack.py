@@ -1,4 +1,4 @@
-from mermaid_tools.tools.base import MermaidTool
+from ..base import MermaidTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools import tool_registry
 
@@ -6,12 +6,12 @@ share_diagram_on_slack_tool = MermaidTool(
     name="share_diagram_on_slack",
     description="Renders a Mermaid diagram from raw input and shares it on Slack. You can specify the Slack destination using @ for direct messages or # for channels.",
     content="""
-#!/bin/bash
+#!/bin/sh
 set -euo pipefail
 
 # Function to display engaging messages
-function print_with_delay() {
-    local message="$1"
+print_with_delay() {
+    message="$1"
     echo "$message"
     sleep 1
 }
@@ -46,11 +46,12 @@ if [ -z "$CHANNEL" ]; then
 fi
 
 # Create a temporary input file
-INPUT_FILE=$(mktemp /tmp/diagram.XXXXXX.mmd)
+TEMP_DIR=$(mktemp -d)
+INPUT_FILE="$TEMP_DIR/diagram.mmd"
 echo "$diagram_content" > "$INPUT_FILE"
 
 # Set output file
-OUTPUT_FILE="diagram_output.${output_format:-png}"
+OUTPUT_FILE="$TEMP_DIR/diagram_output.${output_format:-png}"
 
 # Set theme and background options
 THEME_OPTION=""
@@ -68,7 +69,7 @@ print_with_delay "🎨 Rendering the diagram..."
 # Run mermaid-cli command to render the diagram
 if ! mmdc -i "$INPUT_FILE" -o "$OUTPUT_FILE" -f "${output_format:-png}" $THEME_OPTION $BACKGROUND_OPTION; then
     echo "❌ Error: Failed to render the diagram."
-    rm "$INPUT_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
@@ -79,28 +80,28 @@ print_with_delay "📤 Uploading diagram to Slack..."
 export SLACK_CLI_TOKEN="$SLACK_API_TOKEN"
 
 # Determine Slack destination type
-if [[ "$CHANNEL" == @* ]]; then
+if echo "$CHANNEL" | grep -q '^@'; then
     DESTINATION_TYPE="--dest"
     DESTINATION="${CHANNEL#@}"
-elif [[ "$CHANNEL" == \#* ]]; then
+elif echo "$CHANNEL" | grep -q '^#'; then
     DESTINATION_TYPE="--channel"
     DESTINATION="${CHANNEL#\#}"
 else
     echo "❌ Error: 'slack_destination' must start with '@' for direct messages or '#' for channels."
-    rm "$INPUT_FILE" "$OUTPUT_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
 if ! slack file upload "$OUTPUT_FILE" "$DESTINATION_TYPE" "$DESTINATION" --comment "$COMMENT"; then
     echo "❌ Error: Failed to upload the diagram to Slack."
-    rm "$INPUT_FILE" "$OUTPUT_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
 print_with_delay "✅ Diagram shared on Slack successfully!"
 
 # Clean up temporary files
-rm "$INPUT_FILE" "$OUTPUT_FILE"
+rm -rf "$TEMP_DIR"
 """,
     args=[
         Arg(name="diagram_content", type="str", description="Mermaid diagram content as a string.", required=True),
