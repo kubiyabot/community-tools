@@ -25,19 +25,23 @@ class MermaidTool(Tool):
 
         # Build the content that installs dependencies and runs the shell script
         content = f"""
-        #!/bin/sh
-        set -eu
+        #!/bin/bash
+        set -e
 
-        # Install dependencies silently
+        echo "🎨 Request to render diagram received. Please wait... ⏳"
         apt-get update -qq >/dev/null
-        apt-get install -yqq curl jq >/dev/null
-        npm install -g @mermaid-js/mermaid-cli >/dev/null
-        curl -s -L -o /usr/local/bin/slack https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && chmod +x /usr/local/bin/slack
+        apt-get install -yqq curl jq ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
+            libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 \
+            libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 \
+            libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \
+            libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
+            libxss1 libxtst6 lsb-release wget xdg-utils libgobject-2.0-0 >/dev/null 2>&1
 
-        # Ensure the script is executable
+        npm install -g @mermaid-js/mermaid-cli@latest >/dev/null 2>&1
+        curl -s -L -o /usr/local/bin/slack https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack
+        chmod +x /usr/local/bin/slack
+
         chmod +x {script_path}
-
-        # Run the script
         exec {script_path}
         """
 
@@ -48,7 +52,7 @@ class MermaidTool(Tool):
             name=name,
             description=description,
             type="docker",
-            image="node:18-slim",  # Using the Node.js image with npm
+            image="node:18-slim",
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
