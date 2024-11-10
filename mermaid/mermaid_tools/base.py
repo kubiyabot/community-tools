@@ -37,22 +37,22 @@ class MermaidTool(Tool):
         export DEBIAN_FRONTEND=noninteractive
 
         # Install dependencies and capture all output
-        (
-            apt-get update -qq && \
-            apt-get install -yqq --no-install-recommends \
-                curl chromium chromium-common chromium-sandbox \
-                libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-                libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-                libxfixes3 libxrandr2 libgbm1 libasound2 jq && \
-            npm install -g @mermaid-js/mermaid-cli@latest && \
-            curl -s -L -o /usr/local/bin/slack \
-                https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
+        {{
+            apt-get update -qq && \\
+            apt-get install -yqq --no-install-recommends \\
+                curl chromium chromium-common chromium-sandbox \\
+                libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \\
+                libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \\
+                libxfixes3 libxrandr2 libgbm1 libasound2 jq && \\
+            npm install -g @mermaid-js/mermaid-cli@latest && \\
+            curl -s -L -o /usr/local/bin/slack \\
+                https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \\
             chmod +x /usr/local/bin/slack
-        ) >> "$LOG_FILE" 2>&1 || {
+        }} >> "$LOG_FILE" 2>&1 || {{
             echo "❌ Setup failed. Error log:" 2>&1
             cat "$LOG_FILE"
             exit 1
-        }
+        }}
 
         # Set Chrome path for Puppeteer
         export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
@@ -63,11 +63,11 @@ class MermaidTool(Tool):
 
         # Run the main script and capture output
         echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
-        {script_path} 2>&1 | tee -a "$LOG_FILE" || {
+        {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
             echo "❌ Script execution failed. Error log:" 2>&1
             cat "$LOG_FILE"
             exit 1
-        }
+        }}
 
         # Clean up
         rm -f "$LOG_FILE"
