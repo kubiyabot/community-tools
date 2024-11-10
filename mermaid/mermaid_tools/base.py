@@ -36,7 +36,7 @@ class MermaidTool(Tool):
         chmod +x {script_path}
 
         # Run the script
-        bash {script_path}
+        exec {script_path}
         """
 
         # Clean up content by stripping leading/trailing whitespace
