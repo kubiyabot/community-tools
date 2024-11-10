@@ -1,5 +1,7 @@
 #!/bin/bash
-set -euo pipefail
+
+# exit on error
+set -e
 
 # Check required arguments
 if [ -z "${diagram_content:-}" ]; then
