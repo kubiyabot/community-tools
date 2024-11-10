@@ -25,7 +25,7 @@ class MermaidTool(Tool):
 
         # Build the content that installs dependencies and runs the shell script
         content = f"""
-        #!/bin/bash
+        #!/bin/sh
         set -e
 
         # Create log file for error tracking
@@ -33,8 +33,11 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up environment..." 2>&1 | tee -a "$LOG_FILE"
 
-        # Install minimal dependencies for Slack CLI
-        apt-get update -qq && apt-get install -yqq --no-install-recommends curl jq >/dev/null 2>&1
+        # Install minimal dependencies for Slack CLI (Alpine Linux)
+        apk add --no-cache curl jq bash >/dev/null 2>&1
+
+        # Create scripts directory
+        mkdir -p /tmp/scripts
 
         # Install slack-cli
         curl -s -L -o /usr/local/bin/slack \
@@ -46,7 +49,7 @@ class MermaidTool(Tool):
 
         # Run the main script and capture output
         echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
-        {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
+        bash {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
             echo "❌ Script execution failed. Error log:" 2>&1
             cat "$LOG_FILE"
             exit 1

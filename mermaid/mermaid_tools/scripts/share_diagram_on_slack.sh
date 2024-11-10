@@ -13,11 +13,9 @@ fi
 comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
 
-# Create temporary workspace
+# Create temporary workspace for output only
 TEMP_DIR=$(mktemp -d)
-INPUT_FILE="$TEMP_DIR/diagram.mmd"
 OUTPUT_FILE="$TEMP_DIR/diagram_output.${output_format}"
-echo "$diagram_content" > "$INPUT_FILE"
 
 # Set theme and background options
 THEME_OPTION=""
@@ -25,9 +23,9 @@ BACKGROUND_OPTION=""
 [ -n "${theme:-}" ] && THEME_OPTION="-t $theme"
 [ -n "${background_color:-}" ] && BACKGROUND_OPTION="-b $background_color"
 
-# Render the diagram
+# Render the diagram using stdin
 echo "🎯 Rendering diagram..."
-if ! mmdc -i "$INPUT_FILE" -o "$OUTPUT_FILE" -f "$output_format" $THEME_OPTION $BACKGROUND_OPTION; then
+if ! echo "$diagram_content" | mmdc --input - --output "$OUTPUT_FILE" -f "$output_format" $THEME_OPTION $BACKGROUND_OPTION; then
     echo "❌ Failed to render diagram. Please check your diagram syntax."
     rm -rf "$TEMP_DIR"
     exit 1
