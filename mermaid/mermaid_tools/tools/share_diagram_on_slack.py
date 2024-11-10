@@ -12,7 +12,7 @@ share_diagram_on_slack_tool = MermaidTool(
     name="share_diagram_on_slack",
     description="Renders a Mermaid diagram from raw input and shares it on Slack using slack-cli.",
     args=[
-        Arg(name="diagram_content", type="str", description="Mermaid diagram content as a string.", required=True),
+        Arg(name="diagram_content", type="str", description="Mermaid diagram content as a string (pure mermaid syntax)", required=True),
         Arg(name="slack_destination", type="str", description="Slack destination to send the diagram. Use '@username' for direct messages or '#channelname' for channels.", required=True),
         Arg(name="comment", type="str", description="Comment to include with the uploaded diagram. Defaults to 'Here is the diagram.'", required=False, default="Here is the diagram."),
         Arg(name="output_format", type="str", description="Output format for the diagram (svg, png, pdf). Defaults to 'png'.", required=False, default="png"),
@@ -25,8 +25,8 @@ share_diagram_on_slack_tool = MermaidTool(
             content=script_content,
         ),
     ],
-    secrets=["SLACK_API_TOKEN"],
-    env=["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"],
+    secrets=["SLACK_API_TOKEN"], # Slack API token (fetched automatically if Slack integration is enabled)
+    env=["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"], # Slack specific settings for thread / conversation context
 )
 
 tool_registry.register("mermaid", share_diagram_on_slack_tool)

@@ -18,19 +18,16 @@ class MermaidTool(Tool):
         script_path = script_files[0]
 
         # Build the content that installs dependencies and runs the shell script
-        content = f"""
-        #!/bin/sh
-        set -e
+        content = f"""#!/bin/sh
+set -e
 
-        echo "🎨 Setting up..."
+echo "🎨 Preparing to draw diagram..."
 
-        # Install Chrome and set environment variables
-        apk add --no-cache chromium curl jq >/dev/null 2>&1
-        export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-        export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
+apk add chromium curl jq >/dev/null 2>&1
+export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
 
-        # Create puppeteer config with additional flags
-        cat > /puppeteer-config.json << 'EOF'
+cat > /puppeteer-config.json << 'EOF'
 {{
     "executablePath": "/usr/bin/chromium",
     "args": [
@@ -44,27 +41,21 @@ class MermaidTool(Tool):
 }}
 EOF
 
-        # Install slack-cli
-        curl -s -L -o /usr/local/bin/slack \
-            https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
-            chmod +x /usr/local/bin/slack
+echo "🔗 Validating syntax..."
+curl -s -L -o /usr/local/bin/slack \
+    https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack
+chmod +x /usr/local/bin/slack
 
-        # Create directories and set permissions
-        mkdir -p /tmp/scripts /data
-        chown -R mermaidcli:mermaidcli /data /tmp/scripts
-        chmod 755 /tmp/scripts
+echo "Still setting up..."
+mkdir -p /tmp/scripts /data
+chown -R mermaidcli:mermaidcli /data /tmp/scripts
+chmod 755 /tmp/scripts
 
-        # Make script executable
-        chmod 755 {script_path}
-        chown mermaidcli:mermaidcli {script_path}
-
-        # Run as root (since we need privileged access for Chrome)
-        cd /data
-        exec {script_path}
-        """
-
-        # Clean up content by stripping leading/trailing whitespace
-        content = '\n'.join(line.strip() for line in content.strip().splitlines())
+echo "🚀 Preparing to draw diagram..."
+chmod 755 {script_path}
+chown mermaidcli:mermaidcli {script_path}
+cd /data
+exec {script_path}"""
 
         super().__init__(
             name=name,

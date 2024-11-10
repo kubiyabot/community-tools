@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "🎨 Generating diagram..."
+echo "🎨 Starting diagram generation process..."
 
 # Check required arguments
 if [ -z "${diagram_content:-}" ] || [ -z "${slack_destination:-}" ]; then
@@ -9,15 +9,16 @@ if [ -z "${diagram_content:-}" ] || [ -z "${slack_destination:-}" ]; then
     exit 1
 fi
 
+echo "📋 Validating inputs..."
 # Set defaults
 comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
 OUTPUT_FILE="/data/diagram.${output_format}"
 
-# Generate diagram
+echo "🖌️ Generating diagram..."
 echo "$diagram_content" | mmdc -p /puppeteer-config.json --input - --output "$OUTPUT_FILE"
 
-# Share on Slack
+echo "📤 Uploading to Slack channel: $slack_destination"
 slack file upload "$OUTPUT_FILE" --channels "$slack_destination" --title "$comment"
 
-echo "✨ Done!"
+echo "✨ Done! Diagram has been generated and shared."
