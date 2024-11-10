@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-echo "🎨 Preparing to generate diagram..."
+echo "🎨 Generating diagram..."
 
 # Check required arguments
 if [ -z "${diagram_content:-}" ] || [ -z "${slack_destination:-}" ]; then
@@ -9,35 +9,15 @@ if [ -z "${diagram_content:-}" ] || [ -z "${slack_destination:-}" ]; then
     exit 1
 fi
 
-# Set defaults if not provided
+# Set defaults
 comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
+OUTPUT_FILE="/data/diagram.${output_format}"
 
-# Create temporary workspace for output only
-TEMP_DIR=$(mktemp -d)
-OUTPUT_FILE="$TEMP_DIR/diagram_output.${output_format}"
+# Generate diagram
+echo "$diagram_content" | mmdc -p /puppeteer-config.json --input - --output "$OUTPUT_FILE"
 
-# Set theme and background options
-THEME_OPTION=""
-BACKGROUND_OPTION=""
-[ -n "${theme:-}" ] && THEME_OPTION="-t $theme"
-[ -n "${background_color:-}" ] && BACKGROUND_OPTION="-b $background_color"
+# Share on Slack
+slack file upload "$OUTPUT_FILE" --channels "$slack_destination" --title "$comment"
 
-# Render the diagram using stdin
-echo "🎯 Rendering diagram..."
-if ! echo "$diagram_content" | mmdc --input - --output "$OUTPUT_FILE" -f "$output_format" $THEME_OPTION $BACKGROUND_OPTION; then
-    echo "❌ Failed to render diagram. Please check your diagram syntax."
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-# Upload to Slack
-echo "📤 Sharing to Slack..."
-if ! slack file upload "$OUTPUT_FILE" --channels "$slack_destination" --title "$comment"; then
-    echo "❌ Failed to upload to Slack. Please check your Slack token and destination."
-    rm -rf "$TEMP_DIR"
-    exit 1
-fi
-
-rm -rf "$TEMP_DIR"
-echo "✨ Diagram shared successfully!"
+echo "✨ Done!"
