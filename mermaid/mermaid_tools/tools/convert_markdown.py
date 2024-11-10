@@ -1,4 +1,4 @@
-from ..base import MermaidTool
+from .base import MermaidTool
 from kubiya_sdk.tools import Arg
 
 convert_markdown_tool = MermaidTool(
