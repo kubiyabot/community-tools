@@ -47,12 +47,14 @@ EOF
             https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
             chmod +x /usr/local/bin/slack
 
-        # Make script executable
-        chmod +x {script_path}
+        # Create directories and set permissions
+        mkdir -p /tmp/scripts /data
+        chown -R mermaidcli:mermaidcli /data /tmp/scripts
+        chmod 755 /tmp/scripts
 
-        # Create data directory and set permissions
-        mkdir -p /data
-        chown -R mermaidcli:mermaidcli /data
+        # Make script executable
+        chmod 755 {script_path}
+        chown mermaidcli:mermaidcli {script_path}
 
         # Switch to mermaidcli user and run the script
         cd /data
