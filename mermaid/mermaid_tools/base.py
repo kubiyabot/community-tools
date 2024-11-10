@@ -30,6 +30,9 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up..."
 
+        # Create scripts directory
+        mkdir -p /tmp/scripts
+
         # Install minimal dependencies for Slack CLI
         apk add --no-cache curl jq >/dev/null 2>&1
 
@@ -42,7 +45,7 @@ class MermaidTool(Tool):
         chmod +x {script_path}
 
         # Run the script
-        {script_path}
+        bash {script_path}
         """
 
         # Clean up content by stripping leading/trailing whitespace
