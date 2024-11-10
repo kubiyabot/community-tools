@@ -10,7 +10,7 @@ with open(script_path, 'r') as script_file:
 
 share_diagram_on_slack_tool = MermaidTool(
     name="share_diagram_on_slack",
-    description="Renders a Mermaid diagram from raw input and shares it on Slack using curl.",
+    description="Renders a Mermaid diagram from raw input and shares it on Slack using slack-cli.",
     content=script_content,
     args=[
         Arg(name="diagram_content", type="str", description="Mermaid diagram content as a string.", required=True),
