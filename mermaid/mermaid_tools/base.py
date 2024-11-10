@@ -33,30 +33,13 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up environment..." 2>&1 | tee -a "$LOG_FILE"
 
-        # Ensure non-interactive installation
-        export DEBIAN_FRONTEND=noninteractive
+        # Install minimal dependencies for Slack CLI
+        apt-get update -qq && apt-get install -yqq --no-install-recommends curl jq >/dev/null 2>&1
 
-        # Install dependencies and capture all output
-        {{
-            apt-get update -qq && \\
-            apt-get install -yqq --no-install-recommends \\
-                curl chromium chromium-common chromium-sandbox \\
-                libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \\
-                libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \\
-                libxfixes3 libxrandr2 libgbm1 libasound2 jq && \\
-            npm install -g @mermaid-js/mermaid-cli@latest && \\
-            curl -s -L -o /usr/local/bin/slack \\
-                https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \\
+        # Install slack-cli
+        curl -s -L -o /usr/local/bin/slack \
+            https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
             chmod +x /usr/local/bin/slack
-        }} >> "$LOG_FILE" 2>&1 || {{
-            echo "❌ Setup failed. Error log:" 2>&1
-            cat "$LOG_FILE"
-            exit 1
-        }}
-
-        # Set Chrome path for Puppeteer
-        export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-        export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
         # Make script executable
         chmod +x {script_path}
@@ -80,7 +63,7 @@ class MermaidTool(Tool):
             name=name,
             description=description,
             type="docker",
-            image="node:18-slim",
+            image="minlag/mermaid-cli:latest",  # Using official Mermaid CLI image
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
