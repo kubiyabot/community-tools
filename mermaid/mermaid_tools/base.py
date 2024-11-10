@@ -47,6 +47,12 @@ class MermaidTool(Tool):
         # Make script executable
         chmod +x {script_path}
 
+        # Set up environment for mmdc
+        export PATH="/node_modules/.bin:$PATH"
+        
+        # Ensure data directory exists (required by mermaid-cli)
+        mkdir -p /data
+
         # Run the main script and capture output
         echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
         bash {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
