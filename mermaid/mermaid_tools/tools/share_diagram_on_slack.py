@@ -1,14 +1,11 @@
-from mermaid_tools.tools.base import MermaidTool
+from mermaid_tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools import tool_registry
 
 share_diagram_on_slack_tool = MermaidTool(
     name="share_diagram_on_slack",
     description="Renders a Mermaid diagram from raw input and shares it on Slack. You can specify the Slack destination using @ for direct messages or # for channels.",
-    content="""s
-#!/bin/sh
-set -euo pipefail
-
+    content="""
 # Function to display engaging messages
 print_with_delay() {
     message="$1"

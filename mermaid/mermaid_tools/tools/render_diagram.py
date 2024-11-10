@@ -1,4 +1,4 @@
-from mermaid_tools.tools.base import MermaidTool
+from mermaid_tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools import tool_registry
 
@@ -6,9 +6,6 @@ render_diagram_tool = MermaidTool(
     name="render_mermaid_diagram",
     description="Renders a Mermaid diagram from raw input to a specified output format using mermaid-cli.",
     content="""
-#!/bin/bash
-set -euo pipefail
-
 # Check if diagram_content is provided
 if [ -z "${diagram_content:-}" ]; then
     echo "❌ Error: 'diagram_content' must be provided."
@@ -22,7 +19,8 @@ if [ -z "$diagram_content" ]; then
 fi
 
 # Create a temporary input file
-INPUT_FILE=$(mktemp /tmp/diagram.XXXXXX.mmd)
+TEMP_DIR=$(mktemp -d)
+INPUT_FILE="$TEMP_DIR/diagram.mmd"
 echo "$diagram_content" > "$INPUT_FILE"
 
 # Set output file
@@ -31,15 +29,15 @@ OUTPUT_FILE="${output_file:-diagram_output.${output_format}}"
 # Check if output_format is provided
 if [ -z "${output_format:-}" ]; then
     echo "❌ Error: 'output_format' must be provided."
-    rm "$INPUT_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
 # Validate output_format
-VALID_FORMATS=("svg" "png" "pdf")
-if [[ ! " ${VALID_FORMATS[@]} " =~ " ${output_format} " ]]; then
-    echo "❌ Error: 'output_format' must be one of: ${VALID_FORMATS[*]}"
-    rm "$INPUT_FILE"
+VALID_FORMATS="svg png pdf"
+if ! echo "$VALID_FORMATS" | grep -wq "$output_format"; then
+    echo "❌ Error: 'output_format' must be one of: $VALID_FORMATS"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
@@ -57,14 +55,14 @@ fi
 # Run mermaid-cli command
 if ! mmdc -i "$INPUT_FILE" -o "$OUTPUT_FILE" -f "$output_format" $THEME_OPTION $BACKGROUND_OPTION; then
     echo "❌ Error: Failed to render diagram."
-    rm "$INPUT_FILE"
+    rm -rf "$TEMP_DIR"
     exit 1
 fi
 
 echo "✅ Diagram rendered successfully! Output file: $OUTPUT_FILE"
 
-# Clean up temporary file
-rm "$INPUT_FILE"
+# Clean up temporary files
+rm -rf "$TEMP_DIR"
 """,
     args=[
         Arg(name="diagram_content", type="str", description="Mermaid diagram content as a string", required=True),
