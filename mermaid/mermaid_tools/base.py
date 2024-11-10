@@ -48,7 +48,7 @@ class MermaidTool(Tool):
             name=name,
             description=description,
             type="docker",
-            image="node:16-slim",  # Using the Node.js image with npm
+            image="node:18-slim",  # Using the Node.js image with npm
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
