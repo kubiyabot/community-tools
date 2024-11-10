@@ -25,12 +25,12 @@ class MermaidTool(Tool):
 
         # Build the content that installs dependencies and runs the shell script
         content = f"""
-        #!/bin/bash
-        set -euo pipefail
+        #!/bin/sh
+        set -eu
 
         # Install dependencies silently
         apt-get update -qq >/dev/null
-        apt-get install -yqq bash curl jq >/dev/null
+        apt-get install -yqq curl jq >/dev/null
         npm install -g @mermaid-js/mermaid-cli >/dev/null
         curl -s -L -o /usr/local/bin/slack https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && chmod +x /usr/local/bin/slack
 
