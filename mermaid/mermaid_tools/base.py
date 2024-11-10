@@ -26,9 +26,16 @@ class MermaidTool(Tool):
 
         # Install Chrome and set environment variables
         apk add --no-cache chromium curl jq >/dev/null 2>&1
-        export CHROME_BIN="/usr/bin/chromium-browser"
-        export PUPPETEER_SKIP_DOWNLOAD="true"
+        export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
         export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
+
+        # Create puppeteer config
+        cat > /puppeteer-config.json << 'EOF'
+{{
+    "executablePath": "/usr/bin/chromium",
+    "args": ["--no-sandbox", "--disable-gpu"]
+}}
+EOF
 
         # Install slack-cli
         curl -s -L -o /usr/local/bin/slack \
