@@ -33,11 +33,25 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up environment..." 2>&1 | tee -a "$LOG_FILE"
 
-        # Install minimal dependencies for Slack CLI (Alpine Linux)
-        apk add --no-cache curl jq bash >/dev/null 2>&1
+        # Install system dependencies
+        apk add --no-cache \
+            chromium \
+            curl \
+            jq \
+            bash \
+            >/dev/null 2>&1
 
-        # Create scripts directory
-        mkdir -p /tmp/scripts
+        # Set up environment variables
+        export CHROME_BIN="/usr/bin/chromium-browser"
+        export PUPPETEER_SKIP_DOWNLOAD="true"
+
+        # Create necessary directories
+        mkdir -p /data /tmp/scripts
+
+        # Install mermaid-cli globally
+        cd /tmp
+        npm install @mermaid-js/mermaid-cli >/dev/null 2>&1
+        ln -s /tmp/node_modules/.bin/mmdc /usr/local/bin/mmdc
 
         # Install slack-cli
         curl -s -L -o /usr/local/bin/slack \
@@ -47,14 +61,23 @@ class MermaidTool(Tool):
         # Make script executable
         chmod +x {script_path}
 
-        # Set up environment for mmdc
-        export PATH="/node_modules/.bin:$PATH"
-        
-        # Ensure data directory exists (required by mermaid-cli)
-        mkdir -p /data
+        # Create puppeteer config
+        cat > /puppeteer-config.json << 'EOF'
+        {{
+            "args": ["--no-sandbox", "--disable-gpu"]
+        }}
+EOF
+
+        # Verify mmdc installation
+        if ! which mmdc >/dev/null 2>&1; then
+            echo "❌ mmdc not found in PATH. Error log:" 2>&1
+            cat "$LOG_FILE"
+            exit 1
+        fi
 
         # Run the main script and capture output
         echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
+        cd /data  # Change to /data directory as expected by mermaid-cli
         bash {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
             echo "❌ Script execution failed. Error log:" 2>&1
             cat "$LOG_FILE"
@@ -72,7 +95,7 @@ class MermaidTool(Tool):
             name=name,
             description=description,
             type="docker",
-            image="minlag/mermaid-cli:latest",  # Using official Mermaid CLI image
+            image="node:18-alpine",  # Using Node.js Alpine image
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
