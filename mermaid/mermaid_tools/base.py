@@ -29,7 +29,7 @@ class MermaidTool(Tool):
         export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
         export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
 
-        # Create puppeteer config
+        # Create puppeteer config with additional flags
         cat > /puppeteer-config.json << 'EOF'
 {{
     "executablePath": "/usr/bin/chromium",
@@ -37,7 +37,9 @@ class MermaidTool(Tool):
         "--no-sandbox",
         "--disable-gpu",
         "--disable-dev-shm-usage",
-        "--disable-setuid-sandbox"
+        "--disable-setuid-sandbox",
+        "--single-process",
+        "--no-zygote"
     ]
 }}
 EOF
@@ -56,9 +58,9 @@ EOF
         chmod 755 {script_path}
         chown mermaidcli:mermaidcli {script_path}
 
-        # Switch to mermaidcli user and run the script
+        # Run as root (since we need privileged access for Chrome)
         cd /data
-        exec su mermaidcli -c "{script_path}"
+        exec {script_path}
         """
 
         # Clean up content by stripping leading/trailing whitespace
