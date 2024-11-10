@@ -3,7 +3,7 @@ from kubiya_sdk.tools import Tool, Arg, FileSpec
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
 class MermaidTool(Tool):
-    def __init__(self, name, description, script_name, args, secrets=None, env=None, with_files=None):
+    def __init__(self, name, description, content, args, secrets=None, env=None, with_files=None):
         if secrets is None:
             secrets = []
         if env is None:
@@ -24,16 +24,12 @@ class MermaidTool(Tool):
         apt-get update -qq >/dev/null
         apt-get install -yqq bash curl jq >/dev/null
         npm install -g @mermaid-js/mermaid-cli >/dev/null
-        chmod +x /tmp/scripts/{script_name}
         """
 
-        # The command to execute the script
-        command = f"/bin/bash /tmp/scripts/{script_name}"
-
-        # The full content combines dependencies installation and script execution
+        # Use the provided content
         full_content = f"""
         {install_dependencies}
-        {command}
+        {content.strip()}
         """
 
         # Ensure `full_content` is properly formatted
