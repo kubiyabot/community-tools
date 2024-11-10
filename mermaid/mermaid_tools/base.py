@@ -33,7 +33,12 @@ class MermaidTool(Tool):
         cat > /puppeteer-config.json << 'EOF'
 {{
     "executablePath": "/usr/bin/chromium",
-    "args": ["--no-sandbox", "--disable-gpu"]
+    "args": [
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-dev-shm-usage",
+        "--disable-setuid-sandbox"
+    ]
 }}
 EOF
 
@@ -45,8 +50,13 @@ EOF
         # Make script executable
         chmod +x {script_path}
 
-        # Run the script
-        exec {script_path}
+        # Create data directory and set permissions
+        mkdir -p /data
+        chown -R mermaidcli:mermaidcli /data
+
+        # Switch to mermaidcli user and run the script
+        cd /data
+        exec su mermaidcli -c "{script_path}"
         """
 
         # Clean up content by stripping leading/trailing whitespace
