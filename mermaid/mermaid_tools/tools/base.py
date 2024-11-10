@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Tool, Arg
 
-MERMAID_ICON_URL = "https://raw.githubusercontent.com/mermaid-js/mermaid/develop/img/header.png"
+MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
 class MermaidTool(Tool):
     def __init__(self, name, description, content, args, secrets=None, env=None):
