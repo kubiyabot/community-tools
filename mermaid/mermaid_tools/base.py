@@ -30,41 +30,29 @@ class MermaidTool(Tool):
 
         # Create log file for error tracking
         LOG_FILE=$(mktemp)
-        exec 1> >(tee -a "$LOG_FILE")
-        exec 2> >(tee -a "$LOG_FILE" >&2)
 
-        echo "🎨 Setting up environment..."
+        echo "🎨 Setting up environment..." 2>&1 | tee -a "$LOG_FILE"
 
         # Ensure non-interactive installation
         export DEBIAN_FRONTEND=noninteractive
 
-        echo "Installing system dependencies..."
-        if ! (apt-get update -qq && \
+        # Install dependencies and capture all output
+        (
+            apt-get update -qq && \
             apt-get install -yqq --no-install-recommends \
-            curl chromium chromium-common chromium-sandbox \
-            libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
-            libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
-            libxfixes3 libxrandr2 libgbm1 libasound2 jq) 2>&1; then
-            echo "❌ Failed to install system dependencies. Full log:"
+                curl chromium chromium-common chromium-sandbox \
+                libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
+                libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+                libxfixes3 libxrandr2 libgbm1 libasound2 jq && \
+            npm install -g @mermaid-js/mermaid-cli@latest && \
+            curl -s -L -o /usr/local/bin/slack \
+                https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
+            chmod +x /usr/local/bin/slack
+        ) >> "$LOG_FILE" 2>&1 || {
+            echo "❌ Setup failed. Error log:" 2>&1
             cat "$LOG_FILE"
             exit 1
-        fi
-
-        echo "Installing mermaid-cli..."
-        if ! npm install -g @mermaid-js/mermaid-cli@latest 2>&1; then
-            echo "❌ Failed to install mermaid-cli. Full log:"
-            cat "$LOG_FILE"
-            exit 1
-        fi
-
-        echo "Installing slack-cli..."
-        if ! (curl -s -L -o /usr/local/bin/slack \
-            https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
-            chmod +x /usr/local/bin/slack) 2>&1; then
-            echo "❌ Failed to install slack-cli. Full log:"
-            cat "$LOG_FILE"
-            exit 1
-        fi
+        }
 
         # Set Chrome path for Puppeteer
         export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
@@ -73,12 +61,13 @@ class MermaidTool(Tool):
         # Make script executable
         chmod +x {script_path}
 
-        echo "Running main script..."
-        if ! {script_path} 2>&1; then
-            echo "❌ Script execution failed. Full log:"
+        # Run the main script and capture output
+        echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
+        {script_path} 2>&1 | tee -a "$LOG_FILE" || {
+            echo "❌ Script execution failed. Error log:" 2>&1
             cat "$LOG_FILE"
             exit 1
-        fi
+        }
 
         # Clean up
         rm -f "$LOG_FILE"
