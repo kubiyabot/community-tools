@@ -28,49 +28,40 @@ class MermaidTool(Tool):
         #!/bin/bash
         set -e
 
-        echo "🎨 Request to render diagram received. Please wait... ⏳"
+        echo "🎨 Setting up environment..."
 
         # Ensure non-interactive installation
         export DEBIAN_FRONTEND=noninteractive
 
-        # Create error log file
-        ERROR_LOG=$(mktemp)
+        # Install Chrome dependencies
+        apt-get update -qq >/dev/null
+        apt-get install -yqq --no-install-recommends \
+            curl \
+            chromium \
+            libglib2.0-0 \
+            libnss3 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2 \
+            jq >/dev/null 2>&1
 
-        # Install dependencies with better error handling
-        if ! apt-get update -qq > "$ERROR_LOG" 2>&1; then
-            echo "❌ Failed to update package list. Error:"
-            cat "$ERROR_LOG"
-            exit 1
-        fi
+        # Install mermaid-cli
+        npm install -g @mermaid-js/mermaid-cli@latest >/dev/null 2>&1
 
-        if ! apt-get install -yqq --no-install-recommends curl jq ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 \
-            libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 \
-            libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 libnss3 libpango-1.0-0 \
-            libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 \
-            libxcursor1 libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 \
-            libxss1 libxtst6 lsb-release wget xdg-utils libgobject-2.0-0 > "$ERROR_LOG" 2>&1; then
-            echo "❌ Failed to install system dependencies. Error:"
-            cat "$ERROR_LOG"
-            exit 1
-        fi
-
-        # Install mermaid-cli with error handling
-        if ! npm install -g @mermaid-js/mermaid-cli@latest > "$ERROR_LOG" 2>&1; then
-            echo "❌ Failed to install mermaid-cli. Error:"
-            cat "$ERROR_LOG"
-            exit 1
-        fi
-
-        # Install slack-cli with error handling
-        if ! curl -s -L -o /usr/local/bin/slack https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack > "$ERROR_LOG" 2>&1; then
-            echo "❌ Failed to download slack-cli. Error:"
-            cat "$ERROR_LOG"
-            exit 1
-        fi
+        # Install slack-cli
+        curl -s -L -o /usr/local/bin/slack https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack
         chmod +x /usr/local/bin/slack
 
-        # Clean up error log
-        rm -f "$ERROR_LOG"
+        # Set Chrome path for Puppeteer
+        export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
         # Make script executable and run it
         chmod +x {script_path}
