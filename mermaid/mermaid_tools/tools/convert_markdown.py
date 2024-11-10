@@ -1,6 +1,6 @@
 from mermaid_tools.tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
-
+from kubiya_sdk.tools import tool_registry
 convert_markdown_tool = MermaidTool(
     name="convert_markdown_with_diagrams",
     description="Converts Markdown content containing Mermaid diagrams into Markdown with diagrams rendered as images.",
@@ -44,3 +44,5 @@ rm "$INPUT_MARKDOWN_FILE"
         Arg(name="output_markdown", type="str", description="Path to the output Markdown file", required=False),
     ],
 )
+
+tool_registry.register("mermaid", convert_markdown_tool)

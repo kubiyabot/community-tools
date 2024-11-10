@@ -1,6 +1,6 @@
 from mermaid_tools.tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
-
+from kubiya_sdk.tools import tool_registry
 render_diagram_tool = MermaidTool(
     name="render_mermaid_diagram",
     description="Renders a Mermaid diagram from raw input to a specified output format using mermaid-cli.",
@@ -73,3 +73,5 @@ rm "$INPUT_FILE"
         Arg(name="background_color", type="str", description="Background color or 'transparent'", required=False),
     ],
 )
+
+tool_registry.register("mermaid", render_diagram_tool)

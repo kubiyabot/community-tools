@@ -1,5 +1,6 @@
 from mermaid_tools.tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import tool_registry
 
 share_diagram_on_slack_tool = MermaidTool(
     name="share_diagram_on_slack",
@@ -110,3 +111,5 @@ rm "$INPUT_FILE" "$OUTPUT_FILE"
         Arg(name="background_color", type="str", description="Background color or 'transparent'. Optional.", required=False),
     ],
 )
+
+tool_registry.register("mermaid", share_diagram_on_slack_tool)
