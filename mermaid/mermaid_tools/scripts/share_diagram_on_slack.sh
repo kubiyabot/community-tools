@@ -9,19 +9,18 @@ if [ -z "${diagram_content:-}" ] || [ -z "${slack_destination:-}" ]; then
     exit 1
 fi
 
-echo "📋 Validating inputs..."
 # Set defaults
 comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
 OUTPUT_FILE="/data/diagram.${output_format}"
 
-# Debug: Show the diagram content being processed
-echo "📝 Processing diagram with content length: $(echo "$diagram_content" | wc -c) characters"
-echo "🎯 Output will be saved as: $OUTPUT_FILE"
+echo "📝 Diagram content:"
+echo "$diagram_content"
 
 echo "🖌️ Generating diagram..."
-if ! echo "$diagram_content" | mmdc -p /puppeteer-config.json --input - --output "$OUTPUT_FILE"; then
-    echo "❌ Failed to generate diagram. Error occurred during mmdc execution."
+# Using their exact recommended approach
+if ! echo "$diagram_content" | mmdc --input - --output "$OUTPUT_FILE"; then
+    echo "❌ Failed to generate diagram"
     exit 1
 fi
 

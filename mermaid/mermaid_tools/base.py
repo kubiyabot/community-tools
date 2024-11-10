@@ -21,47 +21,30 @@ class MermaidTool(Tool):
         content = f"""#!/bin/sh
 set -e
 
-echo "🎨 Preparing to draw diagram..."
+echo "🎨 Setting up environment..."
 
-apk add chromium curl jq >/dev/null 2>&1
-export PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
+# Install required packages
+apk add --no-cache curl jq >/dev/null 2>&1
 
-cat > /puppeteer-config.json << 'EOF'
-{{
-    "executablePath": "/usr/bin/chromium",
-    "args": [
-        "--no-sandbox",
-        "--disable-gpu",
-        "--disable-dev-shm-usage",
-        "--disable-setuid-sandbox",
-        "--single-process",
-        "--no-zygote"
-    ]
-}}
-EOF
-
-echo "🔗 Validating syntax..."
+# Install slack-cli
 curl -s -L -o /usr/local/bin/slack \
-    https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack
-chmod +x /usr/local/bin/slack
+    https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
+    chmod +x /usr/local/bin/slack
 
-echo "Still setting up..."
-mkdir -p /tmp/scripts /data
-chown -R mermaidcli:mermaidcli /data /tmp/scripts
-chmod 755 /tmp/scripts
+# Prepare script
+mkdir -p /tmp/scripts
+chmod +x {script_path}
 
-echo "🚀 Preparing to draw diagram..."
-chmod 755 {script_path}
-chown mermaidcli:mermaidcli {script_path}
+# Run in /data directory as expected by mermaid-cli
 cd /data
-exec {script_path}"""
+exec {script_path}
+"""
 
         super().__init__(
             name=name,
             description=description,
             type="docker",
-            image="minlag/mermaid-cli:latest",
+            image="minlag/mermaid-cli:latest",  # Pre-configured image with mermaid-cli
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
