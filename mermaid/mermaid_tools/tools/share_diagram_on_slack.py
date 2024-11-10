@@ -25,6 +25,8 @@ share_diagram_on_slack_tool = MermaidTool(
             content=script_content,
         ),
     ],
+    secrets=["SLACK_API_TOKEN"],
+    env=["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"],
 )
 
 tool_registry.register("mermaid", share_diagram_on_slack_tool)

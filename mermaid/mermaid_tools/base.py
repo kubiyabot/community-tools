@@ -11,12 +11,6 @@ class MermaidTool(Tool):
         if with_files is None:
             with_files = []
 
-        # Add SLACK_API_TOKEN as a secret if it's used
-        if any(arg.name == "SLACK_API_TOKEN" for arg in args):
-            secrets.append("SLACK_API_TOKEN")
-        else:
-            secrets.extend(["SLACK_API_TOKEN"])
-
         # Find the script name from with_files
         script_files = [file_spec.destination for file_spec in with_files if file_spec.destination.endswith('.sh')]
         if not script_files:
@@ -29,9 +23,6 @@ class MermaidTool(Tool):
         set -e
 
         echo "🎨 Setting up..."
-
-        # Create scripts directory
-        mkdir -p /tmp/scripts
 
         # Install minimal dependencies for Slack CLI
         apk add --no-cache curl jq >/dev/null 2>&1
@@ -57,9 +48,9 @@ class MermaidTool(Tool):
             type="docker",
             image="minlag/mermaid-cli:latest",  # Using their pre-configured image
             content=content,
+            secrets=secrets,
             args=args,
             icon_url=MERMAID_ICON_URL,
-            secrets=secrets,
             env=env,
             with_files=with_files,
         )
