@@ -24,6 +24,9 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up..."
 
+        # Add mmdc to PATH
+        export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
+
         # Install minimal dependencies for Slack CLI
         apk add --no-cache curl jq >/dev/null 2>&1
 
@@ -46,11 +49,11 @@ class MermaidTool(Tool):
             name=name,
             description=description,
             type="docker",
-            image="minlag/mermaid-cli:latest",  # Using their pre-configured image
+            image="minlag/mermaid-cli:latest",
             content=content,
-            secrets=secrets,
             args=args,
             icon_url=MERMAID_ICON_URL,
+            secrets=secrets,
             env=env,
             with_files=with_files,
         )
