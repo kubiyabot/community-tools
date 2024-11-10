@@ -41,6 +41,7 @@ pip install kubiya-sdk > /dev/null
             env=["JIRA_WORKSPACE_NAME"],
             secrets=["JIRA_OAUTH_TOKEN"],
             mermaid=mermaid_diagram,
+            icon_url="https://logos-world.net/wp-content/uploads/2021/02/Jira-Emblem.png",
         )
 
 
