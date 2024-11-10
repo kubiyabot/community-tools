@@ -28,30 +28,10 @@ class MermaidTool(Tool):
         #!/bin/sh
         set -e
 
-        # Create log file for error tracking
-        LOG_FILE=$(mktemp)
+        echo "🎨 Setting up..."
 
-        echo "🎨 Setting up environment..." 2>&1 | tee -a "$LOG_FILE"
-
-        # Install system dependencies
-        apk add --no-cache \
-            chromium \
-            curl \
-            jq \
-            bash \
-            >/dev/null 2>&1
-
-        # Set up environment variables
-        export CHROME_BIN="/usr/bin/chromium-browser"
-        export PUPPETEER_SKIP_DOWNLOAD="true"
-
-        # Create necessary directories
-        mkdir -p /data /tmp/scripts
-
-        # Install mermaid-cli globally
-        cd /tmp
-        npm install @mermaid-js/mermaid-cli >/dev/null 2>&1
-        ln -s /tmp/node_modules/.bin/mmdc /usr/local/bin/mmdc
+        # Install minimal dependencies for Slack CLI
+        apk add --no-cache curl jq >/dev/null 2>&1
 
         # Install slack-cli
         curl -s -L -o /usr/local/bin/slack \
@@ -61,31 +41,8 @@ class MermaidTool(Tool):
         # Make script executable
         chmod +x {script_path}
 
-        # Create puppeteer config
-        cat > /puppeteer-config.json << 'EOF'
-        {{
-            "args": ["--no-sandbox", "--disable-gpu"]
-        }}
-EOF
-
-        # Verify mmdc installation
-        if ! which mmdc >/dev/null 2>&1; then
-            echo "❌ mmdc not found in PATH. Error log:" 2>&1
-            cat "$LOG_FILE"
-            exit 1
-        fi
-
-        # Run the main script and capture output
-        echo "Running main script..." 2>&1 | tee -a "$LOG_FILE"
-        cd /data  # Change to /data directory as expected by mermaid-cli
-        bash {script_path} 2>&1 | tee -a "$LOG_FILE" || {{
-            echo "❌ Script execution failed. Error log:" 2>&1
-            cat "$LOG_FILE"
-            exit 1
-        }}
-
-        # Clean up
-        rm -f "$LOG_FILE"
+        # Run the script
+        {script_path}
         """
 
         # Clean up content by stripping leading/trailing whitespace
@@ -95,7 +52,7 @@ EOF
             name=name,
             description=description,
             type="docker",
-            image="node:18-alpine",  # Using Node.js Alpine image
+            image="minlag/mermaid-cli:latest",  # Using their pre-configured image
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
