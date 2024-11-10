@@ -24,11 +24,11 @@ class MermaidTool(Tool):
 
         echo "🎨 Setting up..."
 
-        # Add mmdc to PATH
+        # Install Chrome and set environment variables
+        apk add --no-cache chromium curl jq >/dev/null 2>&1
+        export CHROME_BIN="/usr/bin/chromium-browser"
+        export PUPPETEER_SKIP_DOWNLOAD="true"
         export PATH="/home/mermaidcli/node_modules/.bin:$PATH"
-
-        # Install minimal dependencies for Slack CLI
-        apk add --no-cache curl jq >/dev/null 2>&1
 
         # Install slack-cli
         curl -s -L -o /usr/local/bin/slack \
