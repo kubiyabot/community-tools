@@ -1,4 +1,4 @@
-from ..base import MermaidTool
+from mermaid_tools.tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
 
 render_diagram_tool = MermaidTool(

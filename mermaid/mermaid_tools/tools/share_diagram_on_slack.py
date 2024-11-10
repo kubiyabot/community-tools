@@ -1,4 +1,4 @@
-from ..base import MermaidTool
+from mermaid_tools.tools.base import MermaidTool
 from kubiya_sdk.tools import Arg
 
 share_diagram_on_slack_tool = MermaidTool(
