@@ -2,7 +2,7 @@ from kubiya_sdk.tools import Tool, FileSpec
 from kubiya_sdk.tools import Arg
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
-GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
+GITHUB_ICON_URL = "https://img.icons8.com/?size=100&id=AZOZNnY73haj&format=png&color=000000"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 class GitHubCliTool(Tool):
