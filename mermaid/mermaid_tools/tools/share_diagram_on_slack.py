@@ -8,7 +8,7 @@ share_diagram_on_slack_tool = MermaidTool(
     content="""
 # Function to display engaging messages
 print_with_delay() {
-    message="$1"
+    local message="$1"
     echo "$message"
     sleep 1
 }
