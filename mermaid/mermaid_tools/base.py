@@ -1,48 +1,53 @@
-from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools import Tool, Arg, FileSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
 class MermaidTool(Tool):
-    def __init__(
-        self, name, description, content, args, secrets=None, env=None
-    ):
+    def __init__(self, name, description, script_name, args, secrets=None, env=None, with_files=None):
         if secrets is None:
             secrets = []
         if env is None:
             env = []
+        if with_files is None:
+            with_files = []
+        # Add SLACK_API_TOKEN as a secret if it's used
+        if any(arg.name == "SLACK_API_TOKEN" for arg in args):
+            secrets.append("SLACK_API_TOKEN")
+        else:
+            secrets.extend(["SLACK_API_TOKEN"])
 
-        # Add SLACK_API_TOKEN as a secret
-        secrets.extend(["SLACK_API_TOKEN"])
+        # Ensure bash is installed and scripts have execute permission
+        install_dependencies = f"""
+        #!/bin/bash
+        set -euo pipefail
 
-        # Prepare the script content without shebang
-        script_content = f"""
-set -euo pipefail
+        apt-get update -qq >/dev/null
+        apt-get install -yqq bash curl jq >/dev/null
+        npm install -g @mermaid-js/mermaid-cli >/dev/null
+        chmod +x /tmp/scripts/{script_name}
+        """
 
-# Install dependencies silently
-if ! command -v mmdc &>/dev/null; then
-    echo "Installing dependencies..."
-    apt-get update >/dev/null 2>&1
-    apt-get install -y bash curl jq >/dev/null 2>&1
-    npm install -g @mermaid-js/mermaid-cli >/dev/null 2>&1
-fi
+        # The command to execute the script
+        command = f"/bin/bash /tmp/scripts/{script_name}"
 
-{content.strip()}
-"""
+        # The full content combines dependencies installation and script execution
+        full_content = f"""
+        {install_dependencies}
+        {command}
+        """
 
-        # Escape any single quotes in the script content
-        escaped_script_content = script_content.replace("'", "'\"'\"'")
-
-        # Build the full command to execute the script with bash
-        full_command = f"/bin/bash -c '{escaped_script_content}'"
+        # Ensure `full_content` is properly formatted
+        full_content = '\n'.join(line.strip() for line in full_content.strip().splitlines())
 
         super().__init__(
             name=name,
             description=description,
             type="docker",
             image="node:16-slim",
-            command=full_command,
+            content=full_content,
             args=args,
             icon_url=MERMAID_ICON_URL,
             secrets=secrets,
             env=env,
+            with_files=with_files,
         )
