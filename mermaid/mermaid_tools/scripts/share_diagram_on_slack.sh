@@ -54,34 +54,51 @@ echo "✅ Diagram generated successfully! File size: $(ls -lh "$OUTPUT_FILE" | a
 
 echo "📤 Uploading to Slack: $slack_destination"
 
-# Prepare the curl command for file upload
-CURL_CMD="curl -s -F file=@$OUTPUT_FILE"
-CURL_CMD="$CURL_CMD -F 'initial_comment=$comment'"
+# Initialize upload parameters
+upload_params=(
+    "-F" "file=@$OUTPUT_FILE"
+    "-F" "initial_comment=$comment"
+    "-H" "Authorization: Bearer $SLACK_API_TOKEN"
+)
 
 # Handle different Slack destinations
 if [ -n "${SLACK_CHANNEL_ID:-}" ]; then
     # We're in a specific channel context
-    CURL_CMD="$CURL_CMD -F channels=$SLACK_CHANNEL_ID"
+    upload_params+=("-F" "channels=$SLACK_CHANNEL_ID")
     if [ -n "${SLACK_THREAD_TS:-}" ]; then
         # We're in a thread
-        CURL_CMD="$CURL_CMD -F thread_ts=$SLACK_THREAD_TS"
+        upload_params+=("-F" "thread_ts=$SLACK_THREAD_TS")
     fi
 elif [[ "$slack_destination" == "#"* ]]; then
     # It's a channel
-    CURL_CMD="$CURL_CMD -F channels=${slack_destination#"#"}"
+    channel="${slack_destination#"#"}"
+    upload_params+=("-F" "channels=$channel")
 elif [[ "$slack_destination" == "@"* ]]; then
-    # It's a direct message
-    CURL_CMD="$CURL_CMD -F channels=${slack_destination#"@"}"
+    # It's a direct message - need to get user ID first
+    username="${slack_destination#"@"}"
+    user_response=$(curl -s -H "Authorization: Bearer $SLACK_API_TOKEN" \
+        "https://slack.com/api/users.lookupByEmail?email=$username" || \
+        curl -s -H "Authorization: Bearer $SLACK_API_TOKEN" \
+        "https://slack.com/api/users.list" | jq -r ".members[] | select(.name==\"$username\").id")
+    
+    if [ -z "$user_response" ]; then
+        echo "❌ Could not find user: $username"
+        exit 1
+    fi
+    upload_params+=("-F" "channels=$user_response")
 else
     echo "❌ Invalid slack_destination format. Use #channel or @user"
     exit 1
 fi
 
-# Execute the upload
-if ! $CURL_CMD \
-    -H "Authorization: Bearer $SLACK_API_TOKEN" \
-    "https://slack.com/api/files.upload" | grep -q '"ok":true'; then
-    echo "❌ Failed to upload to Slack"
+# Execute the upload with proper error handling
+response=$(curl -s "${upload_params[@]}" "https://slack.com/api/files.upload")
+ok=$(echo "$response" | jq -r '.ok')
+error=$(echo "$response" | jq -r '.error // empty')
+
+if [ "$ok" != "true" ]; then
+    echo "❌ Failed to upload to Slack: ${error:-Unknown error}"
+    echo "Full response: $response"
     exit 1
 fi
 
