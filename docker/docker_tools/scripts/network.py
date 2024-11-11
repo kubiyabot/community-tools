@@ -1,4 +1,3 @@
-import dagger
 import sys
 import json
 import asyncio
@@ -114,6 +113,15 @@ async def manage_network(
 
 async def main():
     try:
+        # Try to import dagger
+        try:
+            import dagger
+        except ImportError as e:
+            log_status("error", "Failed to import dagger SDK. Please ensure it's installed.",
+                      error_type="ImportError",
+                      details=str(e))
+            sys.exit(1)
+
         if len(sys.argv) != 2:
             raise ValueError("Expected exactly one JSON argument")
 
@@ -130,14 +138,20 @@ async def main():
         if missing_fields:
             raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
 
-        async with dagger.Connection() as client:
-            await manage_network(
-                client,
-                args["action"],
-                args["network_name"],
-                args.get("driver"),
-                args.get("subnet")
-            )
+        try:
+            async with dagger.Connection() as client:
+                await manage_network(
+                    client,
+                    args["action"],
+                    args["network_name"],
+                    args.get("driver"),
+                    args.get("subnet")
+                )
+        except Exception as e:
+            log_status("error", "Failed to connect to Dagger engine",
+                      error_type=type(e).__name__,
+                      details=str(e))
+            sys.exit(1)
 
     except Exception as e:
         log_status("error", "Unexpected error occurred",

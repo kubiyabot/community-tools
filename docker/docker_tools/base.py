@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 import os
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, ClassVar
 from pathlib import Path
 
 DOCKER_ICON_URL = "https://www.docker.com/wp-content/uploads/2022/03/vertical-logo-monochromatic.png"
@@ -9,7 +9,7 @@ class DockerTool(Tool):
     """Base class for Docker tools with enhanced functionality and script management."""
 
     # Required environment variables for Kubernetes integration
-    K8S_ENV = [
+    K8S_ENV: ClassVar[List[str]] = [
         "KUBERNETES_SERVICE_HOST",  # K8s API server host
         "KUBERNETES_SERVICE_PORT"   # K8s API server port
     ]
@@ -88,7 +88,7 @@ class DockerTool(Tool):
         return file_specs
 
     def _wrap_content(self, content: str) -> str:
-        """Wrap the tool's content with Kubiya script framework."""
+        """Wrap the tool's content with our script framework."""
         return f"""#!/bin/sh
 set -e
 
@@ -109,9 +109,17 @@ cleanup() {{
 # Set trap for cleanup
 trap cleanup EXIT INT TERM
 
+# Install required packages
+echo "🔧 Installing required packages..."
+apt-get update -qq && apt-get install -y curl python3-pip jq netcat -qq > /dev/null 2>&1
+
+# Install dagger SDK
+echo "📦 Installing Dagger SDK..."
+pip install dagger-io > /dev/null 2>&1
+
 # Download kubectl if needed
 if ! command -v kubectl >/dev/null 2>&1; then
-    log "🔧" "Downloading kubectl..."
+    echo "🔧 Downloading kubectl..."
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" >/dev/null 2>&1
     chmod +x kubectl
     mv kubectl /usr/local/bin/

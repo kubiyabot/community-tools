@@ -1,9 +1,8 @@
-import dagger
 import sys
 import json
 import asyncio
-from typing import List, Dict
 import time
+from typing import List, Dict, Optional
 
 def log_status(status: str, message: str, **kwargs):
     """Helper function to format and print status messages"""
@@ -22,11 +21,11 @@ async def build_image(
     client,
     context_path: str,
     dockerfile: str,
-    target: str = None,
-    build_args: Dict[str, str] = None,
-    platforms: List[str] = None,
+    target: Optional[str] = None,
+    build_args: Optional[Dict[str, str]] = None,
+    platforms: Optional[List[str]] = None,
     push: bool = False,
-    registry: str = None,
+    registry: Optional[str] = None,
     tag: str = "latest"
 ) -> dict:
     try:
@@ -51,10 +50,18 @@ async def build_image(
                   platforms=platforms)
 
         try:
+            build_args_list = []
+            if build_args:
+                try:
+                    import dagger
+                    build_args_list = [dagger.BuildArg(name=k, value=v) for k, v in build_args.items()]
+                except Exception as e:
+                    raise RuntimeError(f"Failed to process build arguments: {str(e)}")
+
             build = container.docker_build(
                 dockerfile=dockerfile,
-                target=target if target else None,
-                build_args=[dagger.BuildArg(name=k, value=v) for k, v in (build_args or {}).items()],
+                target=target,
+                build_args=build_args_list,
                 platform=platforms[0] if platforms else None
             )
         except Exception as e:
@@ -72,7 +79,7 @@ async def build_image(
                       registry=registry,
                       tag=tag)
             try:
-                # Push logic here...
+                # Push logic here
                 pass
             except Exception as e:
                 raise RuntimeError(f"Failed to push image: {str(e)}")
@@ -102,6 +109,15 @@ async def build_image(
 
 async def main():
     try:
+        # Try to import dagger
+        try:
+            import dagger
+        except ImportError as e:
+            log_status("error", "Failed to import dagger SDK. Please ensure it's installed.",
+                      error_type="ImportError",
+                      details=str(e))
+            sys.exit(1)
+
         if len(sys.argv) != 2:
             raise ValueError("Expected exactly one JSON argument")
 
@@ -118,18 +134,24 @@ async def main():
         if missing_fields:
             raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
 
-        async with dagger.Connection() as client:
-            await build_image(
-                client,
-                args["context_path"],
-                args["dockerfile"],
-                args.get("target"),
-                args.get("build_args"),
-                args.get("platforms"),
-                args.get("push", False),
-                args.get("registry"),
-                args.get("tag", "latest")
-            )
+        try:
+            async with dagger.Connection() as client:
+                await build_image(
+                    client,
+                    args["context_path"],
+                    args["dockerfile"],
+                    args.get("target"),
+                    args.get("build_args"),
+                    args.get("platforms"),
+                    args.get("push", False),
+                    args.get("registry"),
+                    args.get("tag", "latest")
+                )
+        except Exception as e:
+            log_status("error", "Failed to connect to Dagger engine",
+                      error_type=type(e).__name__,
+                      details=str(e))
+            sys.exit(1)
 
     except Exception as e:
         log_status("error", "Unexpected error occurred",
