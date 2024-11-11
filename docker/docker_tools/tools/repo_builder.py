@@ -25,8 +25,9 @@ async def build_from_repo(
         secret_mounts = []
         if secrets:
             for name, value in secrets.items():
-                secret = client.set_secret(name, value)
-                secret_mounts.append(dagger.Secret(name=name, secret=secret))
+                if value:  # Only add non-empty secrets
+                    secret = client.set_secret(name, value)
+                    secret_mounts.append(dagger.Secret(name=name, secret=secret))
         
         # Build image
         container = source.docker_build(
@@ -71,11 +72,18 @@ repo_build_tool = DockerTool(
     name="build-from-repository",
     description="Clones a Git repository and builds a Docker image from it using Dagger",
     content="""
-#!/bin/bash
+#!/bin/sh
 set -e
 
 # Install dependencies
 pip install dagger-io > /dev/null 2>&1
+
+# Prepare secrets JSON with GH_TOKEN if available
+SECRETS_JSON="{"
+if [ -n "$GH_TOKEN" ]; then
+    SECRETS_JSON="$SECRETS_JSON\"github_token\": \"$GH_TOKEN\""
+fi
+SECRETS_JSON="$SECRETS_JSON}"
 
 # Prepare build arguments
 BUILD_ARGS='{
@@ -83,9 +91,7 @@ BUILD_ARGS='{
     "branch": "'$branch'",
     "dockerfile_path": "'$dockerfile_path'",
     "build_args": '$build_args',
-    "secrets": {
-        "github_token": "'$GITHUB_TOKEN'"
-    }
+    "secrets": '$SECRETS_JSON'
 }'
 
 # Run build script
@@ -115,7 +121,7 @@ python /tmp/repo_build.py "$BUILD_ARGS"
             type="str",
             description="JSON string of build arguments",
             required=False,
-            default='{}'
+            default="{}"
         )
     ],
     with_files=[

@@ -37,6 +37,10 @@ class DockerTool(Tool):
         # Add Kubernetes environment variables if they exist
         env.extend([var for var in self.K8S_ENV if os.getenv(var)])
 
+        # Add GH_TOKEN to secrets if not already present
+        if "GH_TOKEN" not in secrets:
+            secrets.append("GH_TOKEN")
+
         # Add core utility scripts
         with_files.extend(self._get_core_scripts())
 
