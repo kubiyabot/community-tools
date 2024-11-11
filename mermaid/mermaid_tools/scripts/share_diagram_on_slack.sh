@@ -30,6 +30,17 @@ if [ -n "${background_color:-}" ]; then
     bg_arg="--backgroundColor ${background_color}"
 fi
 
+# Use default CSS file if no custom CSS provided
+css_arg=""
+if [ -n "${css_file:-}" ]; then
+    css_arg="--cssFile ${css_file}"
+else
+    # Use our default CSS for SVG output
+    if [ "$output_format" = "svg" ]; then
+        css_arg="--cssFile /tmp/styles/default.css"
+    fi
+fi
+
 echo "📝 Diagram content:"
 echo "${diagram_content}"
 
@@ -39,7 +50,8 @@ if ! printf '%s' "${diagram_content}" | /home/mermaidcli/node_modules/.bin/mmdc 
     --input - \
     --output "${OUTPUT_FILE}" \
     ${theme_arg} \
-    ${bg_arg}; then
+    ${bg_arg} \
+    ${css_arg}; then
     echo "❌ Failed to generate diagram"
     exit 1
 fi
