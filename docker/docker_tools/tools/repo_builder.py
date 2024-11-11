@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from docker_tools.base import DockerTool
 

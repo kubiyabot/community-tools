@@ -3,7 +3,7 @@ import os
 from typing import List, Dict, Optional, Any, ClassVar
 from pathlib import Path
 
-DOCKER_ICON_URL = "https://www.docker.com/wp-content/uploads/2022/03/vertical-logo-monochromatic.png"
+DOCKER_ICON_URL = "https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/97_Docker_logo_logos-512.png"
 
 class DockerTool(Tool):
     """Base class for Docker tools with enhanced functionality and script management."""
@@ -118,7 +118,7 @@ apt-get update -qq && apt-get install -y curl python3-pip jq netcat -qq > /dev/n
 . /tmp/scripts/dagger_setup.sh
 
 # Install dagger SDK
-echo "📦 Installing Dagger SDK..."
+echo "📦 Installing relevant runtime dependencies..."
 pip install dagger-io > /dev/null 2>&1
 
 # Run setup script
