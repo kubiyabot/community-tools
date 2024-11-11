@@ -566,7 +566,13 @@ KUBESHARK_TOOLS = [
     kubeshark_troubleshoot,
     kubeshark_monitor,
     kubeshark_mesh_analyzer,
+    kubeshark_http_analyzer,
+    kubeshark_service_mesh_analyzer,
+    kubeshark_security_analyzer,
+    kubeshark_performance_analyzer,
+    kubeshark_api_gateway_analyzer,
 ]
 
+# Register all tools with the registry
 for tool in KUBESHARK_TOOLS:
-    tool_registry.register("kubernetes", tool) 
+    tool_registry.register("kubernetes", tool)

@@ -85,17 +85,3 @@ fi
             with_files=common_file_specs,
             mermaid=mermaid,
         )
-
-# Example usage:
-kubectl_cli = KubernetesTool(
-    name="kubectl_cli",
-    description="Runs any Kubernetes commands using the `kubectl` binary.",
-    content="kubectl {{.command}}",
-    args=[
-        Arg(
-            name="command",
-            description="The Kubernetes CLI command to run. Do not use `kubectl`, only enter its command.",
-            required=True
-        )
-    ]
-)
