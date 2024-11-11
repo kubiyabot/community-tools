@@ -93,7 +93,7 @@ kubeshark_service_mesh_analyzer = KubernetesTool(
     description="Analyzes service mesh traffic patterns and behavior.",
     content=f"{BASE_KUBESHARK_CMD} --mode service-mesh --duration \"$duration\" --namespace \"$namespace\"",
     args=[
-        Arg(name="duration", type="int", description="Duration in seconds", required=True),
+        Arg(name="duration", type="str", description="Duration in seconds", required=True),
         Arg(name="namespace", type="str", description="Target namespace", required=True),
     ],
     file_specs=[
@@ -133,7 +133,7 @@ kubeshark_security_analyzer = KubernetesTool(
     description="Analyzes traffic for security-related patterns and potential issues.",
     content=f"{BASE_KUBESHARK_CMD} --mode security --duration \"$duration\" --additional-args \"$security_level\"",
     args=[
-        Arg(name="duration", type="int", description="Duration in seconds", required=True),
+        Arg(name="duration", type="str", description="Duration in seconds", required=True),
         Arg(name="security_level", type="str", description="Security analysis level (basic/advanced)", required=False, default="basic"),
     ],
     file_specs=[
@@ -173,8 +173,8 @@ kubeshark_performance_analyzer = KubernetesTool(
     description="Analyzes cluster performance metrics and patterns.",
     content=f"{BASE_KUBESHARK_CMD} --mode performance --duration \"$duration\" --threshold \"$threshold\"",
     args=[
-        Arg(name="duration", type="int", description="Duration in seconds", required=True),
-        Arg(name="threshold", type="int", description="Performance threshold in ms", required=False, default=500),
+        Arg(name="duration", type="str", description="Duration in seconds", required=True),
+        Arg(name="threshold", type="str", description="Performance threshold in ms (default: 500)", required=False, default="500"),
     ],
     file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
@@ -214,7 +214,7 @@ kubeshark_api_gateway_analyzer = KubernetesTool(
     content=f"{BASE_KUBESHARK_CMD} --mode api-gateway --gateway \"$gateway_name\" --duration \"$duration\"",
     args=[
         Arg(name="gateway_name", type="str", description="API Gateway name", required=True),
-        Arg(name="duration", type="int", description="Duration in seconds", required=True),
+        Arg(name="duration", type="str", description="Duration in seconds", required=True),
     ],
     file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
@@ -298,17 +298,17 @@ kubeshark_troubleshoot = KubernetesTool(
         ),
         Arg(
             name="duration",
-            type="int",
+            type="str",
             description="Duration in seconds (default: 300)",
             required=False,
-            default=300
+            default="300"
         ),
         Arg(
             name="threshold",
-            type="int",
+            type="str",
             description="Performance threshold in ms (default: 500)",
             required=False,
-            default=500
+            default="500"
         ),
         Arg(
             name="security_level",
@@ -323,10 +323,10 @@ kubeshark_troubleshoot = KubernetesTool(
         ),
         Arg(
             name="include_tls",
-            type="bool",
-            description="Include TLS/SSL analysis",
+            type="str",
+            description="Include TLS/SSL analysis (true/false)",
             required=False,
-            default=False
+            default="false"
         ),
         Arg(
             name="labels",
@@ -401,30 +401,30 @@ kubeshark_monitor = KubernetesTool(
     args=[
         Arg(
             name="duration",
-            type="int",
+            type="str",
             description="Monitoring duration in seconds",
             required=True
         ),
         Arg(
             name="error_threshold",
-            type="int",
+            type="str",
             description="Error count threshold for alerts (default: 5)",
             required=False,
-            default=5
+            default="5"
         ),
         Arg(
             name="latency_threshold",
-            type="int",
+            type="str",
             description="Latency threshold in ms (default: 1000)",
             required=False,
-            default=1000
+            default="1000"
         ),
         Arg(
             name="alert_interval",
-            type="int",
+            type="str",
             description="Alert check interval in seconds (default: 60)",
             required=False,
-            default=60
+            default="60"
         ),
         Arg(
             name="namespaces",
@@ -499,31 +499,31 @@ kubeshark_mesh_analyzer = KubernetesTool(
         ),
         Arg(
             name="duration",
-            type="int",
+            type="str",
             description="Analysis duration in seconds (default: 600)",
             required=False,
-            default=600
+            default="600"
         ),
         Arg(
             name="include_metrics",
-            type="bool",
-            description="Include detailed metrics collection",
+            type="str",
+            description="Include detailed metrics collection (true/false)",
             required=False,
-            default=True
+            default="true"
         ),
         Arg(
             name="trace_requests",
-            type="bool",
-            description="Enable request tracing",
+            type="str",
+            description="Enable request tracing (true/false)",
             required=False,
-            default=False
+            default="false"
         ),
         Arg(
             name="latency_threshold",
-            type="int",
+            type="str",
             description="Latency threshold for tracing in ms (default: 200)",
             required=False,
-            default=200
+            default="200"
         ),
         Arg(
             name="service_patterns",
