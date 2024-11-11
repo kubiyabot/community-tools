@@ -52,7 +52,8 @@ python /tmp/scripts/network.py "$ARGS"
             name="subnet",
             type="str",
             description="Subnet CIDR for the network",
-            required=False
+            required=False,
+            default=""
         )
     ],
     with_files=[
