@@ -561,7 +561,7 @@ kubeshark_mesh_analyzer = KubernetesTool(
     """
 )
 
-# Register tools
+# At the bottom of the file, just define the tools list
 KUBESHARK_TOOLS = [
     kubeshark_troubleshoot,
     kubeshark_monitor,
@@ -572,7 +572,3 @@ KUBESHARK_TOOLS = [
     kubeshark_performance_analyzer,
     kubeshark_api_gateway_analyzer,
 ]
-
-# Register all tools with the registry
-for tool in KUBESHARK_TOOLS:
-    tool_registry.register("kubernetes", tool)

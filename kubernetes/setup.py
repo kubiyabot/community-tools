@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="kubiya-kubernetes-tools",
     version="0.1.0",
-    packages=find_packages(),
+    packages=find_packages(include=['k8s_tools', 'k8s_tools.*']),
     install_requires=[
         "kubiya-sdk>=0.1.0",
         "slack-sdk>=3.19.0",
