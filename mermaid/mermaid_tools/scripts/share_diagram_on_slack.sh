@@ -21,31 +21,22 @@ OUTPUT_FILE="/data/diagram.${output_format}"
 
 # Handle optional theme and background color
 theme_arg=""
-if [ -n "${theme:-}" ]; then
-    theme_arg="--theme ${theme}"
-fi
-
+[ -n "${theme:-}" ] && theme_arg="--theme ${theme}"
 bg_arg=""
-if [ -n "${background_color:-}" ]; then
-    bg_arg="--backgroundColor ${background_color}"
-fi
+[ -n "${background_color:-}" ] && bg_arg="--backgroundColor ${background_color}"
 
-# Use default CSS file if no custom CSS provided
+# Handle CSS for SVG output
 css_arg=""
-if [ -n "${css_file:-}" ]; then
-    css_arg="--cssFile ${css_file}"
-else
-    # Use our default CSS for SVG output
-    if [ "$output_format" = "svg" ]; then
+if [ "$output_format" = "svg" ]; then
+    if [ -n "${custom_css:-}" ]; then
+        echo "${custom_css}" > /tmp/styles/custom.css
+        css_arg="--cssFile /tmp/styles/custom.css"
+    else
         css_arg="--cssFile /tmp/styles/default.css"
     fi
 fi
 
-echo "📝 Diagram content:"
-echo "${diagram_content}"
-
 echo "🖌️ Generating diagram..."
-# Using mmdc from its installed location in the Docker image
 if ! printf '%s' "${diagram_content}" | /home/mermaidcli/node_modules/.bin/mmdc -p /puppeteer-config.json \
     --input - \
     --output "${OUTPUT_FILE}" \
@@ -56,77 +47,63 @@ if ! printf '%s' "${diagram_content}" | /home/mermaidcli/node_modules/.bin/mmdc 
     exit 1
 fi
 
-# Verify the file was created
-if [ ! -f "${OUTPUT_FILE}" ]; then
-    echo "❌ Output file was not created!"
-    exit 1
+[ ! -f "${OUTPUT_FILE}" ] && echo "❌ Output file was not created!" && exit 1
+echo "✅ Diagram generated successfully!"
+
+# First, share in the original thread to get the file URL
+file_url=""
+if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
+    echo "📎 Uploading to original thread..."
+    thread_response=$(curl -s \
+        -F "file=@${OUTPUT_FILE}" \
+        -F "filename=diagram.${output_format}" \
+        -F "channels=${SLACK_CHANNEL_ID}" \
+        -F "thread_ts=${SLACK_THREAD_TS}" \
+        -F "initial_comment=${comment}" \
+        -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+        "https://slack.com/api/files.upload")
+    
+    thread_ok=$(printf '%s' "${thread_response}" | jq -r '.ok')
+    if [ "${thread_ok}" = "true" ]; then
+        echo "✅ Successfully shared in thread"
+        file_url=$(printf '%s' "${thread_response}" | jq -r '.file.permalink')
+        thread_ref=" _(shared from <${file_url}|original diagram>)_\n\n🔒 _Please note: This is an automated share. For any updates or discussion, please use the original thread where authorized users can manage the conversation._"
+    fi
 fi
 
-echo "✅ Diagram generated successfully! File size: $(ls -lh "${OUTPUT_FILE}" | awk '{print $5}')"
-
-echo "📤 Uploading to Slack: ${slack_destination}"
-
-# Handle different Slack destinations
-channel=""
-if [ -n "${SLACK_CHANNEL_ID:-}" ]; then
-    # We're in a specific channel context
-    channel="${SLACK_CHANNEL_ID}"
-    channel_comment="${comment}"
+# Process multiple destinations
+IFS=','
+for dest in ${slack_destination}; do
+    dest=$(echo "$dest" | tr -d ' ')
+    echo "📤 Processing destination: ${dest}"
     
-    # Prepare thread upload command if needed
-    if [ -n "${SLACK_THREAD_TS:-}" ]; then
-        channel_comment="${comment} (Also shared in thread)"
-        (
-            echo "📎 Uploading to thread..."
-            thread_response=$(curl -s \
-                -F "file=@${OUTPUT_FILE}" \
-                -F "filename=diagram.${output_format}" \
-                -F "channels=${channel}" \
-                -F "thread_ts=${SLACK_THREAD_TS}" \
-                -F "initial_comment=${comment}" \
-                -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-                "https://slack.com/api/files.upload")
-            
-            thread_ok=$(printf '%s' "${thread_response}" | jq -r '.ok')
-            if [ "${thread_ok}" != "true" ]; then
-                echo "⚠️ Warning: Failed to upload to thread"
-            else
-                echo "✅ Uploaded to thread successfully"
-            fi
-        ) &
-        thread_pid=$!
+    if [ "${dest}" = "#"* ]; then
+        # Channel destination
+        channel="${dest#"#"}"
+        full_comment="${comment}${thread_ref}"
+    elif [ "${dest}" = "@"* ]; then
+        # DM destination - lookup user
+        username="${dest#"@"}"
+        user_response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+            "https://slack.com/api/users.lookupByEmail?email=${username}" || \
+            curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+            "https://slack.com/api/users.list" | jq -r ".members[] | select(.name==\"${username}\").id")
+        
+        [ -z "${user_response}" ] && echo "⚠️ Skipping: Could not find user ${username}" && continue
+        channel="${user_response}"
+        full_comment="${comment}${thread_ref}"
+    else
+        echo "⚠️ Skipping invalid destination format: ${dest} (use #channel or @user)"
+        continue
     fi
-elif [ "${slack_destination}" = "#"* ]; then
-    # It's a channel
-    channel="${slack_destination#"#"}"
-    channel_comment="${comment}"
-elif [ "${slack_destination}" = "@"* ]; then
-    # It's a direct message - need to get user ID first
-    username="${slack_destination#"@"}"
-    user_response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-        "https://slack.com/api/users.lookupByEmail?email=${username}" || \
-        curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-        "https://slack.com/api/users.list" | jq -r ".members[] | select(.name==\"${username}\").id")
-    
-    if [ -z "${user_response}" ]; then
-        echo "❌ Could not find user: ${username}"
-        exit 1
-    fi
-    channel="${user_response}"
-    channel_comment="${comment}"
-else
-    echo "❌ Invalid slack_destination format. Use #channel or @user"
-    exit 1
-fi
 
-# Execute the channel upload in parallel
-(
-    echo "📎 Uploading to channel..."
+    # Upload to destination
+    echo "📎 Uploading to ${dest}..."
     response=$(curl -s \
         -F "file=@${OUTPUT_FILE}" \
         -F "filename=diagram.${output_format}" \
         -F "channels=${channel}" \
-        -F "initial_comment=${channel_comment}" \
+        -F "initial_comment=${full_comment}" \
         -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
         "https://slack.com/api/files.upload")
 
@@ -134,18 +111,10 @@ fi
     error=$(printf '%s' "${response}" | jq -r '.error // empty')
 
     if [ "${ok}" != "true" ]; then
-        echo "❌ Failed to upload to Slack: ${error:-Unknown error}"
-        echo "Full response: ${response}"
-        exit 1
+        echo "⚠️ Failed to upload to ${dest}: ${error:-Unknown error}"
+    else
+        echo "✅ Successfully shared to ${dest}"
     fi
-    echo "✅ Uploaded to channel successfully"
-) &
-channel_pid=$!
+done
 
-# Wait for all uploads to complete
-if [ -n "${thread_pid:-}" ]; then
-    wait ${thread_pid}
-fi
-wait ${channel_pid}
-
-echo "✨ Success! Diagram has been generated and shared on Slack"
+echo "✨ All sharing operations completed!"
