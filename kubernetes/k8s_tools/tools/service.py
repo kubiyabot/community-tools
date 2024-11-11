@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, FileSpec
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
@@ -32,6 +32,9 @@ service_management_tool = KubernetesTool(
         Arg(name="port", type="int", description="Port number - only for create action", required=False),
         Arg(name="target_port", type="int", description="Target port number - only for create action", required=False),
     ],
+    file_specs=[
+        FileSpec(...)
+    ]
 )
 
 # Service Describe Tool
@@ -55,6 +58,9 @@ service_describe_tool = KubernetesTool(
         Arg(name="name", type="str", description="Name of the service", required=True),
         Arg(name="namespace", type="str", description="Kubernetes namespace (required for describing a specific service)", required=True),
     ],
+    file_specs=[
+        FileSpec(...)
+    ]
 )
 
 # Register Tools

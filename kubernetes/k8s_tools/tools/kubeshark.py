@@ -59,7 +59,7 @@ kubeshark_http_analyzer = KubernetesTool(
         Arg(name="duration", type="int", description="Duration in seconds (1-3600)", required=True),
         Arg(name="namespace", type="str", description="Target namespace (optional)", required=False),
     ],
-    with_files=[
+    file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
         FileSpec(destination="/tmp/requirements.txt", content=REQUIREMENTS_FILE_CONTENT),
     ],
@@ -96,7 +96,7 @@ kubeshark_service_mesh_analyzer = KubernetesTool(
         Arg(name="duration", type="int", description="Duration in seconds", required=True),
         Arg(name="namespace", type="str", description="Target namespace", required=True),
     ],
-    with_files=[
+    file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
         FileSpec(destination="/tmp/requirements.txt", content=REQUIREMENTS_FILE_CONTENT),
     ],
@@ -136,7 +136,7 @@ kubeshark_security_analyzer = KubernetesTool(
         Arg(name="duration", type="int", description="Duration in seconds", required=True),
         Arg(name="security_level", type="str", description="Security analysis level (basic/advanced)", required=False, default="basic"),
     ],
-    with_files=[
+    file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
         FileSpec(destination="/tmp/requirements.txt", content=REQUIREMENTS_FILE_CONTENT),
     ],
@@ -176,7 +176,7 @@ kubeshark_performance_analyzer = KubernetesTool(
         Arg(name="duration", type="int", description="Duration in seconds", required=True),
         Arg(name="threshold", type="int", description="Performance threshold in ms", required=False, default=500),
     ],
-    with_files=[
+    file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
         FileSpec(destination="/tmp/requirements.txt", content=REQUIREMENTS_FILE_CONTENT),
     ],
@@ -216,7 +216,7 @@ kubeshark_api_gateway_analyzer = KubernetesTool(
         Arg(name="gateway_name", type="str", description="API Gateway name", required=True),
         Arg(name="duration", type="int", description="Duration in seconds", required=True),
     ],
-    with_files=[
+    file_specs=[
         FileSpec(destination="/tmp/scripts/kubeshark_capture.py", content=inspect.getsource(kubeshark_capture)),
         FileSpec(destination="/tmp/requirements.txt", content=REQUIREMENTS_FILE_CONTENT),
     ],
