@@ -14,12 +14,27 @@ comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
 OUTPUT_FILE="/data/diagram.${output_format}"
 
+# Handle optional theme and background color
+theme_arg=""
+if [ -n "${theme:-}" ]; then
+    theme_arg="--theme ${theme}"
+fi
+
+bg_arg=""
+if [ -n "${background_color:-}" ]; then
+    bg_arg="--backgroundColor ${background_color}"
+fi
+
 echo "📝 Diagram content:"
 echo "$diagram_content"
 
 echo "🖌️ Generating diagram..."
-# Using their exact recommended approach
-if ! echo "$diagram_content" | mmdc --input - --output "$OUTPUT_FILE"; then
+# Using mmdc from its installed location in the Docker image
+if ! echo "$diagram_content" | /home/mermaidcli/node_modules/.bin/mmdc -p /puppeteer-config.json \
+    --input - \
+    --output "$OUTPUT_FILE" \
+    $theme_arg \
+    $bg_arg; then
     echo "❌ Failed to generate diagram"
     exit 1
 fi
