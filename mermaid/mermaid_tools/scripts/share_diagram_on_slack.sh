@@ -55,26 +55,21 @@ echo "✅ Diagram generated successfully! File size: $(ls -lh "$OUTPUT_FILE" | a
 echo "📤 Uploading to Slack: $slack_destination"
 
 # Initialize upload parameters with proper filename and title
-upload_params=(
-    "-F" "file=@$OUTPUT_FILE;filename=diagram.${output_format}"
-    "-F" "initial_comment=$comment"
-    "-F" "title=Mermaid Diagram"
-    "-H" "Authorization: Bearer $SLACK_API_TOKEN"
-)
+upload_params="-F file=@$OUTPUT_FILE;filename=diagram.${output_format} -F initial_comment=$comment -F title=Mermaid Diagram -H Authorization: Bearer $SLACK_API_TOKEN"
 
 # Handle different Slack destinations
 if [ -n "${SLACK_CHANNEL_ID:-}" ]; then
     # We're in a specific channel context
-    upload_params+=("-F" "channels=$SLACK_CHANNEL_ID")
+    upload_params="$upload_params -F channels=$SLACK_CHANNEL_ID"
     if [ -n "${SLACK_THREAD_TS:-}" ]; then
         # We're in a thread
-        upload_params+=("-F" "thread_ts=$SLACK_THREAD_TS")
+        upload_params="$upload_params -F thread_ts=$SLACK_THREAD_TS"
     fi
-elif [[ "$slack_destination" == "#"* ]]; then
+elif [ "$slack_destination" = "#"* ]; then
     # It's a channel
     channel="${slack_destination#"#"}"
-    upload_params+=("-F" "channels=$channel")
-elif [[ "$slack_destination" == "@"* ]]; then
+    upload_params="$upload_params -F channels=$channel"
+elif [ "$slack_destination" = "@"* ]; then
     # It's a direct message - need to get user ID first
     username="${slack_destination#"@"}"
     user_response=$(curl -s -H "Authorization: Bearer $SLACK_API_TOKEN" \
@@ -86,14 +81,14 @@ elif [[ "$slack_destination" == "@"* ]]; then
         echo "❌ Could not find user: $username"
         exit 1
     fi
-    upload_params+=("-F" "channels=$user_response")
+    upload_params="$upload_params -F channels=$user_response"
 else
     echo "❌ Invalid slack_destination format. Use #channel or @user"
     exit 1
 fi
 
 # Execute the upload with proper error handling
-response=$(curl -s "${upload_params[@]}" "https://slack.com/api/files.upload")
+response=$(curl -s $upload_params "https://slack.com/api/files.upload")
 ok=$(echo "$response" | jq -r '.ok')
 error=$(echo "$response" | jq -r '.error // empty')
 
