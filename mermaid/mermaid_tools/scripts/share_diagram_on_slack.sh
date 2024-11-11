@@ -174,8 +174,14 @@ for dest in ${slack_destination}; do
             fi
             ;;
         *)
-            # Assume it's a raw channel/user ID
-            channel="$dest"
+            # Check if it's a valid Slack ID format (starts with U, C, G, or D)
+            if echo "$dest" | grep -qE '^[UCGD][A-Z0-9]{8,}$'; then
+                channel="$dest"
+                echo "✅ Using provided Slack ID: ${dest}"
+            else
+                echo "❌ Invalid Slack ID format: ${dest}"
+                continue
+            fi
             ;;
     esac
 
