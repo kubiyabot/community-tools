@@ -1,26 +1,22 @@
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from docker_tools.base import DockerTool
 import os
-import inspect
+from pathlib import Path
 
-# Get the current directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-scripts_dir = os.path.join(os.path.dirname(current_dir), 'scripts')
-
-# Read the network script
-with open(os.path.join(scripts_dir, 'network.py'), 'r') as f:
+# Get the script content
+scripts_dir = Path(__file__).parent.parent / "scripts"
+with open(scripts_dir / "network.py", "r") as f:
     NETWORK_SCRIPT = f.read()
 
 network_manager_tool = DockerTool(
     name="manage-network",
     description="Manage Docker networks - create and connect",
     content="""
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "🌐 Initializing network management..."
-pip install dagger-io > /dev/null 2>&1
 
 ARGS='{
     "action": "'$action'",

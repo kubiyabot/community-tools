@@ -66,7 +66,8 @@ class DockerTool(Tool):
             ("utils.sh", "/tmp/scripts/utils.sh"),
             ("setup.sh", "/tmp/scripts/setup.sh"),
             ("git_utils.sh", "/tmp/scripts/git_utils.sh"),
-            ("k8s_utils.sh", "/tmp/scripts/k8s_utils.sh")
+            ("k8s_utils.sh", "/tmp/scripts/k8s_utils.sh"),
+            ("dagger_setup.sh", "/tmp/scripts/dagger_setup.sh")
         ]
         
         file_specs = []
@@ -113,17 +114,12 @@ trap cleanup EXIT INT TERM
 echo "🔧 Installing required packages..."
 apt-get update -qq && apt-get install -y curl python3-pip jq netcat -qq > /dev/null 2>&1
 
+# Setup kubectl and discover Dagger engine
+. /tmp/scripts/dagger_setup.sh
+
 # Install dagger SDK
 echo "📦 Installing Dagger SDK..."
 pip install dagger-io > /dev/null 2>&1
-
-# Download kubectl if needed
-if ! command -v kubectl >/dev/null 2>&1; then
-    echo "🔧 Downloading kubectl..."
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" >/dev/null 2>&1
-    chmod +x kubectl
-    mv kubectl /usr/local/bin/
-fi
 
 # Run setup script
 . /tmp/scripts/setup.sh
