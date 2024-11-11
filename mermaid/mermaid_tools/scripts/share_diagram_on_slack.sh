@@ -54,10 +54,11 @@ echo "✅ Diagram generated successfully! File size: $(ls -lh "$OUTPUT_FILE" | a
 
 echo "📤 Uploading to Slack: $slack_destination"
 
-# Initialize upload parameters
+# Initialize upload parameters with proper filename and title
 upload_params=(
-    "-F" "file=@$OUTPUT_FILE"
+    "-F" "file=@$OUTPUT_FILE;filename=diagram.${output_format}"
     "-F" "initial_comment=$comment"
+    "-F" "title=Mermaid Diagram"
     "-H" "Authorization: Bearer $SLACK_API_TOKEN"
 )
 
