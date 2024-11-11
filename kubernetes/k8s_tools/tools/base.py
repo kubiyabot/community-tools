@@ -5,10 +5,25 @@ KUBERNETES_ICON_URL = "https://cdn-icons-png.flaticon.com/256/3889/3889548.png"
 
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
+        # Common environment variables for all Kubernetes tools
+        common_env = [
+            "SLACK_CHANNEL_ID",  # Slack channel ID for notifications
+            "SLACK_THREAD_TS",   # Slack thread timestamp for replies
+        ]
+
+        # Common secrets for all Kubernetes tools
+        common_secrets = [
+            "SLACK_API_TOKEN",  # Slack API token for notifications
+        ]
+
         inject_kubernetes_context = """
 set -eu
 TOKEN_LOCATION="/tmp/kubernetes_context_token"
 CERT_LOCATION="/tmp/kubernetes_context_cert"
+
+# Export Slack configuration from secrets
+export SLACK_API_TOKEN="$(cat /tmp/secrets/SLACK_API_TOKEN 2>/dev/null || echo '')"
+
 # Inject in-cluster context using the temporary token file
 if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
     KUBE_TOKEN=$(cat $TOKEN_LOCATION)
@@ -45,6 +60,8 @@ fi
             content=full_content,
             args=args,
             with_files=file_specs,
+            env=common_env,
+            secrets=common_secrets,
         )
 
 # Example usage:
