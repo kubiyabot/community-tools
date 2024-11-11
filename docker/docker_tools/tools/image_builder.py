@@ -2,23 +2,21 @@ from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from docker_tools.base import DockerTool
 import os
+from pathlib import Path
 
 # Get the script content
-current_dir = os.path.dirname(os.path.abspath(__file__))
-scripts_dir = os.path.join(os.path.dirname(current_dir), 'scripts')
-
-with open(os.path.join(scripts_dir, 'image_builder.py'), 'r') as f:
+scripts_dir = Path(__file__).parent.parent / "scripts"
+with open(scripts_dir / "image_builder.py", "r") as f:
     BUILD_SCRIPT = f.read()
 
 build_image_tool = DockerTool(
     name="build-docker-image",
     description="Builds a Docker image using Dagger, supporting multi-platform builds and build arguments",
     content="""
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "🔨 Setting up build environment..."
-pip install dagger-io > /dev/null 2>&1
 
 echo "📦 Preparing build context..."
 # Validate JSON inputs
@@ -75,7 +73,7 @@ BUILD_ARGS='{
     "target": "'$target'",
     "build_args": '$build_args',
     "platforms": '$platforms',
-    "push": '$push',
+    "push": "'$push'",
     "registry": "'$registry'",
     "tag": "'$tag'"
 }'
@@ -100,7 +98,8 @@ python /tmp/scripts/image_builder.py "$BUILD_ARGS" 2>&1 | format_output
             name="target",
             type="str",
             description="Target build stage",
-            required=False
+            required=False,
+            default=""
         ),
         Arg(
             name="build_args",
@@ -118,16 +117,17 @@ python /tmp/scripts/image_builder.py "$BUILD_ARGS" 2>&1 | format_output
         ),
         Arg(
             name="push",
-            type="bool",
-            description="Push image to registry after build",
+            type="str",
+            description="Push image to registry after build (true/false)",
             required=False,
-            default=False
+            default="false"
         ),
         Arg(
             name="registry",
             type="str",
             description="Registry to push the image to",
-            required=False
+            required=False,
+            default=""
         ),
         Arg(
             name="tag",
@@ -169,4 +169,4 @@ python /tmp/scripts/image_builder.py "$BUILD_ARGS" 2>&1 | format_output
     """
 )
 
-tool_registry.register("docker", build_image_tool) 
+tool_registry.register("docker", build_image_tool)
