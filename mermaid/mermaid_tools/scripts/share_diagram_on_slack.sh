@@ -104,84 +104,59 @@ fi
 
 # Process multiple destinations
 echo "📤 Processing destinations: ${slack_destination}"
-# Use read to properly handle commas in strings
-printf '%s' "${slack_destination}" | tr ',' '\n' | while IFS= read -r dest || [ -n "$dest" ]; do
-    # Clean the destination string and remove any non-printable characters
-    dest=$(printf '%s' "$dest" | tr -cd '[:print:][:space:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+IFS=',' read -r -a destinations <<EOF
+$slack_destination
+EOF
+
+for dest in "${destinations[@]}"; do
+    # Clean the destination string
+    dest=$(echo "$dest" | tr -d '[:space:]')
     [ -z "$dest" ] && continue
     
     echo "📤 Processing destination: ${dest}"
     
     channel=""
     full_comment="${comment}${thread_ref}"
-    
-    # Function to try channel lookup
-    try_channel_lookup() {
-        local channel_name="$1"
-        local response
-        response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/conversations.list")
-        printf '%s' "${response}" | jq -r --arg name "${channel_name}" \
-            '.channels[] | select(.name==$name) | .id' | head -n 1
-    }
 
-    # Function to try user lookup
-    try_user_lookup() {
-        local username="$1"
-        local response
-        # Try email lookup first
-        response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/users.lookupByEmail?email=${username}")
-        
-        if [ "$(printf '%s' "${response}" | jq -r '.ok // false')" = "true" ]; then
-            printf '%s' "${response}" | jq -r '.user.id'
-            return
-        fi
-        
-        # Try username lookup
-        response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/users.list")
-        printf '%s' "${response}" | jq -r --arg name "${username}" \
-            '.members[] | select(.name==$name or .real_name==$name) | .id' | head -n 1
-    }
-
-    # Handle different destination formats
-    if echo "${dest}" | grep -q "^#"; then
-        # Channel destination with # prefix
-        channel_name=$(echo "${dest}" | sed 's/^#//;s/^[[:space:]]*//;s/[[:space:]]*$//')
-        channel=$(try_channel_lookup "${channel_name}")
-        
-        if [ -z "${channel}" ]; then
-            echo "⚠️ Could not find channel #${channel_name}, trying as direct ID..."
-            channel="${channel_name}"
-        fi
-    elif echo "${dest}" | grep -q "^@"; then
-        # User destination with @ prefix
-        username=$(echo "${dest}" | sed 's/^@//;s/^[[:space:]]*//;s/[[:space:]]*$//')
-        channel=$(try_user_lookup "${username}")
-        
-        if [ -z "${channel}" ]; then
-            echo "⚠️ Could not find user @${username}, trying as direct ID..."
-            channel="${username}"
-        fi
-    else
-        # Direct ID input - try to validate
-        channel="${dest}"
-        
-        # Check if it's a valid channel ID
-        channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/conversations.info?channel=${channel}")
-        
-        if [ "$(printf '%s' "${channel_info}" | jq -r '.ok // false')" != "true" ]; then
-            # Check if it's a valid user ID
-            user_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-                "https://slack.com/api/users.info?user=${channel}")
+    # Handle channel format
+    case "$dest" in
+        "#"*)
+            # Remove # prefix and get channel name
+            channel_name=${dest#"#"}
+            # Try to get channel ID
+            channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                "https://slack.com/api/conversations.list" | \
+                jq -r --arg name "$channel_name" '.channels[] | select(.name == $name) | .id')
             
-            if [ "$(printf '%s' "${user_info}" | jq -r '.ok // false')" != "true" ]; then
-                echo "⚠️ Warning: Could not validate destination ID, attempting to send anyway..."
+            if [ -n "$channel_info" ]; then
+                channel="$channel_info"
+                echo "✅ Found channel ID for ${dest}"
+            else
+                echo "❌ Could not find channel: ${dest}"
+                continue
             fi
-        fi
-    fi
+            ;;
+        "@"*)
+            # Remove @ prefix and get username
+            username=${dest#"@"}
+            # Try to get user ID
+            user_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                "https://slack.com/api/users.list" | \
+                jq -r --arg name "$username" '.members[] | select(.name == $name) | .id')
+            
+            if [ -n "$user_info" ]; then
+                channel="$user_info"
+                echo "✅ Found user ID for ${dest}"
+            else
+                echo "❌ Could not find user: ${dest}"
+                continue
+            fi
+            ;;
+        *)
+            # Assume it's a raw channel/user ID
+            channel="$dest"
+            ;;
+    esac
 
     # Upload to destination
     echo "📎 Uploading to ${dest}..."
@@ -197,7 +172,7 @@ printf '%s' "${slack_destination}" | tr ',' '\n' | while IFS= read -r dest || [ 
     error=$(printf '%s' "${response}" | jq -r '.error // "Unknown error"')
 
     if [ "${ok}" != "true" ]; then
-        echo "⚠️ Failed to upload to ${dest}: ${error}"
+        echo "❌ Failed to upload to ${dest}: ${error}"
     else
         echo "✅ Successfully shared to ${dest}"
     fi
