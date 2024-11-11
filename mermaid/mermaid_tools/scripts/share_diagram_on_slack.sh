@@ -78,8 +78,11 @@ echo "✅ Diagram generated successfully!"
 # First, share in the original thread to get the file URL
 file_url=""
 thread_ref=""
+original_thread_url=""
+
+# Always try to post to original thread first if thread context exists
 if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
-    echo "📎 Uploading to original thread..."
+    echo "📎 Uploading to original thread first..."
     thread_response=$(curl -s \
         -F "file=@${OUTPUT_FILE}" \
         -F "filename=diagram.${output_format}" \
@@ -91,19 +94,31 @@ if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
     
     thread_ok=$(printf '%s' "${thread_response}" | jq -r '.ok // false')
     if [ "${thread_ok}" = "true" ]; then
-        echo "✅ Successfully shared in thread"
+        echo "✅ Successfully shared in original thread"
         file_url=$(printf '%s' "${thread_response}" | jq -r '.file.permalink // ""')
         if [ -n "${file_url}" ]; then
-            thread_ref="\n_(shared from <${file_url}|original reference>)_\n\n🔒 _Please note: This is an automated share. For any updates or discussion, please use the original thread where authorized users can manage the conversation._"
+            # Get the thread URL for reference
+            original_thread_url=$(curl -s \
+                -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                "https://slack.com/api/chat.getPermalink?channel=${SLACK_CHANNEL_ID}&message_ts=${SLACK_THREAD_TS}" | \
+                jq -r '.permalink // ""')
+            
+            if [ -n "${original_thread_url}" ]; then
+                thread_ref="\n\n📍 _This diagram was originally shared in <${original_thread_url}|this thread>._\n🔒 _For context and discussion, please refer to the original thread._"
+            else
+                thread_ref="\n\n_(shared from <${file_url}|original reference>)_"
+            fi
         fi
     else
         error=$(printf '%s' "${thread_response}" | jq -r '.error // "Unknown error"')
-        echo "⚠️ Failed to share in thread: ${error}"
+        echo "⚠️ Failed to share in original thread: ${error}"
     fi
+else
+    echo "ℹ️ No thread context provided, will share as new messages"
 fi
 
 # Process multiple destinations
-echo "📤 Processing destinations: ${slack_destination}"
+echo "📤 Processing additional destinations: ${slack_destination}"
 
 # Use simpler IFS-based iteration for sh compatibility
 OLD_IFS="$IFS"
@@ -112,6 +127,12 @@ for dest in ${slack_destination}; do
     # Clean the destination string
     dest=$(echo "$dest" | tr -d '[:space:]')
     [ -z "$dest" ] && continue
+    
+    # Skip if this is the original thread's channel
+    if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ "$dest" = "${SLACK_CHANNEL_ID}" ]; then
+        echo "⏭️ Skipping ${dest} as it was already posted in the original thread"
+        continue
+    fi
     
     echo "📤 Processing destination: ${dest}"
     
