@@ -1,7 +1,7 @@
 # k8s_tools/tools/base.py
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 
-KUBERNETES_ICON_URL = "https://cdn-icons-png.flaticon.com/256/3889/3889548.png"
+KUBERNETES_ICON_URL = "https://static-00.iconduck.com/assets.00/kubernetes-icon-512x499-3mjeet3c.png"
 
 class KubernetesTool(Tool):
     def __init__(
@@ -13,7 +13,8 @@ class KubernetesTool(Tool):
         env=None,
         secrets=None,
         file_specs=None,
-        image="bitnami/kubectl:latest"
+        image="bitnami/kubectl:latest",
+        mermaid=None
     ):
         # Common environment variables
         common_env = [
@@ -53,6 +54,9 @@ CERT_LOCATION="/tmp/kubernetes_context_cert"
 # Export Slack configuration from secrets
 export SLACK_API_TOKEN="$(cat /tmp/secrets/SLACK_API_TOKEN 2>/dev/null || echo '')"
 
+# Install required Python packages
+pip install argparse slack_sdk websocket-client pyyaml > /dev/null 2>&1
+
 # Inject in-cluster context
 if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
     KUBE_TOKEN=$(cat $TOKEN_LOCATION)
@@ -79,6 +83,7 @@ fi
             env=common_env,
             secrets=common_secrets,
             with_files=common_file_specs,
+            mermaid=mermaid,
         )
 
 # Example usage:

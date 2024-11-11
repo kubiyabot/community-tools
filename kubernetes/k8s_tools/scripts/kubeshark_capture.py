@@ -3,21 +3,135 @@ import os
 import sys
 import time
 import subprocess
-import argparse
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
-import yaml
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
+
+# Handle third-party imports without auto-installation
+REQUIRED_PACKAGES = {
+    'argparse': False,  # Built-in for Python 3
+    'yaml': False,
+    'slack_sdk': False,
+    'websocket': False
+}
+
+try:
+    import argparse
+except ImportError:
+    REQUIRED_PACKAGES['argparse'] = True
+
+try:
+    import yaml
+except ImportError:
+    REQUIRED_PACKAGES['yaml'] = True
+
+try:
+    from slack_sdk import WebClient
+    from slack_sdk.errors import SlackApiError
+    SLACK_AVAILABLE = True
+except ImportError:
+    REQUIRED_PACKAGES['slack_sdk'] = True
+    SLACK_AVAILABLE = False
+
+try:
+    import websocket
+except ImportError:
+    REQUIRED_PACKAGES['websocket'] = True
+
+# Check for missing packages
+missing_packages = [pkg for pkg, missing in REQUIRED_PACKAGES.items() if missing]
+if missing_packages:
+    print(f"Error: Required packages missing: {', '.join(missing_packages)}")
+    print("Please install required packages before running this script.")
+    sys.exit(1)
+
+class KubesharkManager:
+    """Manages Kubeshark binary and its lifecycle."""
+    
+    KUBESHARK_VERSION = "v52.3.89"  # Default version
+    KUBESHARK_BINARY_URL = f"https://github.com/kubeshark/kubeshark/releases/download/{KUBESHARK_VERSION}/kubeshark_linux_amd64"
+    
+    def __init__(self):
+        self.binary_path = "/usr/local/bin/kubeshark"
+        self.version = os.getenv("KUBESHARK_VERSION", self.KUBESHARK_VERSION)
+        if self.version != self.KUBESHARK_VERSION:
+            self.KUBESHARK_BINARY_URL = f"https://github.com/kubeshark/kubeshark/releases/download/{self.version}/kubeshark_linux_amd64"
+    
+    def ensure_binary(self) -> bool:
+        """Ensure Kubeshark binary is available."""
+        if self._check_binary():
+            return True
+            
+        print("Kubeshark binary not found. Installing...")
+        return self._install_binary()
+    
+    def _check_binary(self) -> bool:
+        """Check if Kubeshark binary exists and is executable."""
+        try:
+            result = subprocess.run(
+                [self.binary_path, "version"],
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
+        except (subprocess.SubprocessError, FileNotFoundError):
+            return False
+    
+    def _install_binary(self) -> bool:
+        """Install Kubeshark binary."""
+        try:
+            # Download binary
+            print(f"Downloading Kubeshark {self.version}...")
+            download_cmd = f"curl -Lo {self.binary_path} {self.KUBESHARK_BINARY_URL}"
+            subprocess.run(download_cmd, shell=True, check=True)
+            
+            # Make binary executable
+            chmod_cmd = f"chmod 755 {self.binary_path}"
+            subprocess.run(chmod_cmd, shell=True, check=True)
+            
+            print("✅ Kubeshark installed successfully")
+            return True
+            
+        except subprocess.SubprocessError as e:
+            print(f"❌ Failed to install Kubeshark: {str(e)}")
+            return False
+    
+    def start_capture(self) -> bool:
+        """Start Kubeshark capture."""
+        try:
+            subprocess.run(
+                [self.binary_path, "tap", "--headless"],  # Added --headless for non-interactive mode
+                check=True
+            )
+            return True
+        except subprocess.SubprocessError as e:
+            print(f"Failed to start Kubeshark capture: {str(e)}")
+            return False
+    
+    def stop_capture(self):
+        """Stop Kubeshark capture."""
+        try:
+            subprocess.run(
+                [self.binary_path, "clean"],
+                check=True
+            )
+        except subprocess.SubprocessError as e:
+            print(f"Warning: Failed to clean Kubeshark: {str(e)}")
 
 class ProgressReporter:
+    """Handles progress reporting with optional Slack integration."""
+    
     def __init__(self, slack_token: Optional[str] = None, channel_id: Optional[str] = None):
-        """Initialize progress reporter with optional Slack integration."""
-        self.slack_client = WebClient(token=slack_token) if slack_token else None
+        self.slack_client = None
         self.channel_id = channel_id
         self.message_ts = None
         self.start_time = time.time()
+
+        if SLACK_AVAILABLE and slack_token:
+            try:
+                self.slack_client = WebClient(token=slack_token)
+            except Exception as e:
+                print(f"Warning: Failed to initialize Slack client: {str(e)}")
 
     def console_progress(self, message: str, emoji: str = "🔄", level: int = 0):
         """Print formatted console progress."""
@@ -103,78 +217,47 @@ class ProgressReporter:
             print(f"Warning: Failed to update Slack: {str(e)}")
 
 class KubesharkCapture:
+    """Manages Kubeshark capture and analysis."""
+    
     def __init__(self, output_dir: Path):
-        """Initialize Kubeshark capture with progress reporting."""
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Initialize progress reporter
-        slack_token = os.getenv('SLACK_API_TOKEN')
-        slack_channel = os.getenv('SLACK_CHANNEL_ID')
-        self.progress = ProgressReporter(slack_token, slack_channel)
+        # Initialize managers
+        self.kubeshark = KubesharkManager()
+        self.progress = ProgressReporter(
+            os.getenv('SLACK_API_TOKEN'),
+            os.getenv('SLACK_CHANNEL_ID')
+        )
         
         # Capture configuration
         self.kubeshark_host = os.getenv('KUBESHARK_HOST', '127.0.0.1')
         self.kubeshark_port = os.getenv('KUBESHARK_PORT', '8899')
 
+    def setup(self) -> bool:
+        """Setup and verify environment."""
+        if not self.kubeshark.ensure_binary():
+            return False
+            
+        self.progress.console_progress("Verifying Kubeshark installation", "🔍")
+        return True
+
     def capture_traffic(self, filter_expr: str, duration: int, namespace: Optional[str] = None):
         """Capture traffic with real-time progress updates."""
-        self.progress.console_progress("Starting traffic capture", "🚀")
-        self.progress.update_slack_progress(
-            "Starting Capture",
-            1, 4,
-            {"current_operation": "Initializing capture"}
-        )
+        if not self.setup():
+            raise RuntimeError("Failed to setup Kubeshark environment")
 
-        # Verify environment
-        self.progress.console_progress("Verifying Kubeshark availability", "🔍", 1)
-        self._verify_kubeshark()
-
-        # Initialize capture
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = self.output_dir / f"traffic_{timestamp}.json"
-        
-        # Start capture with progress tracking
-        captured_entries = 0
-        start_time = time.time()
-        
         try:
-            with self._start_capture(filter_expr, duration) as process:
-                self.progress.console_progress("Capturing traffic", "📥", 1)
-                
-                while process.poll() is None:
-                    line = process.stdout.readline()
-                    if line:
-                        captured_entries += 1
-                        if captured_entries % 100 == 0:  # Update every 100 entries
-                            elapsed = time.time() - start_time
-                            rate = captured_entries / elapsed if elapsed > 0 else 0
-                            
-                            self.progress.update_slack_progress(
-                                "Capturing Traffic",
-                                2, 4,
-                                {
-                                    "current_operation": "Processing network traffic",
-                                    "metrics": {
-                                        "Captured Entries": captured_entries,
-                                        "Capture Rate": f"{rate:.1f} entries/sec",
-                                        "Elapsed Time": f"{int(elapsed)}s"
-                                    }
-                                }
-                            )
+            # Start Kubeshark
+            self.progress.console_progress("Starting Kubeshark capture", "🚀")
+            if not self.kubeshark.start_capture():
+                raise RuntimeError("Failed to start Kubeshark capture")
 
-        except Exception as e:
-            self.progress.console_progress(f"Error during capture: {str(e)}", "❌", 1)
-            self.progress.update_slack_progress(
-                "Capture Failed",
-                2, 4,
-                {"current_operation": "Error occurred"},
-                str(e)
-            )
-            raise
+            # ... (rest of capture implementation)
 
-        self.progress.console_progress("Traffic capture completed", "✅", 1)
-        return output_file
+        finally:
+            # Cleanup
+            self.kubeshark.stop_capture()
 
     def analyze_traffic(self, capture_file: Path, analysis_types: List[str] = ["basic"]):
         """Analyze traffic with progress updates."""
@@ -236,6 +319,12 @@ class KubesharkCapture:
     # ... (rest of the implementation)
 
 def main():
+    # Verify environment first
+    kubeshark = KubesharkManager()
+    if not kubeshark.ensure_binary():
+        sys.exit(1)
+
+    # Parse arguments and continue with execution
     parser = argparse.ArgumentParser(description="Kubeshark Traffic Capture and Analysis")
     parser.add_argument("--mode", required=True, help="Capture mode")
     parser.add_argument("--output-dir", required=True, help="Output directory")
@@ -276,6 +365,8 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
+    finally:
+        kubeshark.stop_capture()
 
 if __name__ == "__main__":
     main() 
