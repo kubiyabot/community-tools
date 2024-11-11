@@ -1,1 +1,5 @@
-kubiya-sdk
+kubiya-sdk>=0.1.0
+slack-sdk>=3.19.0
+websocket-client>=1.6.1
+pyyaml>=6.0
+argparse>=1.4.0

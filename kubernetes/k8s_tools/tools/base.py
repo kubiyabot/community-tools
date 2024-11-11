@@ -4,28 +4,34 @@ from kubiya_sdk.tools import Tool, Arg, FileSpec
 KUBERNETES_ICON_URL = "https://static-00.iconduck.com/assets.00/kubernetes-icon-2048x1995-r1q3f8n7.png"
 
 class KubernetesTool(Tool):
-    def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
-        inject_kubernetes_context = """
-set -eu
-TOKEN_LOCATION="/tmp/kubernetes_context_token"
-CERT_LOCATION="/tmp/kubernetes_context_cert"
-# Inject in-cluster context using the temporary token file
-if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
-    KUBE_TOKEN=$(cat $TOKEN_LOCATION)
-    kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc \
-                                          --certificate-authority=$CERT_LOCATION > /dev/null 2>&1
-    kubectl config set-credentials in-cluster --token=$KUBE_TOKEN > /dev/null 2>&1
-    kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster > /dev/null 2>&1
-    kubectl config use-context in-cluster > /dev/null 2>&1
-else
-    echo "Error: Kubernetes context token or cert file not found at $TOKEN_LOCATION \
-          or $CERT_LOCATION respectively."
-    exit 1
-fi
-"""
-        full_content = f"{inject_kubernetes_context}\n{content}"
+    def __init__(
+        self, 
+        name, 
+        description, 
+        content, 
+        args=None, 
+        env=None,
+        secrets=None,
+        file_specs=None,
+        image="bitnami/kubectl:latest"
+    ):
+        # Common environment variables
+        common_env = [
+            "SLACK_CHANNEL_ID",
+            "SLACK_THREAD_TS",
+        ]
+        if env:
+            common_env.extend(env)
 
-        file_specs = [
+        # Common secrets
+        common_secrets = [
+            "SLACK_API_TOKEN",
+        ]
+        if secrets:
+            common_secrets.extend(secrets)
+
+        # Common file specs
+        common_file_specs = [
             FileSpec(
                 source="/var/run/secrets/kubernetes.io/serviceaccount/token",
                 destination="/tmp/kubernetes_context_token"
@@ -35,6 +41,32 @@ fi
                 destination="/tmp/kubernetes_context_cert"
             )
         ]
+        if file_specs:
+            common_file_specs.extend(file_specs)
+
+        # Base content with context injection
+        inject_kubernetes_context = """
+set -eu
+TOKEN_LOCATION="/tmp/kubernetes_context_token"
+CERT_LOCATION="/tmp/kubernetes_context_cert"
+
+# Export Slack configuration from secrets
+export SLACK_API_TOKEN="$(cat /tmp/secrets/SLACK_API_TOKEN 2>/dev/null || echo '')"
+
+# Inject in-cluster context
+if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
+    KUBE_TOKEN=$(cat $TOKEN_LOCATION)
+    kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc \
+                                        --certificate-authority=$CERT_LOCATION > /dev/null 2>&1
+    kubectl config set-credentials in-cluster --token=$KUBE_TOKEN > /dev/null 2>&1
+    kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster > /dev/null 2>&1
+    kubectl config use-context in-cluster > /dev/null 2>&1
+else
+    echo "Error: Kubernetes context token or cert file not found"
+    exit 1
+fi
+"""
+        full_content = f"{inject_kubernetes_context}\n{content}"
 
         super().__init__(
             name=name,
@@ -43,8 +75,10 @@ fi
             type="docker",
             image=image,
             content=full_content,
-            args=args,
-            with_files=file_specs,
+            args=args or [],
+            env=common_env,
+            secrets=common_secrets,
+            with_files=common_file_specs,
         )
 
 # Example usage:

@@ -1,0 +1,32 @@
+[90m2024-11-11T16:15:05Z[0m [32mINF[0m [1mtracer/misc/data.go:17[0m[36m >[0m [1mSet the data directory to:[0m [36mdata-dir=[0mdata
+[90m2024-11-11T16:15:05Z[0m [32mINF[0m [1mtracer/main.go:104[0m[36m >[0m [1mStarting tracer...[0m
+[90m2024-11-11T16:15:05Z[0m [32mINF[0m [1mtracer/tracer.go:49[0m[36m >[0m [1mInitializing tracer (chunksSize: 40960000) (logSize: 4096)[0m
+[90m2024-11-11T16:15:05Z[0m [32mINF[0m [1mtracer/pkg/bpf/bpf.go:93[0m[36m >[0m [1mDetected Linux kernel version: 5.15.0-1071-azure cgroups version2: true[0m
+[90m2024-11-11T16:15:05Z[0m [33mWRN[0m [1mtracer/pkg/bpf/bpf.go:106[0m[36m >[0m [1mGet host netns failed[0m [36merror=[0m[31m[1m"stat /hostproc/1/ns/pid: permission denied"[0m[0m
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/socket/event_unix_socket.go:31[0m[36m >[0m [1mListen event unix socket:[0m [36mName=[0m/app/data/aks-agentpool-40807194-vmss00000z/syscall_event.unix
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/pkg/bpf/tls_poller.go:88[0m[36m >[0m [1mStart polling for tls events[0m
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/pkg/poller/syscall/tracer_syscall_events.go:49[0m[36m >[0m [1mPolling syscall events started[0m
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/pkg/poller/packets/packets_poller.go:128[0m[36m >[0m [1mStart polling for tls events[0m
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/pkg/poller/log/bpf_logger.go:63[0m[36m >[0m [1mStart polling for bpf logs[0m
+2024/11/11 16:15:06 [DEBUG] GET http://kubeshark-hub:80/pods/all
+2024/11/11 16:15:06 [ERR] GET http://kubeshark-hub:80/pods/all request failed: Get "http://kubeshark-hub:80/pods/all": dial tcp 10.0.114.60:80: connect: connection refused
+2024/11/11 16:15:06 [DEBUG] GET http://kubeshark-hub:80/pods/all: retrying in 1s (4 left)
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/socket/unix_socket.go:131[0m[36m >[0m [1mAccepted unix socket:[0m [36mAddress=[0m@ [36mName=[0mtls.unix
+[90m2024-11-11T16:15:06Z[0m [32mINF[0m [1mtracer/socket/event_unix_socket.go:45[0m[36m >[0m [1mAccepted event unix socket:[0m [36mAddress=[0m@ [36mName=[0m/app/data/aks-agentpool-40807194-vmss00000z/syscall_event.unix
+2024/11/11 16:15:07 [ERR] GET http://kubeshark-hub:80/pods/all request failed: Get "http://kubeshark-hub:80/pods/all": dial tcp 10.0.114.60:80: connect: connection refused
+2024/11/11 16:15:07 [DEBUG] GET http://kubeshark-hub:80/pods/all: retrying in 2s (3 left)
+2024/11/11 16:15:09 [ERR] GET http://kubeshark-hub:80/pods/all request failed: Get "http://kubeshark-hub:80/pods/all": dial tcp 10.0.114.60:80: connect: connection refused
+2024/11/11 16:15:09 [DEBUG] GET http://kubeshark-hub:80/pods/all: retrying in 4s (2 left)
+2024/11/11 16:15:14 [DEBUG] GET http://kubeshark-hub:80/pods/targeted
+[90m2024-11-11T16:15:14Z[0m [32mINF[0m [1mtracer/tracer.go:96[0m[36m >[0m [1mUpdate targets[0m [36mAdd pods=[0m19 [36mRemove pods=[0m0
+[90m2024-11-11T16:15:14Z[0m [32mINF[0m [1mtracer/tracer.go:160[0m[36m >[0m [1mCgroup has been targeted[0m [36mCgroup ID=[0m3764011 [36mContainer ID=[0m0eeff2abe216cb4d39ebeb971f0f818b12499a18f851d161960a3549b51c6053
+[90m2024-11-11T16:15:14Z[0m [32mINF[0m [1mtracer/tracer.go:160[0m[36m >[0m [1mCgroup has been targeted[0m [36mCgroup ID=[0m4611426 [36mContainer ID=[0m859e902fcffc2084488647261b3e43be05e811fcc47d8730fdaeef44fabd03c1
+2024/11/11 16:15:17 [DEBUG] GET http://kubeshark-hub:80/pods/all
+2024/11/11 16:15:18 [DEBUG] GET http://kubeshark-hub:80/pods/targeted
+[90m2024-11-11T16:15:18Z[0m [32mINF[0m [1mtracer/tracer.go:96[0m[36m >[0m [1mUpdate targets[0m [36mAdd pods=[0m0 [36mRemove pods=[0m0
+2024/11/11 16:15:48 [DEBUG] GET http://kubeshark-hub:80/pods/all
+2024/11/11 16:15:49 [DEBUG] GET http://kubeshark-hub:80/pods/targeted
+[90m2024-11-11T16:15:49Z[0m [32mINF[0m [1mtracer/tracer.go:96[0m[36m >[0m [1mUpdate targets[0m [36mAdd pods=[0m0 [36mRemove pods=[0m0
+2024/11/11 16:19:14 [DEBUG] GET http://kubeshark-hub:80/pods/all
+2024/11/11 16:19:15 [DEBUG] GET http://kubeshark-hub:80/pods/targeted
+[90m2024-11-11T16:19:15Z[0m [32mINF[0m [1mtracer/tracer.go:96[0m[36m >[0m [1mUpdate targets[0m [36mAdd pods=[0m0 [36mRemove pods=[0m0

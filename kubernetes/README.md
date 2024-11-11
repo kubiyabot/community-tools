@@ -131,3 +131,28 @@ Contributions to this module are welcome! Please ensure that any new tools or mo
 ## License
 
 This project is licensed under the MIT License.
+
+## Configuration
+
+### Environment Variables
+
+The following environment variables are required for proper tool operation:
+
+- `SLACK_CHANNEL_ID`: The Slack channel ID where notifications will be sent
+- `SLACK_THREAD_TS`: (Optional) Slack thread timestamp for replies
+
+### Secrets
+
+The following secrets must be configured in your Teammate settings:
+
+- `SLACK_API_TOKEN`: Slack API token for sending notifications
+
+### Setting up Slack Integration
+
+1. In your Teammate settings, go to the Secrets section
+2. Add a new secret with key `SLACK_API_TOKEN` and your Slack Bot User OAuth Token
+3. In your workflow or environment, set the required environment variables:
+   ```python
+   os.environ["SLACK_CHANNEL_ID"] = "C1234567890"
+   os.environ["SLACK_THREAD_TS"] = "1234567890.123456"  # Optional
+   ```
