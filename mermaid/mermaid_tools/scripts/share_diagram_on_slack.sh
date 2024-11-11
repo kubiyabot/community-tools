@@ -19,8 +19,8 @@ comment="${comment:-Here is the diagram.}"
 output_format="${output_format:-png}"
 # Sanitize output format to only allow valid formats
 case "${output_format}" in
-    png|svg|pdf) ;;
-    *) echo "❌ Error: Invalid output format. Must be png, svg, or pdf."; exit 1 ;;
+    png|svg) ;;
+    *) echo "❌ Error: Invalid output format. Must be png or svg."; exit 1 ;;
 esac
 OUTPUT_FILE="/data/diagram.${output_format}"
 
@@ -86,6 +86,7 @@ if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
     thread_response=$(curl -s \
         -F "file=@${OUTPUT_FILE}" \
         -F "filename=diagram.${output_format}" \
+        -F "filetype=${output_format}" \
         -F "channels=${SLACK_CHANNEL_ID}" \
         -F "thread_ts=${SLACK_THREAD_TS}" \
         -F "initial_comment=${comment}" \
@@ -190,6 +191,7 @@ for dest in ${slack_destination}; do
     response=$(curl -s \
         -F "file=@${OUTPUT_FILE}" \
         -F "filename=diagram.${output_format}" \
+        -F "filetype=${output_format}" \
         -F "channels=${channel}" \
         -F "initial_comment=${full_comment}" \
         -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
