@@ -104,11 +104,11 @@ fi
 
 # Process multiple destinations
 echo "📤 Processing destinations: ${slack_destination}"
-IFS=',' read -r -a destinations <<EOF
-$slack_destination
-EOF
 
-for dest in "${destinations[@]}"; do
+# Use simpler IFS-based iteration for sh compatibility
+OLD_IFS="$IFS"
+IFS=","
+for dest in ${slack_destination}; do
     # Clean the destination string
     dest=$(echo "$dest" | tr -d '[:space:]')
     [ -z "$dest" ] && continue
@@ -177,5 +177,6 @@ for dest in "${destinations[@]}"; do
         echo "✅ Successfully shared to ${dest}"
     fi
 done
+IFS="$OLD_IFS"
 
 echo "✨ All sharing operations completed!"
