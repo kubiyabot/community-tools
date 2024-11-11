@@ -52,6 +52,7 @@ echo "✅ Diagram generated successfully!"
 
 # First, share in the original thread to get the file URL
 file_url=""
+thread_ref=""
 if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
     echo "📎 Uploading to original thread..."
     thread_response=$(curl -s \
@@ -67,31 +68,47 @@ if [ -n "${SLACK_CHANNEL_ID:-}" ] && [ -n "${SLACK_THREAD_TS:-}" ]; then
     if [ "${thread_ok}" = "true" ]; then
         echo "✅ Successfully shared in thread"
         file_url=$(printf '%s' "${thread_response}" | jq -r '.file.permalink')
-        thread_ref=" _(shared from <${file_url}|original diagram>)_\n\n🔒 _Please note: This is an automated share. For any updates or discussion, please use the original thread where authorized users can manage the conversation._"
+        thread_ref="\n_(shared from <${file_url}|original diagram>)_\n\n🔒 _Please note: This is an automated share. For any updates or discussion, please use the original thread where authorized users can manage the conversation._"
     fi
 fi
 
 # Process multiple destinations
+echo "📤 Processing destinations: ${slack_destination}"
 IFS=','
 for dest in ${slack_destination}; do
-    dest=$(echo "$dest" | tr -d ' ')
+    # Clean the destination string
+    dest=$(printf '%s' "$dest" | tr -d ' \t\n\r')
+    [ -z "$dest" ] && continue
+    
     echo "📤 Processing destination: ${dest}"
+    
+    channel=""
+    full_comment="${comment}${thread_ref}"
     
     if [ "${dest}" = "#"* ]; then
         # Channel destination
         channel="${dest#"#"}"
-        full_comment="${comment}${thread_ref}"
     elif [ "${dest}" = "@"* ]; then
         # DM destination - lookup user
         username="${dest#"@"}"
         user_response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/users.lookupByEmail?email=${username}" || \
-            curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-            "https://slack.com/api/users.list" | jq -r ".members[] | select(.name==\"${username}\").id")
+            "https://slack.com/api/users.lookupByEmail?email=${username}")
         
-        [ -z "${user_response}" ] && echo "⚠️ Skipping: Could not find user ${username}" && continue
-        channel="${user_response}"
-        full_comment="${comment}${thread_ref}"
+        user_ok=$(printf '%s' "${user_response}" | jq -r '.ok')
+        if [ "${user_ok}" = "true" ]; then
+            channel=$(printf '%s' "${user_response}" | jq -r '.user.id')
+        else
+            # Try looking up by username if email lookup fails
+            user_list_response=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                "https://slack.com/api/users.list")
+            channel=$(printf '%s' "${user_list_response}" | jq -r --arg name "${username}" \
+                '.members[] | select(.name==$name or .real_name==$name) | .id' | head -n 1)
+        fi
+        
+        if [ -z "${channel}" ]; then
+            echo "⚠️ Skipping: Could not find user ${username}"
+            continue
+        fi
     else
         echo "⚠️ Skipping invalid destination format: ${dest} (use #channel or @user)"
         continue
