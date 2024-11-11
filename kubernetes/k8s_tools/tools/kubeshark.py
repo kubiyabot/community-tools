@@ -56,7 +56,7 @@ kubeshark_http_analyzer = KubernetesTool(
     """,
     content=f"{BASE_KUBESHARK_CMD} --filter \"protocol.name == 'http' or protocol.name == 'https'\" --duration \"$duration\"",
     args=[
-        Arg(name="duration", type="int", description="Duration in seconds (1-3600)", required=True),
+        Arg(name="duration", type="str", description="Duration in seconds (1-3600)", required=True),
         Arg(name="namespace", type="str", description="Target namespace (optional)", required=False),
     ],
     file_specs=[
