@@ -115,7 +115,7 @@ python /tmp/repo_build.py "$BUILD_ARGS"
             type="str",
             description="JSON string of build arguments",
             required=False,
-            default="{}"
+            default='{}'
         )
     ],
     with_files=[
