@@ -8,9 +8,19 @@ slack_send_message = SlackTool(
     description="Send a message to a given channel name or ID",
     action="chat_postMessage",
     args=[
+        Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
         Arg(name="channel", type="str", description="The channel name (with or without # prefix) or ID to send the message to", required=True),
+    ],
+)
+
+slack_send_message_to_predefined_channel = SlackTool(
+    name="slack_send_message_to_predefined_channel",
+    description="Send a message to predefined channel",
+    action="chat_postMessage",
+    args=[
         Arg(name="text", type="str", description="The message text, markdown is supported", required=True),
     ],
+    env=["NOTIFICATION_CHANNEL"]
 )
 
 # Slack Upload File Tool
@@ -27,46 +37,46 @@ slack_upload_file = SlackTool(
 )
 
 #Slack List Channels Tool -  need permissions: channels:read- groups:read- mpim:read- im:read
-#slack_list_channels = SlackTool(
- #   name="slack_list_channels",
- #   description="List all channels in the Slack workspace",
- #   action="conversations_list",
- #   args=[
- #       Arg(name="types", type="str", description="Comma-separated list of channel types to include", required=False),
- #   ],
-#)
+slack_list_channels = SlackTool(
+    name="slack_list_channels",
+    description="List all channels in the Slack workspace",
+    action="conversations_list",
+    args=[
+        Arg(name="types", type="str", description="Comma-separated list of channel types to include", required=False),
+    ],
+)
 
-# Slack Create Channel Tool - need permissions channels:write.invites and channels:manage
-#slack_create_channel = SlackTool(
-#    name="slack_create_channel",
-#    description="Create a new Slack channel",
-#    action="conversations_create",
-#    args=[
-#        Arg(name="name", type="str", description="Name of the channel to create", required=True),
-#        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False),
-#    ],
-#)
+#Slack Create Channel Tool - need permissions channels:write.invites and channels:manage
+slack_create_channel = SlackTool(
+    name="slack_create_channel",
+    description="Create a new Slack channel",
+    action="conversations_create",
+    args=[
+        Arg(name="name", type="str", description="Name of the channel to create", required=True),
+        Arg(name="is_private", type="bool", description="Whether the channel should be private", required=False),
+    ],
+)
 
 # Slack Invite User Tool - need permissions channels:manage
-#slack_invite_user = SlackTool(
-    #name="slack_invite_user",
-    #description="Invite a user to a Slack channel",
-    #action="conversations_invite",
-    #args=[
-     #   Arg(name="channel", type="str", description="The ID of the channel to invite user to", required=True),
-     #   Arg(name="users", type="str", description="Comma-separated list of user IDs to invite", required=True),
-    #],
-#)
+slack_invite_user = SlackTool(
+    name="slack_invite_user",
+    description="Invite a user to a Slack channel",
+    action="conversations_invite",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to invite user to", required=True),
+        Arg(name="users", type="str", description="Comma-separated list of user IDs to invite", required=True),
+    ],
+)
 
 # Slack Get Channel Info Tool - Requires permissions (channels:read, groups:read, mpim:read, im:read).
-#slack_get_channel_info = SlackTool(
-#    name="slack_get_channel_info",
-#    description="Get information about a Slack channel",
-#    action="conversations_info",
-#    args=[
-#        Arg(name="channel", type="str", description="The ID of the channel to get info for", required=True),
-#    ],
-#)
+slack_get_channel_info = SlackTool(
+    name="slack_get_channel_info",
+    description="Get information about a Slack channel",
+    action="conversations_info",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to get info for", required=True),
+    ],
+)
 
 # Slack Get User Info Tool
 slack_get_user_info = SlackTool(
@@ -141,12 +151,13 @@ all_tools = [
     slack_add_reaction,
     slack_remove_reaction,
     slack_upload_file,
-    #slack_list_channels,
-    #slack_create_channel,
-    #slack_invite_user,
-    #slack_get_channel_info,
+    slack_list_channels,
+    slack_create_channel,
+    slack_invite_user,
+    slack_get_channel_info,
     slack_get_user_info,
     slack_get_channel_history,
+    slack_send_message_to_predefined_channel,
 ]
 
 # Register all Slack tools

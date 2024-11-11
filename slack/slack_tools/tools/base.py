@@ -4,8 +4,8 @@ import json
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
 class SlackTool(Tool):
-    def __init__(self, name, description, action, args, long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL"]
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        env = ["KUBIYA_USER_EMAIL", *env]
         secrets = ["SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
@@ -103,18 +103,23 @@ def send_slack_message(client, channel, text):
         logger.error(f"Error sending message: {{error_message}}")
         return {{"success": False, "error": error_message}}
 
-def execute_slack_action(token, action, **kwargs):
+def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
     logger.info(f"Executing Slack action: {{action}}")
     logger.info(f"Action parameters: {{kwargs}}")
 
     try:
         if action == "chat_postMessage":
-            if 'channel' not in kwargs or 'text' not in kwargs:
+            if 'text' not in kwargs:
                 logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
                 return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
-            
-            result = send_slack_message(client, kwargs['channel'], kwargs['text'])
+            if operation == "slack_send_message_to_predefined_channel":
+                result = send_slack_message(client, os.environ["NOTIFICATION_CHANNEL"], kwargs['text'])
+            else:
+                if 'channel' not in kwargs:
+                    logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
+                    return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
+                result = send_slack_message(client, kwargs['channel'], kwargs['text'])    
         else:
             logger.info(f"Executing action: {{action}}")
             method = getattr(client, action)
@@ -143,7 +148,7 @@ if __name__ == "__main__":
         if arg in os.environ:
             args[arg] = os.environ[arg]
     
-    result = execute_slack_action(token, "{action}", **args)
+    result = execute_slack_action(token, "{action}", "{name}", **args)
     logger.info("Slack action execution completed")
     print(json.dumps(result))
 """
@@ -153,7 +158,8 @@ if __name__ == "__main__":
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="pip install slack-sdk fuzzywuzzy python-Levenshtein && python /tmp/script.py",
+            on_build = "pip install slack-sdk fuzzywuzzy python-Levenshtein",
+            content="python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
