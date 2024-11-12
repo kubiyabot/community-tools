@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Tool
 
-ZOOM_ICON_URL = "https://seeklogo.com/images/Z/zoom-icon-logo-C552F99BAB-seeklogo.com.png"
+ZOOM_ICON_URL = "https://w7.pngwing.com/pngs/339/623/png-transparent-zoom-app-hd-logo-thumbnail.png"
 
 class ZoomTool(Tool):
     def __init__(
