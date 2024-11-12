@@ -44,14 +44,18 @@ class ZoomTool(Tool):
             exit 1
         fi
 
-        # Install Python packages
-        if ! pip install --no-cache-dir zoomus requests python-dateutil pytz markdown tabulate > /dev/null 2>&1; then
+        # Install Python packages with better error handling
+        echo "📦 Installing required Python packages..."
+        if ! pip install --no-cache-dir 'zoomus>=1.1.5' requests python-dateutil pytz markdown tabulate > /dev/null 2>&1; then
             echo "❌ Failed to install Python dependencies"
             exit 1
         fi
 
         # Make handlers executable
         chmod +x /tmp/zoom_tools/handlers/*.py
+
+        # Add zoom_tools to Python path
+        export PYTHONPATH="/tmp:$PYTHONPATH"
 
         echo "✅ Environment ready"
         """

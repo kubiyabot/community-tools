@@ -1,9 +1,23 @@
 import os
 import json
-from zoomus import ZoomClient
 from datetime import datetime
 import pytz
-from zoom_formatters import *
+
+# Add error handling for imports
+try:
+    from zoomus import ZoomClient
+except ImportError:
+    print("### ⚠️ Note: This is likely a discovery call without the tool environment")
+    print("Required package 'zoomus' will be installed during actual tool execution")
+    # Create a dummy client for discovery
+    class ZoomClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+try:
+    from .zoom_formatters import *
+except ImportError:
+    print("### ⚠️ Note: Running outside tool environment, formatters will be available during execution")
 
 def get_zoom_client():
     """Initialize and return Zoom client with error handling"""
