@@ -1,11 +1,13 @@
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
-from zoom_tools.base import ZoomTool
+from .base import ZoomTool
 
 # Create Meeting Tool
 create_meeting_tool = ZoomTool(
     name="create-zoom-meeting",
-    description="Create a new Zoom meeting with specified parameters",
+    description="""Create a new Zoom meeting with specified parameters.
+    
+Example usage:""",
     mermaid="""
     sequenceDiagram
         participant U as User 👤
@@ -21,14 +23,13 @@ create_meeting_tool = ZoomTool(
     """,
     content="""
         #!/usr/bin/env python3
+        from zoom_helpers import get_zoom_client, handle_zoom_response, format_meeting_details
         import os
-        import json
-        from zoomus import ZoomClient
         
-        # Initialize Zoom client
-        client = ZoomClient(os.environ['ZOOM_API_KEY'], os.environ['ZOOM_API_SECRET'])
+        print("*Please wait while we set up your meeting...*\n")
         
-        # Prepare meeting settings
+        client = get_zoom_client()
+        
         meeting_settings = {
             "topic": os.environ.get('topic', 'Scheduled Meeting'),
             "type": 2,  # Scheduled meeting
@@ -45,21 +46,12 @@ create_meeting_tool = ZoomTool(
             }
         }
         
-        print("🎥 Creating Zoom meeting...")
         response = client.meeting.create(user_id='me', **meeting_settings)
-        meeting_data = json.loads(response.content)
+        data = handle_zoom_response(response, "Meeting created successfully! 🎉")
         
-        if response.status_code == 201:
-            print("✅ Meeting created successfully!")
-            print(f"📋 Meeting Details:")
-            print(f"   • Meeting ID: {meeting_data['id']}")
-            print(f"   • Topic: {meeting_data['topic']}")
-            print(f"   • Join URL: {meeting_data['join_url']}")
-            print(f"   • Password: {meeting_data['password']}")
-            print(f"   • Start Time: {meeting_data['start_time']}")
-        else:
-            print(f"❌ Failed to create meeting: {meeting_data.get('message', 'Unknown error')}")
-            exit(1)
+        print(format_meeting_details(data))
+        
+        print("\n> 💡 **Tip**: Share the join URL and password with your participants")
     """,
     args=[
         Arg(name="topic", description="Meeting topic/name", required=True),
@@ -97,46 +89,49 @@ meeting_controls_tool = ZoomTool(
     """,
     content="""
         #!/usr/bin/env python3
+        from zoom_helpers import get_zoom_client, handle_zoom_response, format_meeting_control_result
         import os
-        import json
-        from zoomus import ZoomClient
         
-        client = ZoomClient(os.environ['ZOOM_API_KEY'], os.environ['ZOOM_API_SECRET'])
+        client = get_zoom_client()
         meeting_id = os.environ['meeting_id']
         action = os.environ['action']
         
-        print(f"🎮 Executing meeting control: {action}")
+        print(f"### 🎮 Executing Meeting Control")
+        print(f"**Action**: `{action}`")
+        print("*Processing your request...*\n")
         
-        if action == "mute_all":
-            response = client.meeting.update(
-                meeting_id=meeting_id,
-                settings={"mute_upon_entry": True}
-            )
-            print("🔇 All participants muted")
+        try:
+            if action == "mute_all":
+                response = client.meeting.update(
+                    meeting_id=meeting_id,
+                    settings={"mute_upon_entry": True}
+                )
+                print(format_meeting_control_result('mute_all'))
+                
+            elif action == "unmute_all":
+                response = client.meeting.update(
+                    meeting_id=meeting_id,
+                    settings={"mute_upon_entry": False}
+                )
+                print(format_meeting_control_result('unmute_all'))
+                
+            elif action == "end_meeting":
+                response = client.meeting.end(meeting_id=meeting_id)
+                print(format_meeting_control_result('end_meeting'))
+                
+            elif action.startswith("remove_"):
+                participant_id = action.split("_")[1]
+                response = client.meeting.participant_remove(
+                    meeting_id=meeting_id,
+                    participant_id=participant_id
+                )
+                print(format_meeting_control_result('remove'))
             
-        elif action == "unmute_all":
-            response = client.meeting.update(
-                meeting_id=meeting_id,
-                settings={"mute_upon_entry": False}
-            )
-            print("🔊 All participants can now unmute")
+            handle_zoom_response(response, "Control action executed successfully")
             
-        elif action == "end_meeting":
-            response = client.meeting.end(meeting_id=meeting_id)
-            print("🛑 Meeting ended")
-            
-        elif action.startswith("remove_"):
-            participant_id = action.split("_")[1]
-            response = client.meeting.participant_remove(
-                meeting_id=meeting_id,
-                participant_id=participant_id
-            )
-            print(f"⛔ Removed participant {participant_id}")
-        
-        if response.status_code in [200, 204]:
-            print("✅ Action completed successfully!")
-        else:
-            print(f"❌ Action failed: {json.loads(response.content).get('message', 'Unknown error')}")
+        except Exception as e:
+            print(format_meeting_control_result(action, success=False))
+            print(f"**Error Details**: {str(e)}")
             exit(1)
     """,
     args=[
@@ -171,17 +166,22 @@ list_recordings_tool = ZoomTool(
     """,
     content="""
         #!/usr/bin/env python3
+        from zoom_helpers import get_zoom_client, handle_zoom_response, format_recording_details, validate_date
         import os
-        import json
         from datetime import datetime
-        from zoomus import ZoomClient
         
-        client = ZoomClient(os.environ['ZOOM_API_KEY'], os.environ['ZOOM_API_SECRET'])
+        client = get_zoom_client()
         
         start_date = os.environ['start_date']
         end_date = os.environ.get('end_date', datetime.now().strftime('%Y-%m-%d'))
         
-        print(f"📹 Fetching recordings from {start_date} to {end_date}...")
+        # Validate dates
+        validate_date(start_date)
+        validate_date(end_date)
+        
+        print(f"### 📹 Fetching Zoom Recordings")
+        print(f"**Period**: `{start_date}` to `{end_date}`")
+        print("*Please wait while we retrieve your recordings...*\n")
         
         response = client.recording.list(
             user_id='me',
@@ -189,24 +189,8 @@ list_recordings_tool = ZoomTool(
             end=end_date
         )
         
-        recordings = json.loads(response.content)
-        
-        if response.status_code == 200:
-            meetings = recordings.get('meetings', [])
-            print(f"✅ Found {len(meetings)} recordings")
-            
-            for meeting in meetings:
-                print(f"\n📅 Meeting: {meeting['topic']}")
-                print(f"   • Date: {meeting['start_time']}")
-                print(f"   • Duration: {meeting['duration']} minutes")
-                
-                for recording in meeting.get('recording_files', []):
-                    print(f"   • Recording Type: {recording['recording_type']}")
-                    print(f"   • Size: {recording['file_size'] / 1024 / 1024:.2f} MB")
-                    print(f"   • Download URL: {recording['download_url']}")
-        else:
-            print(f"❌ Failed to fetch recordings: {recordings.get('message', 'Unknown error')}")
-            exit(1)
+        data = handle_zoom_response(response, "Recordings retrieved successfully")
+        print(format_recording_details(data.get('meetings', [])))
     """,
     args=[
         Arg(name="start_date", description="Start date for recordings (YYYY-MM-DD)", required=True),
