@@ -22,10 +22,10 @@ class ZoomTool(Tool):
         set -e
 
         # Install required packages
-        apk add --no-cache curl jq
+        apk add --no-cache curl jq >/dev/null 2>&1
 
         # Install Python packages
-        pip install --no-cache-dir zoomus requests
+        pip install --quiet zoomus requests
         """
         
         full_content = setup_script + "\n" + content
