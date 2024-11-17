@@ -157,7 +157,7 @@ if __name__ == "__main__":
             icon_url=KUBIYA_ICON_URL,
             type="docker",
             image="python:3.11",
-            on_build ="pip install requests pytimeparse slack_sdk fuzzywuzzy python-Levenshtein" 
+            on_build ="pip install requests pytimeparse slack_sdk fuzzywuzzy python-Levenshtein", 
             content="python /tmp/script.py",
             args=args,
             env=env,
