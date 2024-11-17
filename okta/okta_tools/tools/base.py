@@ -1,3 +1,5 @@
+# base.py
+
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 
@@ -6,7 +8,7 @@ OKTA_ICON_URL = "https://www.okta.com/sites/default/files/Okta_Logo_BrightBlue_M
 class OktaTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
         env = ["KUBIYA_USER_EMAIL", *env]
-        secrets = ["OKTA_API_TOKEN", "OKTA_ORG_URL"]
+        secrets = ["OKTA_ORG_URL", "OKTA_CLIENT_ID", "OKTA_CLIENT_SECRET"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -18,12 +20,13 @@ import logging
 import requests
 from urllib.parse import urlparse
 from typing import Optional, Dict, List, Union
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class OktaClient:
-    def __init__(self, org_url: str, token: str):
+    def __init__(self, org_url: str, client_id: str, client_secret: str):
         # Ensure the org_url has a scheme and is properly formatted
         if not urlparse(org_url).scheme:
             org_url = "https://" + org_url
@@ -31,15 +34,73 @@ class OktaClient:
             org_url = org_url + ".okta.com"
         
         self.base_url = org_url.rstrip('/')
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.access_token = None
+        self.token_expiry = None
         logger.info("Initializing Okta client with base URL: %s", self.base_url)
         
-        self.headers = {{
+        self._get_oauth_token()
+
+    def _get_oauth_token(self):
+        """Get OAuth 2.0 token using client credentials flow"""
+        token_endpoint = f"{{self.base_url}}/oauth2/v1/clients/{{self.client_id}}/tokens"
+        
+        # Management API scopes
+        scopes = [
+            'okta.users.manage',
+            'okta.users.read',
+            'okta.groups.manage',
+            'okta.groups.read'
+        ]
+        
+        # Basic auth for client credentials
+        auth = (self.client_id, self.client_secret)
+        
+        headers = {{
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': 'SSWS ' + token
+            'Content-Type': 'application/x-www-form-urlencoded'
         }}
+        
+        data = {{
+            'grant_type': 'client_credentials',
+            'scope': ' '.join(scopes)
+        }}
+        
+        try:
+            response = requests.post(
+                token_endpoint,
+                auth=auth,
+                headers=headers,
+                data=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            token_data = response.json()
+            
+            self.access_token = token_data['access_token']
+            expires_in = token_data.get('expires_in', 3600)
+            self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
+            
+            self.headers = {{
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {{self.access_token}}'
+            }}
+            logger.debug("Successfully obtained OAuth token")
+        except Exception as e:
+            logger.error("Error getting OAuth token: %s", str(e))
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error("Response content: %s", e.response.text)
+            raise
+
+    def _ensure_valid_token(self):
+        if not self.access_token or not self.token_expiry or \
+           datetime.now() + timedelta(minutes=5) >= self.token_expiry:
+            self._get_oauth_token()
 
     def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Union[Dict, List, None]:
+        self._ensure_valid_token()
         url = self.base_url + (endpoint if endpoint.startswith('/') else '/' + endpoint)
         logger.debug("Making request to: %s", url)
         
@@ -145,14 +206,15 @@ class OktaClient:
 
 def get_okta_client() -> OktaClient:
     org_url = os.environ['OKTA_ORG_URL']
-    token = os.environ['OKTA_API_TOKEN']
+    client_id = os.environ['OKTA_CLIENT_ID']
+    client_secret = os.environ['OKTA_CLIENT_SECRET']
     
     if not org_url:
         raise ValueError("OKTA_ORG_URL environment variable is required")
         
     org_url = org_url.strip()
     logger.info("Creating Okta client with org URL: %s", org_url)
-    return OktaClient(org_url, token)
+    return OktaClient(org_url, client_id, client_secret)
 
 def find_group_by_name(client: OktaClient, group_name: str) -> Optional[Dict]:
     logger.info("Searching for group: %s", group_name)
@@ -265,10 +327,11 @@ def execute_okta_action(action: str, operation: str, **kwargs) -> Dict:
         return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
-    token = os.environ.get("OKTA_API_TOKEN")
     org_url = os.environ.get("OKTA_ORG_URL")
+    client_id = os.environ.get("OKTA_CLIENT_ID")
+    client_secret = os.environ.get("OKTA_CLIENT_SECRET")
     
-    if not token or not org_url:
+    if not org_url or not client_id or not client_secret:
         logger.error("Missing required environment variables")
         print(json.dumps({{"success": False, "error": "Missing required environment variables"}}))
         sys.exit(1)
