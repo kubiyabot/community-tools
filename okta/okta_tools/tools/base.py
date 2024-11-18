@@ -44,7 +44,7 @@ class OktaClient:
 
     def _get_oauth_token(self):
         """Get OAuth 2.0 token using client credentials flow"""
-        token_endpoint = f"{{self.base_url}}/oauth2/v1/clients/{{self.client_id}}/tokens"
+        token_endpoint = f"{{self.base_url}}/oauth2/v1/token"
         
         # Management API scopes
         scopes = [
@@ -54,23 +54,21 @@ class OktaClient:
             'okta.groups.read'
         ]
         
-        # Basic auth for client credentials
-        auth = (self.client_id, self.client_secret)
+        data = {{
+            'grant_type': 'client_credentials',
+            'scope': ' '.join(scopes),
+            'client_id': self.client_id,
+            'client_secret': self.client_secret
+        }}
         
         headers = {{
             'Accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded'
         }}
         
-        data = {{
-            'grant_type': 'client_credentials',
-            'scope': ' '.join(scopes)
-        }}
-        
         try:
             response = requests.post(
                 token_endpoint,
-                auth=auth,
                 headers=headers,
                 data=data,
                 timeout=30
