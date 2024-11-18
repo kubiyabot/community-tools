@@ -11,9 +11,9 @@ Before using this module, ensure you have:
 1. Access to the Kubiya Platform
 2. Added this repository as a source in Kubiya:
    - Source URL: `https://github.com/kubiyabot/community-tools/tree/main/just-in-time-access`
-   - Connected to your team/workspace
+   - Connect the source to a teammate
 
-3. Required Environment Variables:
+3. Required Environment Variables (On the Teammate environment variables configuration section):
    - `APPROVERS_CHANNEL`: Slack channel ID where approvers will receive notifications
    
    Note: The following variables are automatically injected by Kubiya:
