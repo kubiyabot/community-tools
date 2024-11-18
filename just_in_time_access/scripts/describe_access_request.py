@@ -1,5 +1,10 @@
 import sys
-import sqlite3
+
+try:
+    import sqlite3
+except ImportError:
+    # During discovery phase, sqlite3 might not be available
+    pass
 
 def describe_access_request(request_id):
     conn = sqlite3.connect('/var/lib/database/access_requests.db')

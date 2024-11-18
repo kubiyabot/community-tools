@@ -1,8 +1,13 @@
 import inspect
 from kubiya_sdk.tools import Arg, FileSpec, Volume
-from just_in_time_access.tools.base import JustInTimeAccessTool
+from .base import JustInTimeAccessTool
 from kubiya_sdk.tools.registry import tool_registry
-import just_in_time_access.scripts.access_approval_handler as access_approval_handler
+import sys
+import os
+
+# Update the import path to find scripts
+sys.path.append(os.path.join(os.path.dirname(__file__), '../../scripts'))
+import access_approval_handler
 
 approve_access_tool = JustInTimeAccessTool(
     name="approve_tool_access_request",
