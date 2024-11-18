@@ -70,7 +70,7 @@ request_access_tool = JustInTimeAccessTool(
         "KUBIYA_TOOL_PARAMS",
     ],
     secrets=[
-        "SLACK_API_KEY",
+        "SLACK_API_TOKEN",
     ],
     with_files=[
         FileSpec(
