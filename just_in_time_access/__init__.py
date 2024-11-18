@@ -3,6 +3,8 @@ from .src.tools import (
     request_access_tool,
     describe_access_request_tool,
     list_active_access_requests_tool,
+    view_user_requests_tool,
+    search_access_requests_tool,
 )
 
 __all__ = [
@@ -10,4 +12,6 @@ __all__ = [
     'request_access_tool',
     'describe_access_request_tool',
     'list_active_access_requests_tool',
+    'view_user_requests_tool',
+    'search_access_requests_tool',
 ]
