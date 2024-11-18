@@ -13,8 +13,12 @@ request_access_tool = JustInTimeAccessTool(
     content="""
     set -e
 
+    # Get tool name and params from environment variables
+    TOOL_NAME="${KUBIYA_TOOL_NAME:-{{ .tool_name }}}"
+    TOOL_PARAMS="${KUBIYA_TOOL_PARAMS:-{{ .tool_params }}}"
+
     # Run the access request handler script
-    python /opt/scripts/access_request_handler.py "{{ .tool_name }}" "{{ .user_email }}" "{{ .tool_params }}" "{{ .ttl }}"
+    python /opt/scripts/access_request_handler.py "$TOOL_NAME" "{{ .user_email }}" "$TOOL_PARAMS" "{{ .ttl }}"
     """,
     args=[
         Arg(
@@ -53,6 +57,8 @@ request_access_tool = JustInTimeAccessTool(
     ],
     env=[
         "SLACK_CHANNEL_ID",
+        "KUBIYA_TOOL_NAME",
+        "KUBIYA_TOOL_PARAMS",
     ],
     secrets=[
         "SLACK_API_TOKEN",
