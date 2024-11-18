@@ -10,7 +10,7 @@ Before using this module, ensure you have:
 
 1. Access to the Kubiya Platform
 2. Added this repository as a source in Kubiya:
-   - Source URL: `https://github.com/kubiya-sandbox/just-in-time-access`
+   - Source URL: `https://github.com/kubiyabot/community-tools/tree/main/just-in-time-access`
    - Connected to your team/workspace
 
 3. Required Environment Variables:
