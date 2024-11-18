@@ -2,16 +2,14 @@ import inspect
 import sys
 from pathlib import Path
 
-# Get the package root directory and add it to sys.path
-PACKAGE_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PACKAGE_ROOT))
+# Add the project root to Python path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
-# Use absolute imports
-from just_in_time_access.src.tools.base import JustInTimeAccessTool
-import just_in_time_access.scripts.describe_access_request as describe_access_request_script
+from src.tools.base import JustInTimeAccessTool
+import scripts.describe_access_request as describe_access_request_script
 
 describe_access_request_tool = JustInTimeAccessTool(
     name="describe_access_request",
