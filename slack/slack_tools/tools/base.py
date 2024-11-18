@@ -55,10 +55,7 @@ def find_channel(client, channel_input):
     
     # Try to find the channel by name
     try:
-        public = client.conversations_list(types="public_channel"):
-        private = client.conversations_list(types="private_channel"):
-        combined = public + private
-        for response in combined:
+        for response in client.conversations_list(types="public_channel,private_channel"):
             for channel in response["channels"]:
                 if channel["name"] == channel_input:
                     logger.info(f"Exact match found: {{channel['id']}}")
