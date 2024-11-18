@@ -1,6 +1,26 @@
 # Just-In-Time Access Module 🔐
 
-The `just_in_time_access` module provides a secure and auditable way to manage temporary access to resources and tools. It implements a complete Just-In-Time (JIT) access workflow - from request initiation through approval and access provisioning, with automatic revocation after the specified time period.
+<img src="https://github.com/user-attachments/assets/36829fad-4194-437b-913d-1a3272e81150" alt="image" width="400"/>
+
+The Just-In-Time Access module provides a secure and auditable way to manage temporary access to resources and tools for your team. It implements a complete Just-In-Time (JIT) access workflow - from request initiation through approval and access provisioning, with automatic revocation after the specified time period.
+
+## 📋 Prerequisites
+
+Before using this module, ensure you have:
+
+1. Access to the Kubiya Platform
+2. Added this repository as a source in Kubiya:
+   - Source URL: `https://github.com/kubiya-sandbox/just-in-time-access`
+   - Connected to your team/workspace
+
+3. Required Environment Variables:
+   - `APPROVERS_CHANNEL`: Slack channel ID where approvers will receive notifications
+   
+   Note: The following variables are automatically injected by Kubiya:
+   - `KUBIYA_USER_ORG`
+   - `KUBIYA_AGENT_UUID`
+   - `KUBIYA_SOURCE_URL` 
+   - `KUBIYA_SOURCE_UUID`
 
 ## 🛠️ Available Tools
 
