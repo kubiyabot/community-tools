@@ -6,10 +6,7 @@ import sqlite3
 import uuid
 
 def send_approval_request(tool_name, user_email, tool_params, ttl):
-    approval_channel = os.getenv('APPROVALS_CHANNEL_ID')
-    slack_token = os.getenv('SLACK_API_TOKEN')
     database_path = '/var/lib/database/access_requests.db'
-
     request_id = str(uuid.uuid4())
 
     conn = sqlite3.connect(database_path)
@@ -34,50 +31,20 @@ def send_approval_request(tool_name, user_email, tool_params, ttl):
     conn.commit()
     conn.close()
 
-    approval_message = {
-        "channel": approval_channel,
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Access Request*\n\n*Request ID:* `{request_id}`\n*User:* `{user_email}`\n*Tool:* `{tool_name}`\n*Parameters:* `{tool_params}`\n*TTL:* `{ttl}`"
-                }
-            },
-            {
-                "type": "actions",
-                "block_id": request_id,
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Approve"
-                        },
-                        "style": "primary",
-                        "value": "approve"
-                    },
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "Reject"
-                        },
-                        "style": "danger",
-                        "value": "reject"
-                    }
-                ]
-            }
-        ]
+    # Send webhook to Kubiya API
+    kubiya_api_url = os.getenv('KUBIYA_API_URL')
+    payload = {
+        "request_id": request_id,
+        "user_email": user_email,
+        "tool_name": tool_name,
+        "tool_params": tool_params,
+        "ttl": ttl,
+        "status": "pending"
     }
 
-    headers = {
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {slack_token}'
-    }
-    response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, data=json.dumps(approval_message))
+    response = requests.post(kubiya_api_url, json=payload)
 
-    if response.status_code != 200 or not response.json().get('ok'):
+    if response.status_code != 200:
         print(f"Failed to send approval request: {response.text}")
         sys.exit(1)
 
@@ -87,4 +54,4 @@ if __name__ == "__main__":
     tool_params = sys.argv[3]
     ttl = sys.argv[4] if len(sys.argv) > 4 else "1h"
 
-    send_approval_request(tool_name, user_email, tool_params, ttl) 
+    send_approval_request(tool_name, user_email, tool_params, ttl)
