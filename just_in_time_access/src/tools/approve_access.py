@@ -49,7 +49,7 @@ approve_access_tool = JustInTimeAccessTool(
         "APPROVALS_CHANNEL_ID",
     ],
     secrets=[
-        "SLACK_API_KEY",
+        "SLACK_API_TOKEN",
     ],
     with_files=[
         FileSpec(
