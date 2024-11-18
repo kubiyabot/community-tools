@@ -113,25 +113,26 @@ def notify_user(request_id, status, user_email, approver_email):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Your access request *{request_id}* has been *{approval_status}* by {approver_email}."
+                    "text": f":white_check_mark: Your access request *{request_id}* has been *{approval_status.upper()}* by {approver_email}."
                 }
             },
-            # Provide core details and contextual information
             {
                 "type": "divider"
             },
             {
                 "type": "section",
-                "fields": [
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Request Details:*\n- *Request ID:* {request_id}\n- *Status:* {approval_status.capitalize()}"
+                }
+            },
+            {
+                "type": "context",
+                "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"*Request ID:*\n{request_id}"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Status:*\n{approval_status.capitalize()}"
+                        "text": f"If you have questions, reach out to *{approver_email}*."
                     }
-                    # Include additional details as needed
                 ]
             }
         ]
@@ -157,4 +158,4 @@ if __name__ == "__main__":
     approval_action = sys.argv[2]
     ttl = sys.argv[3] if len(sys.argv) > 3 else None
 
-    approve_access(request_id, approval_action, ttl) 
+    approve_access(request_id, approval_action, ttl)
