@@ -8,7 +8,6 @@ list_active_access_requests_tool = JustInTimeAccessTool(
     name="list_active_access_requests",
     description="List all active (pending) access requests.",
     content="""
-    #!/bin/bash
     set -e
 
     # Run the list_active_access_requests script

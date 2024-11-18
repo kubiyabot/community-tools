@@ -11,7 +11,6 @@ approve_access_tool = JustInTimeAccessTool(
         "This tool processes the approval action and notifies the requester."
     ),
     content="""
-    #!/bin/bash
     set -e
 
     # Run the access approval handler script
