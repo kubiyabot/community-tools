@@ -13,6 +13,8 @@ from kubiya_sdk.tools.registry import tool_registry
 from .base import JustInTimeAccessTool
 from scripts import access_approval_handler
 
+__all__ = ['approve_access_tool']
+
 approve_access_tool = JustInTimeAccessTool(
     name="approve_tool_access_request",
     description=(
@@ -76,6 +78,4 @@ approve_access_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-tool_registry.register("just_in_time_access", approve_access_tool)
-
-__all__ = ['approve_access_tool'] 
+tool_registry.register("just_in_time_access", approve_access_tool) 
