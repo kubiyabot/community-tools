@@ -1,10 +1,15 @@
 import inspect
+import sys
+from pathlib import Path
+
+# Add the project root to Python path
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
-from just_in_time_access.src.tools.base import JustInTimeAccessTool
-import just_in_time_access.scripts.access_approval_handler as access_approval_handler
+from src.tools.base import JustInTimeAccessTool
+import scripts.access_approval_handler as access_approval_handler
 
 approve_access_tool = JustInTimeAccessTool(
     name="approve_tool_access_request",
