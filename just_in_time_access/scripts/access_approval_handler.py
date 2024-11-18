@@ -33,7 +33,7 @@ def approve_access(request_id, approval_action, ttl=None):
         notify_user(request_id, "approved", requester_email, approver_email)
 
         # Send HTTP request to the auth server
-        auth_server_url = os.getenv('AUTH_SERVER_URL', 'http://enforcer.kubiya:8080')
+        auth_server_url = os.getenv('KUBIYA_ENFORCER_SERVER_URL', 'http://enforcer.kubiya:5001')
         api_endpoint = f"{auth_server_url}/policies"
 
         # Prepare the payload for the auth server
