@@ -1,16 +1,17 @@
 import inspect
-from kubiya_sdk.tools import Arg, FileSpec, Volume
-from .base import JustInTimeAccessTool
-from kubiya_sdk.tools.registry import tool_registry
 import sys
-import os
 from pathlib import Path
 
-# Get the scripts directory path
-SCRIPTS_DIR = Path(__file__).parent.parent.parent / 'scripts'
-sys.path.append(str(SCRIPTS_DIR))
+# Get the package root directory and add it to sys.path
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PACKAGE_ROOT))
 
-import access_request_handler
+from kubiya_sdk.tools import Arg, FileSpec, Volume
+from kubiya_sdk.tools.registry import tool_registry
+
+# Use absolute imports
+from just_in_time_access.src.tools.base import JustInTimeAccessTool
+import just_in_time_access.scripts.access_request_handler as access_request_handler
 
 request_access_tool = JustInTimeAccessTool(
     name="request_tool_access",
