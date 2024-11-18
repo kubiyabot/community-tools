@@ -1,6 +1,10 @@
 import sys
-import sqlite3
 
+try:
+    import sqlite3
+except ImportError:
+    # During discovery phase, sqlite3 might not be available
+    pass
 def view_user_requests(user_email):
     conn = sqlite3.connect('/var/lib/database/access_requests.db')
     cursor = conn.cursor()
