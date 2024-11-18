@@ -1,6 +1,6 @@
 import inspect
 from kubiya_sdk.tools import FileSpec, Volume
-from just_in_time_access.src.tools.base import JustInTimeAccessTool
+from .base import JustInTimeAccessTool
 from kubiya_sdk.tools.registry import tool_registry
 import sys
 import os
