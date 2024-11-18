@@ -1,1 +1,1 @@
-# Empty init file to make scripts a package 
+# Make scripts a proper package 

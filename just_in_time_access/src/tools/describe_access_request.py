@@ -3,13 +3,15 @@ import sys
 from pathlib import Path
 
 # Add the project root to Python path
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+project_root = str(Path(__file__).resolve().parents[2])
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
-from src.tools.base import JustInTimeAccessTool
-import scripts.describe_access_request as describe_access_request_script
+from .base import JustInTimeAccessTool
+from scripts import describe_access_request as describe_access_request_script
 
 describe_access_request_tool = JustInTimeAccessTool(
     name="describe_access_request",
@@ -40,4 +42,6 @@ describe_access_request_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-tool_registry.register("just_in_time_access", describe_access_request_tool) 
+tool_registry.register("just_in_time_access", describe_access_request_tool)
+
+__all__ = ['describe_access_request_tool'] 
