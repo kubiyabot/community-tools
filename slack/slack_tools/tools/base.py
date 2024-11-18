@@ -1,164 +1,358 @@
+# base.py
+
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
 
-SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
+OKTA_ICON_URL = "https://www.okta.com/sites/default/files/Okta_Logo_BrightBlue_Medium.png"
 
-class SlackTool(Tool):
+class OktaTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
         env = ["KUBIYA_USER_EMAIL", *env]
-        secrets = ["SLACK_API_TOKEN"]
+        secrets = ["OKTA_ORG_URL", "OKTA_CLIENT_ID", "OKTA_CLIENT_SECRET"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
-        script_content = f"""
+        script_content = f'''
 import os
 import sys
 import json
 import logging
-from slack_sdk import WebClient
-from slack_sdk.errors import SlackApiError
-from fuzzywuzzy import fuzz
+import requests
+from urllib.parse import urlparse
+from typing import Optional, Dict, List, Union
+from datetime import datetime, timedelta
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def create_block_kit_message(text, kubiya_user_email):
-    return [
-        {{
-            "type": "section",
-            "text": {{"type": "mrkdwn", "text": text}}
-        }},
-        {{
-            "type": "divider"
-        }},
-        {{
-            "type": "context",
-            "elements": [
-                {{
-                    "type": "mrkdwn",
-                    "text": f":robot_face: This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform"
-                }}
-            ]
+class OktaClient:
+    def __init__(self, org_url: str, client_id: str, client_secret: str):
+        # Ensure the org_url has a scheme and is properly formatted
+        if not urlparse(org_url).scheme:
+            org_url = "https://" + org_url
+        if not org_url.endswith('.okta.com'):
+            org_url = org_url + ".okta.com"
+        
+        self.base_url = org_url.rstrip('/')
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.access_token = None
+        self.token_expiry = None
+        logger.info("Initializing Okta client with base URL: %s", self.base_url)
+        
+        self._get_oauth_token()
+
+    def _get_oauth_token(self):
+        """Get OAuth 2.0 token using client credentials flow"""
+        token_endpoint = f"{{self.base_url}}/oauth2/v1/token"
+        
+        # Management API scopes
+        scopes = [
+            'okta.users.manage',
+            'okta.users.read',
+            'okta.groups.manage',
+            'okta.groups.read'
+        ]
+        
+        data = {{
+            'grant_type': 'client_credentials',
+            'scope': ' '.join(scopes),
+            'client_id': self.client_id,
+            'client_secret': self.client_secret
         }}
-    ]
-
-def find_channel(client, channel_input):
-    logger.info(f"Attempting to find channel: {{channel_input}}")
-    
-    # If it's already a valid channel ID (starts with C and is 11 characters long), use it directly
-    if channel_input.startswith('C') and len(channel_input) == 11:
-        logger.info(f"Using provided channel ID directly: {{channel_input}}")
-        return channel_input
-    
-    # Remove '#' if present
-    channel_input = channel_input.lstrip('#')
-    
-    # Try to find the channel by name
-    try:
-        for response in client.conversations_list(types="public_channel,private_channel"):
-            for channel in response["channels"]:
-                if channel["name"] == channel_input:
-                    logger.info(f"Exact match found: {{channel['id']}}")
-                    return channel["id"]
-                elif fuzz.ratio(channel["name"], channel_input) > 80:
-                    logger.info(f"Close match found: {{channel['name']}} (ID: {{channel['id']}})")
-                    return channel["id"]
-    except SlackApiError as e:
-        logger.error(f"Error listing channels: {{e}}")
-
-    logger.error(f"Channel not found: {{channel_input}}")
-    return None
-
-def send_slack_message(client, channel, text):
-    logger.info(f"Starting to send Slack message to: {{channel}}")
-    
-    if not channel:
-        logger.error("Channel parameter is missing or empty")
-        return {{"success": False, "error": "Channel parameter is missing or empty"}}
-    
-    channel_id = find_channel(client, channel)
-    if not channel_id:
-        return {{"success": False, "error": f"Channel not found: {{channel}}"}}
-
-    try:
-        kubiya_user_email = os.environ.get("KUBIYA_USER_EMAIL", "Unknown User")
         
-        blocks = create_block_kit_message(text, kubiya_user_email)
+        headers = {{
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }}
         
-        fallback_text = f"{{text}}\\n\\n_This message was sent on behalf of <@{{kubiya_user_email}}> using the Kubiya AI platform_"
-
-        logger.info(f"Attempting to send Block Kit message to channel ID: {{channel_id}}")
         try:
-            response = client.chat_postMessage(channel=channel_id, blocks=blocks, text=fallback_text)
-            logger.info(f"Block Kit message sent successfully to {{channel_id}}")
-        except SlackApiError as block_error:
-            logger.warning(f"Failed to send Block Kit message: {{block_error}}. Falling back to regular message.")
-            response = client.chat_postMessage(channel=channel_id, text=fallback_text)
-            logger.info(f"Regular message sent successfully to {{channel_id}}")
+            response = requests.post(
+                token_endpoint,
+                headers=headers,
+                data=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            token_data = response.json()
+            
+            self.access_token = token_data['access_token']
+            expires_in = token_data.get('expires_in', 3600)
+            self.token_expiry = datetime.now() + timedelta(seconds=expires_in)
+            
+            self.headers = {{
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {{self.access_token}}'
+            }}
+            logger.debug("Successfully obtained OAuth token")
+        except Exception as e:
+            logger.error("Error getting OAuth token: %s", str(e))
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error("Response content: %s", e.response.text)
+            raise
 
-        return {{"success": True, "result": response.data, "thread_ts": response['ts']}}
+    def _ensure_valid_token(self):
+        if not self.access_token or not self.token_expiry or \
+           datetime.now() + timedelta(minutes=5) >= self.token_expiry:
+            self._get_oauth_token()
 
-    except SlackApiError as e:
-        error_message = str(e)
-        logger.error(f"Error sending message: {{error_message}}")
-        return {{"success": False, "error": error_message}}
+    def _make_request(self, method: str, endpoint: str, data: Optional[Dict] = None, params: Optional[Dict] = None) -> Union[Dict, List, None]:
+        self._ensure_valid_token()
+        url = self.base_url + (endpoint if endpoint.startswith('/') else '/' + endpoint)
+        logger.debug("Making request to: %s", url)
+        
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=self.headers,
+                json=data,
+                params=params
+            )
+            response.raise_for_status()
+            return response.json() if response.text else None
+        except requests.exceptions.HTTPError as e:
+            error_detail = e.response.json() if e.response and e.response.text else {{'error': str(e)}}
+            logger.error("HTTP Error: %s", error_detail)
+            raise Exception(f"Okta API Error: {{error_detail}}")
+        except requests.exceptions.RequestException as e:
+            logger.error("Request Error: %s", str(e))
+            raise Exception(f"Request Error: {{str(e)}}")
 
-def execute_slack_action(token, action, operation, **kwargs):
-    client = WebClient(token=token)
-    logger.info(f"Executing Slack action: {{action}}")
-    logger.info(f"Action parameters: {{kwargs}}")
+    def list_groups(self, query: Optional[str] = None, filter: Optional[str] = None, after: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
+        params = {{'q': query}} if query else {{}}
+        if filter:
+            params['filter'] = filter
+        if after:
+            params['after'] = after
+        if limit:
+            params['limit'] = limit
+        return self._make_request('GET', '/api/v1/groups', params=params)
+
+    def create_group(self, name: str, description: Optional[str] = None, skip_naming_conflict_resolution: bool = False) -> Dict:
+        data = {{
+            'profile': {{
+                'name': name,
+                'description': description
+            }}
+        }}
+        params = {{'skipNamingConflictResolution': skip_naming_conflict_resolution}}
+        return self._make_request('POST', '/api/v1/groups', data=data, params=params)
+
+    def get_group(self, group_id: str) -> Dict:
+        return self._make_request('GET', f'/api/v1/groups/{{group_id}}')
+
+    def update_group(self, group_id: str, name: str, description: Optional[str] = None) -> Dict:
+        data = {{
+            'profile': {{
+                'name': name,
+                'description': description
+            }}
+        }}
+        return self._make_request('PUT', f'/api/v1/groups/{{group_id}}', data=data)
+
+    def delete_group(self, group_id: str) -> None:
+        return self._make_request('DELETE', f'/api/v1/groups/{{group_id}}')
+
+    def list_group_members(self, group_id: str, after: Optional[str] = None, limit: Optional[int] = None) -> List[Dict]:
+        params = {{}}
+        if after:
+            params['after'] = after
+        if limit:
+            params['limit'] = limit
+        return self._make_request('GET', f'/api/v1/groups/{{group_id}}/users', params=params)
+
+    def add_user_to_group(self, group_id: str, user_id: str) -> None:
+        return self._make_request('PUT', f'/api/v1/groups/{{group_id}}/users/{{user_id}}')
+
+    def remove_user_from_group(self, group_id: str, user_id: str) -> None:
+        return self._make_request('DELETE', f'/api/v1/groups/{{group_id}}/users/{{user_id}}')
+
+    def search_users(self, query: Optional[str] = None, filter: Optional[str] = None, search: Optional[str] = None, 
+                    limit: Optional[int] = None, after: Optional[str] = None) -> List[Dict]:
+        """Search users with advanced query options."""
+        params = {{}}
+        if query:
+            params['q'] = query
+        if filter:
+            params['filter'] = filter
+        if search:
+            params['search'] = search
+        if limit:
+            params['limit'] = min(int(limit), 200)
+        if after:
+            params['after'] = after
+            
+        try:
+            return self._make_request('GET', '/api/v1/users', params=params)
+        except Exception as e:
+            logger.error("Error searching users: %s", str(e))
+            return []
+
+    def get_user(self, user_id: str, fields: Optional[List[str]] = None) -> Optional[Dict]:
+        """Get user by ID with optional field selection."""
+        params = {{}}
+        if fields and isinstance(fields, (list, tuple)):
+            params['fields'] = ','.join(fields)
+            
+        try:
+            return self._make_request('GET', f'/api/v1/users/{{user_id}}', params=params)
+        except Exception as e:
+            logger.error("Error getting user: %s", str(e))
+            return None
+
+def get_okta_client() -> OktaClient:
+    org_url = os.environ['OKTA_ORG_URL']
+    client_id = os.environ['OKTA_CLIENT_ID']
+    client_secret = os.environ['OKTA_CLIENT_SECRET']
+    
+    if not org_url:
+        raise ValueError("OKTA_ORG_URL environment variable is required")
+        
+    org_url = org_url.strip()
+    logger.info("Creating Okta client with org URL: %s", org_url)
+    return OktaClient(org_url, client_id, client_secret)
+
+def find_group_by_name(client: OktaClient, group_name: str) -> Optional[Dict]:
+    logger.info("Searching for group: %s", group_name)
+    try:
+        groups = client.list_groups(query=group_name)
+        for group in groups:
+            if group['profile']['name'].lower() == group_name.lower():
+                return group
+        return None
+    except Exception as e:
+        logger.error("Error searching for group: %s", str(e))
+        return None
+
+def execute_okta_action(action: str, operation: str, **kwargs) -> Dict:
+    client = get_okta_client()
+    logger.info("Executing Okta action: %s", action)
+    logger.info("Action parameters: %s", kwargs)
 
     try:
-        if action == "chat_postMessage":
-            if 'text' not in kwargs:
-                logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
-                return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
-            if operation == "slack_send_message_to_predefined_channel":
-                result = send_slack_message(client, os.environ["NOTIFICATION_CHANNEL"], kwargs['text'])
+        if action == "users":
+            if operation == "get_user":
+                fields = kwargs.get('fields', '').split(',') if kwargs.get('fields') else None
+                result = client.get_user(kwargs['identifier'], fields=fields)
+                if result:
+                    return {{"success": True, "user": result}}
+                return {{"success": False, "error": f"User not found: {{kwargs['identifier']}}"}}
+                
+            elif operation == "search_users":
+                result = client.search_users(
+                    query=kwargs.get('query'),
+                    filter=kwargs.get('filter'),
+                    search=kwargs.get('search'),
+                    limit=kwargs.get('limit'),
+                    after=kwargs.get('after')
+                )
+                return {{"success": True, "users": result}}
+                
+            elif operation == "list_users":
+                result = client.search_users(
+                    limit=kwargs.get('limit'),
+                    after=kwargs.get('after')
+                )
+                return {{"success": True, "users": result}}
             else:
-                if 'channel' not in kwargs:
-                    logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
-                    return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
-                result = send_slack_message(client, kwargs['channel'], kwargs['text'])    
+                return {{"success": False, "error": f"Unknown operation: {{operation}}"}}
+
+        elif action == "groups":
+            if operation == "list_groups":
+                result = client.list_groups(
+                    query=kwargs.get('query'),
+                    filter=kwargs.get('filter'),
+                    after=kwargs.get('after'),
+                    limit=kwargs.get('limit')
+                )
+                return {{"success": True, "groups": result}}
+
+            elif operation == "create_group":
+                result = client.create_group(
+                    name=kwargs['name'],
+                    description=kwargs.get('description'),
+                    skip_naming_conflict_resolution=kwargs.get('skip_naming_conflict_resolution', False)
+                )
+                return {{"success": True, "group": result}}
+
+            elif operation == "update_group":
+                result = client.update_group(
+                    group_id=kwargs['group_id'],
+                    name=kwargs['name'],
+                    description=kwargs.get('description')
+                )
+                return {{"success": True, "group": result}}
+
+            elif operation == "delete_group":
+                client.delete_group(kwargs['group_id'])
+                return {{"success": True, "message": f"Group {{kwargs['group_id']}} deleted"}}
+
+            elif operation == "get_group":
+                result = client.get_group(kwargs['group_id'])
+                return {{"success": True, "group": result}}
+
+            elif operation == "list_members":
+                result = client.list_group_members(
+                    group_id=kwargs['group_id'],
+                    after=kwargs.get('after'),
+                    limit=kwargs.get('limit')
+                )
+                return {{"success": True, "members": result}}
+
+            elif operation == "add_member":
+                group = find_group_by_name(client, kwargs['group_name'])
+                if not group:
+                    return {{"success": False, "error": f"Group {{kwargs['group_name']}} not found"}}
+                client.add_user_to_group(group['id'], kwargs['user_id'])
+                return {{"success": True, "message": f"User {{kwargs['user_id']}} added to group {{kwargs['group_name']}}"}}
+
+            elif operation == "remove_member":
+                group = find_group_by_name(client, kwargs['group_name'])
+                if not group:
+                    return {{"success": False, "error": f"Group {{kwargs['group_name']}} not found"}}
+                client.remove_user_from_group(group['id'], kwargs['user_id'])
+                return {{"success": True, "message": f"User {{kwargs['user_id']}} removed from group {{kwargs['group_name']}}"}}
+
+            else:
+                return {{"success": False, "error": f"Unknown operation: {{operation}}"}}
         else:
-            logger.info(f"Executing action: {{action}}")
-            method = getattr(client, action)
-            response = method(**kwargs)
-            result = {{"success": True, "result": response.data}}
-            if 'ts' in response.data:
-                result['thread_ts'] = response.data['ts']
-        
-        logger.info(f"Action completed. Result: {{result}}")
-        return result
+            return {{"success": False, "error": f"Unknown action: {{action}}"}}
+
     except Exception as e:
-        logger.error(f"Unexpected error: {{str(e)}}")
+        logger.error("Error executing action: %s", str(e))
         return {{"success": False, "error": str(e)}}
 
 if __name__ == "__main__":
-    token = os.environ.get("SLACK_API_TOKEN")
-    if not token:
-        logger.error("SLACK_API_TOKEN is not set")
-        print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
+    org_url = os.environ.get("OKTA_ORG_URL")
+    client_id = os.environ.get("OKTA_CLIENT_ID")
+    client_secret = os.environ.get("OKTA_CLIENT_SECRET")
+    
+    if not org_url or not client_id or not client_secret:
+        logger.error("Missing required environment variables")
+        print(json.dumps({{"success": False, "error": "Missing required environment variables"}}))
         sys.exit(1)
 
-    logger.info("Starting Slack action execution...")
+    logger.info("Starting Okta action execution...")
     arg_names = {arg_names_json}
     args = {{}}
     for arg in arg_names:
         if arg in os.environ:
             args[arg] = os.environ[arg]
     
-    result = execute_slack_action(token, "{action}", "{name}", **args)
-    logger.info("Slack action execution completed")
+    result = execute_okta_action("{action}", "{name}", **args)
+    logger.info("Okta action execution completed")
     print(json.dumps(result))
-"""
-        super().__init__(
+'''
+       super().__init__(
             name=name,
             description=description,
-            icon_url=SLACK_ICON_URL,
+            icon_url=OKTA_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="pip install slack-sdk fuzzywuzzy python-Levenshtein && python /tmp/script.py",
+            on_build="pip install requests",
+            content="python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
