@@ -13,7 +13,7 @@ class JustInTimeAccessTool(Tool):
         secrets=[],
         long_running=False,
         with_files=None,
-        image="python:3.9",
+        image="python:3.11",
         mermaid=None,
         with_volumes=None,
     ):

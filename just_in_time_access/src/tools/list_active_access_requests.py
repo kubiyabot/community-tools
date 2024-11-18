@@ -1,12 +1,15 @@
 import inspect
 from kubiya_sdk.tools import FileSpec, Volume
-from .base import JustInTimeAccessTool
+from just_in_time_access.src.tools.base import JustInTimeAccessTool
 from kubiya_sdk.tools.registry import tool_registry
 import sys
 import os
+from pathlib import Path
 
-# Update the import path to find scripts
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../scripts'))
+# Get the scripts directory path
+SCRIPTS_DIR = Path(__file__).parent.parent.parent / 'scripts'
+sys.path.append(str(SCRIPTS_DIR))
+
 import list_active_access_requests as list_requests_script
 
 list_active_access_requests_tool = JustInTimeAccessTool(
