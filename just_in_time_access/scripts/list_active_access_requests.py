@@ -1,4 +1,11 @@
-import sqlite3
+import sys
+import os
+
+try:
+    import sqlite3
+except ImportError:
+    # During discovery phase, sqlite3 might not be available
+    pass
 
 def list_active_access_requests():
     conn = sqlite3.connect('/var/lib/database/access_requests.db')

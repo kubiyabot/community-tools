@@ -1,9 +1,14 @@
 import sys
 import os
-import sqlite3
 import requests
 import json
 from datetime import datetime
+
+try:
+    import sqlite3
+except ImportError:
+    # During discovery phase, sqlite3 might not be available
+    pass
 
 def approve_access(request_id, approval_action, ttl=None):
     slack_token = os.getenv('SLACK_API_TOKEN')

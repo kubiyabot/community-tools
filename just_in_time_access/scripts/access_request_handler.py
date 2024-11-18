@@ -2,8 +2,13 @@ import sys
 import os
 import json
 import requests
-import sqlite3
 import uuid
+
+try:
+    import sqlite3
+except ImportError:
+    # During discovery phase, sqlite3 might not be available
+    pass
 
 def send_approval_request(tool_name, user_email, tool_params, ttl):
     database_path = '/var/lib/database/access_requests.db'
