@@ -8,7 +8,6 @@ describe_access_request_tool = JustInTimeAccessTool(
     name="describe_access_request",
     description="Describe a specific access request by its Request ID.",
     content="""
-    #!/bin/bash
     set -e
 
     # Run the describe_access_request script

@@ -11,7 +11,6 @@ request_access_tool = JustInTimeAccessTool(
         "This tool sends an access request to approvers and awaits approval."
     ),
     content="""
-    #!/bin/bash
     set -e
 
     # Run the access request handler script
