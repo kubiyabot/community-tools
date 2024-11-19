@@ -1,5 +1,5 @@
 import logging
-from kubiya_sdk.tools.models import Tool, FileSpec
+from kubiya_sdk.tools.models import Tool
 from .common import COMMON_FILES, COMMON_ENV
 
 logger = logging.getLogger(__name__)

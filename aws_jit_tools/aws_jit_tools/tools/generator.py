@@ -1,10 +1,12 @@
 import logging
+import json
+import inspect
 from pathlib import Path
 from typing import List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
-import json
+from ..scripts.access_handler import AWSAccessHandler
 
 logger = logging.getLogger(__name__)
 
@@ -55,12 +57,32 @@ class ToolGenerator:
     def _create_tool(self, tool_id: str, config: dict) -> AWSJITTool:
         """Create individual tool based on configuration."""
         try:
+            content = f"""
+#!/bin/bash
+set -e
+
+echo "Installing required packages..."
+apk add --no-cache python3 py3-pip
+pip3 install boto3 requests
+
+echo "Setting environment variables..."
+export AWS_ACCOUNT_ID="{config['account_id']}"
+export PERMISSION_SET_NAME="{config['permission_set']}"
+export SESSION_DURATION="{config.get('session_duration', 'PT1H')}"
+
+echo "Executing access handler..."
+python3 /opt/scripts/access_handler.py
+"""
+
             tool = AWSJITTool(
                 name=f"jit_{tool_id.lower()}",
                 description=config['description'],
+                content=content,
                 with_files=[
-                    FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
-                    FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config")
+                    FileSpec(
+                        destination="/opt/scripts/access_handler.py",
+                        content=inspect.getsource(AWSAccessHandler)
+                    )
                 ],
                 env=[
                     "AWS_PROFILE",
