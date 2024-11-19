@@ -5,6 +5,12 @@
             "account_id": "876809951775",
             "permission_set": "SE",
             "session_duration": "PT1H"
+        },
+        "se1": {
+            "description": "Grants SE1 (Solutions Engineer) access to AWS account",
+            "account_id": "876809951776",
+            "permission_set": "SE1",
+            "session_duration": "PT1H"
         }
     }
 } 
