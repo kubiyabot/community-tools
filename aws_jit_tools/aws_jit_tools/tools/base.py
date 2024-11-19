@@ -1,27 +1,25 @@
-import logging
-from kubiya_sdk.tools.models import Tool
-from .common import COMMON_FILES, COMMON_ENV
-
-logger = logging.getLogger(__name__)
-
-AWS_ICON = "https://img.icons8.com/color/200/amazon-web-services.png"
+from kubiya_sdk.tools import Tool, FileSpec
+from pathlib import Path
 
 class AWSJITTool(Tool):
     """Base class for AWS JIT access tools."""
-    def __init__(self, **kwargs):
-        # Combine with common files and env
-        files = list(COMMON_FILES)
-        if kwargs.get('with_files'):
-            files.extend(kwargs['with_files'])
-
-        env_vars = list(COMMON_ENV)
-        if kwargs.get('env'):
-            env_vars.extend(kwargs['env'])
-
-        kwargs['type'] = "docker"
-        kwargs['image'] = "amazon/aws-cli:latest"
-        kwargs['icon_url'] = AWS_ICON
-        kwargs['with_files'] = files
-        kwargs['env'] = env_vars
-
-        super().__init__(**kwargs)
+    
+    def __init__(self, name: str, description: str, content: str, env: list):
+        # Get access handler code
+        handler_path = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
+        with open(handler_path) as f:
+            handler_code = f.read()
+            
+        super().__init__(
+            name=name,
+            description=description,
+            type="docker",
+            image="amazon/aws-cli:latest",
+            content=content,
+            env=env,
+            with_files=[
+                FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+                FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+                FileSpec(destination="/opt/scripts/access_handler.py", content=handler_code)
+            ]
+        )
