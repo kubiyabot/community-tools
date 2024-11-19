@@ -19,7 +19,7 @@ list_active_access_requests_tool = JustInTimeAccessTool(
     content="""
     set -e
     python -m venv /opt/venv > /dev/null
-    source /opt/venv/bin/activate > /dev/null
+    . /opt/venv/bin/activate > /dev/null
     pip install requests==2.32.3 > /dev/null
     python /opt/scripts/list_active_access_requests.py
     """,

@@ -19,7 +19,7 @@ describe_access_request_tool = JustInTimeAccessTool(
     content="""
     set -e
     python -m venv /opt/venv > /dev/null
-    source /opt/venv/bin/activate > /dev/null
+    . /opt/venv/bin/activate > /dev/null
     pip install requests==2.32.3 > /dev/null
     python /opt/scripts/describe_access_request.py "{{ .request_id }}"
     """,
