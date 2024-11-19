@@ -15,9 +15,9 @@ except ImportError as e:
     print(json.dumps({
         "status": "error",
         "error_type": "ImportError",
-        "message": "Required package boto3 is not installed"
+        "message": "Required package boto3 is not installed, could not import - this is OK if you're running a discovery process of a source on the kubiya platform"
     }))
-    sys.exit(1)
+    pass
 
 def convert_duration_to_iso8601(duration: str) -> str:
     """Convert duration string (e.g., '1h', '30m') to ISO8601 duration format."""
