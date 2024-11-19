@@ -45,20 +45,24 @@ class AWSAccessHandler:
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Find user in IAM Identity Center by email."""
         try:
-            response = self.identitystore.list_users(
-                IdentityStoreId=self.identity_store_id,
-                Filters=[{
-                    'AttributePath': 'Emails.Value',
-                    'AttributeValue': email
-                }]
-            )
-
-            users = response.get('Users', [])
-            if not users:
-                logger.error(f"No user found with email: {email}")
-                return None
-
-            return users[0]
+            # List all users and filter manually since the API doesn't support email filtering
+            paginator = self.identitystore.get_paginator('list_users')
+            
+            for page in paginator.paginate(IdentityStoreId=self.identity_store_id):
+                for user in page['Users']:
+                    # Get user details to check email
+                    user_info = self.identitystore.describe_user(
+                        IdentityStoreId=self.identity_store_id,
+                        UserId=user['UserId']
+                    )
+                    
+                    # Check if any email matches
+                    user_emails = user_info.get('Emails', [])
+                    if any(e.get('Value', '').lower() == email.lower() for e in user_emails):
+                        return user_info
+            
+            logger.error(f"No user found with email: {email}")
+            return None
 
         except Exception as e:
             logger.error(f"Error finding user by email: {str(e)}")
@@ -193,7 +197,7 @@ def main():
         logger.error(error_msg)
         print(json.dumps({
             "status": "error",
-            "error_type": type(error).__name__,
+            "error_type": type(e).__name__,
             "message": error_msg
         }))
         sys.exit(1)
