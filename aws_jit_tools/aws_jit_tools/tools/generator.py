@@ -57,4 +57,8 @@ python /opt/scripts/access_handler.py
         logger.error(f"Error generating tools: {str(e)}")
         raise
 
+# Make generate_tools available at module level
 __all__ = ['generate_tools']
+
+# Ensure the function is available when imported
+globals()['generate_tools'] = generate_tools
