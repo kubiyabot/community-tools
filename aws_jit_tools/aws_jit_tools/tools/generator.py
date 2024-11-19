@@ -78,6 +78,10 @@ set -e
 apk add --no-cache python3 py3-pip
 pip3 install boto3
 
+# Set environment variables
+export AWS_ACCOUNT_ID="{config['account_id']}"
+export PERMISSION_SET_NAME="{config['permission_set']}"
+
 # Execute Python script
 python3 /opt/scripts/access_handler.py
 """
