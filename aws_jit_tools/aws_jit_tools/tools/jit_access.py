@@ -35,8 +35,6 @@ pip install boto3 requests
 python /opt/scripts/access_handler.py
 """,
         with_files=[
-            FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
-            FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
             FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE)
         ],
         mermaid=f"""
