@@ -64,7 +64,6 @@ class ToolGenerator:
                 name=f"jit_access_to_{tool_id}",
                 description=config['description'],
                 content=self._generate_tool_content(config),
-                args={},
                 env=[
                     "AWS_PROFILE",
                     "KUBIYA_USER_EMAIL",

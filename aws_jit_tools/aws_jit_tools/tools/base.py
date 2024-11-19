@@ -18,10 +18,6 @@ class AWSJITTool(Tool):
         if kwargs.get('env'):
             env_vars.extend(kwargs['env'])
 
-        # Ensure args is a dict for Kubiya SDK compatibility
-        if 'args' not in kwargs:
-            kwargs['args'] = {}
-
         kwargs['type'] = "docker"
         kwargs['image'] = "amazon/aws-cli:latest"
         kwargs['icon_url'] = AWS_ICON
