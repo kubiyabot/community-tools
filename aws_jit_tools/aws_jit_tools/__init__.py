@@ -1,32 +1,18 @@
 import logging
-import sys
-from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add the project root to Python path
-project_root = str(Path(__file__).resolve().parent.parent)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
-# Import base components first
-from .tools.base import AWSJITTool
-from .tools.common import COMMON_FILES, COMMON_ENV
-
-# Then import and create the generator
-from .tools.generator import ToolGenerator
-
 def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
-        logger.info("Creating tool generator...")
-        generator = ToolGenerator()
-        
-        logger.info("Generating tools...")
-        tools = generator.generate_tools()
-        
+        logger.info("Initializing tools...")
+        # Delayed import to avoid potential circular imports
+        from .tools import initialize_tools as tools_init
+
+        tools = tools_init()
+
         logger.info(f"Successfully initialized {len(tools)} tools")
         return tools
     except Exception as e:
@@ -37,9 +23,10 @@ def initialize_tools():
 tools = initialize_tools()
 
 # Export all components
+from .tools import AWSJITTool, COMMON_FILES, COMMON_ENV
+
 __all__ = [
     'AWSJITTool',
-    'ToolGenerator',
     'tools',
     'COMMON_FILES',
     'COMMON_ENV'

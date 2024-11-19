@@ -12,15 +12,15 @@ logger = logging.getLogger(__name__)
 #     sys.path.insert(0, project_root)
 
 # Import base components first
-from .tools.base import AWSJITTool
-from .tools.common import COMMON_FILES, COMMON_ENV
+from .base import AWSJITTool
+from .common import COMMON_FILES, COMMON_ENV
 
 def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
         logger.info("Creating tool generator...")
         # Delayed import to avoid potential circular imports
-        from .tools.generator import ToolGenerator
+        from .generator import ToolGenerator
 
         logger.info("Initializing ToolGenerator...")
         generator = ToolGenerator()
