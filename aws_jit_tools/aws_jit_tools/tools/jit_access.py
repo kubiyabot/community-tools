@@ -25,7 +25,7 @@ def create_jit_tool(config):
         name=config["name"],
         description=config["description"],
         args=[
-            Arg(name="Duration (TTL)", description="Duration for the access token to be valid", type="string", default="PT1H"),
+            Arg(name="Duration (TTL)", description="Duration for the access token to be valid", type="str", default="PT1H"),
         ],
         content=f"""#!/bin/bash
 set -e
