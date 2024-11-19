@@ -66,8 +66,6 @@ request_access_tool = JustInTimeAccessTool(
     ],
     env=[
         "SLACK_CHANNEL_ID",
-        "KUBIYA_TOOL_NAME",
-        "KUBIYA_TOOL_PARAMS",
     ],
     secrets=[
         "SLACK_API_TOKEN",
