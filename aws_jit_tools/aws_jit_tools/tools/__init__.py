@@ -9,12 +9,8 @@ def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
         logger.info("Initializing AWS JIT access tools...")
-        # Tools are automatically registered when jit_access module is imported
-        return [
-            jit_access.se_access,
-            jit_access.admin_access,
-            jit_access.developer_access
-        ]
+        # Get all tools from jit_access module
+        return list(jit_access.tools.values())
     except Exception as e:
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
