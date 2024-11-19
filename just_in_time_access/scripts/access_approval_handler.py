@@ -32,7 +32,7 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
 def approve_access(request_id: str, approval_action: str, ttl: str | None = None):
     approver_email = os.environ["KUBIYA_USER_EMAIL"]
 
-    enforcer_base_url = "http://enforce.kubiya:5001"
+    enforcer_base_url = "http://enforcer.kubiya:5001"
     requester_email = get_requester_email(request_id, enforcer_base_url)
     if approval_action.lower() == "approve":
         if ttl is None:

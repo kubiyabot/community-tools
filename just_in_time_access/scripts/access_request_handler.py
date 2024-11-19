@@ -24,7 +24,7 @@ def get_requested_tool_and_params(
 
 
 def send_approval_request(request_id: str, ttl: str):
-    enforcer_base_url = "http://enforce.kubiya:5001"
+    enforcer_base_url = "http://enforcer.kubiya:5001"
     req_tool_name, req_tool_params = get_requested_tool_and_params(
         request_id, enforcer_base_url
     )
