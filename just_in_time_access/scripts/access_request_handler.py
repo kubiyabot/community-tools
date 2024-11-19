@@ -27,9 +27,11 @@ def send_approval_request(request_id: str, ttl: str):
     kubiya_api_url = os.environ["REQUEST_ACCESS_WEBHOOK_URL"]
     response = requests.post(kubiya_api_url, json=payload)
 
-    if response.status_code != 200:
+    if response.status_code >= 400:
         print(f"Failed to send approval request: {response.text}")
         sys.exit(1)
+
+    print("Approval request sent successfully.")
 
 
 if __name__ == "__main__":
