@@ -38,5 +38,3 @@ tools = initialize_tools()
 # Export necessary classes
 from .tools.base import AWSJITTool
 __all__ = ['AWSJITTool', 'initialize_tools']
-
-# Don't initialize here - let the user do it

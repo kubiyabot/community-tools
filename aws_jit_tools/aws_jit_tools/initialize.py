@@ -16,5 +16,4 @@ def initialize_tools():
         logger.info(f"Successfully generated {len(tools)} tools")
         return tools
     except Exception as e:
-        logger.error(f"Failed to initialize tools: {str(e)}")
-        return [] 
+        raise e
