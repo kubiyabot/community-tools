@@ -21,4 +21,4 @@ def initialize_tools():
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
 
-__all__ = ['tools']
+__all__ = ['initialize_tools']

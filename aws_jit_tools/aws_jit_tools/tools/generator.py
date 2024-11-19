@@ -55,4 +55,6 @@ python /opt/scripts/access_handler.py
         
     except Exception as e:
         logger.error(f"Error generating tools: {str(e)}")
-        raise 
+        raise
+
+__all__ = ['generate_tools']
