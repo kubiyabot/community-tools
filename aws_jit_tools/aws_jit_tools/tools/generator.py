@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
-from aws_jit_tools.tools.base import AWSJITTool
+from ..tools.base import AWSJITTool
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class ToolGenerator:
             logger.error(f"Failed to load config: {str(e)}")
             raise
 
-    def generate_tools(self) -> List[AWSJITTool]:
+    def generate_tools(self) -> List:
         """Generate tools based on configuration."""
         tools = []
         try:
@@ -54,9 +54,12 @@ class ToolGenerator:
             logger.error(f"Error generating tools: {str(e)}")
             raise
 
-    def _create_tool(self, tool_id: str, config: dict) -> AWSJITTool:
+    def _create_tool(self, tool_id: str, config: dict):
         """Create individual tool based on configuration."""
         try:
+            # Delayed import to avoid circular dependency
+            from aws_jit_tools.tools.base import AWSJITTool
+
             # Read access_handler.py content directly
             access_handler_path = Path(__file__).resolve().parent.parent / 'scripts' / 'access_handler.py'
             with open(access_handler_path, 'r') as f:
