@@ -21,7 +21,9 @@ request_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
-    pip install requests > /dev/null
+    python -m venv /opt/venv > /dev/null
+    source /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 > /dev/null
 
     # Run the access request handler script
     python /opt/scripts/access_request_handler.py "{{ .request_id }}" "{{ .ttl }}"

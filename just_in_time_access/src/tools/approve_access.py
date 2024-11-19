@@ -22,7 +22,9 @@ approve_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
-    pip install requests > /dev/null
+    python -m venv /opt/venv > /dev/null
+    source /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 > /dev/null
 
     # Run the access approval handler script
     python /opt/scripts/access_approval_handler.py "{{ .request_id }}" "{{ .approval_action }}" "{{ .ttl }}"
@@ -54,9 +56,7 @@ approve_access_tool = JustInTimeAccessTool(
             required=False,
         ),
     ],
-    env=[
-        "SLACK_CHANNEL_ID",
-    ],
+    env=[],
     secrets=[
         "SLACK_API_TOKEN",
     ],

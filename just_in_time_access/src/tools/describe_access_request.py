@@ -18,13 +18,16 @@ describe_access_request_tool = JustInTimeAccessTool(
     description="Describe a specific access request by its Request ID.",
     content="""
     set -e
+    python -m venv /opt/venv > /dev/null
+    source /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 > /dev/null
     python /opt/scripts/describe_access_request.py "{{ .request_id }}"
     """,
     args=[
         Arg(
             name="request_id",
             description="The Request ID to describe. Example: 'req-12345'.",
-            required=True
+            required=True,
         ),
     ],
     with_files=[
@@ -33,15 +36,9 @@ describe_access_request_tool = JustInTimeAccessTool(
             content=inspect.getsource(describe_access_request_script),
         ),
     ],
-    with_volumes=[
-        Volume(
-            name="db_data",
-            path="/var/lib/database"
-        )
-    ],
 )
 
 # Register the tool
 tool_registry.register("just_in_time_access", describe_access_request_tool)
 
-__all__ = ['describe_access_request_tool'] 
+__all__ = ["describe_access_request_tool"]

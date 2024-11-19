@@ -18,6 +18,9 @@ list_active_access_requests_tool = JustInTimeAccessTool(
     description="List all active access requests in the system.",
     content="""
     set -e
+    python -m venv /opt/venv > /dev/null
+    source /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 > /dev/null
     python /opt/scripts/list_active_access_requests.py
     """,
     with_files=[
@@ -26,15 +29,9 @@ list_active_access_requests_tool = JustInTimeAccessTool(
             content=inspect.getsource(list_requests_script),
         ),
     ],
-    with_volumes=[
-        Volume(
-            name="db_data",
-            path="/var/lib/database"
-        )
-    ],
 )
 
 # Register the tool
 tool_registry.register("just_in_time_access", list_active_access_requests_tool)
 
-__all__ = ['list_active_access_requests_tool'] 
+__all__ = ["list_active_access_requests_tool"]
