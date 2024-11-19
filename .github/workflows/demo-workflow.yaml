@@ -1,0 +1,126 @@
+name: Python Application CI/CD
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.9
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then
+          pip install -r requirements.txt
+        else
+          echo "requirements.txt not found. This may cause issues." >&2
+        fi
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Run tests
+      run: |
+        pytest tests/ || echo "Tests failed, but continuing workflow"
+    - name: Build Docker image
+      run: |
+        docker build -t myapp:${{ github.sha }} .
+      continue-on-error: true
+    - name: Push to Docker Hub
+      run: |
+        echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
+        docker push myapp:${{ github.sha }}
+      continue-on-error: true
+    - name: Deploy to production
+      run: |
+        ssh user@production-server 'docker pull myapp:${{ github.sha }} && docker stop myapp-container && docker rm myapp-container && docker run -d --name myapp-container myapp:${{ github.sha }}'
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+      continue-on-error: true
+    - name: Capture detailed logs
+      if: always()
+      run: |
+        {
+          echo "GITHUB_WORKFLOW: $GITHUB_WORKFLOW"
+          echo "GITHUB_ACTION: $GITHUB_ACTION"
+          echo "GITHUB_EVENT_NAME: $GITHUB_EVENT_NAME"
+          echo "GITHUB_SHA: $GITHUB_SHA"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "Job: ${{ github.job }}"
+          echo "Run ID: ${{ github.run_id }}"
+          echo "Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Status: ${{ job.status }}"
+          echo "Git Tag: ${{ github.ref }}"
+          echo "Triggered By: ${{ github.actor }}"
+          echo "Branch: ${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Commit SHA: ${{ github.sha }}"
+          echo "Commit Message: ${{ github.event.head_commit.message }}"
+          echo "Event Type: ${{ github.event_name }}"
+          echo "Workflow Name: ${{ github.workflow }}"
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Architecture: ${{ runner.arch }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Author: ${{ github.event.pull_request.user.login }}"
+          echo "PR Base Branch: ${{ github.event.pull_request.base.ref }}"
+          echo "PR Head Branch: ${{ github.event.pull_request.head.ref }}"
+          echo "PR URL: ${{ github.event.pull_request.html_url }}"
+          echo "Python version:"
+          python --version
+          echo "Pip list:"
+          pip list
+          echo "Flake8 output:"
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          echo "Pytest output:"
+          pytest tests/ || echo "Tests failed"
+          echo "Docker version:"
+          docker --version
+          echo "Docker images:"
+          docker images
+          echo "Step outputs:"
+          echo "${{ toJson(steps) }}"
+        } > detailed_logs.txt
+    - name: Send notification
+      if: always()
+      run: |
+        LOGS=$(cat detailed_logs.txt)
+        TRUNCATED_LOGS="${LOGS:0:65000}"
+        ESCAPED_LOGS=$(echo "$TRUNCATED_LOGS" | jq -sRr @json)
+        PAYLOAD=$(jq -n \
+                    --arg status "${{ job.status }}" \
+                    --arg repo "$GITHUB_REPOSITORY" \
+                    --arg workflow "$GITHUB_WORKFLOW" \
+                    --arg commit "$GITHUB_SHA" \
+                    --arg logs "$ESCAPED_LOGS" \
+                    --arg job_name "${{ github.job }}" \
+                    --arg run_id "${{ github.run_id }}" \
+                    --arg run_url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+                    --arg git_tag "${{ github.ref }}" \
+                    --arg triggered_by "${{ github.actor }}" \
+                    --arg branch "${{ github.ref }}" \
+                    --arg commit_message "${{ github.event.head_commit.message }}" \
+                    --arg event_name "${{ github.event_name }}" \
+                    --arg workflow_name "${{ github.workflow }}" \
+                    --arg runner_os "${{ runner.os }}" \
+                    --arg runner_arch "${{ runner.arch }}" \
+                    --arg pr_number "${{ github.event.pull_request.number }}" \
+                    --arg pr_title "${{ github.event.pull_request.title }}" \
+                    --arg pr_author "${{ github.event.pull_request.user.login }}" \
+                    --arg pr_base "${{ github.event.pull_request.base.ref }}" \
+                    --arg pr_head "${{ github.event.pull_request.head.ref }}" \
+                    --arg pr_url "${{ github.event.pull_request.html_url }}" \
+                    '{status: $status, repository: $repo, workflow: $workflow, commit: $commit, logs: $logs}')
+        curl -X POST -H "Content-Type: application/json" \
+        -d "$PAYLOAD" \
+        https://webhooksource-kubiya.hooks.kubiya.ai:8443/5itc-n9c4VE1So0qirUlr3HX83YgT8Z-dZNP9MHclyoXQRyuio3lMQvkZsrogplYu8W1pdI92HXbRBjPjSJDINjJRHLk
