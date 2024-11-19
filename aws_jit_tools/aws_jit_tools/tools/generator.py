@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, List
 from kubiya_sdk.tools import FileSpec, Arg
+from kubiya_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
 
 logger = logging.getLogger(__name__)
@@ -27,8 +28,8 @@ class ToolGenerator:
             logger.error(f"Failed to load config: {str(e)}")
             return {}
 
-    def generate_tools(self) -> List[Any]:
-        """Generate tools based on configuration."""
+    def generate_and_register_tools(self) -> List[Any]:
+        """Generate and register tools based on configuration."""
         if not self.config or 'tools' not in self.config:
             logger.error("No tools configuration found in aws_jit_config.json")
             return []
@@ -40,9 +41,11 @@ class ToolGenerator:
                 tool = self._create_tool(tool_id, config)
                 if tool:
                     tools.append(tool)
-                    logger.info(f"Created tool: jit_access_to_{tool_id}")
+                    # Register tool with aws_jit namespace
+                    tool_registry.register("aws_jit", tool)
+                    logger.info(f"✅ Generated and registered tool: jit_access_to_{tool_id}")
 
-            logger.info(f"Generated {len(tools)} tools")
+            logger.info(f"Successfully generated and registered {len(tools)} tools")
             return tools
         except Exception as e:
             logger.error(f"Error generating tools: {str(e)}")

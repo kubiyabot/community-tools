@@ -11,19 +11,11 @@ logger = logging.getLogger(__name__)
 
 try:
     from .tools.generator import ToolGenerator
-    from kubiya_sdk.tools.registry import tool_registry
-
-    # Create generator
+    
+    # Create generator and register tools
     generator = ToolGenerator()
+    tools = generator.generate_and_register_tools()
     
-    # Generate and register tools
-    tools = generator.generate_tools()
-    
-    # Register each tool
-    for tool in tools:
-        tool_registry.register("aws_jit", tool)
-        logger.info(f"Registered tool: {tool.name}")
-
 except Exception as e:
     logger.error(f"Error registering tools: {str(e)}")
 
