@@ -35,8 +35,6 @@ export PERMISSION_SET_NAME="{config['permission_set']}"
 export SESSION_DURATION="{config['session_duration']}"
 
 # Install dependencies
-# install pip first
-apt-get update && apt-get install -y python3-pip
 pip install -q boto3 requests
 # Run access handler
 python /opt/scripts/access_handler.py
