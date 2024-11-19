@@ -43,9 +43,12 @@ def approve_access(request_id: str, approval_action: str, ttl: str | None = None
 
         approve(request_id, ttl, enforcer_base_url)
 
+        print("Access request approved successfully.")
+
     elif approval_action.lower() == "reject":
         # Notify requester in Slack
         notify_user(request_id, "rejected", requester_email, approver_email)
+        print("Access request rejected successfully.")
 
     else:
         print("Invalid approval action. Use 'approve' or 'reject'.")
