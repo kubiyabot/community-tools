@@ -30,8 +30,7 @@ def initialize_tools():
         
         return tools
     except Exception as e:
-        logger.error(f"Failed to initialize tools: {str(e)}")
-        return []
+        raise e
 
 # Initialize tools when module is imported
 tools = initialize_tools()
