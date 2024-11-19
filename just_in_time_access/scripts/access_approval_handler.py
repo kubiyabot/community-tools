@@ -76,6 +76,7 @@ def notify_user(request_id, status, user_email, approver_email):
 
     # Prepare the Block Kit message
     approval_status = "approved" if status == "approved" else "rejected"
+    emoji = ":white_check_mark:" if status == "approved" else ":x:"
     message = {
         "channel": user_id,
         "blocks": [
@@ -83,7 +84,7 @@ def notify_user(request_id, status, user_email, approver_email):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f":white_check_mark: Your access request *{request_id}* has been *{approval_status.upper()}* by {approver_email}.",
+                    "text": f"{emoji} Your access request *{request_id}* has been *{approval_status.upper()}* by {approver_email}.",
                 },
             },
             {"type": "divider"},
