@@ -3,7 +3,8 @@
         "se": {
             "description": "Grants SE (Solutions Engineer) access to AWS account",
             "account_id": "876809951775",
-            "permission_set": "SE"
+            "permission_set": "SE",
+            "session_duration": "PT1H"
         }
     }
 } 
