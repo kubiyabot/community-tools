@@ -4,7 +4,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any, List
-from kubiya_sdk.tools import FileSpec
+from kubiya_sdk.tools import FileSpec, Arg
 from .base import AWSJITTool
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,17 @@ class ToolGenerator:
                 name=f"jit_access_to_{tool_id}",
                 description=config['description'],
                 content=self._generate_tool_content(config),
+                args=[
+                    Arg(
+                        name="session_duration",
+                        description=(
+                            "Duration for the access session.\n"
+                            "Examples: '1h' for one hour, '30m' for 30 minutes"
+                        ),
+                        required=False,
+                        default="1h"
+                    )
+                ],
                 with_files=[
                     FileSpec(
                         destination="/opt/scripts/access_handler.py",
@@ -82,9 +93,10 @@ pip3 install --quiet boto3 > /dev/null 2>&1
 # Set environment variables
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
+export SESSION_DURATION="{{{{ .session_duration }}}}"
 
 # Execute access handler with engaging message
-echo "🔐 Granting {config['permission_set']} access in AWS account {config['account_id']}..."
+echo "🔐 Granting {config['permission_set']} access in AWS account {config['account_id']} for {{{{ .session_duration }}}}..."
 python3 /opt/scripts/access_handler.py
 """
 
@@ -97,9 +109,11 @@ sequenceDiagram
     participant A as AWS Account
 
     U->>+T: Request {tool_id} access
+    Note over U,T: With session duration
     T->>+I: Find user by email
     I-->>-T: User found
     T->>+A: Assign permission set
+    Note over T,A: Set session duration
     A-->>-T: Access granted
     T-->>-U: Access confirmed
 """ 
