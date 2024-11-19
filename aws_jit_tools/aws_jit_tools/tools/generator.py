@@ -67,7 +67,9 @@ class ToolGenerator:
                 env=[
                     "AWS_PROFILE",
                     "KUBIYA_USER_EMAIL",
-                    "SLACK_API_TOKEN"
+                    "KUBIYA_API_KEY",
+                    "KUBIYA_USER_ORG",
+                    "KUBIYA_AGENT_PROFILE"
                 ],
                 with_files=[
                     FileSpec(
@@ -90,12 +92,11 @@ set -e
 
 echo "Installing required packages..."
 apk add --no-cache python3 py3-pip
-pip3 install boto3 requests
+pip3 install boto3
 
 echo "Setting environment variables..."
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
-export SESSION_DURATION="{config.get('session_duration', 'PT1H')}"
 
 echo "Executing access handler..."
 python3 /opt/scripts/access_handler.py
