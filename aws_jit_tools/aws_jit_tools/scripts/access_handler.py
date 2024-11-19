@@ -24,7 +24,10 @@ class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
         """Initialize AWS access handler."""
         try:
-            self.session = boto3.Session(profile_name=profile_name)
+            # Use default profile
+            self.session = boto3.Session()
+            # Add a print to the caller identity
+            print(self.session.client('sts').get_caller_identity())
             self.identitystore = self.session.client('identitystore')
             self.sso_admin = self.session.client('sso-admin')
             
