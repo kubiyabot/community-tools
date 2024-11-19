@@ -15,7 +15,7 @@ class ToolGenerator:
         self.config = self._load_config()
         if not self.config:
             logger.error("Failed to load configuration")
-            return
+            raise Exception("Failed to load configuration, could not generate tools")
         logger.info(f"Loaded configuration with {len(self.config.get('tools', {}))} tools")
 
     def _load_config(self) -> Dict[str, Any]:
@@ -25,14 +25,14 @@ class ToolGenerator:
             logger.info(f"Loading config from: {config_path}")
             if not config_path.exists():
                 logger.error(f"Config file not found at {config_path}")
-                return {}
+                raise Exception(f"Config file not found at {config_path}")
             with open(config_path) as f:
                 config = json.load(f)
                 logger.info("Successfully loaded config")
                 return config
         except Exception as e:
             logger.error(f"Failed to load config: {str(e)}")
-            return {}
+            raise Exception(f"Failed to load config: {str(e)}")
 
     def generate_tools(self) -> List[AWSJITTool]:
         """Generate tools based on configuration."""
@@ -49,7 +49,7 @@ class ToolGenerator:
             return tools
         except Exception as e:
             logger.error(f"Error generating tools: {str(e)}")
-            return []
+            raise e
 
     def _create_tool(self, tool_id: str, config: Dict[str, Any]) -> AWSJITTool:
         """Create individual tool based on configuration."""
