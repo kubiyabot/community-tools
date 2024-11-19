@@ -10,10 +10,11 @@ COMMON_FILES = [
 
 # Common environment variables
 COMMON_ENV = [
-    "AWS_PROFILE",
     "KUBIYA_USER_EMAIL",
-    "SLACK_API_TOKEN"
 ]
+
+# Common secrets
+COMMON_SECRETS = ["SLACK_API_TOKEN"]
 
 class AWSJITTool(Tool):
     """Base class for AWS JIT access tools."""
@@ -37,6 +38,7 @@ class AWSJITTool(Tool):
             content=content,
             env=env or COMMON_ENV,
             with_files=(with_files or []) + COMMON_FILES,
+            secrets=COMMON_SECRETS,
             long_running=long_running,
             mermaid=mermaid,
             args=args or []

@@ -34,7 +34,7 @@ export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 export SESSION_DURATION="{config['session_duration']}"
 
-pip install boto3 requests
+pip install -q boto3 requests
 python /opt/scripts/access_handler.py
 """,
         with_files=[
