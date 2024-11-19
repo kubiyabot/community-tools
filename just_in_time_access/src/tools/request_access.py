@@ -21,6 +21,7 @@ request_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
+    pip install requests > /dev/null
 
     # Run the access request handler script
     python /opt/scripts/access_request_handler.py "{{ .request_id }}" "{{ .ttl }}"

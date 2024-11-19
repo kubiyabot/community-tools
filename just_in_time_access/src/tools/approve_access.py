@@ -22,6 +22,7 @@ approve_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
+    pip install requests > /dev/null
 
     # Run the access approval handler script
     python /opt/scripts/access_approval_handler.py "{{ .request_id }}" "{{ .approval_action }}" "{{ .ttl }}"
