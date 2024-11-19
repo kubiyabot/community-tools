@@ -4,8 +4,7 @@ import logging
 import sys
 from pathlib import Path
 from typing import Dict, Any, List
-from kubiya_sdk.tools import FileSpec, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_sdk.tools import FileSpec
 from .base import AWSJITTool
 
 logger = logging.getLogger(__name__)
@@ -28,8 +27,8 @@ class ToolGenerator:
             logger.error(f"Failed to load config: {str(e)}")
             return {}
 
-    def generate_and_register_tools(self) -> List[Any]:
-        """Generate and register tools based on configuration."""
+    def generate_tools(self) -> List[Any]:
+        """Generate tools based on configuration."""
         if not self.config or 'tools' not in self.config:
             logger.error("No tools configuration found in aws_jit_config.json")
             return []
@@ -41,11 +40,9 @@ class ToolGenerator:
                 tool = self._create_tool(tool_id, config)
                 if tool:
                     tools.append(tool)
-                    # Register tool with aws_jit namespace
-                    tool_registry.register("aws_jit", tool)
-                    logger.info(f"✅ Generated and registered tool: jit_access_to_{tool_id}")
+                    logger.info(f"Created tool: jit_access_to_{tool_id}")
 
-            logger.info(f"Successfully generated and registered {len(tools)} tools")
+            logger.info(f"Generated {len(tools)} tools")
             return tools
         except Exception as e:
             logger.error(f"Error generating tools: {str(e)}")
@@ -60,16 +57,9 @@ class ToolGenerator:
                 name=f"jit_access_to_{tool_id}",
                 description=config['description'],
                 content=self._generate_tool_content(config),
-                args=[
-                    Arg(
-                        name="session_duration",
-                        description=(
-                            "Duration for the access session.\n"
-                            "Examples: '1h' for one hour, '30m' for 30 minutes"
-                        ),
-                        required=False,
-                        default="1h"
-                    )
+                env=[
+                    "AWS_PROFILE",      # AWS profile with required permissions
+                    "KUBIYA_USER_EMAIL" # User email for SSO lookup
                 ],
                 with_files=[
                     FileSpec(
@@ -96,10 +86,9 @@ pip3 install --quiet boto3 > /dev/null 2>&1
 # Set environment variables
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
-export SESSION_DURATION="{{{{ .session_duration }}}}"
 
 # Execute access handler with engaging message
-echo "🔐 Granting {config['permission_set']} access in AWS account {config['account_id']} for {{{{ .session_duration }}}}..."
+echo "🔐 Granting {config['permission_set']} access in AWS account {config['account_id']}..."
 python3 /opt/scripts/access_handler.py
 """
 
@@ -112,11 +101,9 @@ sequenceDiagram
     participant A as AWS Account
 
     U->>+T: Request {tool_id} access
-    Note over U,T: With session duration
     T->>+I: Find user by email
     I-->>-T: User found
     T->>+A: Assign permission set
-    Note over T,A: Set session duration
     A-->>-T: Access granted
     T-->>-U: Access confirmed
 """ 
