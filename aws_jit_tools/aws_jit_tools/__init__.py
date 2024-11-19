@@ -15,7 +15,6 @@ def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
         from .tools.generator import ToolGenerator
-        from kubiya_sdk.tools.registry import tool_registry
         
         logger.info("Creating tool generator...")
         generator = ToolGenerator()
@@ -23,17 +22,17 @@ def initialize_tools():
         logger.info("Generating tools...")
         tools = generator.generate_tools()
         
-        # Register each tool
-        for tool in tools:
-            tool_registry.register("aws_jit", tool)
-            logger.info(f"Registered tool: {tool.name}")
-        
+        logger.info(f"Successfully initialized {len(tools)} tools")
         return tools
     except Exception as e:
-        raise e
+        logger.error(f"Failed to initialize tools: {str(e)}")
+        raise
 
 # Initialize tools when module is imported
 tools = initialize_tools()
 
-# Export necessary classes
-from .tools import *
+# Export necessary classes and tools
+from .tools.base import AWSJITTool
+from .tools.generator import ToolGenerator
+
+__all__ = ['AWSJITTool', 'ToolGenerator', 'tools']

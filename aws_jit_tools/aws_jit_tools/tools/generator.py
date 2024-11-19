@@ -1,11 +1,10 @@
-import inspect
-import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +17,7 @@ class ToolGenerator:
             raise Exception("Failed to load configuration, could not generate tools")
         logger.info(f"Loaded configuration with {len(self.config.get('tools', {}))} tools")
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict:
         """Load tool configuration from JSON."""
         try:
             config_path = Path(__file__).resolve().parent.parent.parent / 'aws_jit_config.json'
@@ -32,7 +31,7 @@ class ToolGenerator:
                 return config
         except Exception as e:
             logger.error(f"Failed to load config: {str(e)}")
-            raise Exception(f"Failed to load config: {str(e)}")
+            raise
 
     def generate_tools(self) -> List[AWSJITTool]:
         """Generate tools based on configuration."""
@@ -43,72 +42,34 @@ class ToolGenerator:
                 tool = self._create_tool(tool_id, config)
                 if tool:
                     tools.append(tool)
-                    logger.info(f"Successfully created tool: {tool.name}")
+                    # Register the tool immediately
+                    tool_registry.register("aws_jit", tool)
+                    logger.info(f"Successfully registered tool: {tool.name}")
 
-            logger.info(f"Generated {len(tools)} tools")
+            logger.info(f"Generated and registered {len(tools)} tools")
             return tools
         except Exception as e:
             logger.error(f"Error generating tools: {str(e)}")
-            raise e
+            raise
 
-    def _create_tool(self, tool_id: str, config: Dict[str, Any]) -> AWSJITTool:
+    def _create_tool(self, tool_id: str, config: dict) -> AWSJITTool:
         """Create individual tool based on configuration."""
         try:
-            from aws_jit_tools.scripts.access_handler import AWSAccessHandler
-            
             tool = AWSJITTool(
-                name=f"jit_access_to_{tool_id}",
+                name=f"jit_{tool_id.lower()}",
                 description=config['description'],
-                content=self._generate_tool_content(config),
-                args={},  # No arguments needed as everything is in config
+                with_files=[
+                    FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+                    FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config")
+                ],
                 env=[
                     "AWS_PROFILE",
                     "KUBIYA_USER_EMAIL",
-                    "SLACK_API_TOKEN"
-                ],
-                with_files=[
-                    FileSpec(
-                        destination="/opt/scripts/access_handler.py",
-                        content=inspect.getsource(AWSAccessHandler)
-                    )
-                ],
-                mermaid=self._generate_mermaid(tool_id, config)
+                    "AWS_ACCOUNT_ID",
+                    "PERMISSION_SET_NAME"
+                ]
             )
             return tool
         except Exception as e:
             logger.error(f"Error creating tool {tool_id}: {str(e)}")
-            return None
-
-    def _generate_tool_content(self, config: Dict[str, Any]) -> str:
-        return f"""
-#!/bin/bash
-set -e
-
-echo "Installing required packages..."
-apk add --no-cache python3 py3-pip
-pip3 install boto3 requests
-
-echo "Setting environment variables..."
-export AWS_ACCOUNT_ID="{config['account_id']}"
-export PERMISSION_SET_NAME="{config['permission_set']}"
-export SESSION_DURATION="{config.get('session_duration', 'PT1H')}"
-
-echo "Executing access handler..."
-python3 /opt/scripts/access_handler.py
-"""
-
-    def _generate_mermaid(self, tool_id: str, config: Dict[str, Any]) -> str:
-        return f"""
-sequenceDiagram
-    participant U as User
-    participant T as Tool
-    participant I as IAM Identity Center
-    participant A as AWS Account
-
-    U->>+T: Request {tool_id} access
-    T->>+I: Find user by email
-    I-->>-T: User found
-    T->>+A: Assign permission set
-    A-->>-T: Access granted
-    T-->>-U: Access confirmed
-""" 
+            return None 

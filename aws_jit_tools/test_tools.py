@@ -8,18 +8,26 @@ logging.basicConfig(
     stream=sys.stdout
 )
 
+logger = logging.getLogger(__name__)
+
 def main():
-    print("Starting tool generation test...")
+    logger.info("Starting tool generation test...")
     
     # Import and initialize tools
     import aws_jit_tools
     
-    # Tools are automatically initialized when the module is imported
-    print("\nRegistered tools:")
+    # Check registered tools
     from kubiya_sdk.tools.registry import tool_registry
-    tools = tool_registry.get_tools("aws_jit")
-    for tool in tools:
-        print(f"- {tool.name}: {tool.description}")
+    
+    # Get all registered tools
+    all_tools = tool_registry.get_tools("aws_jit")
+    logger.info(f"Found {len(all_tools)} registered tools:")
+    
+    for tool in all_tools:
+        logger.info(f"- {tool.name}: {tool.description}")
+        logger.info(f"  Type: {tool.type}")
+        logger.info(f"  Environment vars: {tool.env}")
+        logger.info("  " + "-" * 40)
 
 if __name__ == "__main__":
     main() 
