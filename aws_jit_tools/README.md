@@ -19,3 +19,7 @@ A collection of tools for managing Just-In-Time AWS access through IAM Identity 
 ## Required AWS Permissions
 
 The AWS profile used needs the following permissions:
+
+## Usage
+
+Import and initialize the tools in your Kubiya environment:

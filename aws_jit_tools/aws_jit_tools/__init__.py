@@ -9,13 +9,10 @@ if project_root not in sys.path:
 
 logger = logging.getLogger(__name__)
 
-try:
-    from .tools.generator import ToolGenerator
-    
-    # Initialize tool generator
-    generator = ToolGenerator()
-    # Generate tools
-    generator.generate_tools()
-except ImportError as e:
-    logger.warning(f"Import error: {str(e)}")
-    logger.warning("Tools will be available after dependencies are installed")
+# Only expose what's needed
+from .tools.generator import ToolGenerator
+from .tools.base import AWSJITTool
+
+__all__ = ['ToolGenerator', 'AWSJITTool']
+
+# Don't initialize here - let the user do it
