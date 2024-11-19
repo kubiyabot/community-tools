@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
-from aws_jit_tools.tools.base import AWSJITTool
-from aws_jit_tools.scripts.access_handler import AWSAccessHandler
+from .base import AWSJITTool
+from ..scripts.access_handler import AWSAccessHandler
 
 logger = logging.getLogger(__name__)
 

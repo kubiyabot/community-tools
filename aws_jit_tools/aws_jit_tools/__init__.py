@@ -14,8 +14,7 @@ if project_root not in sys.path:
 def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
-        # Import the generator class directly from the module
-        from aws_jit_tools.tools.generator import ToolGenerator
+        from .tools import ToolGenerator
         
         logger.info("Creating tool generator...")
         generator = ToolGenerator()
@@ -33,7 +32,6 @@ def initialize_tools():
 tools = initialize_tools()
 
 # Export necessary classes and tools
-from aws_jit_tools.tools.base import AWSJITTool
-from aws_jit_tools.tools.generator import ToolGenerator
+from .tools import AWSJITTool, ToolGenerator
 
 __all__ = ['AWSJITTool', 'ToolGenerator', 'tools']

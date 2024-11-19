@@ -3,8 +3,8 @@ from .base import AWSJITTool
 from .generator import ToolGenerator
 
 __all__ = [
-    'AWSJITTool',
-    'ToolGenerator',
     'COMMON_FILES',
-    'COMMON_ENV'
+    'COMMON_ENV',
+    'AWSJITTool',
+    'ToolGenerator'
 ]

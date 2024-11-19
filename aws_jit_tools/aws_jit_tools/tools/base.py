@@ -1,6 +1,6 @@
 import logging
 from kubiya_sdk.tools.models import Tool
-from aws_jit_tools.tools.common import COMMON_FILES, COMMON_ENV
+from .common import COMMON_FILES, COMMON_ENV
 
 logger = logging.getLogger(__name__)
 
