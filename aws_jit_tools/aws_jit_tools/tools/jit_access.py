@@ -1,5 +1,5 @@
 from kubiya_sdk.tools.registry import tool_registry
-from .base import AWSJITTool
+from aws_jit_tools.tools.base import AWSJITTool
 
 # SE Access Tool
 se_access = AWSJITTool(

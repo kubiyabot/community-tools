@@ -1,5 +1,6 @@
 import logging
 from kubiya_sdk.tools.registry import tool_registry
+from .base import AWSJITTool
 from . import jit_access
 
 logger = logging.getLogger(__name__)
@@ -18,4 +19,4 @@ def initialize_tools():
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
 
-__all__ = ['initialize_tools']
+__all__ = ['initialize_tools', 'AWSJITTool']
