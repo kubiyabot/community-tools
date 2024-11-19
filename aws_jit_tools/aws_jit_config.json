@@ -1,0 +1,24 @@
+{
+    "tools": {
+        "readonly": {
+            "description": "Provides read-only access to AWS services",
+            "account_id": "123456789012",
+            "permission_set": "AWSReadOnlyAccess"
+        },
+        "s3_admin": {
+            "description": "Full access to S3 services",
+            "account_id": "123456789012",
+            "permission_set": "AWSS3AdminAccess"
+        },
+        "developer": {
+            "description": "Standard developer permissions via SSO",
+            "account_id": "987654321098",
+            "permission_set": "AWSDeveloperAccess"
+        },
+        "power_user": {
+            "description": "Advanced user permissions with limited admin capabilities",
+            "account_id": "987654321098",
+            "permission_set": "AWSPowerUserAccess"
+        }
+    }
+} 

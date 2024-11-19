@@ -7,7 +7,6 @@ setup(
     install_requires=[
         "kubiya-sdk",
         "boto3",
-        "pyyaml",
         "requests"
     ],
 ) 
