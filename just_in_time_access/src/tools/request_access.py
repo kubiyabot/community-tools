@@ -43,9 +43,6 @@ request_access_tool = JustInTimeAccessTool(
             default="1h",
         ),
     ],
-    env=[
-        "KUBIYA_WEBHOOK_URL",
-    ],
     secrets=[
         "SLACK_API_TOKEN",
     ],
