@@ -10,6 +10,7 @@ COMMON_FILES = [
 
 # Common environment variables
 COMMON_ENV = [
+    "AWS_PROFILE",
     "KUBIYA_USER_EMAIL",
 ]
 
