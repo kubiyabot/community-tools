@@ -1,5 +1,7 @@
 import logging
 import os
+import sys
+import json
 from typing import Optional, Dict, Any
 from datetime import timedelta
 
@@ -7,9 +9,15 @@ logger = logging.getLogger(__name__)
 
 try:
     import boto3
+    from botocore.exceptions import ClientError, ProfileNotFound
 except ImportError as e:
     logger.error(f"Failed to import boto3: {str(e)}")
-    boto3 = None
+    print(json.dumps({
+        "status": "error",
+        "error_type": "ImportError",
+        "message": "Required package boto3 is not installed"
+    }))
+    sys.exit(1)
 
 def convert_duration_to_iso8601(duration: str) -> str:
     """Convert duration string (e.g., '1h', '30m') to ISO8601 duration format."""
@@ -23,25 +31,58 @@ def convert_duration_to_iso8601(duration: str) -> str:
         else:
             raise ValueError("Duration must end with 'h' for hours or 'm' for minutes")
     except (ValueError, AttributeError) as e:
-        logger.error(f"Invalid duration format: {duration}")
-        raise ValueError(f"Invalid duration format. Use '1h' for 1 hour, '30m' for 30 minutes. Error: {str(e)}")
+        error_msg = f"Invalid duration format. Use '1h' for 1 hour, '30m' for 30 minutes. Error: {str(e)}"
+        logger.error(error_msg)
+        print(json.dumps({
+            "status": "error",
+            "error_type": "ValidationError",
+            "message": error_msg
+        }))
+        sys.exit(1)
 
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
         """Initialize AWS access handler."""
-        if not boto3:
-            raise ImportError("boto3 is required but not available")
+        try:
+            self.session = boto3.Session(profile_name=profile_name)
+            self.identitystore = self.session.client('identitystore')
+            self.sso_admin = self.session.client('sso-admin')
             
-        self.session = boto3.Session(profile_name=profile_name)
-        self.identitystore = self.session.client('identitystore')
-        self.sso_admin = self.session.client('sso-admin')
-        
-        # Get Identity Store ID from SSO Instance
-        instances = self.sso_admin.list_instances()['Instances']
-        if not instances:
-            raise ValueError("No SSO instance found")
-        self.instance_arn = instances[0]['InstanceArn']
-        self.identity_store_id = instances[0]['IdentityStoreId']
+            # Get Identity Store ID from SSO Instance
+            instances = self.sso_admin.list_instances()['Instances']
+            if not instances:
+                raise ValueError("No SSO instance found - AWS IAM Identity Center must be configured")
+            self.instance_arn = instances[0]['InstanceArn']
+            self.identity_store_id = instances[0]['IdentityStoreId']
+            
+        except ProfileNotFound:
+            error_msg = f"AWS profile '{profile_name}' not found. Please check your AWS credentials"
+            logger.error(error_msg)
+            print(json.dumps({
+                "status": "error",
+                "error_type": "ProfileNotFound",
+                "message": error_msg
+            }))
+            sys.exit(1)
+        except ClientError as e:
+            error_msg = f"AWS API error: {str(e)}"
+            logger.error(error_msg)
+            print(json.dumps({
+                "status": "error",
+                "error_type": "AWSError",
+                "message": error_msg,
+                "details": e.response['Error']
+            }))
+            sys.exit(1)
+        except Exception as e:
+            error_msg = f"Failed to initialize AWS handler: {str(e)}"
+            logger.error(error_msg)
+            print(json.dumps({
+                "status": "error",
+                "error_type": "InitializationError",
+                "message": error_msg
+            }))
+            sys.exit(1)
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Find user in IAM Identity Center by email."""
@@ -145,11 +186,17 @@ class AWSAccessHandler:
 def main():
     """Main execution function."""
     try:
+        # Validate required environment variables
+        required_vars = ['KUBIYA_USER_EMAIL', 'AWS_ACCOUNT_ID', 'PERMISSION_SET_NAME']
+        missing_vars = [var for var in required_vars if not os.environ.get(var)]
+        if missing_vars:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+
         # Get environment variables
         user_email = os.environ['KUBIYA_USER_EMAIL']
         account_id = os.environ['AWS_ACCOUNT_ID']
         permission_set = os.environ['PERMISSION_SET_NAME']
-        session_duration = os.environ.get('SESSION_DURATION', '1h')  # Default to 1 hour
+        session_duration = os.environ.get('SESSION_DURATION', '1h')
         aws_profile = os.environ.get('AWS_PROFILE')
 
         handler = AWSAccessHandler(aws_profile)
@@ -157,7 +204,13 @@ def main():
         # Find user by email
         user = handler.get_user_by_email(user_email)
         if not user:
-            raise ValueError(f"User not found in IAM Identity Center: {user_email}")
+            error_msg = f"User not found in IAM Identity Center: {user_email}"
+            print(json.dumps({
+                "status": "error",
+                "error_type": "UserNotFound",
+                "message": error_msg
+            }))
+            sys.exit(1)
 
         # Assign permission set and get details
         assignment = handler.assign_permission_set(
@@ -168,7 +221,7 @@ def main():
         )
 
         # Return detailed success response
-        print({
+        print(json.dumps({
             "status": "success",
             "user": {
                 "id": user['UserId'],
@@ -183,12 +236,37 @@ def main():
                 "session_duration": session_duration
             },
             "instance_arn": handler.instance_arn
-        })
+        }, indent=2))
+        sys.exit(0)
 
+    except ValueError as e:
+        error_msg = str(e)
+        logger.error(error_msg)
+        print(json.dumps({
+            "status": "error",
+            "error_type": "ValidationError",
+            "message": error_msg
+        }))
+        sys.exit(1)
+    except ClientError as e:
+        error_msg = f"AWS API error: {str(e)}"
+        logger.error(error_msg)
+        print(json.dumps({
+            "status": "error",
+            "error_type": "AWSError",
+            "message": error_msg,
+            "details": e.response['Error']
+        }))
+        sys.exit(1)
     except Exception as e:
-        logger.error(f"Error in main: {str(e)}")
-        print({"status": "error", "message": str(e)})
-        raise
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(error_msg)
+        print(json.dumps({
+            "status": "error",
+            "error_type": "UnexpectedError",
+            "message": error_msg
+        }))
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 
