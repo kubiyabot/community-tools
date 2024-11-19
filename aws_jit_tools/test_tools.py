@@ -8,18 +8,16 @@ logging.basicConfig(
     stream=sys.stdout
 )
 
-from aws_jit_tools.tools.generator import ToolGenerator
-
 def main():
     print("Starting tool generation test...")
     
-    # Create generator
-    generator = ToolGenerator()
+    # Import and initialize tools
+    import aws_jit_tools
     
-    # Generate tools
-    tools = generator.generate_tools()
-    
-    print(f"\nGenerated {len(tools)} tools:")
+    # Tools are automatically initialized when the module is imported
+    print("\nRegistered tools:")
+    from kubiya_sdk.tools.registry import tool_registry
+    tools = tool_registry.get_tools("aws_jit")
     for tool in tools:
         print(f"- {tool.name}: {tool.description}")
 
