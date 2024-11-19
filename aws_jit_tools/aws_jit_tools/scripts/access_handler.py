@@ -2,27 +2,17 @@ import logging
 import os
 import sys
 import json
-import time
 from typing import Optional, Dict, Any
+import boto3
+from botocore.exceptions import ClientError
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-try:
-    import boto3
-    import requests
-    from botocore.exceptions import ClientError, ProfileNotFound
-except ImportError as e:
-    logger.error(f"Failed to import boto3: {str(e)}")
-    print(json.dumps({
-        "status": "error",
-        "error_type": "ImportError",
-        "message": "Could not find required packages - its OK during discovery"
-    }))
-    pass
-
-class AWSAccessHandler:
+class SSOAssignmentHandler:
     def __init__(self, profile_name: Optional[str] = None):
-        """Initialize AWS access handler."""
+        """Initialize AWS clients and get SSO instance information."""
         try:
             self.session = boto3.Session(profile_name=profile_name)
             self.identitystore = self.session.client('identitystore')
@@ -32,8 +22,11 @@ class AWSAccessHandler:
             instances = self.sso_admin.list_instances()['Instances']
             if not instances:
                 raise ValueError("No SSO instance found")
+            
             self.instance_arn = instances[0]['InstanceArn']
             self.identity_store_id = instances[0]['IdentityStoreId']
+            logger.info(f"Found SSO instance ARN: {self.instance_arn}")
+            logger.info(f"Found Identity Store ID: {self.identity_store_id}")
             
         except Exception as e:
             self._handle_error("Failed to initialize AWS handler", e)
@@ -51,78 +44,69 @@ class AWSAccessHandler:
 
             users = response.get('Users', [])
             if not users:
-                logger.error(f"No user found with email: {email}")
-                return None
-
+                self._handle_error("User lookup failed", ValueError(f"No user found with email: {email}"))
+            
+            logger.info(f"Found user ID: {users[0]['UserId']} for email: {email}")
             return users[0]
 
         except Exception as e:
-            logger.error(f"Error finding user by email: {str(e)}")
-            raise
+            self._handle_error("Error finding user by email", e)
 
-    def get_slack_user_id(self, email: str) -> Optional[str]:
-        """Get Slack user ID from email."""
+    def get_permission_set_arn(self, permission_set_name: str) -> str:
+        """Get Permission Set ARN by name."""
         try:
-            slack_token = os.environ.get('SLACK_API_TOKEN')
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return None
-
-            response = requests.post(
-                'https://slack.com/api/users.lookupByEmail',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                data={'email': email}
-            )
+            permission_sets = self.sso_admin.list_permission_sets(
+                InstanceArn=self.instance_arn
+            )['PermissionSets']
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('ok'):
-                    return data['user']['id']
+            for ps_arn in permission_sets:
+                response = self.sso_admin.describe_permission_set(
+                    InstanceArn=self.instance_arn,
+                    PermissionSetArn=ps_arn
+                )
+                if response['PermissionSet']['Name'] == permission_set_name:
+                    logger.info(f"Found Permission Set ARN: {ps_arn}")
+                    return ps_arn
             
-            logger.error(f"Failed to find Slack user for email: {email}")
-            return None
-
-        except Exception as e:
-            logger.error(f"Error getting Slack user ID: {str(e)}")
-            return None
-
-    def send_slack_notification(self, user_id: str, message: str):
-        """Send Slack message to user."""
-        try:
-            slack_token = os.environ.get('SLACK_API_TOKEN')
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return
-
-            response = requests.post(
-                'https://slack.com/api/chat.postMessage',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                json={
-                    'channel': user_id,
-                    'text': message
-                }
+            self._handle_error(
+                "Permission Set lookup failed", 
+                ValueError(f"Permission set not found: {permission_set_name}")
             )
 
-            if not response.ok:
-                logger.error(f"Failed to send Slack message: {response.text}")
+        except Exception as e:
+            self._handle_error("Error getting permission set ARN", e)
+
+    def create_assignment(self, account_id: str, permission_set_name: str, user_email: str) -> Dict:
+        """Create the SSO assignment."""
+        try:
+            # Get user details
+            user = self.get_user_by_email(user_email)
+            
+            # Get permission set ARN
+            permission_set_arn = self.get_permission_set_arn(permission_set_name)
+            
+            # Create the assignment
+            response = self.sso_admin.create_account_assignment(
+                InstanceArn=self.instance_arn,
+                TargetId=account_id,
+                TargetType='AWS_ACCOUNT',
+                PermissionSetArn=permission_set_arn,
+                PrincipalType='USER',
+                PrincipalId=user['UserId']
+            )
+            
+            # Wait for the assignment to complete
+            request_id = response['AccountAssignmentCreationStatus']['RequestId']
+            logger.info(f"Assignment request ID: {request_id}")
+            
+            return {
+                "status": "success",
+                "message": f"Successfully assigned {permission_set_name} to {user_email} for account {account_id}",
+                "details": response['AccountAssignmentCreationStatus']
+            }
 
         except Exception as e:
-            logger.error(f"Error sending Slack notification: {str(e)}")
-
-    def parse_iso8601_duration(self, duration: str) -> int:
-        """Convert ISO8601 duration to seconds."""
-        try:
-            # Handle basic format PT#H or PT#M
-            if duration.startswith('PT'):
-                value = int(duration[2:-1])
-                unit = duration[-1]
-                if unit == 'H':
-                    return value * 3600
-                elif unit == 'M':
-                    return value * 60
-            return 3600  # Default 1 hour
-        except Exception:
-            return 3600
+            self._handle_error("Error creating assignment", e)
 
     def _handle_error(self, message: str, error: Exception):
         """Handle and log errors."""
@@ -138,59 +122,33 @@ class AWSAccessHandler:
 def main():
     """Main execution function."""
     try:
-        # Get environment variables
-        user_email = os.environ['KUBIYA_USER_EMAIL']
-        account_id = os.environ['AWS_ACCOUNT_ID']
-        permission_set = os.environ['PERMISSION_SET_NAME']
-        session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
-        aws_profile = os.environ.get('AWS_PROFILE')
-
-        handler = AWSAccessHandler(aws_profile)
+        # Get required environment variables
+        required_vars = ['AWS_ACCOUNT_ID', 'PERMISSION_SET_NAME', 'USER_EMAIL']
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
         
-        # Find user by email
-        user = handler.get_user_by_email(user_email)
-        if not user:
-            raise ValueError(f"User not found: {user_email}")
-
-        # Get Slack user ID
-        slack_user_id = handler.get_slack_user_id(user_email)
+        if missing_vars:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+        
+        account_id = os.getenv('AWS_ACCOUNT_ID')
+        permission_set_name = os.getenv('PERMISSION_SET_NAME')
+        user_email = os.getenv('USER_EMAIL')
+        aws_profile = os.getenv('AWS_PROFILE')  # Optional
+        
+        # Initialize handler
+        handler = SSOAssignmentHandler(aws_profile)
         
         # Create assignment
-        response = handler.sso_admin.create_account_assignment(
-            InstanceArn=handler.instance_arn,
-            TargetId=account_id,
-            TargetType='AWS_ACCOUNT',
-            PermissionSetArn=permission_set,
-            PrincipalType='USER',
-            PrincipalId=user['UserId']
-        )
-
-        # Get session duration in seconds
-        duration_seconds = handler.parse_iso8601_duration(session_duration)
+        result = handler.create_assignment(account_id, permission_set_name, user_email)
         
-        # Print success response
-        print(json.dumps({
-            "status": "success",
-            "message": f"Access granted for {duration_seconds} seconds",
-            "details": response['AccountAssignmentCreationStatus']
-        }))
-
-        # Sleep for the duration
-        time.sleep(duration_seconds)
-
-        # Send Slack notification if possible
-        if slack_user_id:
-            handler.send_slack_notification(
-                slack_user_id,
-                f"Your AWS session for account {account_id} with permission set {permission_set} has expired."
-            )
+        # Print result
+        print(json.dumps(result))
 
     except Exception as e:
-        error_msg = f"Unexpected error: {str(e)}"
-        logger.error(error_msg)
+        logger.error(f"Unexpected error: {str(e)}")
         print(json.dumps({
             "status": "error",
-            "message": error_msg
+            "error_type": type(e).__name__,
+            "message": str(e)
         }))
         sys.exit(1)
 
