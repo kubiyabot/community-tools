@@ -3,8 +3,12 @@ import os
 import sys
 import json
 from typing import Optional, Dict, Any
-import boto3
-from botocore.exceptions import ClientError
+try:
+    import boto3
+    from botocore.exceptions import ClientError
+except Exception as e:
+    print(f"Could not find required packages - its OK during discovery: {str(e)}")
+    pass
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
