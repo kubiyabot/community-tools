@@ -1,5 +1,5 @@
 from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import FileSpec
+from kubiya_sdk.tools.models import FileSpec, Arg
 from ..tools.base import AWSJITTool
 from pathlib import Path
 
@@ -24,6 +24,9 @@ def create_jit_tool(config):
     return AWSJITTool(
         name=config["name"],
         description=config["description"],
+        args=[
+            Arg(name="Duration (TTL)", description="Duration for the access token to be valid", type="string", default="PT1H"),
+        ],
         content=f"""#!/bin/bash
 set -e
 
