@@ -10,7 +10,7 @@ except ImportError:
 
 
 def get_requester_email(request_id: str, enforcer_base_url: str) -> str:
-    response = requests.get(f"{enforcer_base_url}/requests/{request_id}")
+    response = requests.get(f"{enforcer_base_url}/requests/describe/{request_id}")
     if response.status_code != 200:
         print(f"Failed to fetch request details: {response.text}")
         sys.exit(1)
