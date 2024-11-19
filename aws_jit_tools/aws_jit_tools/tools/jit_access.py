@@ -1,5 +1,5 @@
 from kubiya_sdk.tools.registry import tool_registry
-from aws_jit_tools.tools.base import AWSJITTool
+from ..tools.base import AWSJITTool
 
 # Configuration for different access types
 ACCESS_CONFIGS = {
