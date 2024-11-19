@@ -1,3 +1,4 @@
-from .request_access import *
-from .approve_access import *
-from .describe_request import * 
+from .base import AWSJITTool
+from .generator import ToolGenerator
+
+__all__ = ['AWSJITTool', 'ToolGenerator'] 

@@ -1,24 +1,30 @@
 import inspect
 import json
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, Any, List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
 
+# Add the project root to Python path
+project_root = str(Path(__file__).resolve().parent.parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 logger = logging.getLogger(__name__)
 
 class ToolGenerator:
     def __init__(self):
-        from .. import scripts
-        self.scripts = scripts
+        from aws_jit_tools.scripts.access_handler import AWSAccessHandler
+        self.access_handler = AWSAccessHandler
         self.config = self._load_config()
 
     def _load_config(self) -> Dict[str, Any]:
         """Load tool configuration from JSON."""
         try:
-            config_path = Path(__file__).parent.parent.parent / 'aws_jit_config.json'
+            config_path = Path(__file__).resolve().parent.parent.parent / 'aws_jit_config.json'
             with open(config_path) as f:
                 return json.load(f)
         except Exception as e:
@@ -60,7 +66,7 @@ class ToolGenerator:
                 with_files=[
                     FileSpec(
                         destination="/opt/scripts/access_handler.py",
-                        content=inspect.getsource(self.scripts.access_handler)
+                        content=inspect.getsource(self.access_handler)
                     )
                 ],
                 mermaid=self._generate_mermaid(tool_id, config)
