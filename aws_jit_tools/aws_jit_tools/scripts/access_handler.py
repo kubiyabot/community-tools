@@ -3,22 +3,22 @@ import os
 import sys
 import json
 import time
-import requests
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 try:
     import boto3
+    import requests
     from botocore.exceptions import ClientError, ProfileNotFound
 except ImportError as e:
     logger.error(f"Failed to import boto3: {str(e)}")
     print(json.dumps({
         "status": "error",
         "error_type": "ImportError",
-        "message": "Required package boto3 is not installed"
+        "message": "Could not find required packages - its OK during discovery"
     }))
-    sys.exit(1)
+    pass
 
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
@@ -190,7 +190,6 @@ def main():
         logger.error(error_msg)
         print(json.dumps({
             "status": "error",
-            "error_type": type(error).__name__,
             "message": error_msg
         }))
         sys.exit(1)
