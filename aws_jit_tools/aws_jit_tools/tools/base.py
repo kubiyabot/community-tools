@@ -26,5 +26,3 @@ class AWSJITTool(Tool):
             long_running=long_running,
             mermaid=mermaid
         )
-
-__all__ = ['AWSJITTool']
