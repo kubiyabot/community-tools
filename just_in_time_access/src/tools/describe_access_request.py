@@ -20,7 +20,7 @@ describe_access_request_tool = JustInTimeAccessTool(
     set -e
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
-    pip install requests==2.32.3 2> >(grep -v '[notice]') > /dev/null
+    pip install requests==2.32.3 2> >(grep -v '\[notice\]') > /dev/null
     python /opt/scripts/describe_access_request.py "{{ .request_id }}"
     """,
     args=[
