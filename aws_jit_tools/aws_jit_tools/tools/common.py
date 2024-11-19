@@ -6,8 +6,8 @@ COMMON_FILES = [
     FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
 ]
 
-# Common environment variables
+# Common environment variables - single source of truth
 COMMON_ENV = [
-    "AWS_PROFILE",
-    "KUBIYA_USER_EMAIL"
+    "AWS_PROFILE",      # AWS profile with required permissions
+    "KUBIYA_USER_EMAIL" # User email for SSO lookup
 ] 

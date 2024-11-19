@@ -57,10 +57,6 @@ class ToolGenerator:
                 name=f"jit_access_to_{tool_id}",
                 description=config['description'],
                 content=self._generate_tool_content(config),
-                env=[
-                    "AWS_PROFILE",      # AWS profile with required permissions
-                    "KUBIYA_USER_EMAIL" # User email for SSO lookup
-                ],
                 with_files=[
                     FileSpec(
                         destination="/opt/scripts/access_handler.py",
