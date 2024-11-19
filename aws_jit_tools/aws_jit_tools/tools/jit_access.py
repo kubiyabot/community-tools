@@ -14,7 +14,7 @@ ACCESS_CONFIGS = {
         "name": "jit_se_access",
         "description": "Grants SE (Solutions Engineer) access to staging AWS account (876809951775)",
         "account_id": "876809951775",
-        "permission_set": "SE",
+        "permission_set": "ECRReadOnly",
         "session_duration": "PT1H"
     },
 }
@@ -31,7 +31,6 @@ def create_jit_tool(config):
 set -e
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
-export AWS_REGION="us-east-1"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 export SESSION_DURATION="{config['session_duration']}"
 

@@ -27,6 +27,7 @@ class AWSAccessHandler:
             # Use default profile
             self.session = boto3.Session()
             # Add a print to the caller identity
+            print("Using profile: ", self.session.profile_name)
             print(self.session.client('sts').get_caller_identity())
             self.identitystore = self.session.client('identitystore')
             self.sso_admin = self.session.client('sso-admin')
