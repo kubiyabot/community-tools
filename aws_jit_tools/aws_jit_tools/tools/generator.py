@@ -6,7 +6,6 @@ from typing import List
 from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from aws_jit_tools.tools.base import AWSJITTool
-from aws_jit_tools.scripts.access_handler import AWSAccessHandler
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +57,11 @@ class ToolGenerator:
     def _create_tool(self, tool_id: str, config: dict) -> AWSJITTool:
         """Create individual tool based on configuration."""
         try:
+            # Read access_handler.py content directly
+            access_handler_path = Path(__file__).resolve().parent.parent / 'scripts' / 'access_handler.py'
+            with open(access_handler_path, 'r') as f:
+                access_handler_code = f.read()
+
             content = f"""
 #!/bin/bash
 set -e
@@ -82,7 +86,7 @@ python3 /opt/scripts/access_handler.py
                 with_files=[
                     FileSpec(
                         destination="/opt/scripts/access_handler.py",
-                        content=inspect.getsource(AWSAccessHandler)
+                        content=access_handler_code
                     )
                 ],
                 env=[
