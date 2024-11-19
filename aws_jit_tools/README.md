@@ -4,7 +4,7 @@ A collection of tools for managing Just-In-Time AWS access through IAM Identity 
 
 ## Features
 
-- Dynamic tool generation from YAML configuration
+- Dynamic tool generation from JSON configuration
 - Integration with AWS IAM Identity Center (SSO)
 - Automatic permission set assignments
 - Clean separation of configuration and implementation

@@ -8,51 +8,59 @@ from kubiya_sdk.tools import FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
 
-# Add the project root to Python path
-project_root = str(Path(__file__).resolve().parent.parent.parent)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 logger = logging.getLogger(__name__)
 
 class ToolGenerator:
     def __init__(self):
-        from aws_jit_tools.scripts.access_handler import AWSAccessHandler
-        self.access_handler = AWSAccessHandler
         self.config = self._load_config()
+        if not self.config:
+            logger.error("Failed to load configuration")
+            return
+        logger.info(f"Loaded configuration with {len(self.config.get('tools', {}))} tools")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load tool configuration from JSON."""
         try:
             config_path = Path(__file__).resolve().parent.parent.parent / 'aws_jit_config.json'
+            logger.info(f"Loading config from: {config_path}")
+            if not config_path.exists():
+                logger.error(f"Config file not found at {config_path}")
+                return {}
             with open(config_path) as f:
-                return json.load(f)
+                config = json.load(f)
+                logger.info("Successfully loaded config")
+                return config
         except Exception as e:
             logger.error(f"Failed to load config: {str(e)}")
             return {}
 
     def generate_tools(self) -> List[Any]:
         """Generate tools based on configuration."""
-        if not hasattr(self, 'config'):
-            logger.error("Configuration not loaded")
-            return []
-
         tools = []
         try:
             for tool_id, config in self.config.get('tools', {}).items():
+                logger.info(f"Generating tool for: {tool_id}")
                 tool = self._create_tool(tool_id, config)
                 if tool:
                     tools.append(tool)
                     # Register tool with jit_access_to_ prefix
+                    tool_name = f"jit_access_to_{tool_id}"
+                    logger.info(f"Registering tool: {tool_name}")
                     tool_registry.register("aws_jit", tool)
+                    logger.info(f"Successfully registered tool: {tool_name}")
+
+            logger.info(f"Generated {len(tools)} tools")
+            return tools
         except Exception as e:
             logger.error(f"Error generating tools: {str(e)}")
-        return tools
+            return []
 
     def _create_tool(self, tool_id: str, config: Dict[str, Any]) -> Any:
         """Create individual tool based on configuration."""
         try:
-            return AWSJITTool(
+            from aws_jit_tools.scripts.access_handler import AWSAccessHandler
+            
+            tool = AWSJITTool(
                 name=f"jit_access_to_{tool_id}",
                 description=config['description'],
                 content=self._generate_tool_content(config),
@@ -66,11 +74,13 @@ class ToolGenerator:
                 with_files=[
                     FileSpec(
                         destination="/opt/scripts/access_handler.py",
-                        content=inspect.getsource(self.access_handler)
+                        content=inspect.getsource(AWSAccessHandler)
                     )
                 ],
                 mermaid=self._generate_mermaid(tool_id, config)
             )
+            logger.info(f"Created tool: jit_access_to_{tool_id}")
+            return tool
         except Exception as e:
             logger.error(f"Error creating tool {tool_id}: {str(e)}")
             return None
@@ -80,15 +90,15 @@ class ToolGenerator:
 #!/bin/bash
 set -e
 
-# Install required packages
+echo "Installing required packages..."
 apk add --no-cache python3 py3-pip
 pip3 install boto3
 
-# Set environment variables
+echo "Setting environment variables..."
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 
-# Execute Python script
+echo "Executing access handler..."
 python3 /opt/scripts/access_handler.py
 """
 
