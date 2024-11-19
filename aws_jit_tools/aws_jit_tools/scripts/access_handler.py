@@ -1,21 +1,21 @@
-import boto3
 import logging
 import os
 from typing import Optional, Dict, Any
 
-def setup_logging():
-    """Configure logging."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
-    return logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
-logger = setup_logging()
+try:
+    import boto3
+except ImportError as e:
+    logger.error(f"Failed to import boto3: {str(e)}")
+    boto3 = None
 
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
         """Initialize AWS access handler."""
+        if not boto3:
+            raise ImportError("boto3 is required but not available")
+            
         self.session = boto3.Session(profile_name=profile_name)
         self.identitystore = self.session.client('identitystore')
         self.sso_admin = self.session.client('sso-admin')
