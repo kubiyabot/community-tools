@@ -1,7 +1,7 @@
 from kubiya_sdk.tools.registry import tool_registry
 from kubiya_sdk.tools.models import FileSpec, Arg
-from ..tools.base import AWSJITTool
 from pathlib import Path
+from .base import AWSJITTool
 
 # Get access handler code
 HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'

@@ -1,7 +1,19 @@
-from kubiya_sdk.tools.models import Tool
-from .common import COMMON_FILES, COMMON_ENV
+from kubiya_sdk.tools.models import Tool, FileSpec
 
 AWS_JIT_ICON = "https://img.icons8.com/color/200/amazon-web-services.png"
+
+# Common files needed for AWS access
+COMMON_FILES = [
+    FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+    FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+]
+
+# Common environment variables
+COMMON_ENV = [
+    "AWS_PROFILE",
+    "KUBIYA_USER_EMAIL",
+    "SLACK_API_TOKEN"
+]
 
 class AWSJITTool(Tool):
     """Base class for AWS JIT access tools."""
@@ -14,6 +26,7 @@ class AWSJITTool(Tool):
         long_running: bool = False,
         mermaid: str = None,
         with_files: list = None,
+        args: list = None
     ):
         super().__init__(
             name=name,
@@ -23,9 +36,10 @@ class AWSJITTool(Tool):
             image="amazon/aws-cli:latest",
             content=content,
             env=env or COMMON_ENV,
-            with_files=with_files + COMMON_FILES,
+            with_files=(with_files or []) + COMMON_FILES,
             long_running=long_running,
-            mermaid=mermaid
+            mermaid=mermaid,
+            args=args or []
         )
 
 __all__ = ['AWSJITTool']
