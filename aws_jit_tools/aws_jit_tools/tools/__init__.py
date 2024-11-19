@@ -1,6 +1,7 @@
 import logging
-from .generator import generate_tools
 from kubiya_sdk.tools.registry import tool_registry
+from .generator import generate_tools
+from .base import AWSJITTool
 
 logger = logging.getLogger(__name__)
 
@@ -21,4 +22,5 @@ def initialize_tools():
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
 
-__all__ = ['initialize_tools']
+# Export all necessary components
+__all__ = ['initialize_tools', 'generate_tools', 'AWSJITTool']
