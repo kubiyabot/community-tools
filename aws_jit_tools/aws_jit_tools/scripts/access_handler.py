@@ -143,13 +143,34 @@ class AWSAccessHandler:
         }))
         sys.exit(1)
 
+    def get_permission_set_arn(self, permission_set_name: str) -> str:
+        """Get Permission Set ARN from name."""
+        try:
+            paginator = self.sso_admin.get_paginator('list_permission_sets')
+            
+            for page in paginator.paginate(InstanceArn=self.instance_arn):
+                for arn in page['PermissionSets']:
+                    # Get permission set details
+                    response = self.sso_admin.describe_permission_set(
+                        InstanceArn=self.instance_arn,
+                        PermissionSetArn=arn
+                    )
+                    if response['PermissionSet']['Name'] == permission_set_name:
+                        return arn
+                    
+            raise ValueError(f"Permission set not found: {permission_set_name}")
+
+        except Exception as e:
+            logger.error(f"Error getting permission set ARN: {str(e)}")
+            raise
+
 def main():
     """Main execution function."""
     try:
         # Get environment variables
         user_email = os.environ['KUBIYA_USER_EMAIL']
         account_id = os.environ['AWS_ACCOUNT_ID']
-        permission_set = os.environ['PERMISSION_SET_NAME']
+        permission_set_name = os.environ['PERMISSION_SET_NAME']
         session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
 
         handler = AWSAccessHandler()
@@ -159,6 +180,9 @@ def main():
         if not user:
             raise ValueError(f"User not found: {user_email}")
 
+        # Get Permission Set ARN
+        permission_set_arn = handler.get_permission_set_arn(permission_set_name)
+
         # Get Slack user ID
         slack_user_id = handler.get_slack_user_id(user_email)
         
@@ -167,7 +191,7 @@ def main():
             InstanceArn=handler.instance_arn,
             TargetId=account_id,
             TargetType='AWS_ACCOUNT',
-            PermissionSetArn=permission_set,
+            PermissionSetArn=permission_set_arn,
             PrincipalType='USER',
             PrincipalId=user['UserId']
         )
@@ -189,7 +213,7 @@ def main():
         if slack_user_id:
             handler.send_slack_notification(
                 slack_user_id,
-                f"Your AWS session for account {account_id} with permission set {permission_set} has expired."
+                f"Your AWS session for account {account_id} with permission set {permission_set_name} has expired."
             )
 
     except Exception as e:
