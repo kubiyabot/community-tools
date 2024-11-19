@@ -31,7 +31,7 @@ class AWSAccessHandler:
             # Get Identity Store ID from SSO Instance
             instances = self.sso_admin.list_instances()['Instances']
             if not instances:
-                raise ValueError("No SSO instance found")
+                raise ValueError("No SSO instance found - please make sure you have the correct profile set (this tool should run from the main account) - ask your operator for help if you are unsure")
             self.instance_arn = instances[0]['InstanceArn']
             self.identity_store_id = instances[0]['IdentityStoreId']
             
@@ -143,9 +143,8 @@ def main():
         account_id = os.environ['AWS_ACCOUNT_ID']
         permission_set = os.environ['PERMISSION_SET_NAME']
         session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
-        aws_profile = os.environ.get('AWS_PROFILE')
 
-        handler = AWSAccessHandler(aws_profile)
+        handler = AWSAccessHandler()
         
         # Find user by email
         user = handler.get_user_by_email(user_email)

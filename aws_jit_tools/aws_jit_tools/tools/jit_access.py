@@ -31,6 +31,7 @@ def create_jit_tool(config):
 set -e
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
+export AWS_REGION="eu-west-1"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 export SESSION_DURATION="{config['session_duration']}"
 
