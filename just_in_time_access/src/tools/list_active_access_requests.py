@@ -20,7 +20,7 @@ list_active_access_requests_tool = JustInTimeAccessTool(
     set -e
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
-    pip install requests==2.32.3 > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
     python /opt/scripts/list_active_access_requests.py
     """,
     with_files=[

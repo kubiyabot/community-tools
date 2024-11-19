@@ -9,7 +9,7 @@ except ImportError:
 
 def describe_access_request(request_id):
     res = requests.get(f"http://enforcer.kubiya:5001/requests/describe/{request_id}")
-    if res.status_code <= 200:
+    if res.status_code >= 400:
         print(f"Failed to fetch request details: {res.text}")
         sys.exit(1)
 
