@@ -9,17 +9,33 @@ except ImportError:
     pass
 
 
+def get_requested_tool_and_params(
+    request_id: str, enforcer_base_url: str
+) -> tuple[str, dict]:
+    response = requests.get(f"{enforcer_base_url}/requests/{request_id}")
+    if response.status_code >= 400:
+        print(f"Failed to fetch request details: {response.text}")
+        sys.exit(1)
+
+    request_details = response.json()
+    tool_name = request_details["request"]["tool"]["name"]
+    params = request_details["request"]["tool"]["parameters"]
+    return tool_name, params
+
+
 def send_approval_request(request_id: str, ttl: str):
+    enforcer_base_url = "http://enforce.kubiya:5001"
+    req_tool_name, req_tool_params = get_requested_tool_and_params(
+        request_id, enforcer_base_url
+    )
     user_email = os.environ["KUBIYA_USER_EMAIL"]
-    kubiya_tool_name = ["KUBIYA_TOOL_NAME"]
-    kubiya_tool_params = os.environ["KUBIYA_TOOL_PARAMS"]
 
     # Send webhook to Kubiya API
     payload = {
         "request_id": request_id,
         "user_email": user_email,
-        "tool_name": kubiya_tool_name,
-        "tool_params": kubiya_tool_params,
+        "tool_name": req_tool_name,
+        "tool_params": req_tool_params,
         "requested_ttl": ttl,
         "status": "pending",
     }
