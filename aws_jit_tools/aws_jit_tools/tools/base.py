@@ -12,7 +12,8 @@ class AWSJITTool(Tool):
         content: str,
         env: list = None,
         long_running: bool = False,
-        mermaid: str = None
+        mermaid: str = None,
+        with_files: list = None,
     ):
         super().__init__(
             name=name,
@@ -22,7 +23,7 @@ class AWSJITTool(Tool):
             image="amazon/aws-cli:latest",
             content=content,
             env=env or COMMON_ENV,
-            with_files=COMMON_FILES,
+            with_files=with_files + COMMON_FILES,
             long_running=long_running,
             mermaid=mermaid
         )
