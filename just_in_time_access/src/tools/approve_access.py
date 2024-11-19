@@ -56,7 +56,6 @@ approve_access_tool = JustInTimeAccessTool(
     ],
     env=[
         "SLACK_CHANNEL_ID",
-        "APPROVALS_CHANNEL_ID",
     ],
     secrets=[
         "SLACK_API_TOKEN",
