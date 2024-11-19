@@ -1,11 +1,18 @@
 from kubiya_sdk.tools.registry import tool_registry
+from kubiya_sdk.tools.models import FileSpec
 from ..tools.base import AWSJITTool
+from pathlib import Path
+
+# Get access handler code
+HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
+with open(HANDLER_PATH) as f:
+    HANDLER_CODE = f.read()
 
 # Configuration for different access types
 ACCESS_CONFIGS = {
-    "se": {
+    "Solution Engineer Access to Staging": {
         "name": "jit_se_access",
-        "description": "Grants SE (Solutions Engineer) access to AWS account",
+        "description": "Grants SE (Solutions Engineer) access to staging AWS account (876809951775)",
         "account_id": "876809951775",
         "permission_set": "SE",
         "session_duration": "PT1H"
@@ -27,6 +34,11 @@ export SESSION_DURATION="{config['session_duration']}"
 pip install boto3 requests
 python /opt/scripts/access_handler.py
 """,
+        with_files=[
+            FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+            FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+            FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE)
+        ],
         mermaid=f"""
     sequenceDiagram
         participant U as User
