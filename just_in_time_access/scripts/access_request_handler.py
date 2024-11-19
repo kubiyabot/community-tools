@@ -12,7 +12,7 @@ except ImportError:
 def get_requested_tool_and_params(
     request_id: str, enforcer_base_url: str
 ) -> tuple[str, dict]:
-    response = requests.get(f"{enforcer_base_url}/requests/{request_id}")
+    response = requests.get(f"{enforcer_base_url}/requests/describe/{request_id}")
     if response.status_code >= 400:
         print(f"Failed to fetch request details: {response.text}")
         sys.exit(1)
