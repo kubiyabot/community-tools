@@ -7,6 +7,9 @@ setup(
     install_requires=[
         "kubiya-sdk",
         "boto3",
-        "requests"
+        "requests",
+        "jinja2",
+        "jsonschema"
     ],
+    python_requires='>=3.7',
 ) 

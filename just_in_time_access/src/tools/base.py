@@ -2,6 +2,7 @@ from kubiya_sdk.tools import Tool
 
 JIT_ICON_URL = "https://kubiya-public-20221113173935726800000003.s3.us-east-1.amazonaws.com/Knite.png"
 
+
 class JustInTimeAccessTool(Tool):
     def __init__(
         self,
@@ -13,7 +14,7 @@ class JustInTimeAccessTool(Tool):
         secrets=[],
         long_running=False,
         with_files=None,
-        image="python:3.11",
+        image="python:3.11-slim",
         mermaid=None,
         with_volumes=None,
     ):
@@ -31,4 +32,4 @@ class JustInTimeAccessTool(Tool):
             with_files=with_files,
             mermaid=mermaid,
             with_volumes=with_volumes,
-        ) 
+        )

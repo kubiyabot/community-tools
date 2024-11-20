@@ -4,6 +4,10 @@
 
 The Just-In-Time Access module provides a secure and auditable way to manage temporary access to resources and tools for your team. It implements a complete Just-In-Time (JIT) access workflow - from request initiation through approval and access provisioning, with automatic revocation after the specified time period.
 
+## ⚠️ Dependency Notice
+
+**Important:** This solution depends on the **Kubiya Enforcer** component extension installed on the relevant Kubiya Runner (Kubernetes cluster). Please ensure that the Enforcer is properly installed and configured in your cluster. Refer to the [Kubiya Enforcer Stack Deployment Guide](./docs/Kubiya_Enforcer_Deployment.md) for detailed instructions.
+
 ## 📋 Prerequisites
 
 Before using this module, ensure you have:
@@ -15,11 +19,13 @@ Before using this module, ensure you have:
 
 3. Required Environment Variables (On the Teammate environment variables configuration section):
    - `APPROVERS_CHANNEL`: Slack channel ID where approvers will receive notifications
-   
+   - `KUBIYA_TOOL_NAME`: Name of the tool requesting access
+   - `KUBIYA_TOOL_PARAMS`: Parameters for the tool in JSON format
+
    Note: The following variables are automatically injected by Kubiya:
    - `KUBIYA_USER_ORG`
    - `KUBIYA_AGENT_UUID`
-   - `KUBIYA_SOURCE_URL` 
+   - `KUBIYA_SOURCE_URL`
    - `KUBIYA_SOURCE_UUID`
 
 ## 🛠️ Available Tools
@@ -97,3 +103,7 @@ sequenceDiagram
 
     Note over U,S: 🔄 Policy Auto-Revokes After TTL
 ```
+
+## 📚 Documentation
+
+For detailed instructions on setting up the Kubiya Enforcer, please refer to the [Kubiya Enforcer Stack Deployment Guide](./docs/Kubiya_Enforcer_Deployment.md).
