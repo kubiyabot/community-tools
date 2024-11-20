@@ -81,56 +81,6 @@ class AWSAccessHandler:
             logger.error(f"Error finding permission set by name: {str(e)}")
             raise
 
-    def get_slack_user_id(self, email: str) -> Optional[str]:
-        """Get Slack user ID from email."""
-        
-        try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return None
-
-            response = requests.post(
-                'https://slack.com/api/users.lookupByEmail',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                data={'email': email}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('ok'):
-                    return data['user']['id']
-            
-            logger.error(f"Failed to find Slack user for email: {email}")
-            return None
-
-        except Exception as e:
-            logger.error(f"Error getting Slack user ID: {str(e)}")
-            return None
-
-    def send_slack_notification(self, user_id: str, message: str):
-        """Send Slack message to user."""
-        try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return
-
-            response = requests.post(
-                'https://slack.com/api/chat.postMessage',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                json={
-                    'channel': user_id,
-                    'text': message
-                }
-            )
-
-            if not response.ok:
-                logger.error(f"Failed to send Slack message: {response.text}")
-
-        except Exception as e:
-            logger.error(f"Error sending Slack notification: {str(e)}")
-
     def parse_iso8601_duration(self, duration: str) -> int:
         """Convert ISO8601 duration to seconds."""
         try:
@@ -178,9 +128,6 @@ def main():
         permission_set_arn = handler.get_permission_set_arn(permission_set)
         if not permission_set_arn:
             raise ValueError(f"Permission set not found: {permission_set}")
-
-        # Get Slack user ID
-        slack_user_id = handler.get_slack_user_id(user_email)
         
         # Create assignment
         response = handler.sso_admin.create_account_assignment(
@@ -204,13 +151,6 @@ def main():
 
         # Sleep for the duration
         time.sleep(duration_seconds)
-
-        # Send Slack notification if possible
-        if slack_user_id:
-            handler.send_slack_notification(
-                slack_user_id,
-                f"Your AWS session for account {account_id} with permission set {permission_set} has expired."
-            )
 
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
