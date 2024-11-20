@@ -68,8 +68,11 @@ def create_jit_tool(config, action):
         T-->>-U: { "Access Granted 🎉" if action == "grant" else "Access Revoked 🔒" }
     """
 
+    action_prefix = "jit_session_" + ("grant_" if action == "grant" else "revoke_")
+    tool_name = f"{action_prefix}{config['name'].lower().replace(' ', '_')}"
+
     return AWSJITTool(
-        name=f"{config['name']}_{action}",
+        name=tool_name,
         description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} access to AWS account {config['account_id']} using {config['permission_set']} permission set",
         args=args,
         content=f"""#!/bin/bash
@@ -137,8 +140,11 @@ def create_s3_jit_tool(config, action):
         T-->>-U: { "S3 Access Granted 🎉" if action == "grant" else "S3 Access Revoked 🔒" }
     """
 
+    action_prefix = "s3_" + ("grant_" if action == "grant" else "revoke_")
+    tool_name = f"{action_prefix}{config['name'].lower().replace(' ', '_')}"
+
     return AWSJITTool(
-        name=f"{config['name']}_{action}",
+        name=tool_name,
         description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} {config['policy_template']} access to buckets: {buckets_list}",
         args=args,
         content=f"""#!/bin/bash
@@ -161,26 +167,23 @@ python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL
 
 # Create tools only if configurations are loaded successfully
 if ACCESS_CONFIGS and S3_ACCESS_CONFIGS:
-    # Create tools from configuration for both grant and revoke actions
-    tools = {
-        f"{access_type}_{action}": create_jit_tool(config, action)
-        for access_type, config in ACCESS_CONFIGS.items()
-        for action in ["grant", "revoke"]
-    }
+    tools = {}
+    s3_tools = {}
 
-    # Create S3 tools from configuration for both grant and revoke actions
-    s3_tools = {
-        f"{access_type}_{action}": create_s3_jit_tool(config, action)
-        for access_type, config in S3_ACCESS_CONFIGS.items()
-        for action in ["grant", "revoke"]
-    }
+    # Create and register tools
+    for action in ["grant", "revoke"]:
+        for access_type, config in ACCESS_CONFIGS.items():
+            tool = create_jit_tool(config, action)
+            tools[tool.name] = tool
+            tool_registry.register("aws_jit", tool)
 
-    # Register all tools
-    for tool in {**tools, **s3_tools}.values():
-        tool_registry.register("aws_jit", tool)
+        for access_type, config in S3_ACCESS_CONFIGS.items():
+            tool = create_s3_jit_tool(config, action)
+            s3_tools[tool.name] = tool
+            tool_registry.register("aws_jit", tool)
 
     # Export all tools
-    __all__ = list({**tools, **s3_tools}.keys())
+    __all__ = list(tools.keys()) + list(s3_tools.keys())
     globals().update({**tools, **s3_tools})
 else:
     print("No tools created due to configuration loading errors") 
