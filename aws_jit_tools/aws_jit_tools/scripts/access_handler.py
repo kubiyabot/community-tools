@@ -43,6 +43,7 @@ except ImportError as e:
 from utils.notifications import NotificationManager
 from utils.aws_utils import get_account_alias, get_permission_set_details
 from utils.slack_messages import create_access_revoked_blocks
+from utils.iam_policy_manager import IAMPolicyManager
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -58,6 +59,7 @@ class AWSAccessHandler:
             self.identitystore = self.session.client('identitystore')
             self.sso_admin = self.session.client('sso-admin')
             self.notifications = NotificationManager()
+            self.policy_manager = IAMPolicyManager(self.session)
             
             print_progress("Fetching SSO instance details...", "🔍")
             instances = self.sso_admin.list_instances()['Instances']
@@ -154,6 +156,38 @@ class AWSAccessHandler:
         print(formatted_message)
         sys.exit(1)
 
+    def _create_and_attach_policy(self, user_name: str, policy_document: Dict[str, Any], purpose: str) -> Optional[str]:
+        """Create and attach a policy to a user."""
+        try:
+            # Create policy
+            policy_arn = self.policy_manager.create_policy(
+                policy_document=policy_document,
+                purpose=purpose,
+                user_id=user_name
+            )
+            if not policy_arn:
+                raise ValueError("Failed to create policy")
+
+            # Attach policy to user
+            if not self.policy_manager.attach_user_policy(user_name, policy_arn):
+                # Cleanup if attach fails
+                self.policy_manager.delete_policy(policy_arn)
+                raise ValueError("Failed to attach policy")
+
+            return policy_arn
+
+        except Exception as e:
+            logger.error(f"Failed to create and attach policy: {e}")
+            return None
+
+    def _cleanup_user_policies(self, user_name: str) -> bool:
+        """Clean up all JIT policies for a user."""
+        try:
+            return self.policy_manager.cleanup_user_policies(user_name)
+        except Exception as e:
+            logger.error(f"Failed to cleanup user policies: {e}")
+            return False
+
     def revoke_access(self, user_email: str, permission_set_name: str):
         """Revoke access for a user by email and permission set name."""
         try:
@@ -163,6 +197,10 @@ class AWSAccessHandler:
             user = self.get_user_by_email(user_email)
             if not user:
                 raise ValueError(f"User not found: {user_email}")
+
+            # Clean up any JIT policies
+            print_progress("Cleaning up IAM policies...", "🧹")
+            self._cleanup_user_policies(user['UserName'])
 
             # Get permission set ARN
             permission_set_arn = self.get_permission_set_arn(permission_set_name)
@@ -181,7 +219,7 @@ class AWSAccessHandler:
 
             print_progress(f"Access revoked successfully for {user_email}", "✅")
 
-            # Notify user via Slack in their direct thread
+            # Notify user
             self.notifications.send_access_revoked(
                 account_id=os.environ['AWS_ACCOUNT_ID'],
                 permission_set=permission_set_name,

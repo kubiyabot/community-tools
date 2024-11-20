@@ -105,9 +105,9 @@ def create_s3_jit_tool(config, action):
             Arg(name="user_email", description="The email of the user to revoke access for", type="str")
         )
     elif action == "grant":
-        args.append(
-            Arg(name="Duration (TTL)", description="Duration for the access token to be valid (defaults to 1 hour) - needs to be in ISO8601 format eg: 'PT1H'", type="str", default="PT1H")
-        )
+        args.extend([
+            Arg(name="duration", description="Duration for the access token to be valid (defaults to 1 hour) - needs to be in ISO8601 format eg: 'PT1H'", type="str", default="PT1H")
+        ])
 
     # Define file specifications for all necessary files
     file_specs = [
