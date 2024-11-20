@@ -1,11 +1,11 @@
 from typing import Optional
-from botocore.exceptions import ClientError
 import logging
 
 try:
     import boto3
+    from botocore.exceptions import ClientError
 except ImportError:
-    print("boto3 not installed, skipping import (might be a discovery call)")
+    print("boto3 / botocore not installed, skipping import (might be a discovery call)")
     pass
 
 logger = logging.getLogger(__name__)
