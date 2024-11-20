@@ -62,7 +62,6 @@ def schedule_task(
     slack_destination: str,
     ai_instructions: str,
 ):
-
     schedule_time_str = schedule_time.isoformat(timespec="milliseconds").replace(
         "+00:00", "Z"
     )
@@ -98,6 +97,7 @@ def schedule_task(
 
 
 def approve(request_id: str, ttl: str, enforcer_base_url: str):
+    print(f"🚀 Approving request {request_id} with TTL {ttl}.")
     request_metadata = get_request_metadata(request_id, enforcer_base_url)
 
     end_datetime = convert_to_future_date(ttl)
@@ -107,6 +107,7 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
         slack_destination=os.environ["SLACK_CHANNEL_ID"],
         ai_instructions=f"Your task is to revoke the access granted based on the following approved request details: {request_metadata}. If a suitable tool or method is available to revoke the permissions, please execute the action immediately with the relevant context",
     )
+    print("📅 Revoke task scheduled successfully.")
 
     response = requests.put(
         f"{enforcer_base_url}/requests/approve",
@@ -115,6 +116,8 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
     if response.status_code != 200:
         print(f"Failed to approve request: {response.text}")
         sys.exit(1)
+
+    print("🎉 Request approved successfully.")
 
 
 def approve_access(request_id: str, approval_action: str, ttl: str | None = None):
@@ -126,10 +129,11 @@ def approve_access(request_id: str, approval_action: str, ttl: str | None = None
         if ttl is None:
             print("Please provide a TTL for the approved request.")
             sys.exit(1)
-        # Notify requester in Slack
-        notify_user(request_id, "approved", requester_email, approver_email)
 
         approve(request_id, ttl, enforcer_base_url)
+
+        # Notify requester in Slack
+        notify_user(request_id, "approved", requester_email, approver_email)
 
         print("Access request approved successfully.")
 
