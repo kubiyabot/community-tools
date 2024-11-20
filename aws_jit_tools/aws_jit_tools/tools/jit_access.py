@@ -78,7 +78,7 @@ set -e
 echo ">> Processing request... ⏳"
 
 # Install dependencies only if not found
-python -c "import boto3, requests, jinja2, jsonschema argparse" 2>/dev/null || pip install -q boto3 requests jinja2 jsonschema argparse > /dev/null 2>&1
+python -c "import boto3, requests, jinja2, jsonschema, argparse" 2>/dev/null || pip install -q boto3 requests jinja2 jsonschema argparse > /dev/null 2>&1
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
