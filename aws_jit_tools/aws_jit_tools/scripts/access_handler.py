@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import json
-import argparse
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -15,7 +14,7 @@ except ImportError as e:
     print(json.dumps({
         "status": "error",
         "error_type": "ImportError",
-        "message": "Required package boto3 is not installed - its OK during discovery"
+        "message": "Required package boto3 is not installed - please ignore this during discovery"
     }))
     pass
 
@@ -26,7 +25,18 @@ except ImportError as e:
     print(json.dumps({
         "status": "error",
         "error_type": "ImportError",
-        "message": "Required package jinja2 is not installed - its OK during discovery"
+        "message": "Required package jinja2 is not installed - please ignore this during discovery"
+    }))
+    pass
+
+try:
+    import argparse
+except ImportError as e:
+    logger.error(f"Failed to import argparse: {str(e)}")
+    print(json.dumps({
+        "status": "error",
+        "error_type": "ImportError",
+        "message": "Required package argparse is not installed - please ignore this during discovery"
     }))
     pass
 
