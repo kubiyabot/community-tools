@@ -16,14 +16,17 @@ from scripts import access_request_handler
 request_access_tool = JustInTimeAccessTool(
     name="request_tool_access",
     description=(
-        "Initiate a request for temporary access to a specific tool or resource. "
-        "This tool sends an access request to approvers and awaits approval."
+        "Request temporary access to a tool or resource that failed due to missing permissions. "
+        "NOTE: You typically won't need to run this tool directly - it can be used when another tool fails due to insufficient permissions."
+        "On failure, you'll see an error message containing a 'Request ID'. Use this ID when running this tool."
     ),
     content="""
     set -e
+    print "🚀 Submitting your access request..."
+    print "⏳ Please wait while we process your request..."
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
-    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]' > /dev/null
 
     # Run the access request handler script
     python /opt/scripts/access_request_handler.py "{{ .request_id }}" "{{ .ttl }}"
@@ -32,15 +35,21 @@ request_access_tool = JustInTimeAccessTool(
         Arg(
             name="request_id",
             description=(
-                "Unique identifier for the access request. This is used to track the request and match it with the approval decision."
+                "The unique identifier for this access request. "
+                "This is automatically provided when a tool fails due to permissions - "
+                "you'll see it in the error message like: 'Access denied. Request ID: abc-123'. "
+                "Use that ID when running this tool."
             ),
             required=True,
         ),
         Arg(
             name="ttl",
             description=(
-                "Desired time-to-live for the access (optional). Specifies for how long the access should be granted (not guaranteed as the approver may override). "
-                "*Example*: `1h` for one hour, `30m` for 30 minutes."
+                "How long you need the access for. The approver may adjust this duration.\n"
+                "Examples:\n"
+                "- '1h' for one hour access\n" 
+                "- '30m' for 30 minutes access\n"
+                "- '2h' for two hours access"
             ),
             required=False,
             default="1h",
