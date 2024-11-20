@@ -43,6 +43,8 @@ def create_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
+        FileSpec(destination="/opt/scripts/utils/iam_policy_manager.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'iam_policy_manager.py').read()),
+        FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
     mermaid_diagram = f"""
@@ -116,6 +118,8 @@ def create_s3_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
+        FileSpec(destination="/opt/scripts/utils/iam_policy_manager.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'iam_policy_manager.py').read()),
+        FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
     buckets_list = ", ".join(config['buckets'])

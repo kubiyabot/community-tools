@@ -110,4 +110,4 @@ class NotificationManager:
 
         except Exception as e:
             logger.error(f"Failed to send access revoked notification: {e}")
-            return False 
+            return False
