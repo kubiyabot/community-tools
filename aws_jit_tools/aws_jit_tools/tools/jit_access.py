@@ -51,7 +51,7 @@ def create_jit_tool(config, action):
 set -e
 
 # Install dependencies first
-pip install -q boto3 requests jinja2 > /dev/null 2>&1
+pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
@@ -111,7 +111,7 @@ def create_s3_jit_tool(config, action):
 set -e
 
 # Install dependencies first
-pip install -q boto3 requests jinja2 > /dev/null 2>&1
+pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
 
 export BUCKETS="{','.join(config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"

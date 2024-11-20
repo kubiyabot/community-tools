@@ -2,9 +2,15 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Any
-from jsonschema import validate
 
 logger = logging.getLogger(__name__)
+
+try:
+    from jsonschema import validate
+    JSONSCHEMA_AVAILABLE = True
+except ImportError:
+    logger.warning("jsonschema not available - validation will be skipped")
+    JSONSCHEMA_AVAILABLE = False
 
 # JSON Schema for validation
 ACCESS_CONFIG_SCHEMA = {
@@ -58,12 +64,13 @@ def load_config(config_name: str) -> Dict[str, Any]:
             except json.JSONDecodeError as e:
                 raise ValueError(f"Invalid JSON in configuration file {config_name}: {str(e)}")
 
-        # Validate configuration
-        schema = ACCESS_CONFIG_SCHEMA if config_name == 'access_configs' else S3_CONFIG_SCHEMA
-        try:
-            validate(instance=config, schema=schema)
-        except Exception as e:
-            raise ValueError(f"Configuration validation failed for {config_name}: {str(e)}")
+        # Validate configuration if jsonschema is available
+        if JSONSCHEMA_AVAILABLE:
+            schema = ACCESS_CONFIG_SCHEMA if config_name == 'access_configs' else S3_CONFIG_SCHEMA
+            try:
+                validate(instance=config, schema=schema)
+            except Exception as e:
+                raise ValueError(f"Configuration validation failed for {config_name}: {str(e)}")
 
         return config
 
@@ -99,4 +106,7 @@ def validate_configs():
         return True
     except Exception as e:
         logger.error(f"Configuration validation failed: {str(e)}")
-        return False 
+        return False
+
+# Export the functions
+__all__ = ['get_access_configs', 'get_s3_configs', 'validate_configs'] 
