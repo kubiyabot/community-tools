@@ -53,12 +53,8 @@ def create_jit_tool(config, action):
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        # templates
-        FileSpec(destination="/opt/scripts/templates/S3ReadOnlyPolicy.j2", content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'S3ReadOnlyPolicy.j2').read()),    
-        FileSpec(destination="/opt/scripts/templates/S3FullAccessPolicy.j2", content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'S3FullAccessPolicy.j2').read()),
-        # init files
-        FileSpec(destination="/opt/scripts/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / '__init__.py').read()),
-        FileSpec(destination="/opt/scripts/utils/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / '__init__.py').read()),
+        FileSpec(destination="/opt/scripts/__init__.py", content=""),
+        FileSpec(destination="/opt/scripts/utils/__init__.py", content=""),
         FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
@@ -116,8 +112,8 @@ def create_s3_jit_tool(config, action):
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        FileSpec(destination="/opt/scripts/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / '__init__.py').read()),
-        FileSpec(destination="/opt/scripts/utils/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / '__init__.py').read()),
+        FileSpec(destination="/opt/scripts/__init__.py", content=""),
+        FileSpec(destination="/opt/scripts/utils/__init__.py", content=""),
         FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
@@ -132,7 +128,7 @@ def create_s3_jit_tool(config, action):
 set -e
 
 export BUCKETS="{','.join(config['buckets'])}"
-export POLICY_TEMPLATE="{config['policy_template']}.j2"
+export POLICY_TEMPLATE="{config['policy_template']}"
 
 # Install dependencies
 pip install -q boto3 requests jinja2 > /dev/null

@@ -2,8 +2,8 @@ import logging
 import os
 import sys
 import json
-from jinja2 import Template, Environment, FileSystemLoader
 from typing import Optional, Dict, Any
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +18,21 @@ except ImportError as e:
     }))
     pass
 
+try:
+    from jinja2 import Template, Environment, FileSystemLoader
+except ImportError as e:
+    logger.error(f"Failed to import jinja2: {str(e)}")
+    print(json.dumps({
+        "status": "error",
+        "error_type": "ImportError",
+        "message": "Required package jinja2 is not installed - its OK during discovery"
+    }))
+    pass
+
 from .utils.notifications import NotificationManager
 from .utils.aws_utils import get_account_alias, get_permission_set_details
 from .utils.slack_messages import create_access_revoked_blocks
+from .policy_templates import s3_read_only_policy, s3_full_access_policy
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -192,10 +204,16 @@ class S3AccessHandler:
             self.session = boto3.Session(profile_name=profile_name)
             self.iam = self.session.client('iam')
             self.notifications = NotificationManager()
-            self.template_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates')))
+            self.policy_config = self.load_policy_config()
             print_progress("S3 handler initialized successfully", "✅")
         except Exception as e:
             self._handle_error("Failed to initialize S3 handler", e)
+
+    def load_policy_config(self) -> Dict[str, Any]:
+        """Load policy configurations from JSON file."""
+        config_path = Path(__file__).parent / 'policy_config.json'
+        with open(config_path) as f:
+            return json.load(f)
 
     def _handle_error(self, message: str, error: Exception):
         """Handle and log errors."""
@@ -205,16 +223,32 @@ class S3AccessHandler:
         print(formatted_message)
         sys.exit(1)
 
-    def create_policy(self, policy_name: str, buckets: list, template_name: str) -> str:
+    def create_policy(self, policy_name: str, buckets: list, policy_type: str) -> str:
         """Create a policy for S3 bucket access."""
         try:
             print_progress(f"Creating policy: {policy_name}", "🔧")
-            policy_template = self.template_env.get_template(template_name)
-            policy_document = policy_template.render(buckets=buckets)
+            policy_config = self.policy_config.get(policy_type)
+            if not policy_config:
+                raise ValueError(f"Unknown policy type: {policy_type}")
+
+            policy_document = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": policy_config["actions"],
+                        "Resource": [
+                            f"arn:aws:s3:::{bucket}" for bucket in buckets
+                        ] + [
+                            f"arn:aws:s3:::{bucket}/*" for bucket in buckets
+                        ]
+                    }
+                ]
+            }
 
             response = self.iam.create_policy(
                 PolicyName=policy_name,
-                PolicyDocument=policy_document
+                PolicyDocument=json.dumps(policy_document)
             )
             policy_arn = response['Policy']['Arn']
             print_progress(f"Policy created: {policy_arn}", "✅")
@@ -236,7 +270,7 @@ class S3AccessHandler:
             self._handle_error("Failed to attach policy", e)
 
     def revoke_policy(self, user_name: str, policy_arn: str):
-        """Detach a policy from a user."""
+        """Detach a policy from a user and delete it if it was generated."""
         try:
             print_progress(f"Detaching policy {policy_arn} from user {user_name}", "🔗")
             self.iam.detach_user_policy(
@@ -244,8 +278,23 @@ class S3AccessHandler:
                 PolicyArn=policy_arn
             )
             print_progress(f"Policy detached from user {user_name}", "✅")
+
+            # Delete the policy
+            self.delete_policy(policy_arn)
+
         except Exception as e:
             self._handle_error("Failed to detach policy", e)
+
+    def delete_policy(self, policy_arn: str):
+        """Delete a policy."""
+        try:
+            print_progress(f"Deleting policy {policy_arn}", "🗑️")
+            self.iam.delete_policy(
+                PolicyArn=policy_arn
+            )
+            print_progress(f"Policy deleted: {policy_arn}", "✅")
+        except Exception as e:
+            self._handle_error("Failed to delete policy", e)
 
 def main():
     """Main execution function."""
@@ -301,7 +350,7 @@ def main():
             print_progress(f"Access granted successfully!", "✅")
             print(f"   ├─ Account: {account_alias} ({account_id})")
             print(f"   ├─ User: {user_email}")
-            print(f"   ���─ Permission Set: {permission_set}")
+            print(f"   ├─ Permission Set: {permission_set}")
             print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
 
             # Send notifications using the notification manager
