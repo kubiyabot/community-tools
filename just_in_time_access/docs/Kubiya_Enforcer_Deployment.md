@@ -92,7 +92,7 @@ allow {
 # Special access for specific user
 allow {
     input.tool.name == "jit_se_access"
-    input.user.email == "amit@kubiya.ai"
+    input.user.email == "jhon@doe.com"
 }
 
 # Allow PDB checker access for R&D team
@@ -102,7 +102,7 @@ allow {
     
     # Group membership check
     group := input.user.groups[_]
-    group == "Kubiya R&D"
+    group == "R&D"
     
     # Parameter check
     input.tool.parameters.namespace == "all"
@@ -125,7 +125,7 @@ package kubiya.tool_manager
 
 # Helper function to check if the user's email is from a corporate domain
 is_corporate_email(email) {
-    endswith(email, "@kubiya.ai")
+    endswith(email, "@doe.com")
 }
 
 # Allow access if the email is from a corporate domain
