@@ -59,10 +59,10 @@ approve_access_tool = JustInTimeAccessTool(
     env=[
         "KUBIYA_AGENT_NAME",
         "SLACK_CHANNEL_ID",
-        "KUBIYA_API_KEY",
     ],
     secrets=[
         "SLACK_API_TOKEN",
+        "KUBIYA_API_KEY",
     ],
     with_files=[
         FileSpec(
