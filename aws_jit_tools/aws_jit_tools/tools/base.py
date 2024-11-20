@@ -37,7 +37,7 @@ class AWSJITTool(Tool):
             description=description,
             icon_url=AWS_JIT_ICON,
             type="docker",
-            image="python:3.12",
+            image="python:3.12-alpine",
             content=content,
             env=env or COMMON_ENV,
             with_files=(with_files or []) + COMMON_FILES,
