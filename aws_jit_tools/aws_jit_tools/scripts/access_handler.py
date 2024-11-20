@@ -65,7 +65,6 @@ class AWSAccessHandler:
             self.identitystore = self.session.client('identitystore')
             self.sso_admin = self.session.client('sso-admin')
             self.notifications = NotificationManager()
-            self.policy_manager = IAMPolicyManager(self.session)
             self.webhook_handler = WebhookHandler()
             self.iam_client = self.session.client('iam')
             
