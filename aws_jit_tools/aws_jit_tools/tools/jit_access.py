@@ -29,9 +29,10 @@ def create_jit_tool(config, action):
         )
     elif action == "grant":
         args.append(
-            Arg(name="Duration (TTL)", 
+            Arg(name="duration", 
                 description=f"Duration for the access token to be valid (maximum {config['session_duration']}) - needs to be in ISO8601 format eg: 'PT1H'", 
                 type="str", 
+                # This is the recommended duration for the access token (controlled on scripts/config) - does not guarantee the duration
                 default=config['session_duration'])
         )
 
