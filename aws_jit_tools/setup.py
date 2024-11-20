@@ -9,4 +9,5 @@ setup(
         "boto3",
         "requests"
     ],
+    python_requires='>=3.7',
 ) 
