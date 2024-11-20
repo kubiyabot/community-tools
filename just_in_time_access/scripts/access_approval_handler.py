@@ -1,5 +1,3 @@
-from curses import erasechar
-from nt import environ
 import sys
 import os
 import json
