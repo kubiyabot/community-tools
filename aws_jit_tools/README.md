@@ -39,7 +39,8 @@ This tool allows you to:
            "policy_template": "S3ReadOnlyPolicy",
            "session_duration": "PT1H"
        }
-   }   ```
+   }
+   ```
 
 3. **Add the repository as a custom Kubiya source**
 
@@ -103,23 +104,10 @@ Ensure your AWS credentials have the following permissions:
 - `s3:GetObject` (for read access)
 - `s3:PutObject` (for write access)
 
-## Environment Variables
+## Environment Variables for the Team Mate who will execute this module as a source
 
-Set the following environment variables:
-
-```bash
-# AWS Configuration
-export AWS_PROFILE=your-aws-profile
-
-# User Information
-export KUBIYA_USER_EMAIL=your-email@example.com
-
-# Slack Configuration
-export SLACK_API_TOKEN=your-slack-api-token
-export SLACK_CHANNEL_ID=your-slack-channel-id
-```
-
-Ensure your AWS credentials and Slack tokens are securely managed.
+* At least one integration instance with AWS on the team mate is required (it will set the AWS configuration in runtime automatically)
+* A Slack integration is required on the team mate so it can interact with Slack
 
 ## Notifications
 
