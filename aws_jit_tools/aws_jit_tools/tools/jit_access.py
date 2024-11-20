@@ -12,9 +12,9 @@ with open(HANDLER_PATH) as f:
 ACCESS_CONFIGS = {
     "Solution Engineer Access to Staging": {
         "name": "jit_se_access",
-        "description": "Grants SE (Solutions Engineer) access to staging AWS account (876809951775)",
-        "account_id": "876809951775",
-        "permission_set": "ECRReadOnly",
+        "description": "Grants SE (Solutions Engineer) access to march17test2 AWS account (162755939319)",
+        "account_id": "162755939319",
+        "permission_set": "CustomViewOnlyAccess",
         "session_duration": "PT1H"
     },
 }
