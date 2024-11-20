@@ -1,0 +1,15 @@
+{
+    "S3ReadOnlyPolicy": {
+        "description": "Grants read access to specific S3 buckets",
+        "actions": [
+            "s3:GetObject",
+            "s3:ListBucket"
+        ]
+    },
+    "S3FullAccessPolicy": {
+        "description": "Grants full access to specific S3 buckets",
+        "actions": [
+            "s3:*"
+        ]
+    }
+}
