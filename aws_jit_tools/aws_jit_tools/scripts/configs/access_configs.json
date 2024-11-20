@@ -12,5 +12,12 @@
         "account_id": "724175145715",
         "permission_set": "KubiyaViewOnlyAccess",
         "session_duration": "PT1H"
+    },
+    "veranatest Access to Kubiyamichaelg": {
+        "name": "veranatest Access to Kubiyamichaelg",
+        "description": "Grants veranatest access to Kubiyamichaelg account",
+        "account_id": "724175145715",
+        "permission_set": "veranatest",
+        "session_duration": "PT1H"
     }
 } 
