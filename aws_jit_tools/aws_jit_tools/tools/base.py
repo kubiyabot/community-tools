@@ -14,7 +14,6 @@ COMMON_ENV = [
     "KUBIYA_USER_EMAIL",
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
-    "REVOKATION_WEBHOOK_URL"
 ]
 
 # Common secrets
@@ -31,7 +30,7 @@ class AWSJITTool(Tool):
         # Default to long running to ensure the tool is always available
         # As the tools are waiting for the TTL to expire before revoking access
         # This is to avoid race conditions where the tool is not available when the TTL expires
-        long_running: bool = True,
+        long_running: bool = False,
         mermaid: str = None,
         with_files: list = None,
         args: list = None

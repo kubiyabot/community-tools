@@ -319,18 +319,19 @@ class AWSAccessHandler:
                 user_email=user_email
             )
 
-            # After successful access grant, schedule revocation webhook
-            self._schedule_revocation_webhook(
-                user_email=user_email,
-                duration_seconds=duration_seconds,
-                account_id=os.environ['AWS_ACCOUNT_ID'],
-                permission_set=permission_set_name,
-                policy_details={
-                    "name": permission_set_name,
-                    "type": "sso",
-                    "details": permission_set_details
-                }
-            )
+            if os.environ.get('REVOKATION_WEBHOOK_URL'):
+                # After successful access grant, schedule revocation webhook
+                self._schedule_revocation_webhook(
+                    user_email=user_email,
+                    duration_seconds=duration_seconds,
+                    account_id=os.environ['AWS_ACCOUNT_ID'],
+                    permission_set=permission_set_name,
+                    policy_details={
+                        "name": permission_set_name,
+                        "type": "sso",
+                        "details": permission_set_details
+                    }
+                )
 
         except Exception as e:
             self._handle_error("Failed to grant access", e)
