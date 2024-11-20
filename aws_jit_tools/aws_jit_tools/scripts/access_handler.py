@@ -197,7 +197,7 @@ class AWSAccessHandler:
         """Create and attach a policy to a user."""
         try:
             # Create policy
-            policy_arn = self.policy_manager.create_policy(
+            policy_arn = self.iam_client.create_policy(
                 policy_document=policy_document,
                 purpose=purpose,
                 user_id=user_name
@@ -206,9 +206,9 @@ class AWSAccessHandler:
                 raise ValueError("Failed to create policy")
 
             # Attach policy to user
-            if not self.policy_manager.attach_user_policy(user_name, policy_arn):
+            if not self.iam_client.attach_user_policy(user_name, policy_arn):
                 # Cleanup if attach fails
-                self.policy_manager.delete_policy(policy_arn)
+                self.iam_client.delete_policy(policy_arn)
                 raise ValueError("Failed to attach policy")
 
             return policy_arn
@@ -216,14 +216,6 @@ class AWSAccessHandler:
         except Exception as e:
             logger.error(f"Failed to create and attach policy: {e}")
             return None
-
-    def _cleanup_user_policies(self, user_name: str) -> bool:
-        """Clean up all JIT policies for a user."""
-        try:
-            return self.policy_manager.cleanup_user_policies(user_name)
-        except Exception as e:
-            logger.error(f"Failed to cleanup user policies: {e}")
-            return False
 
     def revoke_access(self, user_email: str, permission_set_name: str):
         """Revoke access for a user by email and permission set name."""
@@ -234,10 +226,6 @@ class AWSAccessHandler:
             user = self.get_user_by_email(user_email)
             if not user:
                 raise ValueError(f"User not found: {user_email}")
-
-            # Clean up any JIT policies
-            print_progress("Cleaning up IAM policies...", "🧹")
-            self._cleanup_user_policies(user['UserName'])
 
             # Get permission set ARN
             permission_set_arn = self.get_permission_set_arn(permission_set_name)
@@ -275,6 +263,10 @@ class AWSAccessHandler:
                                    buckets: Optional[list] = None):
         """Schedule the revocation webhook after the TTL expires."""
         def send_webhook():
+            if not os.environ.get('REVOKATION_WEBHOOK_URL'):
+                print("No revocation webhook URL configured, skipping webhook...")
+                return
+            
             time.sleep(duration_seconds)
             access_type = "s3" if buckets else "sso"
             self.webhook_handler.send_revocation_webhook(
