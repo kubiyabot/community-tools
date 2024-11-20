@@ -43,40 +43,47 @@ def create_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
     ]
 
+    mermaid_diagram = f"""
+    sequenceDiagram
+        participant U as 👤 User
+        participant T as 🛠️ Tool
+        participant I as 🔍 IAM Identity Center
+        participant S as 🔐 SSO Admin
+        participant N as 📧 Notifications
+
+        U->>+T: {"Request Access" if action == "grant" else "Request Revocation"}
+        T->>+I: 🔎 Find User by Email
+        I-->>-T: 📄 User Details
+        T->>+S: 🔑 Get Permission Set: {config['permission_set']}
+        S-->>-T: 🆔 Permission Set ARN
+        T->>+S: { "🔧 Create Assignment" if action == "grant" else "❌ Delete Assignment" }
+        Note over T,S: Account: {config['account_id']}
+        S-->>-T: { "✅ Assignment Created" if action == "grant" else "🔓 Assignment Deleted" }
+        T->>+N: Send Notification
+        N-->>-T: Notification Sent
+        T-->>-U: { "Access Granted 🎉" if action == "grant" else "Access Revoked 🔒" }
+    """
+
     return AWSJITTool(
         name=f"{config['name']}_{action}",
-        description=f"{config['description']} ({action.capitalize()})",
+        description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} access to AWS account {config['account_id']} using {config['permission_set']} permission set",
         args=args,
         content=f"""#!/bin/bash
 set -e
+echo ">> Processing request... ⏳"
 
-# Install dependencies first
-pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
+# Install dependencies only if not found
+python -c "import boto3, requests, jinja2, jsonschema" 2>/dev/null || pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 
 # Run access handler
-echo ">> Processing request... ⏳"
+echo ">> Just a moment... ⏳"
 python /opt/scripts/access_handler.py {action} --user-email $1
 """,
         with_files=file_specs,
-        mermaid=f"""
-    sequenceDiagram
-        participant U as 👤 User
-        participant T as 🛠️ Tool
-        participant I as 🔍 IAM
-        participant S as 🔐 SSO
-
-        U->>+T: Request {config['permission_set']} {action.capitalize()}
-        T->>+I: 🔎 Find/Create User
-        I-->>-T: 📄 User Details
-        T->>+S: 🔑 Get Permission Set
-        S-->>-T: 🆔 Permission Set ARN
-        T->>+S: { "🔧 Assign Permissions" if action == "grant" else "❌ Revoke Permissions" }
-        S-->>-T: { "✅ Assignment Complete" if action == "grant" else "🔓 Revocation Complete" }
-        T-->>-U: Access {action.capitalize()}ed 🎉
-    """
+        mermaid=mermaid_diagram
     )
 
 def create_s3_jit_tool(config, action):
@@ -103,40 +110,48 @@ def create_s3_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
     ]
 
+    buckets_list = ", ".join(config['buckets'])
+    mermaid_diagram = f"""
+    sequenceDiagram
+        participant U as 👤 User
+        participant T as 🛠️ Tool
+        participant I as 🔍 IAM
+        participant P as 📜 Policy Manager
+        participant N as 📧 Notifications
+
+        U->>+T: {"Request S3 Access" if action == "grant" else "Request Access Removal"}
+        T->>+I: 🔎 Find User by Email
+        I-->>-T: 📄 User Details
+        T->>+P: { "🔧 Create Dynamic Policy" if action == "grant" else "🔍 Find Existing Policy" }
+        Note over T,P: Template: {config['policy_template']}<br>Buckets: {buckets_list}
+        P-->>-T: 🆔 Policy ARN
+        T->>+I: { "📎 Attach Policy" if action == "grant" else "❌ Detach Policy" }
+        I-->>-T: { "✅ Policy Attached" if action == "grant" else "🔓 Policy Detached" }
+        T->>+N: Send Notification
+        N-->>-T: Notification Sent
+        T-->>-U: { "S3 Access Granted 🎉" if action == "grant" else "S3 Access Revoked 🔒" }
+    """
+
     return AWSJITTool(
         name=f"{config['name']}_{action}",
-        description=f"{config['description']} ({action.capitalize()})",
+        description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} {config['policy_template']} access to buckets: {buckets_list}",
         args=args,
         content=f"""#!/bin/bash
 set -e
+echo ">> Processing request... ⏳"
 
-# Install dependencies first
-pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
+# Install dependencies only if not found
+python -c "import boto3, requests, jinja2, jsonschema" 2>/dev/null || pip install -q boto3 requests jinja2 jsonschema > /dev/null 2>&1
 
 export BUCKETS="{','.join(config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"
 
 # Run access handler
-echo ">> Processing request... ⏳"
+echo ">> Just a moment... ⏳"
 python /opt/scripts/access_handler.py {action} --user-email $1
 """,
         with_files=file_specs,
-        mermaid=f"""
-    sequenceDiagram
-        participant U as 👤 User
-        participant T as 🛠️ Tool
-        participant I as 🔍 IAM
-        participant S as 🔐 SSO
-
-        U->>+T: Request {config['description']} {action.capitalize()}
-        T->>+I: 🔎 Find/Create User
-        I-->>-T: 📄 User Details
-        T->>+S: 🔑 Get/Create Policy
-        S-->>-T: 🆔 Policy ARN
-        T->>+S: { "🔧 Attach Policy" if action == "grant" else "❌ Detach Policy" }
-        S-->>-T: { "✅ Policy Attached" if action == "grant" else "🔓 Policy Detached" }
-        T-->>-U: Access {action.capitalize()}ed 🎉
-    """
+        mermaid=mermaid_diagram
     )
 
 # Create tools only if configurations are loaded successfully
@@ -163,4 +178,5 @@ if ACCESS_CONFIGS and S3_ACCESS_CONFIGS:
     __all__ = list({**tools, **s3_tools}.keys())
     globals().update({**tools, **s3_tools})
 else:
-    logger.error("No tools created due to configuration loading errors") 
+    print("No tools created due to configuration loading errors") 
+    raise Exception("No tools created due to configuration loading errors") 
