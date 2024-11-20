@@ -8,29 +8,117 @@
 
 ## Overview Diagram
 
-To understand how the Kubiya Enforcer integrates within your infrastructure, refer to the following diagram:
+To understand how the Kubiya Enforcer integrates within your infrastructure, leveraging Open Policy Agent (OPA) and OPAL, refer to the following diagram:
 
 ```mermaid
-flowchart LR
-    subgraph User Infrastructure
-        A[User Requests Access]
-        B[Kubiya Runner]
-        C[Enforcer Service]
-        D[Okta Identity Platform]
-    end
+sequenceDiagram
+    participant User
+    participant KubiyaRunner as Kubiya Runner
+    participant Enforcer
+    participant OPA
+    participant OPAL
+    participant GitHub
+    participant Okta
+    participant Resource
 
-    subgraph Kubiya Cloud
-        E[Kubiya App Portal]
-    end
+    Note over User,Resource: Just-In-Time Access Flow with Enforcer, OPA, and OPAL
 
-    A --> B
-    B --> C
-    C --> D
-    D --> C
-    C --> B
-    B --> A
-    B --> E
+    User->>KubiyaRunner: Request Access (e.g., "Create EC2 in eu-west-1")
+    KubiyaRunner->>Enforcer: Validate Access Request
+    Enforcer->>OPA: Query Policy Decision
+    OPA->>OPAL: Ensure Latest Policies
+    OPAL->>GitHub: Sync Policies
+    GitHub-->>OPAL: Provide Policy Updates
+    OPAL-->>OPA: Update Policies
+    OPA-->>Enforcer: Policy Decision
+    Enforcer->>Okta: Fetch User Group Membership
+    Okta-->>Enforcer: Return User Groups
+    Enforcer->>Enforcer: Evaluate Policies
+    alt Access Allowed
+        Enforcer-->>KubiyaRunner: Access Granted
+        KubiyaRunner->>Resource: Perform Action
+        Resource-->>KubiyaRunner: Action Completed
+        KubiyaRunner-->>User: Notifies User of Success
+    else Access Denied
+        Enforcer-->>KubiyaRunner: Access Denied
+        KubiyaRunner-->>User: Notifies User of Denial
+    end
 ```
+
+## Policy Configuration with OPA and OPAL
+
+The Enforcer uses Open Policy Agent (OPA) to evaluate access policies synchronized via OPAL from your GitHub repository. Here's an example of how to define policies to control tool access:
+
+### Example Policy: `policy.rego`
+
+```rego
+package kubiya.tool_manager
+
+# Default deny all access
+default allow = false
+
+# Allow Kubiya R&D team access to all tools except `jit_session_grant_database_access_to_staging`
+allow {
+    group := input.user.groups[_]
+    group == "Kubiya R&D"
+    tool := input.tool.name
+    tool != "jit_session_grant_database_access_to_staging"
+}
+
+# Allow Administrators access to all tools except `jit_session_grant_database_access_to_staging`
+allow {
+    group := input.user.groups[_]
+    group == "Administrators"
+    tool := input.tool.name
+    tool != "jit_session_grant_database_access_to_staging"
+}
+
+# Always allow access to `request_tool_access`
+allow {
+    input.tool.name == "request_tool_access"
+}
+
+# Special access for `jit_se_access` tool
+allow {
+    input.tool.name == "jit_se_access"
+    input.user.email == "amit@kubiya.ai"
+}
+
+# PDB checker access for Kubiya R&D team
+allow {
+    input.tool.name == "pod_disruption_budget_checker"
+    group := input.user.groups[_]
+    namespace := input.tool.parameters.namespace
+    namespace == "all"
+    group == "Kubiya R&D"
+}
+
+# PDB checker access for a specific user
+allow {
+    input.tool.name == "pod_disruption_budget_checker"
+    input.user.email == "kris.talajic@kubiya.ai"
+    input.tool.parameters.namespace == "all"
+}
+
+# Helper function to check if a tool is restricted
+is_restricted(tool) {
+    restricted_tools := {"cluster_health"}
+    restricted_tools[tool]
+}
+```
+
+**Important Notes:**
+
+- **Okta Group Alignment**: The group names used in the policies must exist in Okta.
+- **Tool Parameters**: Tools must include the relevant parameters as specified in the policy conditions.
+
+## Adding Policies to Your Repository
+
+1. **Create a Policy File**: Add a `.rego` file (e.g., `policy.rego`) to your policy repository.
+2. **Define Policies**: Include the policy rules as shown in the example above.
+3. **Commit and Push**: Commit the changes and push them to the repository.
+
+The OPAL service will automatically detect changes and synchronize the updated policies to the Enforcer's OPA engine.
 
 ## Step 1: Obtaining Okta Credentials
 
@@ -293,6 +381,15 @@ kubectl patch deployment tool-manager -n kubiya --type=json -p='[
 ]'
 ```
 
+### Updating the Enforcer Configuration
+
+Ensure that the `OPAL_POLICY_REPO_URL` and `OPAL_POLICY_REPO_MAIN_BRANCH` environment variables are correctly set to point to your policy repository.
+
+```bash
+export OPAL_POLICY_REPO_URL="git@github.com:your-org/your-policy-repo.git"
+export OPAL_POLICY_REPO_MAIN_BRANCH="main"
+```
+
 ## Step 4: Clean Up Environment Variables (Optional)
 
 For security reasons, it's recommended to unset environment variables containing sensitive information:
@@ -311,36 +408,6 @@ unset PRIVATE_KEY_B64
 unset OPAL_POLICY_REPO_URL_B64
 unset OPAL_POLICY_REPO_MAIN_BRANCH_B64
 unset GIT_DEPLOY_KEY_B64
-```
-
-## Diagram: Enforcer Workflow
-
-Here's a detailed diagram illustrating how the Kubiya Enforcer works within the Just-In-Time Access workflow:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant KubiyaRunner as Kubiya Runner
-    participant Enforcer
-    participant Okta
-    participant Resource
-
-    Note over User,Resource: Just-In-Time Access Flow with Enforcer
-
-    User->>KubiyaRunner: Request Access (e.g., "Create EC2 in eu-west-1")
-    KubiyaRunner->>Enforcer: Validate Access Request
-    Enforcer->>Okta: Fetch User Group Membership
-    Okta-->>Enforcer: Return User Groups
-    Enforcer->>Enforcer: Evaluate Policies
-    alt Access Allowed
-        Enforcer-->>KubiyaRunner: Access Granted
-        KubiyaRunner->>Resource: Perform Action
-        Resource-->>KubiyaRunner: Action Completed
-        KubiyaRunner-->>User: Notifies User of Success
-    else Access Denied
-        Enforcer-->>KubiyaRunner: Access Denied
-        KubiyaRunner-->>User: Notifies User of Denial
-    end
 ```
 
 ## Troubleshooting
