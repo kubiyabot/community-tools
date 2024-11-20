@@ -9,9 +9,15 @@ HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
 with open(HANDLER_PATH) as f:
     HANDLER_CODE = f.read()
 
-# Initialize tools dictionary at module level
-tools = {}
-s3_tools = {}
+# Load configurations
+try:
+    ACCESS_CONFIGS = get_access_configs()
+    S3_ACCESS_CONFIGS = get_s3_configs()
+except Exception as e:
+    print(f"Error loading configurations: {e}")
+    ACCESS_CONFIGS = {}
+    S3_ACCESS_CONFIGS = {}
+    raise e
 
 def create_jit_tool(config, action):
     """Create a JIT tool from configuration."""
@@ -164,10 +170,10 @@ python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL
         mermaid=mermaid_diagram
     )
 
-# Load configurations and create tools
-try:
-    ACCESS_CONFIGS = get_access_configs()
-    S3_ACCESS_CONFIGS = get_s3_configs()
+# Create tools only if configurations are loaded successfully
+if ACCESS_CONFIGS and S3_ACCESS_CONFIGS:
+    tools = {}
+    s3_tools = {}
 
     # Create and register tools
     for action in ["grant", "revoke"]:
@@ -181,9 +187,8 @@ try:
             s3_tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
-except Exception as e:
-    print(f"Error loading configurations: {e}")
-    raise
-
-# Export all tools
-__all__ = ['tools', 's3_tools'] 
+    # Export all tools
+    __all__ = list(tools.keys()) + list(s3_tools.keys())
+    globals().update({**tools, **s3_tools})
+else:
+    print("No tools created due to configuration loading errors") 
