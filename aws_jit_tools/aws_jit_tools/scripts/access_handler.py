@@ -80,20 +80,55 @@ class AWSAccessHandler:
             self._handle_error("Failed to initialize AWS handler", e)
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        """Find IAM user by email."""
+        """Find user by email in either IAM Identity Center or IAM."""
         try:
             print_progress(f"Looking up user: {email}", "👤")
-            response = self.iam_client.get_user(UserName=email)
-            user = response.get('User', None)
-            if user:
-                print_progress(f"Found user: {user['UserName']}", "✅")
-                return user
-            else:
-                print_progress(f"No user found with email: {email}", "❌")
-                return None
-        except self.iam_client.exceptions.NoSuchEntityException:
+            
+            # First try IAM Identity Center if we have SSO configured
+            if hasattr(self, 'identity_store_id'):
+                try:
+                    response = self.identitystore.list_users(
+                        IdentityStoreId=self.identity_store_id,
+                        Filters=[{
+                            'AttributePath': 'UserName',
+                            'AttributeValue': email
+                        }]
+                    )
+                    users = response.get('Users', [])
+                    if users:
+                        print_progress(f"Found user in Identity Center: {users[0].get('UserName')}", "✅")
+                        return users[0]
+                except Exception as e:
+                    logger.debug(f"Identity Center lookup failed: {e}")
+
+            # If not found in Identity Center or if SSO is not configured, try IAM
+            try:
+                # For IAM, we'll list users and filter by tags or username
+                paginator = self.iam_client.get_paginator('list_users')
+                for page in paginator.paginate():
+                    for user in page['Users']:
+                        # Check if username matches email
+                        if user['UserName'].lower() == email.lower():
+                            print_progress(f"Found user in IAM: {user['UserName']}", "✅")
+                            return user
+                        
+                        # Check user tags for email
+                        try:
+                            tags_response = self.iam_client.list_user_tags(UserName=user['UserName'])
+                            for tag in tags_response['Tags']:
+                                if tag['Key'].lower() == 'email' and tag['Value'].lower() == email.lower():
+                                    print_progress(f"Found user in IAM by email tag: {user['UserName']}", "✅")
+                                    return user
+                        except Exception as e:
+                            logger.debug(f"Failed to get tags for user {user['UserName']}: {e}")
+                            continue
+
+            except Exception as e:
+                logger.error(f"IAM user lookup failed: {e}")
+
             print_progress(f"No user found with email: {email}", "❌")
             return None
+
         except Exception as e:
             logger.error(f"Error finding user by email: {str(e)}")
             raise
