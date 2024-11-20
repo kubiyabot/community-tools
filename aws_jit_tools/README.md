@@ -27,7 +27,8 @@ This tool allows you to:
            "permission_set": "SEViewOnlyAccess",
            "session_duration": "PT1H"
        }
-   }   ```
+   }
+   ```
 
    ### S3 Bucket Access (`s3_configs.json`)
    ```json
