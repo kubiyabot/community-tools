@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import json
+import argparse
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -32,7 +33,7 @@ except ImportError as e:
 from utils.notifications import NotificationManager
 from utils.aws_utils import get_account_alias, get_permission_set_details
 from utils.slack_messages import create_access_revoked_blocks
-from .policy_templates import s3_read_only_policy, s3_full_access_policy
+from policy_templates import s3_read_only_policy, s3_full_access_policy
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -245,6 +246,42 @@ class AWSAccessHandler:
 
         except Exception as e:
             self._handle_error("Failed to grant access", e)
+
+def main():
+    """Main function to handle command line arguments and execute actions."""
+    parser = argparse.ArgumentParser(description='AWS Access Handler')
+    parser.add_argument('action', choices=['grant', 'revoke'], help='Action to perform')
+    parser.add_argument('--user-email', required=True, help='Email of the user')
+    parser.add_argument('--duration', default='PT1H', help='Duration for access (ISO8601 format, e.g., PT1H)')
+    
+    args = parser.parse_args()
+    
+    print_progress("Starting AWS Access Handler...", "🚀")
+    
+    try:
+        handler = AWSAccessHandler()
+        
+        if args.action == 'grant':
+            print_progress(f"Granting access for user: {args.user_email}", "🔑")
+            handler.grant_access(
+                user_email=args.user_email,
+                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
+                requested_duration=args.duration,
+                max_duration=os.environ.get('MAX_DURATION', 'PT1H')
+            )
+        else:  # revoke
+            print_progress(f"Revoking access for user: {args.user_email}", "🔒")
+            handler.revoke_access(
+                user_email=args.user_email,
+                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
+            )
+            
+    except Exception as e:
+        print_progress(f"Error: {str(e)}", "❌")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
 
 # Export the class
 __all__ = ['AWSAccessHandler']
