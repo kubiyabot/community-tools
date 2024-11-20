@@ -12,37 +12,33 @@ To understand how the Kubiya Enforcer integrates within your infrastructure, lev
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant KubiyaRunner as Kubiya Runner
-    participant Enforcer
-    participant OPA
-    participant OPAL
-    participant GitHub
-    participant Okta
-    participant Resource
+    participant User as 👤 User
+    participant KubiyaRunner as 🤖 Kubiya Runner
+    participant Enforcer as 🛡️ Enforcer
+    participant OPA as 📜 OPA
+    participant OPAL as 🔄 OPAL
+    participant GitHub as 📦 GitHub
+    participant Okta as 🔐 Okta
+    participant Resource as 💻 Resource
 
-    Note over User,Resource: Just-In-Time Access Flow with Enforcer, OPA, and OPAL
+    note over User,Resource: 🎯 Just-In-Time Access Flow
 
-    User->>KubiyaRunner: Request Access (e.g., "Create EC2 in eu-west-1")
-    KubiyaRunner->>Enforcer: Validate Access Request
-    Enforcer->>OPA: Query Policy Decision
-    OPA->>OPAL: Ensure Latest Policies
-    OPAL->>GitHub: Sync Policies
-    GitHub-->>OPAL: Provide Policy Updates
-    OPAL-->>OPA: Update Policies
-    OPA-->>Enforcer: Policy Decision
-    Enforcer->>Okta: Fetch User Group Membership
-    Okta-->>Enforcer: Return User Groups
-    Enforcer->>Enforcer: Evaluate Policies
-    alt Access Allowed
-        Enforcer-->>KubiyaRunner: Access Granted
-        KubiyaRunner->>Resource: Perform Action
-        Resource-->>KubiyaRunner: Action Completed
-        KubiyaRunner-->>User: Notifies User of Success
-    else Access Denied
-        Enforcer-->>KubiyaRunner: Access Denied
-        KubiyaRunner-->>User: Notifies User of Denial
-    end
+    User->>KubiyaRunner: 📝 Request Access
+    Note right of User: e.g., "Create EC2 in eu-west-1"
+    
+    KubiyaRunner->>Enforcer: 🔍 Validate Request
+    
+    Enforcer->>OPA: ⚡ Query Policy
+    
+    OPA->>OPAL: 🔄 Check Latest Policies
+    
+    OPAL->>GitHub: 📥 Sync Policies
+    GitHub-->>OPAL: 📤 Policy Updates
+    
+    OPAL-->>OPA: 📨 Update Policies
+    OPA-->>Enforcer: ✅ Policy Decision
+    
+    Enforcer->>Okta: 👥 Get User Groups
 ```
 
 ## Policy Configuration with OPA and OPAL
@@ -556,5 +552,4 @@ If you encounter issues during deployment or operation:
   - Ensure that private keys are stored in secure, access-controlled locations.
 
 - **Principle of Least Privilege**:
-  - Assign the minimal set of permissions required for services and users to function.
-  
+  - Assign the minimal set of permissions required for services and users to function.  
