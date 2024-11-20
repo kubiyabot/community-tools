@@ -28,7 +28,10 @@ class AWSJITTool(Tool):
         description: str, 
         content: str,
         env: list = None,
-        long_running: bool = False,
+        # Default to long running to ensure the tool is always available
+        # As the tools are waiting for the TTL to expire before revoking access
+        # This is to avoid race conditions where the tool is not available when the TTL expires
+        long_running: bool = True,
         mermaid: str = None,
         with_files: list = None,
         args: list = None
