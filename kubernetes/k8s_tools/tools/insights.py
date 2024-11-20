@@ -4,7 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 
 resource_usage_tool = KubernetesTool(
     name="resource_usage",
-    description="Shows resource usage of nodes or pods in a specific namespace for pods",
+    description="Shows resource usage of nodes or pods, requiring a namespace or 'all' for all namespaces",
     content="""
     #!/bin/bash
     set -e
@@ -15,6 +15,15 @@ resource_usage_tool = KubernetesTool(
         exit 1
     fi
 
+    # Ensure namespace is provided
+    if [ -z "$namespace" ]; then
+        echo "❌ Namespace is required. Please specify a namespace or 'all' for all namespaces."
+        exit 1
+    fi
+
+    # Set namespace flag
+    namespace_flag=$( [ "$namespace" = "all" ] && echo "--all-namespaces" || echo "-n $namespace" )
+
     if [ "$resource_type" = "nodes" ]; then
         echo "🖥️  Node Resource Usage:"
         echo "======================="
@@ -22,17 +31,12 @@ resource_usage_tool = KubernetesTool(
     elif [ "$resource_type" = "pods" ]; then
         echo "🛠️  Pod Resource Usage:"
         echo "====================="
-        # If no namespace is provided, search in all namespaces
-        if [ -z "$namespace" ]; then
-            kubectl top pods --all-namespaces | awk 'NR>1 {print "  🔧 " $0}'
-        else
-            kubectl top pods -n $namespace | awk 'NR>1 {print "  🔧 " $0}'
-        fi
+        kubectl top pods $namespace_flag | awk 'NR>1 {print "  🔧 " $0}'
     fi
     """,
     args=[
         Arg(name="resource_type", type="str", description="Resource type to show usage for (nodes or pods)", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace (for pods only, optional)", required=False),
+        Arg(name="namespace", type="str", description="Kubernetes namespace or 'all' for all namespaces", required=True),
     ],
 )
 

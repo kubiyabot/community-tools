@@ -15,14 +15,19 @@ service_management_tool = KubernetesTool(
         exit 1
     fi
 
-    # Define flags for service creation
-    namespace_flag="-n $namespace"
-    type_flag=$( [ "$action" = "create" ] && [ -n "$type" ] && echo "--type=$type" || echo "" )
-    port_flag=$( [ "$action" = "create" ] && [ -n "$port" ] && echo "--port=$port" || echo "" )
-    target_port_flag=$( [ "$action" = "create" ] && [ -n "$target_port" ] && echo "--target-port=$target_port" || echo "" )
-
-    # Execute the kubectl command
-    kubectl $action service $name $type_flag $port_flag $target_port_flag $namespace_flag
+    # Handle different actions
+    if [ "$action" = "create" ]; then
+        # Convert type to lowercase for kubectl command
+        type_lower=$(echo "$type" | tr '[:upper:]' '[:lower:]')
+        
+        # For create action, use the correct subcommand syntax
+        kubectl create service $type_lower $name \
+            --namespace=$namespace \
+            --tcp=$port:$target_port
+    else
+        # For other actions (delete, get)
+        kubectl $action service $name -n $namespace
+    fi
     """,
     args=[
         Arg(name="action", type="str", description="Action to perform (create, delete, get)", required=True),
