@@ -19,12 +19,10 @@ Before using this module, ensure you have:
 
 3. Required Environment Variables (On the Teammate environment variables configuration section):
    - `APPROVERS_CHANNEL`: Slack channel ID where approvers will receive notifications
-   - `KUBIYA_TOOL_NAME`: Name of the tool requesting access
-   - `KUBIYA_TOOL_PARAMS`: Parameters for the tool in JSON format
 
    Note: The following variables are automatically injected by Kubiya:
    - `KUBIYA_USER_ORG`
-   - `KUBIYA_AGENT_UUID`
+   - `KUBIYA_AGENT_NAME`
    - `KUBIYA_SOURCE_URL`
    - `KUBIYA_SOURCE_UUID`
 
