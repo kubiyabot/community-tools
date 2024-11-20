@@ -58,11 +58,11 @@ restricted_tools := {
     "jit_session_grant_database_access_to_staging"
 }
 
-# Allow Kubiya R&D team access to all tools except restricted ones
+# Allow R&D team access to all tools except restricted ones
 allow {
-    # Check if user is in Kubiya R&D group
+    # Check if user is in R&D group
     group := input.user.groups[_]
-    group == "Kubiya R&D"
+    group == "R&D"
     
     # Get requested tool
     tool := input.tool.name
