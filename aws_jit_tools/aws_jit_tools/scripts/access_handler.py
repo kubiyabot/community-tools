@@ -7,6 +7,9 @@ from pathlib import Path
 import time
 import threading
 
+# Add the parent directory to Python path to allow direct imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -42,11 +45,12 @@ except ImportError as e:
     }))
     pass
 
-from utils.notifications import NotificationManager
-from utils.aws_utils import get_account_alias, get_permission_set_details
-from utils.slack_messages import create_access_revoked_blocks
-from utils.iam_policy_manager import IAMPolicyManager
-from utils.webhook_handler import WebhookHandler
+# Direct imports from the scripts directory
+from scripts.utils.notifications import NotificationManager
+from scripts.utils.aws_utils import get_account_alias, get_permission_set_details
+from scripts.utils.slack_messages import create_access_revoked_blocks
+from scripts.utils.iam_policy_manager import IAMPolicyManager
+from scripts.utils.webhook_handler import WebhookHandler
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
