@@ -2,15 +2,13 @@ import logging
 import os
 import sys
 import json
-import time
-import requests
+from jinja2 import Template, Environment, FileSystemLoader
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 try:
     import boto3
-    from botocore.exceptions import ClientError, ProfileNotFound
 except ImportError as e:
     logger.error(f"Failed to import boto3: {str(e)}")
     print(json.dumps({
@@ -186,6 +184,69 @@ class AWSAccessHandler:
         except Exception as e:
             self._handle_error("Failed to revoke access", e)
 
+class S3AccessHandler:
+    def __init__(self, profile_name: Optional[str] = None):
+        """Initialize S3 access handler."""
+        try:
+            print_progress("Initializing S3 handler...", "🔄")
+            self.session = boto3.Session(profile_name=profile_name)
+            self.iam = self.session.client('iam')
+            self.notifications = NotificationManager()
+            self.template_env = Environment(loader=FileSystemLoader(os.path.join(os.path.dirname(__file__), 'templates')))
+            print_progress("S3 handler initialized successfully", "✅")
+        except Exception as e:
+            self._handle_error("Failed to initialize S3 handler", e)
+
+    def _handle_error(self, message: str, error: Exception):
+        """Handle and log errors."""
+        error_msg = f"{message}: {str(error)}"
+        logger.error(error_msg)
+        formatted_message = f"\n❌ Error: {message}\n   └─ Details: {str(error)}"
+        print(formatted_message)
+        sys.exit(1)
+
+    def create_policy(self, policy_name: str, buckets: list, template_name: str) -> str:
+        """Create a policy for S3 bucket access."""
+        try:
+            print_progress(f"Creating policy: {policy_name}", "🔧")
+            policy_template = self.template_env.get_template(template_name)
+            policy_document = policy_template.render(buckets=buckets)
+
+            response = self.iam.create_policy(
+                PolicyName=policy_name,
+                PolicyDocument=policy_document
+            )
+            policy_arn = response['Policy']['Arn']
+            print_progress(f"Policy created: {policy_arn}", "✅")
+            return policy_arn
+
+        except Exception as e:
+            self._handle_error("Failed to create policy", e)
+
+    def attach_policy(self, user_name: str, policy_arn: str):
+        """Attach a policy to a user."""
+        try:
+            print_progress(f"Attaching policy {policy_arn} to user {user_name}", "🔗")
+            self.iam.attach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn
+            )
+            print_progress(f"Policy attached to user {user_name}", "✅")
+        except Exception as e:
+            self._handle_error("Failed to attach policy", e)
+
+    def revoke_policy(self, user_name: str, policy_arn: str):
+        """Detach a policy from a user."""
+        try:
+            print_progress(f"Detaching policy {policy_arn} from user {user_name}", "🔗")
+            self.iam.detach_user_policy(
+                UserName=user_name,
+                PolicyArn=policy_arn
+            )
+            print_progress(f"Policy detached from user {user_name}", "✅")
+        except Exception as e:
+            self._handle_error("Failed to detach policy", e)
+
 def main():
     """Main execution function."""
     try:
@@ -240,7 +301,7 @@ def main():
             print_progress(f"Access granted successfully!", "✅")
             print(f"   ├─ Account: {account_alias} ({account_id})")
             print(f"   ├─ User: {user_email}")
-            print(f"   ├─ Permission Set: {permission_set}")
+            print(f"   ���─ Permission Set: {permission_set}")
             print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
 
             # Send notifications using the notification manager
@@ -272,4 +333,4 @@ def main():
         sys.exit(1)
 
 if __name__ == "__main__":
-    main() 
+    main()

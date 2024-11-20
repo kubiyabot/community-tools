@@ -19,6 +19,24 @@ ACCESS_CONFIGS = {
     },
 }
 
+# Configuration for S3 bucket access
+S3_ACCESS_CONFIGS = {
+    "S3 Bucket Read Access": {
+        "name": "jit_s3_read_access",
+        "description": "Grants read access to specific S3 buckets",
+        "buckets": ["example-bucket-1", "example-bucket-2"],
+        "policy_template": "S3ReadOnlyPolicy",
+        "session_duration": "PT1H"
+    },
+    "S3 Bucket Write Access": {
+        "name": "jit_s3_write_access",
+        "description": "Grants write access to specific S3 buckets",
+        "buckets": ["example-bucket-1", "example-bucket-2"],
+        "policy_template": "S3FullAccessPolicy",
+        "session_duration": "PT1H"
+    },
+}
+
 def create_jit_tool(config, action):
     """Create a JIT tool from configuration."""
     args = []
@@ -35,6 +53,10 @@ def create_jit_tool(config, action):
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
+        # templates
+        FileSpec(destination="/opt/scripts/templates/S3ReadOnlyPolicy.j2", content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'S3ReadOnlyPolicy.j2').read()),    
+        FileSpec(destination="/opt/scripts/templates/S3FullAccessPolicy.j2", content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'S3FullAccessPolicy.j2').read()),
+        # init files
         FileSpec(destination="/opt/scripts/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / '__init__.py').read()),
         FileSpec(destination="/opt/scripts/utils/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / '__init__.py').read()),
         FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
@@ -78,6 +100,65 @@ python /opt/scripts/access_handler.py {action} --user-email $1
     """
     )
 
+def create_s3_jit_tool(config, action):
+    """Create a JIT tool for S3 bucket access from configuration."""
+    args = []
+    
+    if action == "revoke":
+        args.append(
+            Arg(name="User Email", description="The email of the user to revoke access for", type="str")
+        )
+    elif action == "grant":
+        args.append(
+            Arg(name="Duration (TTL)", description="Duration for the access token to be valid (defaults to 1 hour) - needs to be in ISO8601 format eg: 'PT1H'", type="str", default="PT1H")
+        )
+
+    # Define file specifications for all necessary files
+    file_specs = [
+        FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
+        FileSpec(destination="/opt/scripts/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / '__init__.py').read()),
+        FileSpec(destination="/opt/scripts/utils/__init__.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / '__init__.py').read()),
+        FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
+        FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
+    ]
+
+    return AWSJITTool(
+        name=f"{config['name']}_{action}",
+        description=f"{config['description']} ({action.capitalize()})",
+        args=args,
+        content=f"""#!/bin/bash
+set -e
+
+export BUCKETS="{','.join(config['buckets'])}"
+export POLICY_TEMPLATE="{config['policy_template']}.j2"
+
+# Install dependencies
+pip install -q boto3 requests jinja2 > /dev/null
+# Run access handler
+echo ">> Processing request... ⏳"
+python /opt/scripts/access_handler.py {action} --user-email $1
+""",
+        with_files=file_specs,
+        mermaid=f"""
+    sequenceDiagram
+        participant U as 👤 User
+        participant T as 🛠️ Tool
+        participant I as 🔍 IAM
+        participant S as 🔐 SSO
+
+        U->>+T: Request {config['description']} {action.capitalize()}
+        T->>+I: 🔎 Find/Create User
+        I-->>-T: 📄 User Details
+        T->>+S: 🔑 Get/Create Policy
+        S-->>-T: 🆔 Policy ARN
+        T->>+S: { "🔧 Attach Policy" if action == "grant" else "❌ Detach Policy" }
+        S-->>-T: { "✅ Policy Attached" if action == "grant" else "🔓 Policy Detached" }
+        T-->>-U: Access {action.capitalize()}ed 🎉
+    """
+    )
+
 # Create tools from configuration for both grant and revoke actions
 tools = {
     f"{access_type}_{action}": create_jit_tool(config, action)
@@ -85,10 +166,17 @@ tools = {
     for action in ["grant", "revoke"]
 }
 
+# Create S3 tools from configuration for both grant and revoke actions
+s3_tools = {
+    f"{access_type}_{action}": create_s3_jit_tool(config, action)
+    for access_type, config in S3_ACCESS_CONFIGS.items()
+    for action in ["grant", "revoke"]
+}
+
 # Register all tools
-for tool in tools.values():
+for tool in {**tools, **s3_tools}.values():
     tool_registry.register("aws_jit", tool)
 
 # Export all tools
-__all__ = list(tools.keys())
-globals().update(tools) 
+__all__ = list({**tools, **s3_tools}.keys())
+globals().update({**tools, **s3_tools}) 
