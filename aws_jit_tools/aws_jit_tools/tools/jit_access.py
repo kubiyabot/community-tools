@@ -68,11 +68,12 @@ def create_jit_tool(config, action):
         content=f"""#!/bin/bash
 set -e
 
+# Install dependencies first
+pip install -q boto3 requests jinja2 > /dev/null 2>&1
+
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 
-# Install dependencies
-pip install -q boto3 requests > /dev/null
 # Run access handler
 echo ">> Processing request... ⏳"
 python /opt/scripts/access_handler.py {action} --user-email $1
@@ -127,11 +128,12 @@ def create_s3_jit_tool(config, action):
         content=f"""#!/bin/bash
 set -e
 
+# Install dependencies first
+pip install -q boto3 requests jinja2 > /dev/null 2>&1
+
 export BUCKETS="{','.join(config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"
 
-# Install dependencies
-pip install -q boto3 requests jinja2 > /dev/null
 # Run access handler
 echo ">> Processing request... ⏳"
 python /opt/scripts/access_handler.py {action} --user-email $1
