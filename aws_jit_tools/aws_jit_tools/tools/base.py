@@ -12,6 +12,8 @@ COMMON_FILES = [
 COMMON_ENV = [
     "AWS_PROFILE",
     "KUBIYA_USER_EMAIL",
+    "SLACK_CHANNEL_ID",
+    "SLACK_THREAD_TS"
 ]
 
 # Common secrets

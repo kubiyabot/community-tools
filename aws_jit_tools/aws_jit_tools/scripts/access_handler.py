@@ -20,20 +20,32 @@ except ImportError as e:
     }))
     pass
 
+from .utils.notifications import NotificationManager
+from .utils.aws_utils import get_account_alias, get_permission_set_details
+from .utils.slack_messages import create_access_revoked_blocks
+
+def print_progress(message: str, emoji: str) -> None:
+    """Print progress messages with emoji."""
+    print(f"\n{emoji} {message}", flush=True)
+    sys.stdout.flush()
+
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
         """Initialize AWS access handler."""
         try:
+            print_progress("Initializing AWS handler...", "🔄")
             self.session = boto3.Session(profile_name=profile_name)
             self.identitystore = self.session.client('identitystore')
             self.sso_admin = self.session.client('sso-admin')
+            self.notifications = NotificationManager()
             
-            # Get Identity Store ID from SSO Instance
+            print_progress("Fetching SSO instance details...", "🔍")
             instances = self.sso_admin.list_instances()['Instances']
             if not instances:
                 raise ValueError("No SSO instance found")
             self.instance_arn = instances[0]['InstanceArn']
             self.identity_store_id = instances[0]['IdentityStoreId']
+            print_progress("AWS handler initialized successfully", "✅")
             
         except Exception as e:
             self._handle_error("Failed to initialize AWS handler", e)
@@ -41,6 +53,7 @@ class AWSAccessHandler:
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Find user in IAM Identity Center by email."""
         try:
+            print_progress(f"Looking up user: {email}", "👤")
             response = self.identitystore.list_users(
                 IdentityStoreId=self.identity_store_id,
                 Filters=[{
@@ -51,9 +64,10 @@ class AWSAccessHandler:
 
             users = response.get('Users', [])
             if not users:
-                logger.error(f"No user found with email: {email}")
+                print_progress(f"No user found with email: {email}", "❌")
                 return None
 
+            print_progress(f"Found user: {users[0].get('UserName')}", "✅")
             return users[0]
 
         except Exception as e:
@@ -63,6 +77,7 @@ class AWSAccessHandler:
     def get_permission_set_arn(self, permission_set_name: str) -> Optional[str]:
         """Get Permission Set ARN from its name."""
         try:
+            print_progress(f"Looking up permission set: {permission_set_name}", "🔑")
             paginator = self.sso_admin.get_paginator('list_permission_sets')
             
             for page in paginator.paginate(InstanceArn=self.instance_arn):
@@ -72,69 +87,19 @@ class AWSAccessHandler:
                         PermissionSetArn=permission_set_arn
                     )
                     if response['PermissionSet']['Name'] == permission_set_name:
+                        print_progress(f"Found permission set: {permission_set_name}", "✅")
                         return permission_set_arn
             
-            logger.error(f"No permission set found with name: {permission_set_name}")
+            print_progress(f"No permission set found with name: {permission_set_name}", "❌")
             return None
 
         except Exception as e:
             logger.error(f"Error finding permission set by name: {str(e)}")
             raise
 
-    def get_slack_user_id(self, email: str) -> Optional[str]:
-        """Get Slack user ID from email."""
-        
-        try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return None
-
-            response = requests.post(
-                'https://slack.com/api/users.lookupByEmail',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                data={'email': email}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('ok'):
-                    return data['user']['id']
-            
-            logger.error(f"Failed to find Slack user for email: {email}")
-            return None
-
-        except Exception as e:
-            logger.error(f"Error getting Slack user ID: {str(e)}")
-            return None
-
-    def send_slack_notification(self, user_id: str, message: str):
-        """Send Slack message to user."""
-        try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
-            if not slack_token:
-                logger.error("SLACK_API_TOKEN not set")
-                return
-
-            response = requests.post(
-                'https://slack.com/api/chat.postMessage',
-                headers={'Authorization': f'Bearer {slack_token}'},
-                json={
-                    'channel': user_id,
-                    'text': message
-                }
-            )
-
-            if not response.ok:
-                logger.error(f"Failed to send Slack message: {response.text}")
-
-        except Exception as e:
-            logger.error(f"Error sending Slack notification: {str(e)}")
-
     def parse_iso8601_duration(self, duration: str) -> int:
         """Convert ISO8601 duration to seconds."""
         try:
-            # Handle basic format PT#H or PT#M
             if duration.startswith('PT'):
                 value = int(duration[2:-1])
                 unit = duration[-1]
@@ -150,73 +115,158 @@ class AWSAccessHandler:
         """Handle and log errors."""
         error_msg = f"{message}: {str(error)}"
         logger.error(error_msg)
-        print(json.dumps({
-            "status": "error",
-            "error_type": type(error).__name__,
-            "message": error_msg
-        }))
+        print_progress(error_msg, "❌")
         sys.exit(1)
+
+    def get_aws_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        """Find AWS user in IAM Identity Center by email."""
+        try:
+            print_progress(f"Looking up AWS user: {email}", "👤")
+            response = self.identitystore.list_users(
+                IdentityStoreId=self.identity_store_id,
+                Filters=[{
+                    'AttributePath': 'UserName',
+                    'AttributeValue': email
+                }]
+            )
+
+            users = response.get('Users', [])
+            if not users:
+                print_progress(f"No AWS user found with email: {email}", "❌")
+                return None
+
+            print_progress(f"Found AWS user: {users[0].get('UserName')}", "✅")
+            return users[0]
+
+        except Exception as e:
+            logger.error(f"Error finding AWS user by email: {str(e)}")
+            raise
+
+    def revoke_access(self, user_email: str, permission_set_name: str):
+        """Revoke access for a user by email and permission set name."""
+        try:
+            print_progress(f"Revoking access for {user_email} with permission set {permission_set_name}...", "🔄")
+
+            # Find AWS user by email
+            aws_user = self.get_aws_user_by_email(user_email)
+            if not aws_user:
+                raise ValueError(f"AWS user not found: {user_email}")
+
+            # Get permission set ARN
+            permission_set_arn = self.get_permission_set_arn(permission_set_name)
+            if not permission_set_arn:
+                raise ValueError(f"Permission set not found: {permission_set_name}")
+
+            # Revoke account assignment
+            response = self.sso_admin.delete_account_assignment(
+                InstanceArn=self.instance_arn,
+                TargetId=os.environ['AWS_ACCOUNT_ID'],
+                TargetType='AWS_ACCOUNT',
+                PermissionSetArn=permission_set_arn,
+                PrincipalType='USER',
+                PrincipalId=aws_user['UserId']
+            )
+
+            print_progress(f"Access revoked successfully for {user_email}", "✅")
+
+            # Notify user via Slack
+            slack_user_id = self.notifications.slack.lookup_user_by_email(user_email)
+            if slack_user_id:
+                blocks = create_access_revoked_blocks(
+                    account_id=os.environ['AWS_ACCOUNT_ID'],
+                    permission_set=permission_set_name,
+                    user_email=user_email
+                )
+                self.notifications.slack.send_message(
+                    message="Your AWS access has been revoked.",
+                    blocks=blocks
+                )
+
+        except Exception as e:
+            self._handle_error("Failed to revoke access", e)
 
 def main():
     """Main execution function."""
     try:
-        # Get environment variables
-        user_email = os.environ['KUBIYA_USER_EMAIL']
-        account_id = os.environ['AWS_ACCOUNT_ID']
-        permission_set = os.environ['PERMISSION_SET_NAME']
-        session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
-        aws_profile = os.environ.get('AWS_PROFILE')
+        action = os.environ.get('ACTION', 'grant')  # Default to 'grant' if not specified
 
-        handler = AWSAccessHandler(aws_profile)
-        
-        # Find user by email
-        user = handler.get_user_by_email(user_email)
-        if not user:
-            raise ValueError(f"User not found: {user_email}")
+        if action == 'grant':
+            print_progress("Starting JIT access provisioning...", "🚀")
 
-        # Get permission set ARN
-        permission_set_arn = handler.get_permission_set_arn(permission_set)
-        if not permission_set_arn:
-            raise ValueError(f"Permission set not found: {permission_set}")
+            # Get environment variables
+            user_email = os.environ['KUBIYA_USER_EMAIL']
+            account_id = os.environ['AWS_ACCOUNT_ID']
+            permission_set = os.environ['PERMISSION_SET_NAME']
+            session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
+            aws_profile = os.environ.get('AWS_PROFILE')
 
-        # Get Slack user ID
-        slack_user_id = handler.get_slack_user_id(user_email)
-        
-        # Create assignment
-        response = handler.sso_admin.create_account_assignment(
-            InstanceArn=handler.instance_arn,
-            TargetId=account_id,
-            TargetType='AWS_ACCOUNT',
-            PermissionSetArn=permission_set_arn,
-            PrincipalType='USER',
-            PrincipalId=user['UserId']
-        )
+            handler = AWSAccessHandler(aws_profile)
+            
+            # Find user by email
+            user = handler.get_user_by_email(user_email)
+            if not user:
+                raise ValueError(f"User not found: {user_email}")
 
-        # Get session duration in seconds
-        duration_seconds = handler.parse_iso8601_duration(session_duration)
-        
-        # Print success response
-        print(json.dumps({
-            "status": "success",
-            "message": f"Access granted for {duration_seconds} seconds",
-            "details": response['AccountAssignmentCreationStatus']
-        }))
-
-        # Send Slack notification if possible
-        if slack_user_id:
-            handler.send_slack_notification(
-                slack_user_id,
-                f"Your AWS session for account {account_id} with permission set {permission_set} has expired."
+            # Get permission set ARN
+            permission_set_arn = handler.get_permission_set_arn(permission_set)
+            if not permission_set_arn:
+                raise ValueError(f"Permission set not found: {permission_set}")
+            
+            # Get account alias and permission set details for better display
+            account_alias = get_account_alias(handler.session) or account_id
+            permission_set_details = get_permission_set_details(
+                handler.session, 
+                handler.instance_arn, 
+                permission_set_arn
             )
+            
+            print_progress("Creating account assignment...", "⚙️")
+            
+            # Create assignment
+            response = handler.sso_admin.create_account_assignment(
+                InstanceArn=handler.instance_arn,
+                TargetId=account_id,
+                TargetType='AWS_ACCOUNT',
+                PermissionSetArn=permission_set_arn,
+                PrincipalType='USER',
+                PrincipalId=user['UserId']
+            )
+
+            # Get session duration in seconds
+            duration_seconds = handler.parse_iso8601_duration(session_duration)
+            
+            # Print human-readable success message
+            print_progress(f"Access granted successfully!", "✅")
+            print(f"   ├─ Account: {account_alias} ({account_id})")
+            print(f"   ├─ User: {user_email}")
+            print(f"   ├─ Permission Set: {permission_set}")
+            print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
+
+            # Send notifications using the notification manager
+            handler.notifications.send_access_granted(
+                account_id=account_id,
+                account_alias=account_alias,
+                permission_set=permission_set,
+                permission_set_details=permission_set_details,
+                duration_seconds=duration_seconds,
+                user_email=user_email
+            )
+
+        elif action == 'revoke':
+            print_progress("Starting JIT access revocation to AWS...", "🚫")
+
+            # Get environment variables
+            user_email = sys.argv[2]  # Assuming user email is passed as the second argument
+            permission_set = os.environ['PERMISSION_SET_NAME']
+            aws_profile = os.environ.get('AWS_PROFILE')
+
+            handler = AWSAccessHandler(aws_profile)
+            handler.revoke_access(user_email, permission_set)
 
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(error_msg)
-        print(json.dumps({
-            "status": "error",
-            "error_type": type(e).__name__,
-            "message": error_msg
-        }))
+        print_progress(error_msg, "❌")
         sys.exit(1)
 
 if __name__ == "__main__":
