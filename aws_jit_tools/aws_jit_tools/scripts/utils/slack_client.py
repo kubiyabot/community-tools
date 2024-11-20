@@ -9,7 +9,7 @@ class SlackClient:
     def __init__(self):
         self.token = os.environ.get('SLACK_API_TOKEN')
         self.channel_id = os.environ.get('SLACK_CHANNEL_ID')
-        self.thread_ts = os.environ.get('SLACK_THREAD_TS')
+        self.thread_ts = os.environ.get('SLACK_THREAD_TS') # Optional
         
         if not self.token or not self.channel_id:
             logger.warning("SLACK_API_TOKEN or SLACK_CHANNEL_ID not set")
