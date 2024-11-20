@@ -1,8 +1,8 @@
 # AWS Just-In-Time (JIT) Access Tools
 
-**Version:** 0.2.0
+**Version:** 0.3.0
 
-A comprehensive toolkit for managing Just-In-Time AWS access through IAM Identity Center (SSO) and S3 bucket access. Built on top of Kubiya JIT Tools, this package provides a flexible and secure way to manage AWS access controls dynamically, including dynamic IAM policy creation and cleanup.
+A comprehensive toolkit for managing Just-In-Time AWS access through IAM Identity Center (SSO) and S3 bucket access. Built on top of Kubiya JIT Tools, this package provides a flexible and secure way to manage AWS access controls dynamically, including dynamic IAM policy creation and cleanup for both SSO and S3 access types.
 
 ## Overview
 
