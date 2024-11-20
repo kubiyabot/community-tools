@@ -53,79 +53,59 @@ package kubiya.tool_manager
 # Default deny all access
 default allow = false
 
-# Allow members of the "DevOps" group to access specific tools
+# Define restricted tools
+restricted_tools := {
+    "jit_session_grant_database_access_to_staging"
+}
+
+# Allow Kubiya R&D team access to all tools except restricted ones
 allow {
+    # Check if user is in Kubiya R&D group
     group := input.user.groups[_]
-    group == "DevOps"
+    group == "Kubiya R&D"
+    
+    # Get requested tool
     tool := input.tool.name
-    tool == "deploy_application"  # Specify the tool name
-}
-
-# Allow users with specific email domains to access monitoring tools
-allow {
-    endswith(input.user.email, "@kubiya.ai")
-    tool := input.tool.name
-    tool == "view_metrics"
-}
-
-# Grant access based on user roles
-allow {
-    role := input.user.roles[_]
-    role == "SRE"
-    tool := input.tool.name
-    tool != "modify_security_groups"  # Deny access to this tool
-}
-
-# Time-based access control: Allow access during business hours
-allow {
-    tool := input.tool.name
-    tool == "restart_service"
-    time := input.time.hour  # Assume input includes current time
-    time >= 9
-    time <= 17
-}
-
-# IP-based access control: Allow access only from specific IP ranges
-allow {
-    tool := input.tool.name
-    tool == "access_database"
-    ip := input.client_ip
-    net.cidr_contains("10.0.0.0/8", ip)
-}
-
-# Allow access to emergency tools for on-call engineers
-allow {
-    group := input.user.groups[_]
-    group == "OnCall"
-    tool := input.tool.name
-    tool == "trigger_failover"
-}
-
-# Allow access to all tools for administrators except specified ones
-allow {
-    group := input.user.groups[_]
-    group == "Administrators"
-    tool := input.tool.name
+    
+    # Ensure tool is not restricted
     not restricted_tools[tool]
 }
 
-# Define a set of restricted tools
-restricted_tools := {
-    "delete_production_data",
-    "shutdown_server",
-}
-
-# Allow access to a tool if the user has a specific attribute
+# Allow Administrators full access except restricted tools
 allow {
-    input.user.attributes.region == "EU"
+    # Check if user is in Administrators group
+    group := input.user.groups[_]
+    group == "Administrators"
+    
+    # Get requested tool
     tool := input.tool.name
-    tool == "deploy_europe"
+    
+    # Ensure tool is not restricted
+    not restricted_tools[tool]
 }
 
-# Example of denying access explicitly
-deny[msg] {
-    input.user.email == "user_to_block@example.com"
-    msg := sprintf("User %s is denied access", [input.user.email])
+# Always allow access to request_tool_access (public tool)
+allow {
+    input.tool.name == "request_tool_access"
+}
+
+# Special access for specific user
+allow {
+    input.tool.name == "jit_se_access"
+    input.user.email == "amit@kubiya.ai"
+}
+
+# Allow PDB checker access for R&D team
+allow {
+    # Tool specific check
+    input.tool.name == "pod_disruption_budget_checker"
+    
+    # Group membership check
+    group := input.user.groups[_]
+    group == "Kubiya R&D"
+    
+    # Parameter check
+    input.tool.parameters.namespace == "all"
 }
 ```
 
