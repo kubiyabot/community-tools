@@ -3,8 +3,6 @@ from kubiya_sdk.tools.models import FileSpec, Arg
 from pathlib import Path
 from .base import AWSJITTool
 from ..scripts.config_loader import get_access_configs, get_s3_configs
-from ..scripts.policy_templates import s3_read_only_policy, s3_full_access_policy
-import json
 
 # Get access handler code
 HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
