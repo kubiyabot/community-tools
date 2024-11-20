@@ -47,9 +47,9 @@ sequenceDiagram
 
 ## Policy Configuration with OPA and OPAL
 
-The Enforcer uses Open Policy Agent (OPA) to evaluate access policies synchronized via OPAL from your GitHub repository. Here's an example of how to define policies to control tool access:
+The Enforcer uses Open Policy Agent (OPA) to evaluate access policies synchronized via OPAL from your GitHub repository. Below are multiple policy examples covering different scenarios to help you define your access control policies effectively.
 
-### Example Policy: `policy.rego`
+### Example Policies: `policy.rego`
 
 ```rego
 package kubiya.tool_manager
@@ -57,65 +57,181 @@ package kubiya.tool_manager
 # Default deny all access
 default allow = false
 
-# Allow Kubiya R&D team access to all tools except `jit_session_grant_database_access_to_staging`
+# Allow members of the "DevOps" group to access specific tools
 allow {
     group := input.user.groups[_]
-    group == "Kubiya R&D"
+    group == "DevOps"
     tool := input.tool.name
-    tool != "jit_session_grant_database_access_to_staging"
+    tool == "deploy_application"  # Specify the tool name
 }
 
-# Allow Administrators access to all tools except `jit_session_grant_database_access_to_staging`
+# Allow users with specific email domains to access monitoring tools
+allow {
+    endswith(input.user.email, "@kubiya.ai")
+    tool := input.tool.name
+    tool == "view_metrics"
+}
+
+# Grant access based on user roles
+allow {
+    role := input.user.roles[_]
+    role == "SRE"
+    tool := input.tool.name
+    tool != "modify_security_groups"  # Deny access to this tool
+}
+
+# Time-based access control: Allow access during business hours
+allow {
+    tool := input.tool.name
+    tool == "restart_service"
+    time := input.time.hour  # Assume input includes current time
+    time >= 9
+    time <= 17
+}
+
+# IP-based access control: Allow access only from specific IP ranges
+allow {
+    tool := input.tool.name
+    tool == "access_database"
+    ip := input.client_ip
+    net.cidr_contains("10.0.0.0/8", ip)
+}
+
+# Allow access to emergency tools for on-call engineers
+allow {
+    group := input.user.groups[_]
+    group == "OnCall"
+    tool := input.tool.name
+    tool == "trigger_failover"
+}
+
+# Allow access to all tools for administrators except specified ones
 allow {
     group := input.user.groups[_]
     group == "Administrators"
     tool := input.tool.name
-    tool != "jit_session_grant_database_access_to_staging"
+    not restricted_tools[tool]
 }
 
-# Always allow access to `request_tool_access`
+# Define a set of restricted tools
+restricted_tools := {
+    "delete_production_data",
+    "shutdown_server",
+}
+
+# Allow access to a tool if the user has a specific attribute
 allow {
-    input.tool.name == "request_tool_access"
+    input.user.attributes.region == "EU"
+    tool := input.tool.name
+    tool == "deploy_europe"
 }
 
-# Special access for `jit_se_access` tool
-allow {
-    input.tool.name == "jit_se_access"
-    input.user.email == "amit@kubiya.ai"
-}
-
-# PDB checker access for Kubiya R&D team
-allow {
-    input.tool.name == "pod_disruption_budget_checker"
-    group := input.user.groups[_]
-    namespace := input.tool.parameters.namespace
-    namespace == "all"
-    group == "Kubiya R&D"
-}
-
-# PDB checker access for a specific user
-allow {
-    input.tool.name == "pod_disruption_budget_checker"
-    input.user.email == "kris.talajic@kubiya.ai"
-    input.tool.parameters.namespace == "all"
-}
-
-# Helper function to check if a tool is restricted
-is_restricted(tool) {
-    restricted_tools := {"cluster_health"}
-    restricted_tools[tool]
+# Example of denying access explicitly
+deny[msg] {
+    input.user.email == "user_to_block@example.com"
+    msg := sprintf("User %s is denied access", [input.user.email])
 }
 ```
 
 **Important Notes:**
 
-- **Okta Group Alignment**: The group names used in the policies must exist in Okta.
+- **Okta Group Alignment**: The group names and roles used in the policies must exist in Okta.
+- **User Attributes**: Ensure that user attributes required by the policies are provided by Okta and included in the `input`.
 - **Tool Parameters**: Tools must include the relevant parameters as specified in the policy conditions.
+- **Time and IP Data**: For time-based and IP-based policies, ensure that the necessary data (e.g., `input.time`, `input.client_ip`) is passed to OPA.
+
+### Using Helper Functions
+
+You can define helper functions within your policies to simplify complex conditions.
+
+```rego
+package kubiya.tool_manager
+
+# Helper function to check if the user's email is from a corporate domain
+is_corporate_email(email) {
+    endswith(email, "@kubiya.ai")
+}
+
+# Allow access if the email is from a corporate domain
+allow {
+    is_corporate_email(input.user.email)
+    tool := input.tool.name
+    tool == "view_internal_docs"
+}
+```
+
+### Contextual Policies Based on Tool Parameters
+
+```rego
+package kubiya.tool_manager
+
+# Allow deployment to staging environment for all developers
+allow {
+    group := input.user.groups[_]
+    group == "Developers"
+    tool := input.tool.name
+    tool == "deploy_application"
+    env := input.tool.parameters.environment
+    env == "staging"
+}
+
+# Restrict deployment to production environment
+allow {
+    group := input.user.groups[_]
+    group == "Release Managers"
+    tool := input.tool.name
+    tool == "deploy_application"
+    env := input.tool.parameters.environment
+    env == "production"
+}
+```
+
+### Policy for Temporary Access with Just-In-Time (JIT)
+
+```rego
+package kubiya.tool_manager
+
+# Allow temporary access if a valid JIT token is provided
+allow {
+    input.tool.name == "access_sensitive_data"
+    valid_jit_token(input.user.email, input.jit_token)
+}
+
+# Function to validate JIT token (simplified example)
+valid_jit_token(email, token) {
+    # Implement token validation logic here
+    # For example, check if the token exists in a database and is not expired
+    true
+}
+```
+
+### Deny with Detailed Messages
+
+Provide detailed denial messages to help users understand why access was denied.
+
+```rego
+package kubiya.tool_manager
+
+default allow = false
+
+# Deny access and provide a message
+deny[msg] {
+    not allow
+    msg := "Access denied. Please contact the administrator if you believe this is an error."
+}
+```
+
+## Important Considerations
+
+- **Testing Policies**: Before deploying policies to production, thoroughly test them to ensure they behave as expected.
+- **Policy Organization**: Keep your policies well-organized and documented for maintainability.
+- **Version Control**: Use version control (e.g., Git) for your policy repository to track changes over time.
+- **Audit Logging**: Implement audit logging to track policy decisions and access attempts.
 
 ## Adding Policies to Your Repository
 
 1. **Create a Policy File**: Add a `.rego` file (e.g., `policy.rego`) to your policy repository.
-2. **Define Policies**: Include the policy rules as shown in the example above.
+2. **Define Policies**: Include the policy rules as shown in the examples above.
 3. **Commit and Push**: Commit the changes and push them to the repository.
 
 The OPAL service will automatically detect changes and synchronize the updated policies to the Enforcer's OPA engine.
