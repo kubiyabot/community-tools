@@ -2,40 +2,22 @@ from kubiya_sdk.tools.registry import tool_registry
 from kubiya_sdk.tools.models import FileSpec, Arg
 from pathlib import Path
 from .base import AWSJITTool
+from ..scripts.config_loader import get_access_configs, get_s3_configs
 
 # Get access handler code
 HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
 with open(HANDLER_PATH) as f:
     HANDLER_CODE = f.read()
 
-# Configuration for different access types
-ACCESS_CONFIGS = {
-    "Solution Engineer Access to Staging": {
-        "name": "jit_se_access",
-        "description": "Grants SE (Solutions Engineer) access to march17test2 AWS account (162755939319)",
-        "account_id": "162755939319",
-        "permission_set": "CustomViewOnlyAccess",
-        "session_duration": "PT1H"
-    },
-}
-
-# Configuration for S3 bucket access
-S3_ACCESS_CONFIGS = {
-    "S3 Bucket Read Access": {
-        "name": "jit_s3_read_access",
-        "description": "Grants read access to specific S3 buckets",
-        "buckets": ["example-bucket-1", "example-bucket-2"],
-        "policy_template": "S3ReadOnlyPolicy",
-        "session_duration": "PT1H"
-    },
-    "S3 Bucket Write Access": {
-        "name": "jit_s3_write_access",
-        "description": "Grants write access to specific S3 buckets",
-        "buckets": ["example-bucket-1", "example-bucket-2"],
-        "policy_template": "S3FullAccessPolicy",
-        "session_duration": "PT1H"
-    },
-}
+# Load configurations
+try:
+    ACCESS_CONFIGS = get_access_configs()
+    S3_ACCESS_CONFIGS = get_s3_configs()
+except Exception as e:
+    print(f"Error loading configurations: {e}")
+    ACCESS_CONFIGS = {}
+    S3_ACCESS_CONFIGS = {}
+    raise e
 
 def create_jit_tool(config, action):
     """Create a JIT tool from configuration."""
@@ -157,24 +139,28 @@ python /opt/scripts/access_handler.py {action} --user-email $1
     """
     )
 
-# Create tools from configuration for both grant and revoke actions
-tools = {
-    f"{access_type}_{action}": create_jit_tool(config, action)
-    for access_type, config in ACCESS_CONFIGS.items()
-    for action in ["grant", "revoke"]
-}
+# Create tools only if configurations are loaded successfully
+if ACCESS_CONFIGS and S3_ACCESS_CONFIGS:
+    # Create tools from configuration for both grant and revoke actions
+    tools = {
+        f"{access_type}_{action}": create_jit_tool(config, action)
+        for access_type, config in ACCESS_CONFIGS.items()
+        for action in ["grant", "revoke"]
+    }
 
-# Create S3 tools from configuration for both grant and revoke actions
-s3_tools = {
-    f"{access_type}_{action}": create_s3_jit_tool(config, action)
-    for access_type, config in S3_ACCESS_CONFIGS.items()
-    for action in ["grant", "revoke"]
-}
+    # Create S3 tools from configuration for both grant and revoke actions
+    s3_tools = {
+        f"{access_type}_{action}": create_s3_jit_tool(config, action)
+        for access_type, config in S3_ACCESS_CONFIGS.items()
+        for action in ["grant", "revoke"]
+    }
 
-# Register all tools
-for tool in {**tools, **s3_tools}.values():
-    tool_registry.register("aws_jit", tool)
+    # Register all tools
+    for tool in {**tools, **s3_tools}.values():
+        tool_registry.register("aws_jit", tool)
 
-# Export all tools
-__all__ = list({**tools, **s3_tools}.keys())
-globals().update({**tools, **s3_tools}) 
+    # Export all tools
+    __all__ = list({**tools, **s3_tools}.keys())
+    globals().update({**tools, **s3_tools})
+else:
+    logger.error("No tools created due to configuration loading errors") 
