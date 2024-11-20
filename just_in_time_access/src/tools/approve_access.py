@@ -22,9 +22,12 @@ approve_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
+    python -m venv /opt/venv > /dev/null
+    . /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
 
     # Run the access approval handler script
-    python /opt/scripts/access_approval_handler.py "{{ .request_id }}" "{{ .approval_action }}"
+    python /opt/scripts/access_approval_handler.py "{{ .request_id }}" "{{ .approval_action }}" "{{ .ttl }}"
     """,
     args=[
         Arg(
@@ -33,7 +36,7 @@ approve_access_tool = JustInTimeAccessTool(
                 "The unique identifier of the access request to be approved or rejected.\n"
                 "*Example*: `req-12345`."
             ),
-            required=True
+            required=True,
         ),
         Arg(
             name="approval_action",
@@ -41,13 +44,19 @@ approve_access_tool = JustInTimeAccessTool(
                 "The action to perform on the access request. Must be either `approve` or `reject`.\n"
                 "*Example*: `approve`."
             ),
-            required=True
+            required=True,
+        ),
+        Arg(
+            name="ttl",
+            description=(
+                "Actual time-to-live for the access (optional). Specifies for how long the access should be granted (not guaranteed as the approver may override).\n"
+                "*Example*: `1h` for one hour, `30m` for 30 minutes.\n"
+                "This is only required if the approval action is `approve`."
+            ),
+            required=False,
         ),
     ],
-    env=[
-        "SLACK_CHANNEL_ID",
-        "APPROVALS_CHANNEL_ID",
-    ],
+    env=[],
     secrets=[
         "SLACK_API_TOKEN",
     ],
@@ -57,12 +66,7 @@ approve_access_tool = JustInTimeAccessTool(
             content=inspect.getsource(access_approval_handler),
         ),
     ],
-    with_volumes=[
-        Volume(
-            name="db_data",
-            path="/var/lib/database"
-        )
-    ],
+    with_volumes=[Volume(name="db_data", path="/var/lib/database")],
     long_running=False,
     mermaid="""
     sequenceDiagram
@@ -80,7 +84,7 @@ approve_access_tool = JustInTimeAccessTool(
 tool_registry.register("just_in_time_access", approve_access_tool)
 
 # Export the tool
-__all__ = ['approve_access_tool']
+__all__ = ["approve_access_tool"]
 
 # Make sure the tool is available at module level
-globals()['approve_access_tool'] = approve_access_tool 
+globals()["approve_access_tool"] = approve_access_tool
