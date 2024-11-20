@@ -79,7 +79,7 @@ def schedule_task(
         response = requests.post(
             "https://api.kubiya.ai/api/v1/scheduled_tasks",
             headers={
-                "Authorization": f'UserKey {{{{os.environ["KUBIYA_API_KEY"]}}}}',
+                "Authorization": f'UserKey {os.environ["KUBIYA_API_KEY"]}',
                 "Content-Type": "application/json",
             },
             json=payload,
