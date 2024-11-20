@@ -1,16 +1,9 @@
 {
-    "S3 Bucket Read Access": {
-        "name": "jit_s3_read_access",
-        "description": "Grants read access to specific S3 buckets",
-        "buckets": ["example-bucket-1", "example-bucket-2"],
+    "aaron-for-president access": {
+        "name": "Grant access to s3 bucket aaron-for-president",
+        "description": "Grants read access to specific S3 bucket - aaron-for-president",
+        "buckets": ["aaron-for-president"],
         "policy_template": "S3ReadOnlyPolicy",
         "session_duration": "PT1H"
-    },
-    "S3 Bucket Write Access": {
-        "name": "jit_s3_write_access",
-        "description": "Grants write access to specific S3 buckets",
-        "buckets": ["example-bucket-1", "example-bucket-2"],
-        "policy_template": "S3FullAccessPolicy",
-        "session_duration": "PT1H"
     }
-} 
+}
