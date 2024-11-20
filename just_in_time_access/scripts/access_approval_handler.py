@@ -1,3 +1,5 @@
+from curses import erasechar
+from nt import environ
 import sys
 import os
 import json
@@ -19,7 +21,95 @@ def get_requester_email(request_id: str, enforcer_base_url: str) -> str:
     return request_details["request"]["user"]["email"]
 
 
+def get_request_metadata(request_id: str, enforcer_base_url: str) -> dict:
+    response = requests.get(f"{enforcer_base_url}/requests/describe/{request_id}")
+    if response.status_code >= 400:
+        print(f"Failed to fetch request details: {response.text}")
+        sys.exit(1)
+
+    return response.json()
+
+
+from datetime import datetime, timedelta, timezone
+
+
+# Function to convert 'xh' format to a future date
+def convert_to_future_date(duration: str) -> datetime:
+    # Get current time
+    current_time = datetime.now(timezone.utc)
+
+    unit = duration[-1:]  # Extract the unit of time from the string
+    duration_format = {
+        "s": "seconds",
+        "m": "minutes",
+        "h": "hours",
+        "d": "days",
+    }
+    d = duration_format.get(unit, None)
+    if d is None:
+        raise ValueError(
+            "Invalid duration format. Please use a valid format (e.g., 5h for 5 hours, 30m for 30 minutes). Seconds, Minutes, Hours, Days are supported."
+        )
+    # Extract the number of hours from the string
+    value = int(duration[:-1])  # Remove the 'h' and convert the number to int
+    # Add the number of hours to the current time
+    future_time = current_time + timedelta(**{d: value})
+
+    return future_time
+
+
+def schedule_task(
+    teammate: str,
+    schedule_time: datetime,
+    slack_destination: str,
+    ai_instructions: str,
+):
+
+    schedule_time_str = schedule_time.isoformat(timespec="milliseconds").replace(
+        "+00:00", "Z"
+    )
+    payload = {
+        "channel_id": slack_destination,
+        "cron_string": None,
+        "schedule_time": schedule_time_str,
+        "selected_agent": teammate,
+        "task_description": ai_instructions,
+    }
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        response = requests.post(
+            "https://api.kubiya.ai/api/v1/scheduled_tasks",
+            headers={
+                "Authorization": f'UserKey {{{{os.environ["KUBIYA_API_KEY"]}}}}',
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        if response.status_code < 400:
+            break
+        else:
+            print(f"Attempt {attempt + 1} failed: {response.text}")
+            if attempt < max_retries - 1:
+                print("Retrying...")
+            else:
+                print("Max retries reached. Unable to schedule task.")
+                sys.exit(1)
+
+    print("Task scheduled successfully.")
+
+
 def approve(request_id: str, ttl: str, enforcer_base_url: str):
+    request_metadata = get_request_metadata(request_id, enforcer_base_url)
+
+    end_datetime = convert_to_future_date(ttl)
+    schedule_task(
+        teammate=os.environ["KUBIYA_AGENT_PROFILE"],
+        schedule_time=end_datetime,
+        slack_destination=os.environ["SLACK_CHANNEL_ID"],
+        ai_instructions=f"Your task is to revoke the access granted based on the following approved request details: {request_metadata}. If a suitable tool or method is available to revoke the permissions, please execute the action immediately with the relevant context",
+    )
+
     response = requests.put(
         f"{enforcer_base_url}/requests/approve",
         json={"id": request_id, "ttl": ttl},
