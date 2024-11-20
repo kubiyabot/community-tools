@@ -10,14 +10,18 @@ class NotificationManager:
         self.slack = SlackClient()
 
     def send_access_granted(self, account_id: str, permission_set: str, 
-                          duration_seconds: int, user_email: str) -> bool:
+                          duration_seconds: int, user_email: str,
+                          account_alias: Optional[str] = None,
+                          permission_set_details: Optional[dict] = None) -> bool:
         """Send access granted notification."""
         try:
             blocks = create_access_granted_blocks(
                 account_id=account_id,
                 permission_set=permission_set,
                 duration_seconds=duration_seconds,
-                user_email=user_email
+                user_email=user_email,
+                account_alias=account_alias,
+                permission_set_details=permission_set_details
             )
             return self.slack.send_message(
                 message="AWS access granted! 🎉",
