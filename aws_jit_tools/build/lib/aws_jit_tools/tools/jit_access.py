@@ -192,4 +192,3 @@ if ACCESS_CONFIGS and S3_ACCESS_CONFIGS:
     globals().update({**tools, **s3_tools})
 else:
     print("No tools created due to configuration loading errors") 
-    raise Exception("No tools created due to configuration loading errors")
