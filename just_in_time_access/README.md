@@ -99,3 +99,7 @@ sequenceDiagram
 
     Note over U,S: 🔄 Policy Auto-Revokes After TTL
 ```
+
+## 📚 Documentation
+
+For detailed instructions on setting up the Kubiya Enforcer, please refer to the [Kubiya Enforcer Stack Deployment Guide](./docs/Kubiya_Enforcer_Deployment.md).
