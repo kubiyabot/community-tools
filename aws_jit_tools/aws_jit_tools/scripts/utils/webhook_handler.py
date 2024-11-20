@@ -8,9 +8,9 @@ logger = logging.getLogger(__name__)
 
 class WebhookHandler:
     def __init__(self):
-        self.webhook_url = os.environ.get('REVOCATION_WEBHOOK_URL')
+        self.webhook_url = os.environ.get('REVOKATION_WEBHOOK_URL')
         if not self.webhook_url:
-            logger.warning("REVOCATION_WEBHOOK_URL not set")
+            logger.warning("REVOKATION_WEBHOOK_URL not set")
 
     def send_revocation_webhook(self, 
                               user_email: str,
@@ -22,7 +22,7 @@ class WebhookHandler:
                               buckets: Optional[list] = None) -> bool:
         """Send revocation webhook to Kubiya API."""
         if not self.webhook_url:
-            logger.error("REVOCATION_WEBHOOK_URL not configured")
+            logger.error("REVOKATION_WEBHOOK_URL not configured")
             return False
 
         try:
