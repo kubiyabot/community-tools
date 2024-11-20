@@ -17,7 +17,7 @@ class SlackClient:
     def send_message(self, message: str = None, blocks: Dict[str, Any] = None) -> bool:
         """Send a Slack message with optional blocks."""
         if not self.token or not self.channel_id:
-            logger.error("Slack credentials not properly configured")
+            logger.error("Slack credentials not properly configured - please make sure you have enabled Slack integration on the execution environment (team mate)")
             return False
 
         try:

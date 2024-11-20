@@ -3,7 +3,7 @@ import json
 
 def create_access_granted_blocks(account_id: str, permission_set: str, duration_seconds: int, 
                                user_email: str, account_alias: Optional[str] = None,
-                               permission_set_details: Optional[dict] = None) -> list:
+                               permission_set_details: Optional[dict] = None) -> Dict[str, Any]:
     """Create engaging Slack Block Kit message for access grant notification."""
     
     duration_hours = duration_seconds / 3600
@@ -95,7 +95,8 @@ def create_access_granted_blocks(account_id: str, permission_set: str, duration_
         }
     ])
 
-    return blocks
+    # Return blocks wrapped in a dictionary
+    return {"blocks": blocks}
 
 def create_access_expired_blocks(account_id: str, permission_set: str) -> Dict[str, Any]:
     """Create Slack Block Kit message for access expiration notification."""
