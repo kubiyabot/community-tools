@@ -6,6 +6,8 @@ try:
     from botocore.exceptions import ClientError
 except ImportError:
     print("boto3 / botocore not installed, skipping import (might be a discovery call)")
+    boto3 = None
+    ClientError = None
     pass
 
 logger = logging.getLogger(__name__)
