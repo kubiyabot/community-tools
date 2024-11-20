@@ -2,8 +2,10 @@ import logging
 import os
 import sys
 import json
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pathlib import Path
+import time
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,7 @@ from utils.notifications import NotificationManager
 from utils.aws_utils import get_account_alias, get_permission_set_details
 from utils.slack_messages import create_access_revoked_blocks
 from utils.iam_policy_manager import IAMPolicyManager
+from utils.webhook_handler import WebhookHandler
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -60,6 +63,7 @@ class AWSAccessHandler:
             self.sso_admin = self.session.client('sso-admin')
             self.notifications = NotificationManager()
             self.policy_manager = IAMPolicyManager(self.session)
+            self.webhook_handler = WebhookHandler()
             
             print_progress("Fetching SSO instance details...", "🔍")
             instances = self.sso_admin.list_instances()['Instances']
@@ -229,6 +233,32 @@ class AWSAccessHandler:
         except Exception as e:
             self._handle_error("Failed to revoke access", e)
 
+    def _schedule_revocation_webhook(self, 
+                                   user_email: str,
+                                   duration_seconds: int,
+                                   account_id: str,
+                                   permission_set: Optional[str] = None,
+                                   policy_details: Optional[Dict[str, Any]] = None,
+                                   buckets: Optional[list] = None):
+        """Schedule the revocation webhook after the TTL expires."""
+        def send_webhook():
+            time.sleep(duration_seconds)
+            access_type = "s3" if buckets else "sso"
+            self.webhook_handler.send_revocation_webhook(
+                user_email=user_email,
+                access_type=access_type,
+                policy_details=policy_details or {},
+                duration_seconds=duration_seconds,
+                account_id=account_id,
+                permission_set=permission_set,
+                buckets=buckets
+            )
+
+        # Start webhook thread
+        webhook_thread = threading.Thread(target=send_webhook)
+        webhook_thread.daemon = True
+        webhook_thread.start()
+
     def grant_access(self, user_email: str, permission_set_name: str, requested_duration: str, max_duration: str):
         """Grant access for a user by email and permission set name."""
         try:
@@ -285,8 +315,66 @@ class AWSAccessHandler:
                 user_email=user_email
             )
 
+            # After successful access grant, schedule revocation webhook
+            self._schedule_revocation_webhook(
+                user_email=user_email,
+                duration_seconds=duration_seconds,
+                account_id=os.environ['AWS_ACCOUNT_ID'],
+                permission_set=permission_set_name,
+                policy_details={
+                    "name": permission_set_name,
+                    "type": "sso",
+                    "details": permission_set_details
+                }
+            )
+
         except Exception as e:
             self._handle_error("Failed to grant access", e)
+
+    def grant_s3_access(self, user_email: str, buckets: List[str], policy_template: str, duration: str):
+        """Grant S3 access for a user."""
+        try:
+            print_progress(f"Granting S3 access for {user_email}...", "🔄")
+            
+            # Validate duration
+            duration_seconds = self.parse_iso8601_duration(duration)
+            
+            # Find user by email
+            user = self.get_user_by_email(user_email)
+            if not user:
+                raise ValueError(f"User not found: {user_email}")
+
+            # Schedule revocation webhook
+            self._schedule_revocation_webhook(
+                user_email=user_email,
+                duration_seconds=duration_seconds,
+                account_id=os.environ['AWS_ACCOUNT_ID'],
+                buckets=buckets,
+                policy_details={
+                    "name": f"s3_{policy_template.lower()}",
+                    "type": "s3",
+                    "template": policy_template,
+                    "buckets": buckets
+                }
+            )
+
+            # Print human-readable success message
+            print_progress(f"S3 access granted successfully!", "✅")
+            print(f"   ├─ Account: {os.environ['AWS_ACCOUNT_ID']}")
+            print(f"   ├─ User: {user_email}")
+            print(f"   ├─ Policy Template: {policy_template}")
+            print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
+
+            # Send notifications using the notification manager
+            self.notifications.send_s3_access_granted(
+                account_id=os.environ['AWS_ACCOUNT_ID'],
+                user_email=user_email,
+                policy_template=policy_template,
+                duration_seconds=duration_seconds
+            )
+
+        except Exception as e:
+            self._handle_error("Failed to grant S3 access", e)
 
 def main():
     """Main function to handle command line arguments and execute actions."""
