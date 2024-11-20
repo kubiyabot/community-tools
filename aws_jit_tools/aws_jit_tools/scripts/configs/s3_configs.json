@@ -1,9 +1,0 @@
-{
-    "aaron-for-president access": {
-        "name": "Grant access to s3 bucket aaron-for-president",
-        "description": "Grants read access to specific S3 bucket - aaron-for-president",
-        "buckets": ["aaron-for-president"],
-        "policy_template": "S3ReadOnlyPolicy",
-        "session_duration": "PT1H"
-    }
-}
