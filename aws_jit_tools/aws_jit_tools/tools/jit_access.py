@@ -169,8 +169,7 @@ done
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram,
-        # Set long_running to True for grant action to allow webhook scheduling
-        long_running=(action == "grant")
+        long_running=False,
     )
 
 # Load configurations and create tools
