@@ -1,6 +1,6 @@
 {
-    "DB View Access to Staging": {
-        "name": "Database View Access to Staging",
+    "View Access to March17Test2": {
+        "name": "View Access to March17Test2",
         "description": "Grants access to all staging RDS databases",
         "account_id": "162755939319",
         "permission_set": "CustomViewOnlyAccess",
