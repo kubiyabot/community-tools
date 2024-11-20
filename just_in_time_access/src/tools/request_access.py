@@ -18,7 +18,7 @@ request_access_tool = JustInTimeAccessTool(
     description=(
         "Request temporary access to a tool or resource that failed due to missing permissions. "
         "NOTE: You typically won't need to run this tool directly - it can be used when another tool fails due to insufficient permissions."
-        "On failure, you'll see an error message containing a 'Request ID'. Use this ID when running this tool."
+        "On failure, you'll see an error message containing a 'Request ID'. ASK THE USER if he wants to submit an access request for the operation. Do not assume."
     ),
     content="""
     set -e
