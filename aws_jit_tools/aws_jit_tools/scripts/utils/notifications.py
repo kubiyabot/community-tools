@@ -13,8 +13,9 @@ class NotificationManager:
                           duration_seconds: int, user_email: str,
                           account_alias: Optional[str] = None,
                           permission_set_details: Optional[dict] = None) -> bool:
-        """Send access granted notification."""
+        """Send access granted notification to both thread and main channel."""
         try:
+            # Create blocks for the message
             blocks = create_access_granted_blocks(
                 account_id=account_id,
                 permission_set=permission_set,
@@ -23,10 +24,32 @@ class NotificationManager:
                 account_alias=account_alias,
                 permission_set_details=permission_set_details
             )
-            return self.slack.send_message(
-                message="AWS access granted! 🎉",
-                blocks=blocks
-            )
+
+            # Store original thread_ts
+            original_thread = self.slack.thread_ts
+
+            try:
+                # First send to the thread if thread_ts exists
+                if original_thread:
+                    self.slack.thread_ts = original_thread
+                    self.slack.send_message(
+                        message="AWS access granted! 🎉",
+                        blocks=blocks  # No need to wrap, already in correct format
+                    )
+
+                # Then send to main channel (without thread)
+                self.slack.thread_ts = None
+                success = self.slack.send_message(
+                    message="AWS access granted! 🎉",
+                    blocks=blocks  # No need to wrap, already in correct format
+                )
+
+                return success
+
+            finally:
+                # Restore original thread_ts
+                self.slack.thread_ts = original_thread
+
         except Exception as e:
             logger.error(f"Failed to send access granted notification: {e}")
             return False
