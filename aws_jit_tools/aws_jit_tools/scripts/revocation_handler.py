@@ -2,7 +2,6 @@ import logging
 import os
 import sys
 import json
-import time
 import requests
 from typing import Optional, Dict, Any
 
@@ -20,9 +19,9 @@ except ImportError as e:
     }))
     pass
 
-class AWSAccessHandler:
+class AWSRevocationHandler:
     def __init__(self, profile_name: Optional[str] = None):
-        """Initialize AWS access handler."""
+        """Initialize AWS revocation handler."""
         try:
             self.session = boto3.Session(profile_name=profile_name)
             self.identitystore = self.session.client('identitystore')
@@ -81,11 +80,26 @@ class AWSAccessHandler:
             logger.error(f"Error finding permission set by name: {str(e)}")
             raise
 
+    def revoke_account_assignment(self, user_id: str, account_id: str, permission_set_arn: str) -> Dict[str, Any]:
+        """Revoke an account assignment for a user."""
+        try:
+            response = self.sso_admin.delete_account_assignment(
+                InstanceArn=self.instance_arn,
+                TargetId=account_id,
+                TargetType='AWS_ACCOUNT',
+                PermissionSetArn=permission_set_arn,
+                PrincipalType='USER',
+                PrincipalId=user_id
+            )
+            return response['AccountAssignmentDeletionStatus']
+        except Exception as e:
+            logger.error(f"Error revoking account assignment: {str(e)}")
+            raise
+
     def get_slack_user_id(self, email: str) -> Optional[str]:
         """Get Slack user ID from email."""
-        
         try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
+            slack_token = os.environ.get('SLACK_API_TOKEN')
             if not slack_token:
                 logger.error("SLACK_API_TOKEN not set")
                 return None
@@ -111,7 +125,7 @@ class AWSAccessHandler:
     def send_slack_notification(self, user_id: str, message: str):
         """Send Slack message to user."""
         try:
-            slack_token = "os.environ.get('SLACK_API_TOKEN')"
+            slack_token = os.environ.get('SLACK_API_TOKEN')
             if not slack_token:
                 logger.error("SLACK_API_TOKEN not set")
                 return
@@ -131,21 +145,6 @@ class AWSAccessHandler:
         except Exception as e:
             logger.error(f"Error sending Slack notification: {str(e)}")
 
-    def parse_iso8601_duration(self, duration: str) -> int:
-        """Convert ISO8601 duration to seconds."""
-        try:
-            # Handle basic format PT#H or PT#M
-            if duration.startswith('PT'):
-                value = int(duration[2:-1])
-                unit = duration[-1]
-                if unit == 'H':
-                    return value * 3600
-                elif unit == 'M':
-                    return value * 60
-            return 3600  # Default 1 hour
-        except Exception:
-            return 3600
-
     def _handle_error(self, message: str, error: Exception):
         """Handle and log errors."""
         error_msg = f"{message}: {str(error)}"
@@ -164,10 +163,9 @@ def main():
         user_email = os.environ['KUBIYA_USER_EMAIL']
         account_id = os.environ['AWS_ACCOUNT_ID']
         permission_set = os.environ['PERMISSION_SET_NAME']
-        session_duration = os.environ.get('SESSION_DURATION', 'PT1H')
         aws_profile = os.environ.get('AWS_PROFILE')
 
-        handler = AWSAccessHandler(aws_profile)
+        handler = AWSRevocationHandler(aws_profile)
         
         # Find user by email
         user = handler.get_user_by_email(user_email)
@@ -179,37 +177,26 @@ def main():
         if not permission_set_arn:
             raise ValueError(f"Permission set not found: {permission_set}")
 
-        # Get Slack user ID
-        slack_user_id = handler.get_slack_user_id(user_email)
-        
-        # Create assignment
-        response = handler.sso_admin.create_account_assignment(
-            InstanceArn=handler.instance_arn,
-            TargetId=account_id,
-            TargetType='AWS_ACCOUNT',
-            PermissionSetArn=permission_set_arn,
-            PrincipalType='USER',
-            PrincipalId=user['UserId']
+        # Revoke the assignment
+        revocation_status = handler.revoke_account_assignment(
+            user['UserId'],
+            account_id,
+            permission_set_arn
         )
 
-        # Get session duration in seconds
-        duration_seconds = handler.parse_iso8601_duration(session_duration)
-        
         # Print success response
         print(json.dumps({
             "status": "success",
-            "message": f"Access granted for {duration_seconds} seconds",
-            "details": response['AccountAssignmentCreationStatus']
+            "message": "Access revoked successfully",
+            "details": revocation_status
         }))
 
-        # Sleep for the duration
-        time.sleep(duration_seconds)
-
-        # Send Slack notification if possible
+        # Get Slack user ID and send notification
+        slack_user_id = handler.get_slack_user_id(user_email)
         if slack_user_id:
             handler.send_slack_notification(
                 slack_user_id,
-                f"Your AWS session for account {account_id} with permission set {permission_set} has expired."
+                f"Your AWS access for account {account_id} with permission set {permission_set} has been revoked."
             )
 
     except Exception as e:
