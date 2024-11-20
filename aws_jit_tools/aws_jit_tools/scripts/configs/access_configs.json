@@ -5,17 +5,5 @@
         "account_id": "162755939319",
         "permission_set": "CustomViewOnlyAccess",
         "session_duration": "PT1H"
-    },
-    "SE Kubiyamichaelg Full": {
-        "description": "Provides full Solutions Engineer access to the kubiyamichaelg AWS account using the 'veranatest' permission set.",
-        "account_id": "724175145715",
-        "permission_set": "veranatest",
-        "session_duration": "PT1H"
-    },
-    "SE Kubiyamichaelg View": {
-        "description": "Grants view-only Solutions Engineer access to the kubiyamichaelg AWS account with the 'KubiyaViewOnlyAccess' permission set.",
-        "account_id": "724175145715",
-        "permission_set": "KubiyaViewOnlyAccess",
-        "session_duration": "PT1H"
     }
 } 
