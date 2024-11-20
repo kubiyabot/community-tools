@@ -22,8 +22,8 @@ request_access_tool = JustInTimeAccessTool(
     ),
     content="""
     set -e
-    print "🚀 Submitting your access request..."
-    print "⏳ Please wait while we process your request..."
+    echo "🚀 Submitting your access request..."
+    echo "⏳ Please wait while we process your request..."
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
     pip install requests==2.32.3 2>&1 | grep -v '[notice]' > /dev/null
