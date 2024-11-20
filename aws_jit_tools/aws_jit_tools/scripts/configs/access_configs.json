@@ -5,5 +5,12 @@
         "account_id": "162755939319",
         "permission_set": "CustomViewOnlyAccess",
         "session_duration": "PT1H"
-    }
+    },
+    "View Access to Kubiyamichaelg": {
+        "name": "View Access to Kubiyamichaelg",
+        "description": "Grants view only access to Kubiyamichaelg account",
+        "account_id": "724175145715",
+        "permission_set": "KubiyaViewOnlyAccess",
+        "session_duration": "PT1H"
+    },
 } 
