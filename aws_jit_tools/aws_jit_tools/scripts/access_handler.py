@@ -68,6 +68,7 @@ class AWSAccessHandler:
             self.notifications = NotificationManager()
             self.policy_manager = IAMPolicyManager(self.session)
             self.webhook_handler = WebhookHandler()
+            self.iam_client = self.session.client('iam')
             
             print_progress("Fetching SSO instance details...", "🔍")
             instances = self.sso_admin.list_instances()['Instances']
@@ -81,25 +82,20 @@ class AWSAccessHandler:
             self._handle_error("Failed to initialize AWS handler", e)
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        """Find user in IAM Identity Center by email."""
+        """Find IAM user by email."""
         try:
             print_progress(f"Looking up user: {email}", "👤")
-            response = self.identitystore.list_users(
-                IdentityStoreId=self.identity_store_id,
-                Filters=[{
-                    'AttributePath': 'UserName',
-                    'AttributeValue': email
-                }]
-            )
-
-            users = response.get('Users', [])
-            if not users:
+            response = self.iam_client.get_user(UserName=email)
+            user = response.get('User', None)
+            if user:
+                print_progress(f"Found user: {user['UserName']}", "✅")
+                return user
+            else:
                 print_progress(f"No user found with email: {email}", "❌")
                 return None
-
-            print_progress(f"Found user: {users[0].get('UserName')}", "✅")
-            return users[0]
-
+        except self.iam_client.exceptions.NoSuchEntityException:
+            print_progress(f"No user found with email: {email}", "❌")
+            return None
         except Exception as e:
             logger.error(f"Error finding user by email: {str(e)}")
             raise
@@ -336,7 +332,7 @@ class AWSAccessHandler:
         except Exception as e:
             self._handle_error("Failed to grant access", e)
 
-    def grant_s3_access(self, user_email: str, buckets: List[str], policy_template: str, duration: str):
+    def grant_s3_access(self, user_email: str, policy_template: str, duration: str):
         """Grant S3 access for a user."""
         try:
             print_progress(f"Granting S3 access for {user_email}...", "🔄")
@@ -349,30 +345,45 @@ class AWSAccessHandler:
             if not user:
                 raise ValueError(f"User not found: {user_email}")
 
+            # Load policy document from file
+            policy_document_path = os.environ.get('S3_POLICY_DOCUMENT')
+            if not policy_document_path or not os.path.exists(policy_document_path):
+                raise ValueError("Policy document file not found")
+
+            with open(policy_document_path) as f:
+                policy_document = json.load(f)
+
+            # Create and attach policy
+            policy_arn = self._create_and_attach_policy(
+                user_name=user['UserName'],
+                policy_document=policy_document,
+                purpose='s3_access'
+            )
+            if not policy_arn:
+                raise ValueError("Failed to create and attach policy")
+
             # Schedule revocation webhook
             self._schedule_revocation_webhook(
                 user_email=user_email,
                 duration_seconds=duration_seconds,
-                account_id=os.environ['AWS_ACCOUNT_ID'],
-                buckets=buckets,
+                account_id=os.environ.get('AWS_ACCOUNT_ID', ''),
+                buckets=os.environ.get('BUCKETS', '').split(','),
                 policy_details={
-                    "name": f"s3_{policy_template.lower()}",
+                    "name": policy_arn.split('/')[-1],
                     "type": "s3",
                     "template": policy_template,
-                    "buckets": buckets
                 }
             )
 
-            # Print human-readable success message
+            # Print success message
             print_progress(f"S3 access granted successfully!", "✅")
-            print(f"   ├─ Account: {os.environ['AWS_ACCOUNT_ID']}")
             print(f"   ├─ User: {user_email}")
-            print(f"   ├─ Policy Template: {policy_template}")
+            print(f"   ├─ Policy: {policy_arn}")
             print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
 
-            # Send notifications using the notification manager
+            # Send notifications
             self.notifications.send_s3_access_granted(
-                account_id=os.environ['AWS_ACCOUNT_ID'],
+                account_id=os.environ.get('AWS_ACCOUNT_ID', ''),
                 user_email=user_email,
                 policy_template=policy_template,
                 duration_seconds=duration_seconds
@@ -380,6 +391,29 @@ class AWSAccessHandler:
 
         except Exception as e:
             self._handle_error("Failed to grant S3 access", e)
+
+    def revoke_s3_access(self, user_email: str):
+        """Revoke S3 access for a user."""
+        try:
+            print_progress(f"Revoking S3 access for {user_email}...", "🔄")
+            
+            # Find user by email
+            user = self.get_user_by_email(user_email)
+            if not user:
+                raise ValueError(f"User not found: {user_email}")
+
+            # Clean up policies
+            self._cleanup_user_policies(user['UserName'])
+
+            print_progress(f"S3 access revoked successfully for {user_email}", "✅")
+
+            # Notify user via Slack
+            self.notifications.send_s3_access_revoked(
+                user_email=user_email
+            )
+
+        except Exception as e:
+            self._handle_error("Failed to revoke S3 access", e)
 
 def main():
     """Main function to handle command line arguments and execute actions."""
@@ -396,20 +430,34 @@ def main():
         handler = AWSAccessHandler()
         
         if args.action == 'grant':
-            print_progress(f"Granting access for user: {args.user_email}", "🔑")
-            handler.grant_access(
-                user_email=args.user_email,
-                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
-                requested_duration=args.duration,
-                max_duration=os.environ.get('MAX_DURATION', 'PT1H')
-            )
+            if os.environ.get('BUCKETS') and os.environ.get('POLICY_TEMPLATE'):
+                # Handle S3 access
+                handler.grant_s3_access(
+                    user_email=args.user_email,
+                    policy_template=os.environ['POLICY_TEMPLATE'],
+                    duration=args.duration
+                )
+            else:
+                # Handle SSO access
+                handler.grant_access(
+                    user_email=args.user_email,
+                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
+                    requested_duration=args.duration,
+                    max_duration=os.environ.get('MAX_DURATION', 'PT1H')
+                )
         else:  # revoke
-            print_progress(f"Revoking access for user: {args.user_email}", "🔒")
-            handler.revoke_access(
-                user_email=args.user_email,
-                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
-            )
-            
+            if os.environ.get('BUCKETS') and os.environ.get('POLICY_TEMPLATE'):
+                # Handle S3 access revocation
+                handler.revoke_s3_access(
+                    user_email=args.user_email
+                )
+            else:
+                # Handle SSO access revocation
+                handler.revoke_access(
+                    user_email=args.user_email,
+                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
+                )
+                
     except Exception as e:
         print_progress(f"Error: {str(e)}", "❌")
         sys.exit(1)
