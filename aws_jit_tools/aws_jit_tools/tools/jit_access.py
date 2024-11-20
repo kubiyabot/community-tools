@@ -84,7 +84,7 @@ export MAX_DURATION="{config['session_duration']}"
 
 # Run access handler
 echo ">> Just a moment... ⏳"
-python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{{{.user_email}}}}"} {"--duration {{{{.duration}}}}" if action == "grant" else "--duration PT1H"}
+python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{.user_email}}"} {"--duration {{.duration}}" if action == "grant" else "--duration PT1H"}
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram
@@ -152,7 +152,7 @@ export POLICY_TEMPLATE="{config['policy_template']}"
 
 # Run access handler
 echo ">> Just a moment... ⏳"
-python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{{{.user_email}}}}"} {"--duration {{{{.duration}}}}" if action == "grant" else "--duration PT1H"}
+python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{.user_email}}"} {"--duration {{.duration}}" if action == "grant" else "--duration PT1H"}
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram
