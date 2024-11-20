@@ -43,7 +43,6 @@ except ImportError as e:
 from utils.notifications import NotificationManager
 from utils.aws_utils import get_account_alias, get_permission_set_details
 from utils.slack_messages import create_access_revoked_blocks
-from policy_templates import s3_read_only_policy, s3_full_access_policy
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
