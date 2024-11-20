@@ -202,9 +202,6 @@ def main():
             "details": response['AccountAssignmentCreationStatus']
         }))
 
-        # Sleep for the duration
-        time.sleep(duration_seconds)
-
         # Send Slack notification if possible
         if slack_user_id:
             handler.send_slack_notification(
