@@ -65,7 +65,7 @@ class ToolGenerator:
                 description=config['description'],
                 content=self._generate_tool_content(config),
                 env=[
-                    "AWS_PROFILE",
+                    "AWS_PROFILE", # AWS profile to use
                     "KUBIYA_USER_EMAIL",
                     "KUBIYA_API_KEY",
                     "KUBIYA_USER_ORG",
