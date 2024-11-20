@@ -101,11 +101,14 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
     request_metadata = get_request_metadata(request_id, enforcer_base_url)
 
     end_datetime = convert_to_future_date(ttl)
+    metadata_str = ""
+    for key, value in request_metadata.items():
+        metadata_str += f"{key}: {value}\n"
     schedule_task(
         teammate=os.environ["KUBIYA_AGENT_NAME"],
         schedule_time=end_datetime,
         slack_destination=os.environ["SLACK_CHANNEL_ID"],
-        ai_instructions=f"Your task is to revoke the access granted based on the following approved request details: {request_metadata}. If a suitable tool or method is available to revoke the permissions, please execute the action immediately with the relevant context",
+        ai_instructions=f"Your task is to revoke the access granted based on the following approved request details:\n{metadata_str}\n\n If a suitable tool or method is available to revoke the permissions, please execute the action immediately with the relevant context",
     )
     print("📅 Revoke task scheduled successfully.")
 
