@@ -44,7 +44,7 @@ class AWSAccessHandler:
             response = self.identitystore.list_users(
                 IdentityStoreId=self.identity_store_id,
                 Filters=[{
-                    'AttributePath': 'Emails.Value',
+                    'AttributePath': 'UserName',
                     'AttributeValue': email
                 }]
             )
