@@ -96,18 +96,16 @@ def create_s3_jit_tool(config, action):
     args = []
     
     if action == "revoke":
-        args.extend([
-            Arg(name="user_email", description="The email of the user to revoke access for", type="str"),
-            Arg(name="bucket_name", description="Name of the S3 bucket", type="str")
-        ])
+        args.append(
+            Arg(name="user_email", description="The email of the user to revoke access for", type="str")
+        )
     elif action == "grant":
-        args.extend([
+        args.append(
             Arg(name="duration", 
                 description=f"Duration for the access (maximum {config['session_duration']}) - ISO8601 format (e.g., 'PT1H')", 
                 type="str", 
-                default=config['session_duration']),
-            Arg(name="bucket_name", description="Name of the S3 bucket", type="str")
-        ])
+                default=config['session_duration'])
+        )
 
     # Define file specifications for all necessary files
     file_specs = [
@@ -119,11 +117,34 @@ def create_s3_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
+    buckets_list = ", ".join(config['buckets'])
     tool_name = f"s3_{action}_{config['name'].lower().replace(' ', '_')}"
+
+    mermaid_diagram = f"""
+    sequenceDiagram
+        participant U as 👤 User
+        participant T as 🛠️ Tool
+        participant I as 🔍 IAM
+        participant B as 🪣 S3 Bucket
+        participant N as 📧 Notifications
+        participant W as ⏰ Webhook
+
+        U->>+T: {"Request S3 Access" if action == "grant" else "Request Access Removal"}
+        T->>+I: 🔎 Find User by Email
+        I-->>-T: 📄 User Details
+        T->>+B: {"🔧 Update Bucket Policy" if action == "grant" else "❌ Remove from Policy"}
+        Note over T,B: Buckets: {buckets_list}
+        B-->>-T: {"✅ Access Granted" if action == "grant" else "🔓 Access Removed"}
+        T->>+N: Send Notification
+        N-->>-T: Notification Sent
+        {"T->>+W: Schedule Revocation" if action == "grant" else ""}
+        {"W-->>-T: Scheduled" if action == "grant" else ""}
+        T-->>-U: {"S3 Access Granted 🎉" if action == "grant" else "S3 Access Revoked 🔒"}
+    """
 
     return AWSJITTool(
         name=tool_name,
-        description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} access to S3 bucket: {{.bucket_name}}",
+        description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} access to S3 buckets: {buckets_list}",
         args=args,
         content=f"""#!/bin/bash
 set -e
@@ -132,17 +153,24 @@ echo ">> Processing request... ⏳"
 # Install dependencies
 pip install -q boto3 requests jinja2 jsonschema argparse
 
+# Export bucket names and policy template from config
+export BUCKETS="{','.join(config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"
 export MAX_DURATION="{config['session_duration']}"
 
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
 
-# Run access handler
-python /opt/scripts/access_handler.py {action} --user-email "{{.user_email}}" --bucket-name "{{.bucket_name}}" {"--duration {{.duration}}" if action == "grant" else ""}
+# Run access handler for each bucket in the configuration
+for bucket in {' '.join(config['buckets'])}; do
+    echo "Processing bucket: $bucket"
+    python /opt/scripts/access_handler.py {action} --user-email {"$KUBIYA_USER_EMAIL" if action == "grant" else "{{.user_email}}"} --bucket-name "$bucket" {"--duration {{.duration}}" if action == "grant" else ""}
+done
 """,
         with_files=file_specs,
-        # ... rest of the code ...
+        mermaid=mermaid_diagram,
+        # Set long_running to True for grant action to allow webhook scheduling
+        long_running=(action == "grant")
     )
 
 # Load configurations and create tools
