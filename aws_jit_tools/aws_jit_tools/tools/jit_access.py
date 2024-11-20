@@ -39,8 +39,6 @@ def create_jit_tool(config, action):
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        FileSpec(destination="/opt/scripts/__init__.py", content=""),
-        FileSpec(destination="/opt/scripts/utils/__init__.py", content=""),
         FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
@@ -86,6 +84,10 @@ export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
 export MAX_DURATION="{config['session_duration']}"
 
+# Create __init__ files to cover the python project
+touch /opt/scripts/__init__.py
+touch /opt/scripts/utils/__init__.py
+
 # Run access handler
 echo ">> Just a moment... ⏳"
 python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{.user_email}}"} {"--duration {{.duration}}" if action == "grant" else "--duration PT1H"}
@@ -110,8 +112,6 @@ def create_s3_jit_tool(config, action):
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        FileSpec(destination="/opt/scripts/__init__.py", content=""),
-        FileSpec(destination="/opt/scripts/utils/__init__.py", content=""),
         FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
         FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
         FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
@@ -157,8 +157,13 @@ python -c "import boto3, requests, jinja2, jsonschema" 2>/dev/null || pip instal
 export BUCKETS="{','.join(config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"
 
-# Run access handler
 echo ">> Just a moment... ⏳"
+
+# Create __init__ files to cover the python project
+touch /opt/scripts/__init__.py
+touch /opt/scripts/utils/__init__.py
+
+# Run access handler
 python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{.user_email}}"} {"--duration {{.duration}}" if action == "grant" else "--duration PT1H"}
 """,
         with_files=file_specs,
