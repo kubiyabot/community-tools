@@ -13,7 +13,8 @@ COMMON_ENV = [
     "AWS_PROFILE",
     "KUBIYA_USER_EMAIL",
     "SLACK_CHANNEL_ID",
-    "SLACK_THREAD_TS"
+    "SLACK_THREAD_TS",
+    "REVOCATION_WEBHOOK_URL"
 ]
 
 # Common secrets
