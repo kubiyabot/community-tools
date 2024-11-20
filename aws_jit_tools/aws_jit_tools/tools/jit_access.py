@@ -130,6 +130,26 @@ def create_s3_jit_tool(config, action):
     action_prefix = "s3_" + ("grant_" if action == "grant" else "revoke_")
     tool_name = f"{action_prefix}{config['name'].lower().replace(' ', '_')}"
 
+    mermaid_diagram = f"""
+    sequenceDiagram
+        participant U as 👤 User
+        participant T as 🛠️ Tool
+        participant I as 🔍 IAM
+        participant P as 📜 IAM Policy Manager
+        participant N as 📧 Notifications
+
+        U->>+T: {"Request S3 Access" if action == "grant" else "Request S3 Access Revocation"}
+        T->>+I: 🔎 Find User by Email
+        I-->>-T: 📄 User Details
+        T->>+P: {"📎 Attach Policy" if action == "grant" else "🧹 Detach Policy"}
+        Note over T,P: Policy: {config['policy_template']}
+        Note over T,P: Buckets: {buckets_list}
+        P-->>-T: {"✅ Policy Attached" if action == "grant" else "✅ Policy Detached"}
+        T->>+N: Send Notification
+        N-->>-T: Notification Sent
+        T-->>-U: {"S3 Access Granted 🎉" if action == "grant" else "S3 Access Revoked 🔒"}
+    """
+
     return AWSJITTool(
         name=tool_name,
         description=f"{config['description']} ({action.capitalize()}) - {'Grants' if action == 'grant' else 'Revokes'} access to S3 buckets: {buckets_list}",
@@ -153,7 +173,7 @@ touch /opt/scripts/utils/__init__.py
 python /opt/scripts/access_handler.py {action} --user-email {"$KUBIYA_USER_EMAIL" if action == "grant" else "{{.user_email}}"} {"--duration {{.duration}}" if action == "grant" else ""}
 """,
         with_files=file_specs,
-        mermaid=None  # Mermaid diagram can be included as needed
+        mermaid=mermaid_diagram
     )
 
 # Load configurations and create tools
