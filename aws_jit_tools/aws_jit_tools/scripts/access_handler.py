@@ -115,7 +115,8 @@ class AWSAccessHandler:
         """Handle and log errors."""
         error_msg = f"{message}: {str(error)}"
         logger.error(error_msg)
-        print_progress(error_msg, "❌")
+        formatted_message = f"\n❌ Error: {message}\n   └─ Details: {str(error)}"
+        print(formatted_message)
         sys.exit(1)
 
     def get_aws_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -266,7 +267,8 @@ def main():
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(error_msg)
-        print_progress(error_msg, "❌")
+        formatted_message = f"\n❌ Unexpected Error\n   └─ Details: {str(e)}"
+        print(formatted_message)
         sys.exit(1)
 
 if __name__ == "__main__":
