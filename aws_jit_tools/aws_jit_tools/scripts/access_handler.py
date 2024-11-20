@@ -121,6 +121,21 @@ class AWSAccessHandler:
         except Exception:
             return 3600
 
+    def validate_duration(self, requested_duration: str, max_duration: str) -> str:
+        """Validate that requested duration doesn't exceed maximum duration."""
+        try:
+            requested_seconds = self.parse_iso8601_duration(requested_duration)
+            max_seconds = self.parse_iso8601_duration(max_duration)
+            
+            if requested_seconds > max_seconds:
+                print_progress(f"Requested duration exceeds maximum allowed duration of {max_duration}. Using maximum duration.", "⚠️")
+                return max_duration
+            
+            return requested_duration
+        except Exception as e:
+            print_progress(f"Invalid duration format. Using default duration of {max_duration}", "⚠️")
+            return max_duration
+
     def _handle_error(self, message: str, error: Exception):
         """Handle and log errors."""
         error_msg = f"{message}: {str(error)}"
@@ -171,6 +186,65 @@ class AWSAccessHandler:
 
         except Exception as e:
             self._handle_error("Failed to revoke access", e)
+
+    def grant_access(self, user_email: str, permission_set_name: str, requested_duration: str, max_duration: str):
+        """Grant access for a user by email and permission set name."""
+        try:
+            print_progress(f"Granting access for {user_email} with permission set {permission_set_name}...", "🔄")
+            
+            # Validate duration
+            validated_duration = self.validate_duration(requested_duration, max_duration)
+            duration_seconds = self.parse_iso8601_duration(validated_duration)
+            
+            # Find user by email
+            user = self.get_user_by_email(user_email)
+            if not user:
+                raise ValueError(f"User not found: {user_email}")
+
+            # Get permission set ARN
+            permission_set_arn = self.get_permission_set_arn(permission_set_name)
+            if not permission_set_arn:
+                raise ValueError(f"Permission set not found: {permission_set_name}")
+            
+            # Get account alias and permission set details for better display
+            account_alias = get_account_alias(self.session) or os.environ['AWS_ACCOUNT_ID']
+            permission_set_details = get_permission_set_details(
+                self.session, 
+                self.instance_arn, 
+                permission_set_arn
+            )
+            
+            print_progress("Creating account assignment...", "⚙️")
+            
+            # Create assignment
+            response = self.sso_admin.create_account_assignment(
+                InstanceArn=self.instance_arn,
+                TargetId=os.environ['AWS_ACCOUNT_ID'],
+                TargetType='AWS_ACCOUNT',
+                PermissionSetArn=permission_set_arn,
+                PrincipalType='USER',
+                PrincipalId=user['UserId']
+            )
+
+            # Print human-readable success message
+            print_progress(f"Access granted successfully!", "✅")
+            print(f"   ├─ Account: {account_alias} ({os.environ['AWS_ACCOUNT_ID']})")
+            print(f"   ├─ User: {user_email}")
+            print(f"   ├─ Permission Set: {permission_set_name}")
+            print(f"   └─ Duration: {duration_seconds/3600:.1f} hours")
+
+            # Send notifications using the notification manager
+            self.notifications.send_access_granted(
+                account_id=os.environ['AWS_ACCOUNT_ID'],
+                account_alias=account_alias,
+                permission_set=permission_set_name,
+                permission_set_details=permission_set_details,
+                duration_seconds=duration_seconds,
+                user_email=user_email
+            )
+
+        except Exception as e:
+            self._handle_error("Failed to grant access", e)
 
 # Export the class
 __all__ = ['AWSAccessHandler']

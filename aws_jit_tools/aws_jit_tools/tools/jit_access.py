@@ -29,7 +29,10 @@ def create_jit_tool(config, action):
         )
     elif action == "grant":
         args.append(
-            Arg(name="Duration (TTL)", description="Duration for the access token to be valid (defaults to 1 hour) - needs to be in ISO8601 format eg: 'PT1H'", type="str", default="PT1H")
+            Arg(name="Duration (TTL)", 
+                description=f"Duration for the access token to be valid (maximum {config['session_duration']}) - needs to be in ISO8601 format eg: 'PT1H'", 
+                type="str", 
+                default=config['session_duration'])
         )
 
     # Define file specifications for all necessary files
@@ -77,10 +80,11 @@ python -c "import boto3, requests, jinja2, jsonschema" 2>/dev/null || pip instal
 
 export AWS_ACCOUNT_ID="{config['account_id']}"
 export PERMISSION_SET_NAME="{config['permission_set']}"
+export MAX_DURATION="{config['session_duration']}"
 
 # Run access handler
 echo ">> Just a moment... ⏳"
-python /opt/scripts/access_handler.py {action} --user-email $1
+python /opt/scripts/access_handler.py {action} --user-email $1 --duration $2
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram
