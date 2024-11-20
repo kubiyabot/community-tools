@@ -2,8 +2,20 @@
     "DB Access to Staging": {
         "name": "Database Access to Staging",
         "description": "Grants access to all staging RDS databases",
-        "account_id": "876809951775",
-        "permission_set": "ECRReadOnly",
+        "account_id": "162755939319",
+        "permission_set": "CustomViewOnlyAccess",
+        "session_duration": "PT1H"
+    },
+    "Solutions Engineer Kubiyamichaelg Full Access": {
+        "description": "Provides full Solutions Engineer access to the kubiyamichaelg AWS account using the 'veranatest' permission set.",
+        "account_id": "724175145715",
+        "permission_set": "veranatest",
+        "session_duration": "PT1H"
+    },
+    "Solutions Engineer Kubiyamichaelg View Only": {
+        "description": "Grants view-only Solutions Engineer access to the kubiyamichaelg AWS account with the 'KubiyaViewOnlyAccess' permission set.",
+        "account_id": "724175145715",
+        "permission_set": "KubiyaViewOnlyAccess",
         "session_duration": "PT1H"
     }
 } 
