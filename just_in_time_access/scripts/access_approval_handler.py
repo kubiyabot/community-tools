@@ -102,7 +102,7 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
 
     end_datetime = convert_to_future_date(ttl)
     schedule_task(
-        teammate=os.environ["KUBIYA_AGENT_PROFILE"],
+        teammate=os.environ["KUBIYA_AGENT_NAME"],
         schedule_time=end_datetime,
         slack_destination=os.environ["SLACK_CHANNEL_ID"],
         ai_instructions=f"Your task is to revoke the access granted based on the following approved request details: {request_metadata}. If a suitable tool or method is available to revoke the permissions, please execute the action immediately with the relevant context",
