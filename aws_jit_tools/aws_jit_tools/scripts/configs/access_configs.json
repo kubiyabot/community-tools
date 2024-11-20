@@ -1,7 +1,7 @@
 {
     "View Access to March17Test2": {
         "name": "View Access to March17Test2",
-        "description": "Grants access to all staging RDS databases",
+        "description": "Grants view only access to March17Test2 account",
         "account_id": "162755939319",
         "permission_set": "CustomViewOnlyAccess",
         "session_duration": "PT1H"
