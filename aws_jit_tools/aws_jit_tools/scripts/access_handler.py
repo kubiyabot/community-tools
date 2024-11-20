@@ -181,18 +181,12 @@ class AWSAccessHandler:
 
             print_progress(f"Access revoked successfully for {user_email}", "✅")
 
-            # Notify user via Slack
-            slack_user_id = self.notifications.slack.lookup_user_by_email(user_email)
-            if slack_user_id:
-                blocks = create_access_revoked_blocks(
-                    account_id=os.environ['AWS_ACCOUNT_ID'],
-                    permission_set=permission_set_name,
-                    user_email=user_email
-                )
-                self.notifications.slack.send_message(
-                    message="Your AWS access has been revoked.",
-                    blocks=blocks
-                )
+            # Notify user via Slack in their direct thread
+            self.notifications.send_access_revoked(
+                account_id=os.environ['AWS_ACCOUNT_ID'],
+                permission_set=permission_set_name,
+                user_email=user_email
+            )
 
         except Exception as e:
             self._handle_error("Failed to revoke access", e)

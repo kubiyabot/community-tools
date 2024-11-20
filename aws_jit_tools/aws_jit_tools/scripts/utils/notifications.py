@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 from .slack_client import SlackClient
-from .slack_messages import create_access_granted_blocks, create_access_expired_blocks
+from .slack_messages import create_access_granted_blocks, create_access_expired_blocks, create_access_revoked_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -44,4 +44,47 @@ class NotificationManager:
             )
         except Exception as e:
             logger.error(f"Failed to send access expired notification: {e}")
+            return False
+
+    def send_access_revoked(self, account_id: str, permission_set: str, user_email: str) -> bool:
+        """Send access revoked notification directly to the user."""
+        try:
+            # Look up Slack user ID by email
+            slack_user_id = self.slack.lookup_user_by_email(user_email)
+            if not slack_user_id:
+                logger.error(f"Could not find Slack user ID for email: {user_email}")
+                return False
+
+            # Create message blocks
+            blocks = create_access_revoked_blocks(
+                account_id=account_id,
+                permission_set=permission_set,
+                user_email=user_email
+            )
+
+            # Store original channel and thread
+            original_channel = self.slack.channel_id
+            original_thread = self.slack.thread_ts
+
+            try:
+                # Set channel to user's ID for direct message
+                self.slack.channel_id = slack_user_id
+                # Clear thread_ts to send to main thread
+                self.slack.thread_ts = None
+
+                # Send the message
+                success = self.slack.send_message(
+                    message="Your AWS access has been revoked.",
+                    blocks=blocks
+                )
+
+                return success
+
+            finally:
+                # Restore original channel and thread
+                self.slack.channel_id = original_channel
+                self.slack.thread_ts = original_thread
+
+        except Exception as e:
+            logger.error(f"Failed to send access revoked notification: {e}")
             return False 
