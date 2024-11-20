@@ -138,19 +138,13 @@ def main():
             PrincipalType='USER',
             PrincipalId=user['UserId']
         )
-
-        # Get session duration in seconds
-        duration_seconds = handler.parse_iso8601_duration(session_duration)
         
         # Print success response
         print(json.dumps({
             "status": "success",
-            "message": f"Access granted for {duration_seconds} seconds",
+            "message": f"Access granted for XYZ seconds",
             "details": response['AccountAssignmentCreationStatus']
         }))
-
-        # Sleep for the duration
-        time.sleep(duration_seconds)
 
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
