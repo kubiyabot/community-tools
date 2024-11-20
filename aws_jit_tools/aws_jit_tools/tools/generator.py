@@ -43,9 +43,9 @@ python /opt/scripts/access_handler.py
                 content=script,
                 env=[
                     "AWS_PROFILE",
-                    "KUBIYA_USER_EMAIL",
-                    "SLACK_API_TOKEN"
-                ]
+                    "KUBIYA_USER_EMAIL"
+                ],
+                secrets=["SLACK_API_TOKEN"]
             )
             
             tools.append(tool)
