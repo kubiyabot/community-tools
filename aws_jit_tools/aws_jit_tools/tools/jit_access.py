@@ -25,7 +25,7 @@ def create_jit_tool(config, action):
     
     if action == "revoke":
         args.append(
-            Arg(name="User Email", description="The email of the user to revoke access for", type="str")
+            Arg(name="user_email", description="The email of the user to revoke access for", type="str")
         )
     elif action == "grant":
         args.append(
@@ -84,7 +84,7 @@ export MAX_DURATION="{config['session_duration']}"
 
 # Run access handler
 echo ">> Just a moment... ⏳"
-python /opt/scripts/access_handler.py {action} --user-email $1 --duration $2
+python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{{{.user_email}}}}"} {"--duration {{{{.duration}}}}" if action == "grant" else "--duration PT1H"}
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram
@@ -96,7 +96,7 @@ def create_s3_jit_tool(config, action):
     
     if action == "revoke":
         args.append(
-            Arg(name="User Email", description="The email of the user to revoke access for", type="str")
+            Arg(name="user_email", description="The email of the user to revoke access for", type="str")
         )
     elif action == "grant":
         args.append(
@@ -152,7 +152,7 @@ export POLICY_TEMPLATE="{config['policy_template']}"
 
 # Run access handler
 echo ">> Just a moment... ⏳"
-python /opt/scripts/access_handler.py {action} --user-email $1
+python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL" if action == "grant" else "--user-email {{{{.user_email}}}}"} {"--duration {{{{.duration}}}}" if action == "grant" else "--duration PT1H"}
 """,
         with_files=file_specs,
         mermaid=mermaid_diagram
