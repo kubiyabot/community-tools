@@ -24,50 +24,13 @@ case "${output_format}" in
 esac
 OUTPUT_FILE="/data/diagram.${output_format}"
 
-# Handle optional theme and background color
-theme_arg=""
-if [ -n "${theme:-}" ]; then
-    case "${theme}" in
-        default|dark|forest|neutral) theme_arg="--theme ${theme}" ;;
-        *) echo "⚠️ Warning: Invalid theme specified, using default" ;;
-    esac
-fi
-
-bg_arg=""
-if [ -n "${background_color:-}" ]; then
-    # Validate background color format (#RGB, #RGBA, #RRGGBB, #RRGGBBAA, or 'transparent')
-    if echo "${background_color}" | grep -qE '^(#[0-9A-Fa-f]{3,8}|transparent)$'; then
-        bg_arg="--backgroundColor ${background_color}"
-    else
-        echo "⚠️ Warning: Invalid background color format, ignoring"
-    fi
-fi
-
-# Handle CSS for SVG output
-css_arg=""
-if [ "$output_format" = "svg" ]; then
-    if [ -n "${custom_css:-}" ]; then
-        # Create directory if it doesn't exist
-        mkdir -p /tmp/styles
-        echo "${custom_css}" > /tmp/styles/custom.css
-        css_arg="--cssFile /tmp/styles/custom.css"
-    else
-        # Ensure default CSS file exists
-        if [ -f "/tmp/styles/default.css" ]; then
-            css_arg="--cssFile /tmp/styles/default.css"
-        else
-            echo "⚠️ Warning: Default CSS file not found, proceeding without CSS"
-        fi
-    fi
-fi
-
+# Generate diagram using Mermaid service
 echo "🖌️ Generating diagram..."
-if ! printf '%s' "${diagram_content}" | /home/mermaidcli/node_modules/.bin/mmdc -p /puppeteer-config.json \
-    --input - \
-    --output "${OUTPUT_FILE}" \
-    ${theme_arg} \
-    ${bg_arg} \
-    ${css_arg}; then
+if ! curl -s -X POST \
+    -H "Content-Type: text/plain" \
+    --data-raw "${diagram_content}" \
+    "http://mermaid-svc:80/generate" \
+    --output "${OUTPUT_FILE}"; then
     echo "❌ Failed to generate diagram"
     exit 1
 fi

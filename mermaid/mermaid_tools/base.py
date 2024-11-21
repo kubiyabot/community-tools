@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_sdk.tools import Tool, Arg, FileSpec, ServiceSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
@@ -24,7 +24,7 @@ set -e
 echo "🎨 Setting up environment..."
 
 # Install required packages
-apk add --no-cache curl jq >/dev/null 2>&1
+apk add curl jq >/dev/null 2>&1
 
 # Install slack-cli
 curl -s -L -o /usr/local/bin/slack \
@@ -35,20 +35,27 @@ curl -s -L -o /usr/local/bin/slack \
 mkdir -p /tmp/scripts
 chmod +x {script_path}
 
-# Run in /data directory as expected by mermaid-cli
-cd /data
+# Run script
 exec {script_path}
 """
+
+        # Define the Mermaid service
+        mermaid_service = ServiceSpec(
+            name="mermaid",
+            image="ghcr.io/kubiyabot/mermaid-server",
+            exposed_ports=[80]
+        )
 
         super().__init__(
             name=name,
             description=description,
             type="docker",
-            image="minlag/mermaid-cli:latest",  # Pre-configured image with mermaid-cli
+            image="alpine:latest",
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
             secrets=secrets,
             env=env,
             with_files=with_files,
+            with_services=[mermaid_service]
         )
