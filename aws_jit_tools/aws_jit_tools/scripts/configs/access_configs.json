@@ -3,14 +3,7 @@
         "name": "Database Access to Staging",
         "description": "Grants access to all staging RDS databases",
         "account_id": "876809951775",
-        "permission_set": "ECRReadOnly",
+        "permission_set": ["ECRReadOnly", "ECRWriteOnly"],
         "session_duration": "PT1H"
     },
-    "DB Write to Staging": {
-        "name": "Database Write to Staging",
-        "description": "Grants write to all staging RDS databases",
-        "account_id": "876809951775",
-        "permission_set": "ECRWriteOnly",
-        "session_duration": "PT1H"
-    }
 } 
