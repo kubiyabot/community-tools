@@ -43,7 +43,7 @@ exec {script_path}
         mermaid_service = ServiceSpec(
             name="mermaid",
             image="ghcr.io/kubiyabot/mermaid-server",
-            exposed_ports=[80]
+            exposed_ports=[8080]
         )
 
         super().__init__(

@@ -2,7 +2,19 @@
 
 <img src="https://github.com/user-attachments/assets/36829fad-4194-437b-913d-1a3272e81150" alt="image" width="400"/>
 
-The Just-In-Time Access module provides a secure and auditable way to manage temporary access to resources and tools for your team. It implements a complete Just-In-Time (JIT) access workflow - from request initiation through approval and access provisioning, with automatic revocation after the specified time period.
+The **Just-In-Time Access** module provides a secure and auditable way to manage temporary access to resources and tools for your team. It implements a complete Just-In-Time (JIT) access workflow—from request initiation through approval and access provisioning, with automatic revocation after the specified time period.
+
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Available Tools](#available-tools)
+- [Workflow Overview](#workflow-overview)
+- [Creating and Bundling Kubiya Tools](#creating-and-bundling-kubiya-tools)
+- [TeamMate Environment](#teammate-environment)
+- [Built-in Variables](#built-in-variables)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## ⚠️ Dependency Notice
 
@@ -12,12 +24,13 @@ The Just-In-Time Access module provides a secure and auditable way to manage tem
 
 Before using this module, ensure you have:
 
-1. Access to the Kubiya Platform
-2. Added this repository as a source in Kubiya:
-   - Source URL: `https://github.com/kubiyabot/community-tools/tree/main/just-in-time-access`
-   - Connect the source to a teammate
+1. **Access to the Kubiya Platform**
 
-3. Required Environment Variables (On the Teammate environment variables configuration section):
+2. **Added this repository as a source in Kubiya**:
+   - Source URL: `https://github.com/kubiyabot/community-tools/tree/main/just-in-time-access`
+   - Connect the source to a TeamMate (see [TeamMate Environment](#teammate-environment))
+
+3. **Required Environment Variables** (Configure these in the TeamMate environment variables section):
    - `APPROVERS_CHANNEL`: Slack channel ID where approvers will receive notifications
 
    Note: The following variables are automatically injected by Kubiya:
@@ -29,34 +42,41 @@ Before using this module, ensure you have:
 ## 🛠️ Available Tools
 
 ### 1. `request_tool_access`
+
 Request temporary access to a specific tool or resource.
 
 **Arguments:**
+
 - `tool_name` (required): Name of the tool (e.g., `create_ec2`, `restart_service`)
 - `user_email` (required): Requestor's email address
 - `tool_params` (required): Tool-specific parameters as JSON (e.g., `{"region": "eu-west-1"}`)
 - `ttl` (optional): Requested access duration (default: `1h`)
 
-### 2. `approve_tool_access_request` 
-Process approval/rejection of access requests.
+### 2. `approve_tool_access_request`
+
+Process approval or rejection of access requests.
 
 **Arguments:**
+
 - `request_id` (required): The request ID to approve/reject
 - `approval_action` (required): Either `approve` or `reject`
 - `ttl` (optional): Override the requested TTL when approving
 
 ### 3. `describe_access_request`
+
 View details of a specific access request.
 
 **Arguments:**
+
 - `request_id` (required): Request ID to describe
 
 ### 4. `list_active_access_requests`
+
 List all pending access requests.
 
 **Arguments:** None required
 
-## 🔄 Workflow
+## 🔄 Workflow Overview
 
 The following diagram illustrates the complete Just-In-Time access workflow:
 ```mermaid
