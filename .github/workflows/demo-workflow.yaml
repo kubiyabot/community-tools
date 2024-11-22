@@ -14,9 +14,8 @@ jobs:
     - name: Step that might fail
       run: |
         {
-          echo "Simulating failure" &&
-          exit 1
-        } 2> error.log || echo "Step failed, capturing error log"
+          echo "Failure due to Build failed in the middle" 
+        } > error.log
 
     - name: Send notification
       if: always()
