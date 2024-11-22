@@ -14,7 +14,8 @@ jobs:
     - name: Step that might fail
       run: |
         {
-          echo "Failure due to Build failed in the middle" 
+          python --version
+          echo "The issue "
         } > error.log
 
     - name: Send notification
