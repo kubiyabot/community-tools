@@ -21,7 +21,7 @@ jobs:
     - name: Send notification
       if: always()
       run: |
-        LOGS=$(cat detailed_logs.txt)
+        LOGS=$(cat error.log)
         TRUNCATED_LOGS="${LOGS:0:65000}"
         ESCAPED_LOGS=$(echo "$TRUNCATED_LOGS" | jq -sRr @json)
       
