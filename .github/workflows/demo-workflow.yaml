@@ -14,8 +14,25 @@ jobs:
     - name: Step that might fail
       run: |
         {
+          echo "GITHUB_WORKFLOW: $GITHUB_WORKFLOW"
+          echo "GITHUB_ACTION: $GITHUB_ACTION"
+          echo "GITHUB_EVENT_NAME: $GITHUB_EVENT_NAME"
+          echo "GITHUB_SHA: $GITHUB_SHA"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "Python version:"
           python --version
-          echo "The issue "
+          echo "Pip list:"
+          pip list
+          echo "Flake8 output:"
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          echo "Pytest output:"
+          pytest tests/ || echo "Tests failed"
+          echo "Docker version:"
+          docker --version
+          echo "Docker images:"
+          docker images
+          echo "Step outputs:"
+          echo "${{ toJson(steps) }}"
         } > error.log
 
     - name: Send notification
