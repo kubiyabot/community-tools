@@ -18,45 +18,10 @@ jobs:
           exit 1
         } 2> error.log || echo "Step failed, capturing error log"
 
-    # - name: Send notification
-    #   if: always()
-    #   run: |
-    #     LOGS=$(cat detailed_logs.txt)
-    #     TRUNCATED_LOGS="${LOGS:0:65000}"
-    #     ESCAPED_LOGS=$(echo "$TRUNCATED_LOGS" | jq -sRr @json)
-      
-    #     # Extract additional details
-    #     REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
-    #     ORG_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
-    #     PR_NUMBER=$(echo "$GITHUB_REF" | grep -o 'pull/[0-9]\+' | cut -d'/' -f2 || echo "N/A") 
-
-    #         # Create payload
-    #     PAYLOAD=$(jq -n \
-    #                 --arg status "${{ job.status }}" \
-    #                 --arg repo "$GITHUB_REPOSITORY" \
-    #                 --arg repo_name "$REPO_NAME" \
-    #                 --arg org_name "$ORG_NAME" \
-    #                 --arg workflow "$GITHUB_WORKFLOW" \
-    #                 --arg commit "$GITHUB_SHA" \
-    #                 --arg pr_number "$PR_NUMBER" \
-    #                 --arg logs "$ESCAPED_LOGS" \
-    #                 '{status: $status, repo: $repo_name, org_name: $org_name, workflow: $workflow, commit: $commit, pr_number: $pr_number, logs: $logs}')
-    #     curl -X POST -H "Content-Type: application/json" \
-    #     -d "$PAYLOAD" \
-    #     https://webhooksource-kubiya.hooks.kubiya.ai:8443/nMUePj-nJI2uQCouSReO8ldNws6sVzouRwNEprvZWlWKw2IC90hDkTyOx2ljo4_Y8MK3X9LXDCdkmYauuI0=
-
-  notify:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Notify on Failure
+    - name: Send notification
       if: always()
       run: |
         LOGS=$(cat detailed_logs.txt)
-        if [ ! -s detailed_logs.txt ]; then
-          echo "Log file is empty. Exiting step."
-          exit 0
-        fi
         TRUNCATED_LOGS="${LOGS:0:65000}"
         ESCAPED_LOGS=$(echo "$TRUNCATED_LOGS" | jq -sRr @json)
       
@@ -79,3 +44,38 @@ jobs:
         curl -X POST -H "Content-Type: application/json" \
         -d "$PAYLOAD" \
         https://webhooksource-kubiya.hooks.kubiya.ai:8443/nMUePj-nJI2uQCouSReO8ldNws6sVzouRwNEprvZWlWKw2IC90hDkTyOx2ljo4_Y8MK3X9LXDCdkmYauuI0=
+
+  # notify:
+  #   needs: build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Notify on Failure
+  #     if: always()
+  #     run: |
+  #       LOGS=$(cat detailed_logs.txt)
+  #       if [ ! -s detailed_logs.txt ]; then
+  #         echo "Log file is empty. Exiting step."
+  #         exit 0
+  #       fi
+  #       TRUNCATED_LOGS="${LOGS:0:65000}"
+  #       ESCAPED_LOGS=$(echo "$TRUNCATED_LOGS" | jq -sRr @json)
+      
+  #       # Extract additional details
+  #       REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+  #       ORG_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
+  #       PR_NUMBER=$(echo "$GITHUB_REF" | grep -o 'pull/[0-9]\+' | cut -d'/' -f2 || echo "N/A") 
+
+  #           # Create payload
+  #       PAYLOAD=$(jq -n \
+  #                   --arg status "${{ job.status }}" \
+  #                   --arg repo "$GITHUB_REPOSITORY" \
+  #                   --arg repo_name "$REPO_NAME" \
+  #                   --arg org_name "$ORG_NAME" \
+  #                   --arg workflow "$GITHUB_WORKFLOW" \
+  #                   --arg commit "$GITHUB_SHA" \
+  #                   --arg pr_number "$PR_NUMBER" \
+  #                   --arg logs "$ESCAPED_LOGS" \
+  #                   '{status: $status, repo: $repo_name, org_name: $org_name, workflow: $workflow, commit: $commit, pr_number: $pr_number, logs: $logs}')
+  #       curl -X POST -H "Content-Type: application/json" \
+  #       -d "$PAYLOAD" \
+  #       https://webhooksource-kubiya.hooks.kubiya.ai:8443/nMUePj-nJI2uQCouSReO8ldNws6sVzouRwNEprvZWlWKw2IC90hDkTyOx2ljo4_Y8MK3X9LXDCdkmYauuI0=
