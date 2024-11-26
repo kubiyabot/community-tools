@@ -22,13 +22,6 @@ repo_create = GitHubCliTool(
     ],
 )
 
-repo_clone = GitHubCliTool(
-    name="github_repo_clone",
-    description="Clone a GitHub repository to your local machine.",
-    content="gh repo clone $repo",
-    args=[Arg(name="repo", type="str", description="Repository name or URL to clone. Example: 'octocat/Hello-World' or 'https://github.com/octocat/Hello-World.git'", required=True)],
-)
-
 repo_view = GitHubCliTool(
     name="github_repo_view",
     description="View details of a GitHub repository, optionally opening it in a web browser.",
@@ -185,7 +178,7 @@ github_close_issue = GitHubCliTool(
 
 # Register all tools
 for tool in [
-    repo_create, repo_clone, repo_view, repo_list, repo_delete, repo_fork,
+    repo_create, repo_view, repo_list, repo_delete, repo_fork,
     repo_archive, repo_unarchive, repo_readme, repo_language,
     repo_metadata, repo_search, github_search,
     github_actions_list, github_actions_status, github_actions_logs,
