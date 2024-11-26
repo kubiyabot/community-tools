@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, FileSpec
+from kubiya_sdk.tools import Tool, FileSpec, Volume
 from kubiya_sdk.tools import Arg
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
@@ -13,7 +13,7 @@ set -e
 
 if ! command -v jq >/dev/null 2>&1; then
     # Silently install jq
-    apk add --no-cache --quiet jq >/dev/null 2>&1
+    apk add --quiet jq >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
@@ -83,7 +83,9 @@ get_repo_context
             env=COMMON_ENV,
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
-            long_running=long_running
+            long_running=long_running,
+            with_volumes=[Volume(name="git_data", path="/var/git_data")]
+
         )
 
 # Add this new tool for streaming GitHub Actions workflow logs
@@ -178,7 +180,8 @@ check_and_set_org
             env=COMMON_ENV,
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
-            long_running=long_running
+            long_running=long_running,
+            with_volumes=[Volume(name="git_data", path="/var/git_data")]
         )
 
 # Add this new tool for streaming GitHub Actions workflow logs
@@ -215,7 +218,8 @@ done
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
     ],
-    long_running=True
+    long_running=True,
+    with_volumes=[Volume(name="git_data", path="/var/git_data")]
 )
 
 # Don't forget to register the new tool
