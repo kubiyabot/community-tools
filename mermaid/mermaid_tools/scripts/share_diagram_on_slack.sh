@@ -175,13 +175,23 @@ for dest in ${slack_destination}; do
             fi
             ;;
         *)
-            # Check if it's a valid Slack ID format (starts with U, C, G, or D)
+            # First try to use it as a channel ID
             if echo "$dest" | grep -qE '^[UCGD][A-Z0-9]{8,}$'; then
                 channel="$dest"
                 echo "✅ Using provided Slack ID: ${dest}"
             else
-                echo "❌ Invalid Slack ID format: ${dest}"
-                continue
+                # Try to get channel ID from exact name match
+                channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                    "https://slack.com/api/conversations.list" | \
+                    jq -r --arg name "$dest" '.channels[] | select(.name == $name) | .id')
+                
+                if [ -n "$channel_info" ]; then
+                    channel="$channel_info"
+                    echo "✅ Found channel ID for ${dest}"
+                else
+                    echo "❌ Invalid destination format or channel not found: ${dest}"
+                    continue
+                fi
             fi
             ;;
     esac
