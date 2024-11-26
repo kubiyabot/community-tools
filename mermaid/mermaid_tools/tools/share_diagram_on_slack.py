@@ -26,7 +26,7 @@ share_diagram_on_slack_tool = MermaidTool(
         Arg(
             name="slack_destination",
             type="str",
-            description="Slack destination (#channel or @user)",
+            description="Slack destination (#channel or @user, channel ID or user ID is also accepted)",
             required=True
         ),
         Arg(
