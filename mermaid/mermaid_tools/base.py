@@ -21,15 +21,21 @@ class MermaidTool(Tool):
         content = f"""#!/bin/sh
 set -e
 
-echo "🎨 Setting up environment..."
+echo "🎨 Preparing to draw diagram..."
 
-# Install required packages
-apk add --no-cache curl jq >/dev/null 2>&1
+# Install required packages if not already installed
+if ! command -v curl >/dev/null || ! command -v jq >/dev/null; then
+    echo "📦 Installing required packages..."
+    apk add curl jq >/dev/null 2>&1
+fi
 
-# Install slack-cli
-curl -s -L -o /usr/local/bin/slack \
-    https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
-    chmod +x /usr/local/bin/slack
+# Install slack-cli if not already installed
+if [ ! -f "/usr/local/bin/slack" ]; then
+    echo "📥 Connecting to Slack..."
+    curl -s -L -o /usr/local/bin/slack \
+        https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
+        chmod +x /usr/local/bin/slack
+fi
 
 # Prepare script
 mkdir -p /tmp/scripts
