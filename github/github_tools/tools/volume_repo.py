@@ -18,8 +18,8 @@ mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
 
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --quiet jq >/dev/null 2>&1
+    # Silently install jq and git
+    apk add --quiet jq git >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
