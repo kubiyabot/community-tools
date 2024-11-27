@@ -137,8 +137,8 @@ class GitHubRepolessCliTool(Tool):
 set -e
 
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --no-cache --quiet jq >/dev/null 2>&1
+    # Silently install jq and git
+    apk add --no-cache --quiet jq git >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
