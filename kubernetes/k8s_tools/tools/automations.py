@@ -15,8 +15,12 @@ find_resource_tool = KubernetesTool(
     field_selector=${field_selector:-}
     search_term=${search_term:-}
 
-    # Use --all-namespaces if no specific namespace is provided
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Use --all-namespaces if no specific namespace is provided or if namespace is "all"
+    if [ -z "$namespace" ] || [ "$namespace" = "all" ]; then
+        namespace_flag="--all-namespaces"
+    else
+        namespace_flag="-n $namespace"
+    fi
 
     # Run kubectl command and filter by search_term if provided
     result=$(kubectl get $resource_type $namespace_flag \
@@ -33,7 +37,7 @@ find_resource_tool = KubernetesTool(
     """,
     args=[
         Arg(name="resource_type", type="str", description="Type of resource to find (e.g., pods, services, deployments)", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
+        Arg(name="namespace", type="str", description="Kubernetes namespace. Use 'all' or leave empty to search across all namespaces", required=True),
         Arg(name="label_selector", type="str", description="Label selector for filtering resources", required=False),
         Arg(name="field_selector", type="str", description="Field selector for filtering resources", required=False),
         Arg(name="search_term", type="str", description="Search term to filter results", required=False),
