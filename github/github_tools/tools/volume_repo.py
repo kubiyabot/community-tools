@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, Volume
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 import os
@@ -82,12 +82,13 @@ get_repo_context
             description=description,
             content=enhanced_content,
             args=updated_args,
-            long_running=long_running
+            long_running=long_running,
+            with_volumes=[Volume(name="git_data", path="/var/git_data")]
         )
 
 # Repository Management Tools
 list_repos = VolumeRepoTool(
-    name="github_list_repos",
+    name="github_list_cloned_repos",
     description="List all cloned repositories with their status",
     content="""
 echo "Cloned Repositories:"
@@ -105,7 +106,7 @@ done
 )
 
 clean_repos = VolumeRepoTool(
-    name="github_clean_repos",
+    name="github_clean_cloned_repos_vol",
     description="Clean up cloned repositories",
     content="""
 if [ -n "$repo_name" ]; then
@@ -128,7 +129,7 @@ fi
 
 # Git Operations Tools
 git_status = VolumeRepoTool(
-    name="github_git_status",
+    name="github_git_status_cloned_repo",
     description="Show git status of a repository",
     content="""
 if [ ! -d "$WORK_DIR/$repo_name" ]; then
@@ -145,7 +146,7 @@ git status
 )
 
 git_commit_file = VolumeRepoTool(
-    name="github_git_commit_file",
+    name="github_git_commit_file_cloned_repo",
     description="Commit specific file(s) in a repository",
     content="""
 if [ ! -d "$WORK_DIR/$repo_name" ]; then
@@ -212,7 +213,7 @@ echo "Changes pushed successfully"
 )
 
 git_branch = VolumeRepoTool(
-    name="github_git_branch",
+    name="github_git_branch_cloned_repo",
     description="Create or switch branches",
     content="""
 if [ ! -d "$WORK_DIR/$repo_name" ]; then
@@ -259,7 +260,7 @@ git log --pretty=format:"%h - %s (%cr) <%an>" --graph $([[ -n "$limit" ]] && ech
 )
 
 git_diff = VolumeRepoTool(
-    name="github_git_diff",
+    name="github_git_diff_cloned_repo",
     description="Show changes in repository",
     content="""
 if [ ! -d "$WORK_DIR/$repo_name" ]; then
@@ -297,13 +298,5 @@ for tool in tools:
     tool_registry.register("github", tool)
 
 __all__ = [
-    'list_repos',
-    'clean_repos',
-    'git_status',
-    'git_commit_file',
-    'git_commit_all',
-    'git_push',
-    'git_branch',
-    'git_log',
-    'git_diff',
-] 
+    "VolumeRepoTool"
+]
