@@ -110,6 +110,16 @@ workflow_run_logs = GitHubCliTool(
     ],
 )
 
+workflow_run_logs_failed = GitHubCliTool(
+    name="workflow_run_logs_failed",
+    description="View failure logs only of a specific workflow run.",
+    content="gh run view --repo $repo $run_id --log-failed",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+    ],
+)
+
 workflow_run_cancel = GitHubCliTool(
     name="github_workflow_run_cancel",
     description="Cancel a workflow run.",
