@@ -2,6 +2,146 @@ from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# First, let's add these shell functions at the beginning of the content for tools that need log processing
+LOG_PROCESSING_FUNCTIONS = '''
+# Function to extract relevant error context from logs efficiently
+function extract_error_context() {
+    awk '
+        BEGIN {
+            # Configure sizes
+            max_buffer = 100    # Lines to keep before error
+            after_lines = 20    # Lines to show after error
+            buffer_size = 0     # Current buffer size
+            buffer_start = 0    # Start position in circular buffer
+            printing = 0        # Number of lines left to print after match
+            
+            # Error patterns
+            err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
+            # Noise patterns to filter
+            noise_pattern = "(Download|Progress|download|progress)"
+        }
+        
+        # Skip noisy lines early
+        $0 ~ noise_pattern { next }
+        
+        {
+            # Store in circular buffer
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
+            
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
+            }
+            
+            # Check for errors
+            if ($0 ~ err_pattern) {
+                # Generate a hash of the surrounding context to avoid duplicates
+                context = ""
+                for (i = 0; i < 3; i++) {  # Use 3 lines for context hash
+                    pos = (buffer_pos - i + max_buffer) % max_buffer
+                    if (buffer[pos]) {
+                        context = context buffer[pos]
+                    }
+                }
+                context_hash = context
+                
+                # Only print if we have not seen this context
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    
+                    # Print separator for readability
+                    print "\\n=== Error Context ===\\n"
+                    
+                    # Print buffer content (previous lines)
+                    for (i = 0; i < buffer_size; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print buffer[pos]
+                    }
+                    
+                    # Start printing aftermath
+                    printing = after_lines
+                }
+            }
+            else if (printing > 0) {
+                print
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Context ===\\n"
+                }
+            }
+        }
+    '
+}
+
+# Function to search logs with context efficiently
+function search_logs_with_context() {
+    local pattern="$1"
+    local before_context="${2:-5}"
+    local after_context="${3:-5}"
+    
+    awk -v pattern="$pattern" -v before="$before_context" -v after="$after_context" '
+        BEGIN {
+            # Initialize circular buffer
+            max_buffer = before + 1
+            buffer_size = 0
+            buffer_start = 0
+            printing = 0
+            
+            # Noise pattern to filter
+            noise_pattern = "(Download|Progress|download|progress)"
+        }
+        
+        # Skip noisy lines early
+        $0 ~ noise_pattern { next }
+        
+        {
+            # Store in circular buffer
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
+            
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
+            }
+            
+            # Check for pattern match
+            if ($0 ~ pattern) {
+                # Generate context hash to avoid duplicates
+                context_hash = $0  # Use matching line as hash
+                
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    
+                    print "\\n=== Match Found ===\\n"
+                    
+                    # Print previous lines from buffer
+                    for (i = 0; i < buffer_size - 1; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print "BEFORE | " buffer[pos]
+                    }
+                    
+                    # Print matching line
+                    print "MATCH  | " $0
+                    
+                    # Start printing aftermath
+                    printing = after
+                }
+            }
+            else if (printing > 0) {
+                print "AFTER  | " $0
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Match ===\\n"
+                }
+            }
+        }
+    '
+}
+'''
+
 workflow_list = GitHubCliTool(
     name="github_workflow_list",
     description="List GitHub Actions workflows in a repository.",
@@ -102,21 +242,71 @@ workflow_run_view = GitHubCliTool(
 
 workflow_run_logs = GitHubCliTool(
     name="github_workflow_run_logs",
-    description="View logs of a specific workflow run.",
-    content="gh run view --repo $repo $run_id --log",
+    description="""View GitHub Actions workflow logs with search capabilities.
+    
+Shows workflow run logs (maximum 150 lines) with options to:
+- Search for specific patterns in the logs
+- Control how many recent lines to show (1-150 lines)
+- Default shows last 100 lines if not specified""",
+    content="""
+# Enforce maximum lines limit
+MAX_LINES=150
+LINES=${tail_lines:-100}
+
+if [ $LINES -gt $MAX_LINES ]; then
+    LINES=$MAX_LINES
+fi
+
+if [ -n "$pattern" ]; then
+    # If pattern is provided, search and show context
+    echo "Searching for pattern '$pattern' in logs"
+    gh run view --repo $repo $run_id --log | tail -n $MAX_LINES | grep -B 2 -A 2 "$pattern" | head -n $LINES
+else
+    # Just show the last N lines
+    echo "Showing last $LINES lines of logs"
+    gh run view --repo $repo $run_id --log | tail -n $LINES
+fi
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
+        Arg(name="pattern", type="str", description="Search pattern to filter logs. Shows 2 lines before and after each match", required=False),
     ],
 )
 
 workflow_run_logs_failed = GitHubCliTool(
     name="workflow_run_logs_failed",
-    description="View failure logs only of a specific workflow run.",
-    content="gh run view --repo $repo $run_id --log-failed",
+    description="""View failed job outputs from GitHub Actions workflow run.
+    
+Shows only the failed job logs (maximum 150 lines) with options to:
+- Search for specific patterns in the failed logs
+- Control how many recent lines to show (1-150 lines)
+- Default shows last 100 lines if not specified""",
+    content="""
+# Enforce maximum lines limit
+MAX_LINES=150
+LINES=${tail_lines:-100}
+
+if [ $LINES -gt $MAX_LINES ]; then
+    LINES=$MAX_LINES
+fi
+
+if [ -n "$pattern" ]; then
+    # If pattern is provided, search and show context
+    echo "Searching for pattern '$pattern' in failed logs"
+    gh run view --repo $repo $run_id --log-failed | tail -n $MAX_LINES | grep -B 2 -A 2 "$pattern" | head -n $LINES
+else
+    # Just show the last N lines
+    echo "Showing last $LINES lines of failed logs"
+    gh run view --repo $repo $run_id --log-failed | tail -n $LINES
+fi
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
+        Arg(name="pattern", type="str", description="Search pattern to filter failed logs. Shows 2 lines before and after each match", required=False),
     ],
 )
 
@@ -235,7 +425,7 @@ workflow_set_secret = GitHubCliTool(
 for tool in [
     workflow_list, workflow_view, workflow_run, workflow_disable, workflow_enable,
     workflow_create, workflow_delete, workflow_run_list, workflow_run_view,
-    workflow_run_logs,workflow_run_logs_failed, workflow_run_cancel, workflow_run_rerun,
+    workflow_run_logs, workflow_run_cancel, workflow_run_rerun,
     workflow_clone_repo, workflow_discover_files, workflow_lint,
     workflow_visualize, workflow_dispatch_event, workflow_get_usage,
     workflow_set_secret
@@ -245,7 +435,7 @@ for tool in [
 __all__ = [
     'workflow_list', 'workflow_view', 'workflow_run', 'workflow_disable', 'workflow_enable',
     'workflow_create', 'workflow_delete', 'workflow_run_list', 'workflow_run_view',
-    'workflow_run_logs','workflow_run_logs_failed', 'workflow_run_cancel', 'workflow_run_rerun',
+    'workflow_run_logs', 'workflow_run_cancel', 'workflow_run_rerun',
     'workflow_clone_repo', 'workflow_discover_files', 'workflow_lint',
     'workflow_visualize', 'workflow_dispatch_event', 'workflow_get_usage',
     'workflow_set_secret'

@@ -1,0 +1,40 @@
+name: Simple AWS VPC
+description: Basic VPC with public and private subnets
+source: terraform-aws-modules/vpc/aws
+version: 5.0.0
+auto_discover: true
+
+variables:
+  name:
+    type: string
+    required: true
+    description: Name for all VPC resources
+  
+  cidr:
+    type: string
+    default: 10.0.0.0/16
+    description: The CIDR block for the VPC
+    validation:
+      - condition: can(cidrhost(var.cidr, 0))
+        error: Must be valid CIDR block
+  
+  azs:
+    type: list
+    required: true
+    description: List of availability zones
+    example: ["us-west-2a", "us-west-2b", "us-west-2c"]
+  
+  private_subnets:
+    type: list
+    default: ["10.0.1.0/24", "10.0.2.0/24"]
+    description: List of private subnet CIDR blocks
+  
+  public_subnets:
+    type: list
+    default: ["10.0.101.0/24", "10.0.102.0/24"]
+    description: List of public subnet CIDR blocks
+  
+  enable_nat_gateway:
+    type: bool
+    default: true
+    description: Should be true if you want to provision NAT Gateways 

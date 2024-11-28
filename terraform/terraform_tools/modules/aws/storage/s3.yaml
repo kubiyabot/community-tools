@@ -1,0 +1,36 @@
+name: S3 Bucket with Folders
+description: Creates an S3 bucket with predefined folders
+template: true  # Indicates this is a template, not a module
+
+variables:
+  bucket_name:
+    type: string
+    required: true
+    description: Name of the S3 bucket
+    validation:
+      - condition: can(regex("^[a-z0-9][a-z0-9-]*[a-z0-9]$", var.bucket_name))
+        error: Bucket name must be valid S3 bucket name
+  
+  folders:
+    type: list
+    default: ["logs", "data", "backups"]
+    description: List of folders to create in the bucket
+  
+  enable_versioning:
+    type: bool
+    default: true
+    description: Enable versioning on the bucket
+
+generate:
+  resource:
+    aws_s3_bucket:
+      main:
+        bucket: ${bucket_name}
+        versioning:
+          enabled: ${enable_versioning}
+    
+    aws_s3_object:
+      for_each: ${folders}
+      bucket: ${bucket_name}
+      key: ${each.value}/
+      content_type: application/x-directory 

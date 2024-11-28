@@ -1,0 +1,153 @@
+2024/11/26 16:33:06 chat.go:112: === Starting SendMessage ===
+2024/11/26 16:33:06 chat.go:113: Payload: {Message:create a very nice mermaid diagram (detailed, styled, emphasized) representing the pods on the dagger namespace with their utilization etc and share it on the #devops-oncall channel
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732631586631198000}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments:  Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {" Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":" Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods"," Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":" Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":"dag Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":"dagger Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:false Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:true Status:}
+2024/11/26 16:33:11 chat.go:219: Sending message: {Content:
+Tool: find_resource
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T16:33:11+02:00 SenderName:Bot Type:tool Message: MessageID:268835 Final:true Status:}
+2024/11/26 16:33:31 chat.go:219: Sending message: {Content:🔍 Found resources: Error: SessionID: Timestamp:2024-11-26T16:33:31+02:00 SenderName:Bot Type:tool_output Message: MessageID:457320 Final:false Status:}
+2024/11/26 16:39:00 chat.go:112: === Starting SendMessage ===
+2024/11/26 16:39:00 chat.go:113: Payload: {Message:hello there
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732631940279704000}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:true Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:05 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach Error: SessionID: Timestamp:2024-11-26T16:39:05+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:true Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:true Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, Git Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, let Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, let me Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, let me know Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:false Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, let me know! Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:true Status:}
+2024/11/26 16:39:06 chat.go:219: Sending message: {Content:Hi there! It seems like you mentioned reference files but didn't attach any. How can I assist you today? If you have any specific tasks in mind or if you need help with Kubernetes, GitHub, Jira, or Slack, let me know! Error: SessionID: Timestamp:2024-11-26T16:39:06+02:00 SenderName:Bot Type:msg Message: MessageID:256782 Final:true Status:}
+2024/11/26 19:24:19 chat.go:112: === Starting SendMessage ===
+2024/11/26 19:24:19 chat.go:113: Payload: {Message:create a very nice mermaid diagram (detailed, styled, emphasized) representing the pods on the dagger namespace with their utilization etc and share it on the #devops-oncall channel
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732641859756569000}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments:  Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {" Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":" Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods"," Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":" Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":"dag Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":"dagger Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:false Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:true Status:}
+2024/11/26 19:24:25 chat.go:219: Sending message: {Content:
+Tool: resource_usage
+Arguments: {"resource_type":"pods","namespace":"dagger"} Error: SessionID: Timestamp:2024-11-26T19:24:25+02:00 SenderName:Bot Type:tool Message: MessageID:158674 Final:true Status:}
+2024/11/26 19:24:35 chat.go:219: Sending message: {Content:🛠️  Pod Resource Usage: Error: SessionID: Timestamp:2024-11-26T19:24:35+02:00 SenderName:Bot Type:tool_output Message: MessageID:648592 Final:false Status:}
+2024/11/26 19:24:35 chat.go:219: Sending message: {Content:🛠️  Pod Resource Usage:===================== Error: SessionID: Timestamp:2024-11-26T19:24:35+02:00 SenderName:Bot Type:tool_output Message: MessageID:648592 Final:false Status:}
