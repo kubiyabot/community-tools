@@ -428,14 +428,14 @@ for tool in [
     workflow_run_logs, workflow_run_cancel, workflow_run_rerun,
     workflow_clone_repo, workflow_discover_files, workflow_lint,
     workflow_visualize, workflow_dispatch_event, workflow_get_usage,
-    workflow_set_secret
+    workflow_set_secret, workflow_run_logs_failed
 ]:
     tool_registry.register("github", tool)
 
 __all__ = [
     'workflow_list', 'workflow_view', 'workflow_run', 'workflow_disable', 'workflow_enable',
     'workflow_create', 'workflow_delete', 'workflow_run_list', 'workflow_run_view',
-    'workflow_run_logs', 'workflow_run_cancel', 'workflow_run_rerun',
+    'workflow_run_logs', 'workflow_run_logs_failed', 'workflow_run_cancel', 'workflow_run_rerun',
     'workflow_clone_repo', 'workflow_discover_files', 'workflow_lint',
     'workflow_visualize', 'workflow_dispatch_event', 'workflow_get_usage',
     'workflow_set_secret'
