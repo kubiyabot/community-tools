@@ -12,8 +12,8 @@ class GitHubCliTool(Tool):
 set -e
 
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --no-cache --quiet jq >/dev/null 2>&1
+    # Silently install jq (TODO:: install git as well for git operations)
+    apk add --quiet jq >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
@@ -135,8 +135,8 @@ class GitHubRepolessCliTool(Tool):
 set -e
 
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --no-cache --quiet jq >/dev/null 2>&1
+    # Silently install jq (TODO:: install git as well for git operations)
+    apk add --quiet jq >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
