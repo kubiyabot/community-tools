@@ -242,12 +242,13 @@ workflow_run_view = GitHubCliTool(
 
 workflow_run_logs = GitHubCliTool(
     name="github_workflow_run_logs",
-    description="""View GitHub Actions workflow logs with search capabilities.
+    description="""View GitHub Actions workflow logs with advanced search capabilities.
     
 Shows workflow run logs (maximum 150 lines) with options to:
-- Search for specific patterns in the logs
-- Control how many recent lines to show (1-150 lines)
-- Default shows last 100 lines if not specified""",
+- Search for specific patterns with case sensitivity control
+- Control context lines around matches (up to 5 lines before/after)
+- Use exact match or regular expressions for searching
+- Default shows last 100 lines if not searching""",
     content="""
 # Enforce maximum lines limit
 MAX_LINES=150
@@ -258,9 +259,25 @@ if [ $LINES -gt $MAX_LINES ]; then
 fi
 
 if [ -n "$pattern" ]; then
-    # If pattern is provided, search and show context
-    echo "Searching for pattern '$pattern' in logs"
-    gh run view --repo $repo $run_id --log | tail -n $MAX_LINES | grep -B 2 -A 2 "$pattern" | head -n $LINES
+    # Build grep options
+    GREP_OPTS=""
+    if [ "$case_sensitive" != "true" ]; then
+        GREP_OPTS="$GREP_OPTS -i"  # Case insensitive by default
+    fi
+    if [ "$exact_match" = "true" ]; then
+        GREP_OPTS="$GREP_OPTS -w"  # Word match
+    fi
+    
+    # Set context lines (max 5 each)
+    BEFORE_LINES=${before_context:-2}
+    AFTER_LINES=${after_context:-2}
+    if [ $BEFORE_LINES -gt 5 ]; then BEFORE_LINES=5; fi
+    if [ $AFTER_LINES -gt 5 ]; then AFTER_LINES=5; fi
+    
+    echo "Searching for pattern '$pattern' in logs (showing $BEFORE_LINES lines before and $AFTER_LINES lines after matches)"
+    gh run view --repo $repo $run_id --log | tail -n $MAX_LINES | \
+        grep $GREP_OPTS -B $BEFORE_LINES -A $AFTER_LINES "$pattern" | \
+        head -n $LINES
 else
     # Just show the last N lines
     echo "Showing last $LINES lines of logs"
@@ -271,18 +288,23 @@ fi
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
         Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
-        Arg(name="pattern", type="str", description="Search pattern to filter logs. Shows 2 lines before and after each match", required=False),
+        Arg(name="pattern", type="str", description="Pattern to search in logs. Supports regular expressions", required=False),
+        Arg(name="case_sensitive", type="bool", description="Make pattern matching case sensitive. Default: false", required=False),
+        Arg(name="exact_match", type="bool", description="Match whole words only. Default: false", required=False),
+        Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
+        Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
     ],
 )
 
 workflow_run_logs_failed = GitHubCliTool(
     name="workflow_run_logs_failed",
-    description="""View failed job outputs from GitHub Actions workflow run.
+    description="""View failed job outputs from GitHub Actions workflow run with advanced search.
     
 Shows only the failed job logs (maximum 150 lines) with options to:
-- Search for specific patterns in the failed logs
-- Control how many recent lines to show (1-150 lines)
-- Default shows last 100 lines if not specified""",
+- Search for specific patterns with case sensitivity control
+- Control context lines around matches (up to 5 lines before/after)
+- Use exact match or regular expressions for searching
+- Default shows last 100 lines if not searching""",
     content="""
 # Enforce maximum lines limit
 MAX_LINES=150
@@ -293,9 +315,25 @@ if [ $LINES -gt $MAX_LINES ]; then
 fi
 
 if [ -n "$pattern" ]; then
-    # If pattern is provided, search and show context
-    echo "Searching for pattern '$pattern' in failed logs"
-    gh run view --repo $repo $run_id --log-failed | tail -n $MAX_LINES | grep -B 2 -A 2 "$pattern" | head -n $LINES
+    # Build grep options
+    GREP_OPTS=""
+    if [ "$case_sensitive" != "true" ]; then
+        GREP_OPTS="$GREP_OPTS -i"  # Case insensitive by default
+    fi
+    if [ "$exact_match" = "true" ]; then
+        GREP_OPTS="$GREP_OPTS -w"  # Word match
+    fi
+    
+    # Set context lines (max 5 each)
+    BEFORE_LINES=${before_context:-2}
+    AFTER_LINES=${after_context:-2}
+    if [ $BEFORE_LINES -gt 5 ]; then BEFORE_LINES=5; fi
+    if [ $AFTER_LINES -gt 5 ]; then AFTER_LINES=5; fi
+    
+    echo "Searching for pattern '$pattern' in failed logs (showing $BEFORE_LINES lines before and $AFTER_LINES lines after matches)"
+    gh run view --repo $repo $run_id --log-failed | tail -n $MAX_LINES | \
+        grep $GREP_OPTS -B $BEFORE_LINES -A $AFTER_LINES "$pattern" | \
+        head -n $LINES
 else
     # Just show the last N lines
     echo "Showing last $LINES lines of failed logs"
@@ -306,7 +344,11 @@ fi
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
         Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
-        Arg(name="pattern", type="str", description="Search pattern to filter failed logs. Shows 2 lines before and after each match", required=False),
+        Arg(name="pattern", type="str", description="Pattern to search in failed logs. Supports regular expressions", required=False),
+        Arg(name="case_sensitive", type="bool", description="Make pattern matching case sensitive. Default: false", required=False),
+        Arg(name="exact_match", type="bool", description="Match whole words only. Default: false", required=False),
+        Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
+        Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
     ],
 )
 
