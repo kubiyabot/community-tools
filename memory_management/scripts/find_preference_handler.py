@@ -2,6 +2,12 @@ import os
 import sys
 from mem0 import Memory
 from typing import Optional
+
+# Add scripts directory to Python path for config import
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.append(scripts_dir)
+
 from config import MemoryConfig
 
 def find_preference(search_query: str) -> None:

@@ -1,6 +1,13 @@
 import os
+import sys
 from mem0 import Memory
-from .config import MemoryConfig
+
+# Add scripts directory to Python path for config import
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.append(scripts_dir)
+
+from config import MemoryConfig
 
 def load_memories() -> None:
     """Load and display all stored preferences for the current user."""

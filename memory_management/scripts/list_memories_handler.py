@@ -1,7 +1,14 @@
 import os
+import sys
 from mem0 import Memory
 from typing import Optional
-from .config import MemoryConfig
+
+# Add scripts directory to Python path for config import
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.append(scripts_dir)
+
+from config import MemoryConfig
 
 def list_memories(search_filter: Optional[str] = None) -> None:
     """
