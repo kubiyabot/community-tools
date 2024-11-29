@@ -10,15 +10,8 @@ if project_root not in sys.path:
 
 from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
-
 from .base import MemoryManagementTool
-
-# Import all scripts from the scripts directory
-scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
-script_files = {}
-for script_path in scripts_dir.glob("*.py"):
-    with open(script_path, "r") as f:
-        script_files[script_path.name] = f.read()
+from ..utils import get_script_files  # Import the utility function
 
 list_memories_tool = MemoryManagementTool(
     name="list_memories",
@@ -34,7 +27,7 @@ list_memories_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai==1.1.0 2>&1 | grep -v '[notice]' > /dev/null
 
 # Run the list memories handler script
 python /opt/scripts/list_memories_handler.py {{ if .search_filter }}"{{ .search_filter }}"{{ end }} || exit 1
@@ -61,11 +54,11 @@ python /opt/scripts/list_memories_handler.py {{ if .search_filter }}"{{ .search_
     ],
     with_files=[
         FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in script_files.items()
+        for script_name, script_content in get_script_files().items()
     ],
 )
 
-# Register the tool with high priority
-tool_registry.register("memory_management", list_memories_tool, priority=100)
+# Register the tool (without priority parameter)
+tool_registry.register("memory_management", list_memories_tool)
 
 __all__ = ["list_memories_tool"] 
