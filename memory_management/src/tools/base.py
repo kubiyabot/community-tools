@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Tool
 
-MEMORY_ICON_URL = "https://path_to_icon/memory_icon.png"
+MEMORY_ICON_URL = "https://www.onlygfx.com/wp-content/uploads/2022/04/brain-icon-3.png"
 
 class MemoryManagementTool(Tool):
     def __init__(
