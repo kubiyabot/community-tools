@@ -1,7 +1,8 @@
 import os
+import sys
 from mem0 import Memory
 from typing import Optional
-from .config import MemoryConfig
+from config import MemoryConfig
 
 def find_preference(search_query: str) -> None:
     """
