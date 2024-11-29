@@ -27,7 +27,7 @@ class MemoryManagementTool(Tool):
             content=enhanced_content,
             args=args,
             env=env,
-            secrets=secrets + ["OPENAI_API_KEY"],
+            secrets=secrets + ["LLM_API_KEY"],
             long_running=long_running,
             with_files=with_files,
             mermaid=mermaid,
