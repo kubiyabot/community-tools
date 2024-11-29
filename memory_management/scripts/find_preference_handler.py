@@ -1,7 +1,7 @@
 import os
 import sys
 from mem0 import Memory
-from typing import Optional
+from typing import Optional, Dict, Any, List
 
 # Add scripts directory to Python path for config import
 scripts_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,20 +32,41 @@ def find_preference(search_query: str) -> None:
 
         print(f"🔍 Searching for preferences matching '{search_query}'...")
 
-        # Get all memories and filter them
-        memories = m.get_all(user_id=user_id)
+        try:
+            # Try using the search method first
+            search_results = m.search(query=search_query, user_id=user_id)
+            if search_results and isinstance(search_results, dict) and search_results.get('results'):
+                memories = [MemoryConfig.format_memory_response(mem) for mem in search_results['results']]
+            else:
+                # Fallback to get_all and filter manually
+                raw_memories = m.get_all(user_id=user_id)
+                if isinstance(raw_memories, dict):
+                    memories = [MemoryConfig.format_memory_response(mem) for mem in raw_memories.get('memories', [])]
+                elif isinstance(raw_memories, list):
+                    memories = [MemoryConfig.format_memory_response(mem) for mem in raw_memories]
+                else:
+                    memories = []
+        except Exception as e:
+            print(f"⚠️ Search failed, falling back to manual filtering: {str(e)}")
+            raw_memories = m.get_all(user_id=user_id)
+            if isinstance(raw_memories, dict):
+                memories = [MemoryConfig.format_memory_response(mem) for mem in raw_memories.get('memories', [])]
+            elif isinstance(raw_memories, list):
+                memories = [MemoryConfig.format_memory_response(mem) for mem in raw_memories]
+            else:
+                memories = []
         
         if not memories:
             print("📭 No stored preferences found.")
             return
 
-        # Perform search
+        # Perform search if using manual filtering
         search_terms = search_query.lower().split()
         matches = []
         
         for mem in memories:
-            content = mem['data'].lower()
-            tags = [tag.lower() for tag in mem.get('metadata', {}).get('tags', [])]
+            content = mem['content'].lower()
+            tags = [tag.lower() for tag in mem['metadata'].get('tags', [])]
             
             # Calculate match score based on number of matching terms
             score = sum(1 for term in search_terms if term in content or any(term in tag for tag in tags))
@@ -67,11 +88,11 @@ def find_preference(search_query: str) -> None:
         
         print(f"\n✨ Found {len(matches)} matching preferences:\n")
         for score, mem in matches:
-            tags = mem.get('metadata', {}).get('tags', [])
+            tags = mem['metadata'].get('tags', [])
             tags_str = f"[{', '.join(tags)}]" if tags else "[]"
             
-            print(f"📌 {mem['data']}")
-            print(f"   ID: {mem['memory_id']}")
+            print(f"📌 {mem['content']}")
+            print(f"   ID: {mem['id']}")
             print(f"   Tags: {tags_str}")
             print(f"   Added: {mem['timestamp']}\n")
 
@@ -83,7 +104,6 @@ def find_preference(search_query: str) -> None:
         sys.exit(1)
 
 if __name__ == "__main__":
-    import sys
     if len(sys.argv) != 2:
         print("Usage: find_preference_handler.py <search_query>")
         sys.exit(1)
