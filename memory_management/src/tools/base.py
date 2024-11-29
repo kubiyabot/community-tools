@@ -22,7 +22,6 @@ class MemoryManagementTool(Tool):
 # Configure OpenAI
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
-#export OPENAI_API_VERSION=2024-02-15-preview
 
 # Create and activate virtual environment
 python -m venv /opt/venv > /dev/null

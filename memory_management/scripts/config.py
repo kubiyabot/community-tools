@@ -6,53 +6,22 @@ class MemoryConfig:
     
     @staticmethod
     def get_neo4j_config(custom_prompt: Optional[str] = None) -> Dict[str, Any]:
-        """Get Neo4j configuration with validation."""
+        """Get configuration with validation."""
         # Validate required environment variables
-        required_env_vars = ["NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD", 
-                           "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG",
-                           "OPENAI_API_KEY", "OPENAI_API_BASE"]
+        required_env_vars = ["MEM0_API_KEY", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
         
         missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
         if missing_vars:
             raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
         config = {
-            "llm": {
-                "provider": "openai",
-                "config": {
-                    "model": "gpt-4o",
-                    "temperature": 0.2,
-                    "max_tokens": 1500,
-                    "api_key": os.environ["OPENAI_API_KEY"],
-                    "api_base": os.environ["OPENAI_API_BASE"],
-                    "api_version": os.environ.get("OPENAI_API_VERSION", "2024-02-15-preview")
-                }
-            },
-            "graph_store": {
-                "provider": "neo4j",
-                "config": {
-                    "url": os.environ["NEO4J_URI"],
-                    "username": os.environ["NEO4J_USER"],
-                    "password": os.environ["NEO4J_PASSWORD"],
-                    "database": "neo4j",
-                },
-                "llm": {
-                    "provider": "openai",
-                    "config": {
-                        "model": "gpt-4o",
-                        "temperature": 0.0,
-                        "api_key": os.environ["OPENAI_API_KEY"],
-                        "api_base": os.environ["OPENAI_API_BASE"],
-                        "api_version": os.environ.get("OPENAI_API_VERSION", "2024-02-15-preview")
-                    }
-                }
-            },
+            "api_key": os.environ["MEM0_API_KEY"],
             "version": "v1.1"
         }
 
         # Add custom prompt if provided
         if custom_prompt:
-            config["graph_store"]["custom_prompt"] = custom_prompt
+            config["custom_prompt"] = custom_prompt
 
         return config
 
@@ -67,7 +36,7 @@ class MemoryConfig:
         if isinstance(memory, str):
             return {
                 'content': memory,
-                'id': 'unknown',
+                'memory_id': 'unknown',
                 'timestamp': 'unknown',
                 'metadata': {'tags': []},
                 'relationships': [],
@@ -77,7 +46,7 @@ class MemoryConfig:
             # Handle both old and new response formats
             return {
                 'content': memory.get('content', memory.get('data', memory.get('memory', ''))),
-                'id': memory.get('id', memory.get('memory_id', 'unknown')),
+                'memory_id': memory.get('memory_id', memory.get('id', 'unknown')),
                 'timestamp': memory.get('timestamp', memory.get('created_at', 'unknown')),
                 'metadata': memory.get('metadata', {'tags': []}),
                 'relationships': memory.get('relationships', []),
