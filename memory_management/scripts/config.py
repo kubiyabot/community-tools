@@ -9,23 +9,41 @@ class MemoryConfig:
         """Get Neo4j configuration with validation."""
         # Validate required environment variables
         required_env_vars = ["NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD", 
-                           "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
+                           "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG",
+                           "OPENAI_API_KEY", "OPENAI_API_BASE"]
         
         missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
         if missing_vars:
             raise EnvironmentError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
         config = {
+            "llm": {
+                "provider": "openai",
+                "config": {
+                    "model": "gpt-4o",
+                    "temperature": 0.2,
+                    "max_tokens": 1500,
+                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_base": os.environ["OPENAI_API_BASE"],
+                    "api_version": os.environ.get("OPENAI_API_VERSION", "2024-02-15-preview")
+                }
+            },
             "graph_store": {
                 "provider": "neo4j",
                 "config": {
                     "url": os.environ["NEO4J_URI"],
                     "username": os.environ["NEO4J_USER"],
                     "password": os.environ["NEO4J_PASSWORD"],
-                    "database": "neo4j",  # Default Neo4j database
-                    "node_properties": {
-                        "Memory": ["content", "user_id", "timestamp", "metadata"],
-                        "User": ["user_id", "email", "org"]
+                    "database": "neo4j",
+                },
+                "llm": {
+                    "provider": "openai",
+                    "config": {
+                        "model": "gpt-4o",
+                        "temperature": 0.0,
+                        "api_key": os.environ["OPENAI_API_KEY"],
+                        "api_base": os.environ["OPENAI_API_BASE"],
+                        "api_version": os.environ.get("OPENAI_API_VERSION", "2024-02-15-preview")
                     }
                 }
             },
@@ -51,7 +69,9 @@ class MemoryConfig:
                 'content': memory,
                 'id': 'unknown',
                 'timestamp': 'unknown',
-                'metadata': {'tags': []}
+                'metadata': {'tags': []},
+                'relationships': [],
+                'entities': []
             }
         elif isinstance(memory, dict):
             # Handle both old and new response formats
@@ -59,7 +79,9 @@ class MemoryConfig:
                 'content': memory.get('content', memory.get('data', memory.get('memory', ''))),
                 'id': memory.get('id', memory.get('memory_id', 'unknown')),
                 'timestamp': memory.get('timestamp', memory.get('created_at', 'unknown')),
-                'metadata': memory.get('metadata', {'tags': []})
+                'metadata': memory.get('metadata', {'tags': []}),
+                'relationships': memory.get('relationships', []),
+                'entities': memory.get('extracted_entities', memory.get('entities', []))
             }
         else:
             raise ValueError(f"Unexpected memory format: {type(memory)}") 

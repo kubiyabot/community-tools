@@ -17,7 +17,23 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
-        enhanced_content = """export OPENAI_API_KEY=$LLM_API_KEY\nexport OPENAI_API_BASE=https://llm-proxy.kubiya.ai\n""" + content
+        # Add OpenAI configuration for GPT-4-O
+        enhanced_content = """
+# Configure OpenAI
+export OPENAI_API_KEY=$LLM_API_KEY
+export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
+#export OPENAI_API_VERSION=2024-02-15-preview
+
+# Create and activate virtual environment
+python -m venv /opt/venv > /dev/null
+. /opt/venv/bin/activate > /dev/null
+
+# Install required packages
+pip install --upgrade pip > /dev/null
+pip install mem0ai[graph] langchain-community rank_bm25 neo4j openai 2>&1 | grep -v '[notice]' > /dev/null
+
+""" + content
+
         super().__init__(
             name=name,
             description=description,
@@ -26,7 +42,7 @@ class MemoryManagementTool(Tool):
             image=image,
             content=enhanced_content,
             args=args,
-            env=env,
+            env=env + ["OPENAI_API_VERSION"],
             secrets=secrets + ["LLM_API_KEY"],
             long_running=long_running,
             with_files=with_files,
