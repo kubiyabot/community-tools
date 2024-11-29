@@ -6,6 +6,6 @@ setup(
     packages=find_packages(),
     install_requires=[
         "kubiya_sdk",
-        "mem0ai",
+        "mem0ai==1.1.0",
     ],
 ) 

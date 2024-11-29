@@ -11,6 +11,7 @@ if project_root not in sys.path:
 from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
+from ..utils import get_script_files
 
 find_preference_tool = MemoryManagementTool(
     name="find_preference",
@@ -25,7 +26,7 @@ find_preference_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai==1.1.0 2>&1 | grep -v '[notice]' > /dev/null
 
 python /opt/scripts/find_preference_handler.py "{{ .search_query }}" || exit 1
 """,
@@ -53,7 +54,7 @@ python /opt/scripts/find_preference_handler.py "{{ .search_query }}" || exit 1
     ],
     with_files=[
         FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in script_files.items()
+        for script_name, script_content in get_script_files().items()
     ],
 )
 

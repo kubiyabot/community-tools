@@ -11,6 +11,7 @@ if project_root not in sys.path:
 from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
+from ..utils import get_script_files
 
 load_memories_tool = MemoryManagementTool(
     name="load_memories",
@@ -25,7 +26,7 @@ load_memories_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai==1.1.0 2>&1 | grep -v '[notice]' > /dev/null
 
 python /opt/scripts/load_memories_handler.py || exit 1
 """,
@@ -41,9 +42,9 @@ python /opt/scripts/load_memories_handler.py || exit 1
     ],
     with_files=[
         FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in script_files.items()
+        for script_name, script_content in get_script_files().items()
     ],
 )
 
-# Register the tool with high priority
-tool_registry.register("memory_management", load_memories_tool, priority=100) 
+# Register the tool (without priority parameter)
+tool_registry.register("memory_management", load_memories_tool) 
