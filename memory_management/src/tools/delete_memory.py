@@ -30,7 +30,7 @@ delete_memory_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai langchain-community rank_bm25 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai langchain-community rank_bm25 neo4j 2>&1 | grep -v '[notice]' > /dev/null
 
 # Run the delete memory handler script
 python /opt/scripts/delete_memory_handler.py "{{ .memory_id }}"
