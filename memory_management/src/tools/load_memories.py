@@ -26,7 +26,7 @@ load_memories_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai==1.1.0 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
 
 python /opt/scripts/load_memories_handler.py || exit 1
 """,
