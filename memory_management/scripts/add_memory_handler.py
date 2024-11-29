@@ -2,7 +2,14 @@ import sys
 import json
 from mem0 import Memory
 from typing import Optional, List, Union
-from .config import MemoryConfig
+import os
+
+# Add scripts directory to Python path for config import
+scripts_dir = os.path.dirname(os.path.abspath(__file__))
+if scripts_dir not in sys.path:
+    sys.path.append(scripts_dir)
+
+from config import MemoryConfig
 
 def validate_tags(tags_str: Optional[str]) -> Optional[List[str]]:
     """Validate and parse tags JSON string."""
@@ -55,14 +62,8 @@ def add_memory(
             for entity in result["extracted_entities"]:
                 print(f"- {entity}")
 
-    except EnvironmentError as e:
-        print(f"❌ Environment Error: {str(e)}")
-        sys.exit(1)
-    except ValueError as e:
-        print(f"❌ Validation Error: {str(e)}")
-        sys.exit(1)
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        print(f"❌ Error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
@@ -80,9 +81,6 @@ if __name__ == "__main__":
         
         add_memory(memory_content, tags, custom_prompt)
 
-    except ValueError as e:
-        print(f"❌ Error: {str(e)}")
-        sys.exit(1)
     except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
+        print(f"❌ Error: {str(e)}")
         sys.exit(1) 

@@ -13,7 +13,6 @@ from config import MemoryConfig
 def find_preference(search_query: str) -> None:
     """
     Search for specific preferences using the provided query.
-    Uses both vector and graph-based search for comprehensive results.
     
     Args:
         search_query: Text to search for in preferences
@@ -34,72 +33,22 @@ def find_preference(search_query: str) -> None:
         print(f"🔍 Searching for preferences matching '{search_query}'...")
 
         try:
-            # Try using the graph-enhanced search method first
-            search_results = m.search(
-                query=search_query, 
-                user_id=user_id,
-                include_graph=True  # Enable graph-based search
-            )
+            # Use mem0's search functionality
+            search_results = m.search(query=search_query, user_id=user_id)
             
             if search_results and isinstance(search_results, dict):
-                memories = []
-                
-                # Handle vector search results
-                if search_results.get('results'):
-                    memories.extend([
-                        MemoryConfig.format_memory_response(mem) 
-                        for mem in search_results['results']
-                    ])
-                
-                # Handle graph search results
-                if search_results.get('graph_results'):
-                    for result in search_results['graph_results']:
-                        formatted = MemoryConfig.format_memory_response(result)
-                        if formatted not in memories:  # Avoid duplicates
-                            memories.append(formatted)
-            else:
-                # Fallback to get_all and filter manually
-                raw_memories = m.get_all(user_id=user_id)
                 memories = [
                     MemoryConfig.format_memory_response(mem) 
-                    for mem in (raw_memories if isinstance(raw_memories, list) 
-                              else raw_memories.get('memories', []))
+                    for mem in search_results.get('results', [])
                 ]
+            else:
+                memories = []
                 
         except Exception as e:
-            print(f"⚠️ Advanced search failed, falling back to basic search: {str(e)}")
-            raw_memories = m.get_all(user_id=user_id)
-            memories = [
-                MemoryConfig.format_memory_response(mem) 
-                for mem in (raw_memories if isinstance(raw_memories, list) 
-                          else raw_memories.get('memories', []))
-            ]
-        
-        if not memories:
-            print("📭 No stored preferences found.")
+            print(f"⚠️ Search failed: {str(e)}")
             return
 
-        # Perform search if using manual filtering
-        search_terms = search_query.lower().split()
-        matches = []
-        
-        for mem in memories:
-            content = mem['content'].lower()
-            tags = [tag.lower() for tag in mem['metadata'].get('tags', [])]
-            entities = [str(entity).lower() for entity in mem.get('entities', [])]
-            
-            # Calculate match score based on content, tags, and entities
-            score = sum(
-                1 for term in search_terms 
-                if term in content 
-                or any(term in tag for tag in tags)
-                or any(term in entity for entity in entities)
-            )
-            
-            if score > 0:
-                matches.append((score, mem))
-
-        if not matches:
+        if not memories:
             print("🤔 No matching preferences found.")
             print("\n💡 Tips for better search:")
             print("- Try using different keywords")
@@ -108,33 +57,21 @@ def find_preference(search_query: str) -> None:
             print("\n📋 Use 'load_memories' to see all your preferences")
             return
 
-        # Sort by score (most relevant first)
-        matches.sort(reverse=True, key=lambda x: x[0])
-        
-        print(f"\n✨ Found {len(matches)} matching preferences:\n")
-        for score, mem in matches:
+        print(f"\n✨ Found {len(memories)} matching preferences:\n")
+        for mem in memories:
             tags = mem['metadata'].get('tags', [])
             tags_str = f"[{', '.join(tags)}]" if tags else "[]"
             
             print(f"📌 {mem['content']}")
-            print(f"   ID: {mem['id']}")
+            print(f"   ID: {mem['memory_id']}")
             print(f"   Tags: {tags_str}")
             
             # Display extracted entities if available
             if mem.get('entities'):
                 print(f"   Entities: {', '.join(str(e) for e in mem['entities'])}")
             
-            # Display relationships if available
-            if mem.get('relationships'):
-                print("   Relationships:")
-                for rel in mem['relationships']:
-                    print(f"      - {rel}")
-            
             print(f"   Added: {mem['timestamp']}\n")
 
-    except ValueError as e:
-        print(f"❌ {str(e)}")
-        sys.exit(1)
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         sys.exit(1)
