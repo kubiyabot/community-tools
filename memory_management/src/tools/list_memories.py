@@ -27,7 +27,7 @@ list_memories_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai langchain-community rank_bm25 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai langchain-community rank_bm25 neo4j 2>&1 | grep -v '[notice]' > /dev/null
 
 # Run the list memories handler script
 python /opt/scripts/list_memories_handler.py {{ if .search_filter }}"{{ .search_filter }}"{{ end }} || exit 1
