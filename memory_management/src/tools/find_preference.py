@@ -26,7 +26,7 @@ find_preference_tool = MemoryManagementTool(
 set -e
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
-pip install mem0ai langchain-community 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai langchain-community rank_bm25 2>&1 | grep -v '[notice]' > /dev/null
 
 python /opt/scripts/find_preference_handler.py "{{ .search_query }}" || exit 1
 """,
