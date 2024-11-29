@@ -1,13 +1,35 @@
-name: "deploy-ec2-instance"
-description: "Deploy an EC2 instance using a Terraform module."
-terraform_module: "https://github.com/yourorg/terraform-aws-ec2-instance.git"
+name: "vpc"
+description: "AWS VPC Module for creating networking infrastructure"
+
+# Source configuration
+source:
+  # Can be a git URL or local path
+  location: "https://github.com/terraform-aws-modules/terraform-aws-vpc.git"
+  type: "git"  # git, local, or s3
+  git_config:  # Optional, for git sources
+    branch: "main"
+    tag: "v3.0.0"  # Optional
+    subfolder: "examples/complete"  # Optional, point to specific folder
+  
+# Optional pre-script to run before Terraform operations
+pre_script: |
+  #!/bin/bash
+  # Example: generate configs, download dependencies, etc.
+  echo "Preparing environment..."
+  # wget https://example.com/some-dependency
+  # ./generate_config.sh
+
 auto_detect_vars: true
+
+# Environment variables needed
 env:
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
   - AWS_DEFAULT_REGION
   - GH_TOKEN
+
+# Required secrets
 secrets:
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
-  - GH_TOKEN 
+  - GH_TOKEN
