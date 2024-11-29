@@ -17,18 +17,19 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
+        enhanced_content = """export OPENAI_API_KEY=$LLM_API_KEY\nexport OPENAI_API_BASE=https://llm-proxy.kubiya.ai\n""" + content
         super().__init__(
             name=name,
             description=description,
             icon_url=MEMORY_ICON_URL,
             type="docker",
             image=image,
-            content=content,
+            content=enhanced_content,
             args=args,
             env=env,
-            secrets=secrets,
+            secrets=secrets + ["OPENAI_API_KEY"],
             long_running=long_running,
             with_files=with_files,
             mermaid=mermaid,
             with_volumes=with_volumes,
-        ) 
+        )

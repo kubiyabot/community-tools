@@ -238,3 +238,234 @@ Here's some reference files for context:
 2024/11/29 13:51:13 chat.go:219: Sending message: {Content:It seems like your message was cutoff. Could you please provide more details or upload the referenced files for context? This will help me better understand the error you're referring to Error: SessionID: Timestamp:2024-11-29T13:51:13+02:00 SenderName:Bot Type:msg Message: MessageID:961923 Final:false Status:}
 2024/11/29 13:51:13 chat.go:219: Sending message: {Content:It seems like your message was cutoff. Could you please provide more details or upload the referenced files for context? This will help me better understand the error you're referring to. Error: SessionID: Timestamp:2024-11-29T13:51:13+02:00 SenderName:Bot Type:msg Message: MessageID:961923 Final:true Status:}
 2024/11/29 13:51:13 chat.go:219: Sending message: {Content:It seems like your message was cutoff. Could you please provide more details or upload the referenced files for context? This will help me better understand the error you're referring to. Error: SessionID: Timestamp:2024-11-29T13:51:13+02:00 SenderName:Bot Type:msg Message: MessageID:961923 Final:true Status:}
+2024/11/29 14:17:02 chat.go:112: === Starting SendMessage ===
+2024/11/29 14:17:02 chat.go:113: Payload: {Message:get the current memories
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732882622644630000}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments:  Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {" Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":" Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current"} Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:false Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current"} Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:true Status:}
+2024/11/29 14:17:10 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current"} Error: SessionID: Timestamp:2024-11-29T14:17:10+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:true Status:}
+2024/11/29 14:17:42 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current"} Error: SessionID: Timestamp:2024-11-29T14:17:42+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:true Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:
+Tool: search_memories
+Arguments: {"query":"current"} Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:tool Message: MessageID:535659 Final:true Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:true Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:true Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist you Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist you with Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist you with that Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:false Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist you with that. Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:true Status:}
+2024/11/29 14:17:44 chat.go:219: Sending message: {Content:There are no current memories stored. How would you like to proceed? If you'd like to add any new memories, provide the details so I can assist you with that. Error: SessionID: Timestamp:2024-11-29T14:17:44+02:00 SenderName:Bot Type:msg Message: MessageID:417438 Final:true Status:}
+2024/11/29 14:20:35 chat.go:112: === Starting SendMessage ===
+2024/11/29 14:20:35 chat.go:113: Payload: {Message:get the current memories
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732882835839753000}
+2024/11/29 14:20:42 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments:  Error: SessionID: Timestamp:2024-11-29T14:20:42+02:00 SenderName:Bot Type:tool Message: MessageID:337663 Final:false Status:}
+2024/11/29 14:20:42 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:20:42+02:00 SenderName:Bot Type:tool Message: MessageID:337663 Final:false Status:}
+2024/11/29 14:20:42 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:20:42+02:00 SenderName:Bot Type:tool Message: MessageID:337663 Final:true Status:}
+2024/11/29 14:20:42 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:20:42+02:00 SenderName:Bot Type:tool Message: MessageID:337663 Final:true Status:}
+2024/11/29 14:21:00 chat.go:219: Sending message: {Content:Traceback (most recent call last): Error: SessionID: Timestamp:2024-11-29T14:21:00+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:false Status:}
+2024/11/29 14:21:00 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 2, in <module> Error: SessionID: Timestamp:2024-11-29T14:21:00+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:false Status:}
+2024/11/29 14:21:00 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 2, in <module>    from mem0 import Memory Error: SessionID: Timestamp:2024-11-29T14:21:00+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:false Status:}
+2024/11/29 14:21:00 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 2, in <module>    from mem0 import MemoryModuleNotFoundError: No module named 'mem0' Error: SessionID: Timestamp:2024-11-29T14:21:00+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:false Status:}
+2024/11/29 14:21:00 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 2, in <module>    from mem0 import MemoryModuleNotFoundError: No module named 'mem0' Error: SessionID: Timestamp:2024-11-29T14:21:00+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:true Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 2, in <module>    from mem0 import MemoryModuleNotFoundError: No module named 'mem0' Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:tool_output Message: MessageID:290685 Final:true Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:true Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+ Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to resolve Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to resolve the Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to resolve the issue Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:false Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to resolve the issue? Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:true Status:}
+2024/11/29 14:21:02 chat.go:219: Sending message: {Content:It seems there was an error while trying to list the current memories. The script couldn't find the required module.
+
+Would you like to try another action or perhaps attempt to resolve the issue? Error: SessionID: Timestamp:2024-11-29T14:21:02+02:00 SenderName:Bot Type:msg Message: MessageID:988234 Final:true Status:}
+2024/11/29 14:22:29 chat.go:112: === Starting SendMessage ===
+2024/11/29 14:22:29 chat.go:113: Payload: {Message:get the current memories
+
+Here's some reference files for context:
+ AgentUUID:7695b865-97bd-4c14-8f65-c617976a40a5 SessionID:1732882949994543000}
+2024/11/29 14:22:37 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments:  Error: SessionID: Timestamp:2024-11-29T14:22:37+02:00 SenderName:Bot Type:tool Message: MessageID:557531 Final:false Status:}
+2024/11/29 14:22:37 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:22:37+02:00 SenderName:Bot Type:tool Message: MessageID:557531 Final:false Status:}
+2024/11/29 14:22:37 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:22:37+02:00 SenderName:Bot Type:tool Message: MessageID:557531 Final:true Status:}
+2024/11/29 14:22:37 chat.go:219: Sending message: {Content:
+Tool: list_memories
+Arguments: {} Error: SessionID: Timestamp:2024-11-29T14:22:37+02:00 SenderName:Bot Type:tool Message: MessageID:557531 Final:true Status:}
+2024/11/29 14:23:05 chat.go:219: Sending message: {Content:Traceback (most recent call last): Error: SessionID: Timestamp:2024-11-29T14:23:05+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:false Status:}
+2024/11/29 14:23:05 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 4, in <module> Error: SessionID: Timestamp:2024-11-29T14:23:05+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:false Status:}
+2024/11/29 14:23:05 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 4, in <module>    from .config import MemoryConfig Error: SessionID: Timestamp:2024-11-29T14:23:05+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:false Status:}
+2024/11/29 14:23:05 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 4, in <module>    from .config import MemoryConfigImportError: attempted relative import with no known parent package Error: SessionID: Timestamp:2024-11-29T14:23:05+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:false Status:}
+2024/11/29 14:23:06 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 4, in <module>    from .config import MemoryConfigImportError: attempted relative import with no known parent package Error: SessionID: Timestamp:2024-11-29T14:23:06+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:true Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:Traceback (most recent call last):  File "/opt/scripts/list_memories_handler.py", line 4, in <module>    from .config import MemoryConfigImportError: attempted relative import with no known parent package Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:tool_output Message: MessageID:663004 Final:true Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:true Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can assist Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can assist you Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can assist you further Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:false Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can assist you further. Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:true Status:}
+2024/11/29 14:23:09 chat.go:219: Sending message: {Content:It seems that there was an error while trying to fetch your current memories. If you have any specific reference files or context you'd like to share, feel free to upload them, and I can assist you further. Error: SessionID: Timestamp:2024-11-29T14:23:09+02:00 SenderName:Bot Type:msg Message: MessageID:282692 Final:true Status:}
