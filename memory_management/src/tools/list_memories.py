@@ -23,9 +23,12 @@ for script_path in scripts_dir.glob("*.py"):
 list_memories_tool = MemoryManagementTool(
     name="list_memories",
     description=(
-        "List all stored user preferences for the current user. "
-        "This tool helps in reviewing long-term memories about user preferences around resources and actions they like to consume. "
-        "You can filter memories by tags to focus on specific categories."
+        "🎯 [Recommended First Step] View your stored preferences and settings!\n\n"
+        "This tool shows all your stored preferences and settings, helping me understand your "
+        "previous choices and preferences. Running this at the start of our conversation helps "
+        "me provide more personalized assistance.\n\n"
+        "You can optionally filter the results by providing search terms that match either the "
+        "content or tags of your stored preferences."
     ),
     content="""
 set -e
@@ -34,15 +37,14 @@ python -m venv /opt/venv > /dev/null
 pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
 
 # Run the list memories handler script
-python /opt/scripts/list_memories_handler.py "{{ .tags }}"
+python /opt/scripts/list_memories_handler.py {{ if .search_filter }}"{{ .search_filter }}"{{ end }} || exit 1
 """,
     args=[
         Arg(
-            name="tags",
+            name="search_filter",
             description=(
-                "Optional tags to filter memories. Only preferences containing all the specified tags will be listed. "
-                "Provide the tags as a JSON array of strings.\n"
-                "**Example**: '[\"notifications\"]'"
+                "Optional search terms to filter your preferences. Matches against both content and tags.\n"
+                "**Example**: \"notifications email\" will show preferences related to email notifications"
             ),
             required=False,
             default=None,
@@ -63,7 +65,7 @@ python /opt/scripts/list_memories_handler.py "{{ .tags }}"
     ],
 )
 
-# Register the tool
-tool_registry.register("memory_management", list_memories_tool)
+# Register the tool with high priority
+tool_registry.register("memory_management", list_memories_tool, priority=100)
 
 __all__ = ["list_memories_tool"] 
