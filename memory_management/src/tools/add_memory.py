@@ -2,6 +2,7 @@ import inspect
 import sys
 import os
 from pathlib import Path
+import json
 
 # Add the project root to Python path
 project_root = str(Path(__file__).resolve().parents[2])
@@ -23,9 +24,9 @@ for script_path in scripts_dir.glob("*.py"):
 add_memory_tool = MemoryManagementTool(
     name="add_memory",
     description=(
-        "Add a new memory to the long-term memory store for the current user. "
-        "This tool is useful for storing user preferences around resources and actions they like to consume. "
-        "By adding these memories, you can personalize experiences based on user preferences in the future."
+        "Add a new memory to the graph memory store for the current user. "
+        "This tool stores user preferences and can extract entities using optional custom prompts. "
+        "The stored memories can be used to personalize future interactions."
     ),
     content="""
 set -e
@@ -33,8 +34,11 @@ python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
 pip install mem0ai 2>&1 | grep -v '[notice]' > /dev/null
 
-# Run the add memory handler script
-python /opt/scripts/add_memory_handler.py "{{ .memory_content }}" "{{ .tags }}"
+# Run the add memory handler script with error handling
+python /opt/scripts/add_memory_handler.py \
+    "{{ .memory_content }}" \
+    {{ if .tags }}"{{ .tags }}"{{ else }}""{{ end }} \
+    {{ if .custom_prompt }}"{{ .custom_prompt }}"{{ end }} || exit 1
 """,
     args=[
         Arg(
@@ -44,6 +48,7 @@ python /opt/scripts/add_memory_handler.py "{{ .memory_content }}" "{{ .tags }}"
                 "**Example**: \"Prefers to receive notifications via email for deployment events\""
             ),
             required=True,
+            validate=lambda x: bool(x.strip()),
         ),
         Arg(
             name="tags",
@@ -51,6 +56,19 @@ python /opt/scripts/add_memory_handler.py "{{ .memory_content }}" "{{ .tags }}"
                 "Optional tags to categorize the memory for better organization and retrieval. "
                 "Provide the tags as a JSON array of strings.\n"
                 "**Example**: '[\"notifications\", \"preferences\", \"email\"]'"
+            ),
+            required=False,
+            default=None,
+            validate=lambda x: x is None or (
+                isinstance(x, str) and 
+                all(isinstance(tag, str) for tag in json.loads(x))
+            ),
+        ),
+        Arg(
+            name="custom_prompt",
+            description=(
+                "Optional custom prompt for entity extraction. Use this to guide the extraction of specific types of entities.\n"
+                "**Example**: \"Please only extract entities containing deployment-related relationships.\""
             ),
             required=False,
             default=None,
