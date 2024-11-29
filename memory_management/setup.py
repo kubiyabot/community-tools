@@ -6,6 +6,10 @@ setup(
     packages=find_packages(),
     install_requires=[
         "kubiya_sdk",
-        "mem0ai==1.1.0",
+        "mem0ai[graph]==1.1.0",
+        "langchain-community",
+        "rank_bm25",
+        "neo4j",
+        "openai>=1.0.0"
     ],
 ) 

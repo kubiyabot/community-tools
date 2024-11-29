@@ -29,12 +29,7 @@ add_memory_tool = MemoryManagementTool(
         "The stored memories can be used to personalize future interactions."
     ),
     content="""
-set -e
-python -m venv /opt/venv > /dev/null
-. /opt/venv/bin/activate > /dev/null
-pip install mem0ai langchain-community rank_bm25 neo4j 2>&1 | grep -v '[notice]' > /dev/null
-
-# Run the add memory handler script with error handling
+# Run the add memory handler script
 python /opt/scripts/add_memory_handler.py \
     "{{ .memory_content }}" \
     {{ if .tags }}"{{ .tags }}"{{ else }}""{{ end }} \
