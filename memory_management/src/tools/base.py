@@ -41,7 +41,7 @@ pip install mem0ai[graph] langchain-community rank_bm25 neo4j openai 2>&1 | grep
             image=image,
             content=enhanced_content,
             args=args,
-            env=env + ["OPENAI_API_VERSION"],
+            env=env + ["MEM0_API_KEY"],
             secrets=secrets + ["LLM_API_KEY"],
             long_running=long_running,
             with_files=with_files,
