@@ -53,6 +53,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to load tools: {str(e)}", exc_info=True)
     tools = []
+    raise
 
 # Export functions and tools
 __all__ = ['tools', 'load_terraform_modules']
