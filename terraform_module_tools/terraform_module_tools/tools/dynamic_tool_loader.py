@@ -1,5 +1,5 @@
 import os
-import yaml
+import json
 from typing import Dict, Any, List
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
@@ -25,57 +25,72 @@ def _create_arg_from_variable(var_name: str, var_info: Dict[str, Any]) -> Arg:
 def load_terraform_tools():
     """Load all Terraform tools from configuration files."""
     for filename in os.listdir(CONFIG_DIR):
-        if filename.endswith(('.yaml', '.yml')):
+        if filename.endswith('.json'):
             config_path = os.path.join(CONFIG_DIR, filename)
-            with open(config_path, 'r') as f:
-                try:
-                    config = yaml.safe_load(f)
-                    create_tools_from_config(config)
-                except Exception as e:
-                    print(f"Error loading config {filename}: {str(e)}")
+            try:
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                create_tools_from_config(config)
+            except Exception as e:
+                print(f"Error loading config {filename}: {str(e)}")
+                continue
 
 def create_tools_from_config(config: Dict[str, Any]):
     """Create all tools for a module with dynamic variable arguments."""
-    module_name = config['name']
-    source_config = config['source']
-    
-    # Parse module variables
-    parser = TerraformModuleParser(
-        source_url=source_config['location'],
-        ref=source_config.get('git_config', {}).get('ref'),
-        subfolder=source_config.get('git_config', {}).get('subfolder')
-    )
-    
-    variables = parser.get_variables()
-    
-    # Create arguments from variables
-    variable_args = [
-        _create_arg_from_variable(name, var_info)
-        for name, var_info in variables.items()
-    ]
-    
-    # Create tools with variable arguments
-    for action in ['plan', 'apply']:
-        tool = create_terraform_tool(
-            name=f"iac_{module_name}_{action}",
-            description=f"{action.capitalize()} {config['description']}",
+    try:
+        module_name = config['name']
+        source_config = config['source']
+        
+        # Parse module variables
+        parser = TerraformModuleParser(
+            source_url=source_config['location'],
+            ref=source_config.get('git_config', {}).get('ref'),
+            subfolder=source_config.get('git_config', {}).get('subfolder')
+        )
+        
+        variables, warnings, errors = parser.get_variables()
+        
+        # Log any warnings or errors
+        for warning in warnings:
+            print(f"Warning for {module_name}: {warning}")
+        for error in errors:
+            print(f"Error for {module_name}: {error}")
+        
+        if not variables:
+            print(f"No variables found for module {module_name}")
+            return
+        
+        # Create arguments from variables
+        variable_args = [
+            _create_arg_from_variable(name, var_info)
+            for name, var_info in variables.items()
+        ]
+        
+        # Create tools with variable arguments
+        for action in ['plan', 'apply']:
+            tool = create_terraform_tool(
+                name=f"iac_{module_name}_{action}",
+                description=f"{action.capitalize()} {config['description']}",
+                source_config=source_config,
+                variable_args=variable_args,
+                action=action,
+                env=config.get('env', []),
+                secrets=config.get('secrets', [])
+            )
+            
+            tool_registry.register('terraform_modules', tool)
+        
+        # Create variables tool
+        vars_tool = create_terraform_tool(
+            name=f"iac_{module_name}_vars",
+            description=f"Show variables for {config['description']}",
             source_config=source_config,
-            variable_args=variable_args,
-            action=action,
+            action='vars',
             env=config.get('env', []),
             secrets=config.get('secrets', [])
         )
         
-        tool_registry.register('terraform_modules', tool)
-    
-    # Create variables tool
-    vars_tool = create_terraform_tool(
-        name=f"iac_{module_name}_vars",
-        description=f"Show variables for {config['description']}",
-        source_config=source_config,
-        action='vars',
-        env=config.get('env', []),
-        secrets=config.get('secrets', [])
-    )
-    
-    tool_registry.register('terraform_modules', vars_tool) 
+        tool_registry.register('terraform_modules', vars_tool)
+        
+    except Exception as e:
+        print(f"Failed to create tools for module {config.get('name', 'unknown')}: {str(e)}") 

@@ -1,6 +1,5 @@
 import os
 import json
-import git
 import tempfile
 import subprocess
 import requests
@@ -281,14 +280,27 @@ class TerraformModuleParser:
                         )
                     
                     print(f"📦 Cloning repository {source_url}...")
-                    repo = git.Repo.clone_from(auth_url, temp_dir)
                     
-                    if self.ref:
-                        print(f"⚡ Checking out ref: {self.ref}")
-                        try:
-                            repo.git.checkout(self.ref)
-                        except git.GitCommandError as e:
-                            raise GitSourceError(f"Failed to checkout ref '{self.ref}': {str(e)}")
+                    # Use git command line instead of gitpython
+                    try:
+                        subprocess.run(
+                            ["git", "clone", auth_url, temp_dir],
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        
+                        if self.ref:
+                            print(f"⚡ Checking out ref: {self.ref}")
+                            subprocess.run(
+                                ["git", "checkout", self.ref],
+                                cwd=temp_dir,
+                                check=True,
+                                capture_output=True,
+                                text=True
+                            )
+                    except subprocess.CalledProcessError as e:
+                        raise GitSourceError(f"Git operation failed: {e.stderr}")
                     
                     module_path = temp_dir
                     if self.subfolder:
@@ -300,8 +312,6 @@ class TerraformModuleParser:
                 else:
                     return self.parse_directory(source_url)
                     
-            except git.GitCommandError as e:
-                raise GitSourceError(f"Git operation failed: {str(e)}")
             except Exception as e:
                 raise TerraformSourceError(f"Failed to process source: {str(e)}")
 

@@ -1,0 +1,33 @@
+{
+  "name": "vpc",
+  "description": "AWS VPC Module for creating networking infrastructure",
+  "source": {
+    "location": "https://github.com/terraform-aws-modules/terraform-aws-vpc.git",
+    "type": "git",
+    "git_config": {
+      "ref": "v3.0.0",
+      "subfolder": "examples/complete"
+    }
+  },
+  "env": [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_DEFAULT_REGION",
+    "GH_TOKEN"
+  ],
+  "secrets": [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "GH_TOKEN"
+  ],
+  "variable_overrides": {
+    "vpc_name": {
+      "description": "Override default description",
+      "type": "string",
+      "required": true
+    },
+    "environment": {
+      "allowed_values": ["dev", "staging", "prod"]
+    }
+  }
+} 
