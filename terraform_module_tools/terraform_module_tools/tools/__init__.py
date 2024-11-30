@@ -1,56 +1,32 @@
-from typing import Dict, Any, List
+import logging
+from typing import List
+from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
 from .dynamic_tool_loader import load_terraform_tools as _load_tools
 
-def load_terraform_tools() -> None:
-    """
-    Load and register all Terraform tools from configuration files.
-    
-    Raises:
-        Exception: If any critical error occurs during tool loading
-    """
-    errors = []
-    
+logger = logging.getLogger(__name__)
+
+def initialize_tools() -> List[Tool]:
+    """Initialize and register all Terraform module tools."""
     try:
-        # Get initial tool count
-        initial_count = len(tool_registry.get_tools())
-        print(f"📊 Current tool count before loading: {initial_count}")
+        logger.info("🔄 Initializing Terraform module tools...")
         
-        # Load tools
-        _load_tools()
+        # Load tools using the dynamic loader
+        tools = _load_tools()
         
-        # Get final tool count
-        final_count = len(tool_registry.get_tools())
-        print(f"📊 Tool count after loading: {final_count}")
-        print(f"📈 New tools added: {final_count - initial_count}")
+        # Register each tool
+        for tool in tools:
+            try:
+                tool_registry.register("terraform_modules", tool)
+                logger.info(f"✅ Registered tool: {tool.name}")
+            except Exception as e:
+                logger.error(f"❌ Failed to register tool {tool.name}: {str(e)}")
         
-        # List registered terraform tools
-        terraform_tools = [
-            tool.name 
-            for tool in tool_registry.get_tools() 
-            if tool.name.startswith('terraform_')
-        ]
-        if terraform_tools:
-            print("\n🔧 Registered Terraform tools:")
-            for tool_name in terraform_tools:
-                print(f"  - {tool_name}")
-        else:
-            print("\n⚠️ No Terraform tools were registered!")
-            
+        return tools
+        
     except Exception as e:
-        errors.append({
-            "type": type(e).__name__,
-            "message": str(e),
-            "details": getattr(e, "errors", None)
-        })
-    
-    if errors:
-        error_msg = "Failed to load terraform tools:\n"
-        for error in errors:
-            error_msg += f"\n- {error['type']}: {error['message']}"
-            if error.get('details'):
-                error_msg += f"\n  Details: {error['details']}"
-        raise Exception(error_msg)
+        logger.error(f"❌ Failed to initialize tools: {str(e)}")
+        return []
 
 # Export only what's needed
-__all__ = ['load_terraform_tools']
+__all__ = ['initialize_tools']
