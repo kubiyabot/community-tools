@@ -1,4 +1,5 @@
 from typing import Dict, Any, List
+from kubiya_sdk.tools.registry import tool_registry
 from .dynamic_tool_loader import load_terraform_tools as _load_tools
 
 def load_terraform_tools() -> None:
@@ -11,7 +12,31 @@ def load_terraform_tools() -> None:
     errors = []
     
     try:
+        # Get initial tool count
+        initial_count = len(tool_registry.get_tools())
+        print(f"📊 Current tool count before loading: {initial_count}")
+        
+        # Load tools
         _load_tools()
+        
+        # Get final tool count
+        final_count = len(tool_registry.get_tools())
+        print(f"📊 Tool count after loading: {final_count}")
+        print(f"📈 New tools added: {final_count - initial_count}")
+        
+        # List registered terraform tools
+        terraform_tools = [
+            tool.name 
+            for tool in tool_registry.get_tools() 
+            if tool.name.startswith('terraform_')
+        ]
+        if terraform_tools:
+            print("\n🔧 Registered Terraform tools:")
+            for tool_name in terraform_tools:
+                print(f"  - {tool_name}")
+        else:
+            print("\n⚠️ No Terraform tools were registered!")
+            
     except Exception as e:
         errors.append({
             "type": type(e).__name__,
