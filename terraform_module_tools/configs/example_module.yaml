@@ -5,21 +5,15 @@ description: "AWS VPC Module for creating networking infrastructure"
 source:
   # Can be a git URL or local path
   location: "https://github.com/terraform-aws-modules/terraform-aws-vpc.git"
-  type: "git"  # git, local, or s3
-  git_config:  # Optional, for git sources
-    branch: "main"
-    tag: "v3.0.0"  # Optional
-    subfolder: "examples/complete"  # Optional, point to specific folder
+  type: "git"  # git or local
+  git_config:
+    ref: "v3.0.0"  # Branch, tag, or commit
+    subfolder: "examples/complete"  # Optional, for nested modules
   
 # Optional pre-script to run before Terraform operations
 pre_script: |
   #!/bin/bash
-  # Example: generate configs, download dependencies, etc.
   echo "Preparing environment..."
-  # wget https://example.com/some-dependency
-  # ./generate_config.sh
-
-auto_detect_vars: true
 
 # Environment variables needed
 env:
@@ -33,3 +27,12 @@ secrets:
   - AWS_ACCESS_KEY_ID
   - AWS_SECRET_ACCESS_KEY
   - GH_TOKEN
+
+# Optional variable overrides or constraints
+variable_overrides:
+  vpc_name:
+    description: "Override default description"
+    type: "string"
+    required: true
+  environment:
+    allowed_values: ["dev", "staging", "prod"]
