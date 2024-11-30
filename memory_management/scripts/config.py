@@ -5,10 +5,16 @@ class MemoryConfig:
     """Centralized configuration for memory management."""
     
     @staticmethod
-    def get_neo4j_config(custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    def get_config(custom_prompt: Optional[str] = None) -> Dict[str, Any]:
         """Get configuration with validation."""
         # Validate required environment variables
-        required_env_vars = ["MEM0_API_KEY", "KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
+        required_env_vars = [
+            "MEM0_API_KEY", 
+            "KUBIYA_USER_EMAIL", 
+            "KUBIYA_USER_ORG",
+            "LLM_API_KEY",
+            "OPENAI_API_BASE"
+        ]
         
         missing_vars = [var for var in required_env_vars if not os.environ.get(var)]
         if missing_vars:
@@ -16,6 +22,16 @@ class MemoryConfig:
 
         config = {
             "api_key": os.environ["MEM0_API_KEY"],
+            "llm": {
+                "provider": "litellm",
+                "config": {
+                    "model": "gpt-4o",
+                    "temperature": 0.2,
+                    "max_tokens": 1500,
+                    "api_key": os.environ["LLM_API_KEY"],
+                    "api_base": os.environ["OPENAI_API_BASE"]
+                }
+            },
             "version": "v1.1"
         }
 
@@ -39,7 +55,6 @@ class MemoryConfig:
                 'memory_id': 'unknown',
                 'timestamp': 'unknown',
                 'metadata': {'tags': []},
-                'relationships': [],
                 'entities': []
             }
         elif isinstance(memory, dict):
@@ -49,7 +64,6 @@ class MemoryConfig:
                 'memory_id': memory.get('memory_id', memory.get('id', 'unknown')),
                 'timestamp': memory.get('timestamp', memory.get('created_at', 'unknown')),
                 'metadata': memory.get('metadata', {'tags': []}),
-                'relationships': memory.get('relationships', []),
                 'entities': memory.get('extracted_entities', memory.get('entities', []))
             }
         else:

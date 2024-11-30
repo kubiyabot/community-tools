@@ -1,38 +1,25 @@
 import os
 import sys
-from mem0 import Memory
+from mem0 import MemoryClient
 from typing import Dict, Any, List
-
-# Add scripts directory to Python path for config import
-scripts_dir = os.path.dirname(os.path.abspath(__file__))
-if scripts_dir not in sys.path:
-    sys.path.append(scripts_dir)
-
-from config import MemoryConfig
 
 def load_memories() -> None:
     """Load and display all stored preferences for the current user."""
     try:
-        # Get configuration
-        config = MemoryConfig.get_neo4j_config()
-        
-        # Initialize Memory client
-        m = Memory.from_config(config_dict=config)
+        # Initialize Memory client with API key from environment
+        client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
         
         # Get user ID
-        user_id = MemoryConfig.get_user_id()
+        user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
 
         print("🔄 Loading your preferences... 🧠")
 
         # Get all memories for the user
-        raw_memories = m.get_all(user_id=user_id)
+        raw_memories = client.get_all(user_id=user_id)
         
         # Handle different response formats
-        memories = [
-            MemoryConfig.format_memory_response(mem) 
-            for mem in (raw_memories if isinstance(raw_memories, list) 
-                      else raw_memories.get('memories', []))
-        ]
+        memories = (raw_memories if isinstance(raw_memories, list) 
+                   else raw_memories.get('memories', []))
 
         if not memories:
             print("📭 No stored preferences found. Use the add_memory tool to store your first preference!")
@@ -45,7 +32,7 @@ def load_memories() -> None:
         untagged = []
         
         for mem in memories:
-            tags = mem['metadata'].get('tags', [])
+            tags = mem.get('metadata', {}).get('tags', [])
             if tags:
                 for tag in tags:
                     if tag not in tag_groups:
@@ -60,17 +47,17 @@ def load_memories() -> None:
             for tag, mems in tag_groups.items():
                 print(f"\n🏷️ {tag.upper()}:")
                 for mem in mems:
-                    print(f"  📌 {mem['content']}")
-                    print(f"     ID: {mem['memory_id']}")
-                    print(f"     Added: {mem['timestamp']}\n")
+                    print(f"  📌 {mem.get('content', mem.get('data', ''))}")
+                    print(f"     ID: {mem.get('id', 'unknown')}")
+                    print(f"     Added: {mem.get('timestamp', 'unknown')}\n")
 
         # Print untagged memories
         if untagged:
             print("\n📋 Other preferences:")
             for mem in untagged:
-                print(f"  📌 {mem['content']}")
-                print(f"     ID: {mem['memory_id']}")
-                print(f"     Added: {mem['timestamp']}\n")
+                print(f"  📌 {mem.get('content', mem.get('data', ''))}")
+                print(f"     ID: {mem.get('id', 'unknown')}")
+                print(f"     Added: {mem.get('timestamp', 'unknown')}\n")
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")

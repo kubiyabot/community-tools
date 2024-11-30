@@ -17,9 +17,9 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
-        # Add OpenAI configuration for GPT-4-O
+        # Add LiteLLM configuration
         enhanced_content = """
-# Configure OpenAI
+# Configure LiteLLM
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
@@ -29,7 +29,7 @@ python -m venv /opt/venv > /dev/null
 
 # Install required packages
 pip install --upgrade pip > /dev/null
-pip install mem0ai[graph] langchain-community rank_bm25 neo4j openai 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai litellm 2>&1 | grep -v '[notice]' > /dev/null
 
 """ + content
 
@@ -41,8 +41,8 @@ pip install mem0ai[graph] langchain-community rank_bm25 neo4j openai 2>&1 | grep
             image=image,
             content=enhanced_content,
             args=args,
-            env=env + ["MEM0_API_KEY"],
-            secrets=secrets + ["LLM_API_KEY"],
+            env=env,
+            secrets=secrets + ["LLM_API_KEY", "MEM0_API_KEY"],
             long_running=long_running,
             with_files=with_files,
             mermaid=mermaid,

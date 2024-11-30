@@ -1,14 +1,7 @@
 import os
 import sys
-from mem0 import Memory
+from mem0 import MemoryClient
 from typing import Optional, Dict, Any, List
-
-# Add scripts directory to Python path for config import
-scripts_dir = os.path.dirname(os.path.abspath(__file__))
-if scripts_dir not in sys.path:
-    sys.path.append(scripts_dir)
-
-from config import MemoryConfig
 
 def find_preference(search_query: str) -> None:
     """
@@ -21,26 +14,20 @@ def find_preference(search_query: str) -> None:
         if not search_query.strip():
             raise ValueError("Search query cannot be empty")
 
-        # Get configuration
-        config = MemoryConfig.get_neo4j_config()
-        
-        # Initialize Memory client
-        m = Memory.from_config(config_dict=config)
+        # Initialize Memory client with API key from environment
+        client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
         
         # Get user ID
-        user_id = MemoryConfig.get_user_id()
+        user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
 
         print(f"🔍 Searching for preferences matching '{search_query}'...")
 
         try:
             # Use mem0's search functionality
-            search_results = m.search(query=search_query, user_id=user_id)
+            search_results = client.search(query=search_query, user_id=user_id)
             
             if search_results and isinstance(search_results, dict):
-                memories = [
-                    MemoryConfig.format_memory_response(mem) 
-                    for mem in search_results.get('results', [])
-                ]
+                memories = search_results.get('results', [])
             else:
                 memories = []
                 
@@ -59,18 +46,18 @@ def find_preference(search_query: str) -> None:
 
         print(f"\n✨ Found {len(memories)} matching preferences:\n")
         for mem in memories:
-            tags = mem['metadata'].get('tags', [])
+            tags = mem.get('metadata', {}).get('tags', [])
             tags_str = f"[{', '.join(tags)}]" if tags else "[]"
             
-            print(f"📌 {mem['content']}")
-            print(f"   ID: {mem['memory_id']}")
+            print(f"📌 {mem.get('content', mem.get('data', ''))}")
+            print(f"   ID: {mem.get('id', 'unknown')}")
             print(f"   Tags: {tags_str}")
             
             # Display extracted entities if available
-            if mem.get('entities'):
+            if 'entities' in mem:
                 print(f"   Entities: {', '.join(str(e) for e in mem['entities'])}")
             
-            print(f"   Added: {mem['timestamp']}\n")
+            print(f"   Added: {mem.get('timestamp', 'unknown')}\n")
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")

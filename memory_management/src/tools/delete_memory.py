@@ -10,28 +10,16 @@ if project_root not in sys.path:
 
 from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
-
 from .base import MemoryManagementTool
-
-# Import all scripts from the scripts directory
-scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
-script_files = {}
-for script_path in scripts_dir.glob("*.py"):
-    with open(script_path, "r") as f:
-        script_files[script_path.name] = f.read()
+from ..utils import get_script_files
 
 delete_memory_tool = MemoryManagementTool(
     name="delete_memory",
     description=(
-        "Delete a stored user preference from the long-term memory store based on its ID. "
+        "Delete a stored user preference from memory based on its ID. "
         "Use this tool when a user's preference has changed or is no longer valid."
     ),
     content="""
-set -e
-python -m venv /opt/venv > /dev/null
-. /opt/venv/bin/activate > /dev/null
-pip install mem0ai langchain-community rank_bm25 neo4j 2>&1 | grep -v '[notice]' > /dev/null
-
 # Run the delete memory handler script
 python /opt/scripts/delete_memory_handler.py "{{ .memory_id }}"
 """,
@@ -48,15 +36,13 @@ python /opt/scripts/delete_memory_handler.py "{{ .memory_id }}"
     env=[
         "KUBIYA_USER_EMAIL",
         "KUBIYA_USER_ORG",
-        "NEO4J_URI",
-        "NEO4J_USER",
     ],
     secrets=[
-        "NEO4J_PASSWORD",
+        "MEM0_API_KEY",
     ],
     with_files=[
         FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in script_files.items()
+        for script_name, script_content in get_script_files().items()
     ],
 )
 
