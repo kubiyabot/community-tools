@@ -6,118 +6,24 @@ from kubiya_sdk.tools.registry import tool_registry
 from ..parser import TerraformModuleParser, TerraformVariable
 import logging
 
-CONFIG_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'configs')
+logger = logging.getLogger(__name__)
 
-def _create_arg_from_variable(var: TerraformVariable) -> Arg:
-    """Create a Kubiya tool argument from a Terraform variable."""
-    description = (
-        f"{var.description or f'Variable: {var.name}'}\n\n"
-        f"Type: {var.type.base_type}\n"
-    )
-    
-    if var.type.base_type in ['object', 'map', 'list', 'set']:
-        description += f"\nExample Input:\n```json\n{var.get_example_value()}\n```"
-    
-    if var.validation_rules:
-        description += "\nValidation Rules:\n"
-        for rule in var.validation_rules:
-            description += f"- {rule.get('error_message', rule.get('condition'))}\n"
-    
-    if var.default is not None:
-        description += f"\nDefault: {json.dumps(var.default)}"
-
-    return Arg(
-        name=var.name,
-        description=description,
-        required=var.required,
-        type="string",  # All inputs will be JSON strings for consistency
-        default=json.dumps(var.default) if var.default is not None else None,
-    )
-
-def register_terraform_tools(module_name: str, config: Dict[str, Any], variables: Dict[str, TerraformVariable]) -> None:
-    """Register all tools for a Terraform module."""
-    
-    # Create variable arguments
-    variable_args = [
-        _create_arg_from_variable(var)
-        for var in variables.values()
-    ]
-    
-    # Register plan tool
-    plan_tool = {
-        "name": f"terraform_{module_name}_plan",
-        "description": f"Plan changes for {config['description']}",
-        "content": """
-            # Run Terraform plan
-            python /opt/scripts/terraform_plan.py '{{ .source_config | toJson }}' '{{ .variables | toJson }}'
-        """,
-        "args": variable_args + [
-            Arg(
-                name="source_config",
-                description="Module source configuration",
-                type="object",
-                required=True,
-                default=config['source']
-            )
-        ],
-        "env": config.get('env', []),
-        "secrets": config.get('secrets', [])
-    }
-    tool_registry.register("terraform", plan_tool)
-    
-    # Register apply tool
-    apply_tool = {
-        "name": f"terraform_{module_name}_apply",
-        "description": f"Apply changes for {config['description']}",
-        "content": """
-            # Run Terraform apply
-            python /opt/scripts/terraform_apply.py '{{ .source_config | toJson }}' '{{ .variables | toJson }}'
-        """,
-        "args": variable_args + [
-            Arg(
-                name="source_config",
-                description="Module source configuration",
-                type="object",
-                required=True,
-                default=config['source']
-            )
-        ],
-        "env": config.get('env', []),
-        "secrets": config.get('secrets', [])
-    }
-    tool_registry.register("terraform", apply_tool)
-    
-    # Register variables tool
-    vars_tool = {
-        "name": f"terraform_{module_name}_vars",
-        "description": f"Show variables for {config['description']}",
-        "content": """
-            # Show variables
-            python /opt/scripts/get_module_vars.py '{{ .source_config | toJson }}'
-        """,
-        "args": [
-            Arg(
-                name="source_config",
-                description="Module source configuration",
-                type="object",
-                required=True,
-                default=config['source']
-            )
-        ],
-        "env": config.get('env', []),
-        "secrets": config.get('secrets', [])
-    }
-    tool_registry.register("terraform", vars_tool)
+def get_config_dir() -> str:
+    """Get the path to the configs directory."""
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'configs')
 
 def load_terraform_tools(config_dir: str = None):
     """Load and register all Terraform tools from configuration files."""
     tools = []
     
     if not config_dir:
-        logger.error("No config directory provided")
-        return tools
+        config_dir = get_config_dir()
         
     logger.info(f"Loading tools from config directory: {config_dir}")
+    
+    if not os.path.exists(config_dir):
+        logger.error(f"Config directory not found: {config_dir}")
+        return tools
     
     for filename in os.listdir(config_dir):
         if filename.endswith('.json'):
