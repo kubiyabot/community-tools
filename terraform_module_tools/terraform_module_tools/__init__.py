@@ -40,12 +40,13 @@ def load_terraform_modules():
                 logger.info(f"  - {tool.name}")
         else:
             logger.warning("⚠️ No tools were created from configurations")
+            raise Exception("No tools were created from configurations")
             
         return tools
         
     except Exception as e:
         logger.error(f"❌ Failed to load Terraform modules: {str(e)}", exc_info=True)
-        raise
+        raise e
 
 # Load tools when package is imported
 try:
@@ -53,7 +54,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to load tools: {str(e)}", exc_info=True)
     tools = []
-    raise
+    raise e
 
 # Export functions and tools
 __all__ = ['tools', 'load_terraform_modules']
