@@ -27,7 +27,7 @@ def load_terraform_modules():
         config_files = [f for f in os.listdir(config_dir) if f.endswith('.json')]
         if not config_files:
             logger.warning("⚠️ No module configurations found!")
-            return []
+            raise Exception("No module configurations found!")
             
         logger.info(f"📋 Found {len(config_files)} module configurations: {', '.join(config_files)}")
         
