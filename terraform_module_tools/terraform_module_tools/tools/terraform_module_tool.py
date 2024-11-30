@@ -1,89 +1,113 @@
 from kubiya_sdk.tools import Tool, Arg, FileSpec
-from typing import List, Optional
+from typing import List, Dict, Any
 import os
+import json
 
-class TerraformBaseTool(Tool):
+class TerraformTool(Tool):
+    """Base class for Terraform tools."""
     def __init__(
         self,
         name: str,
         description: str,
-        terraform_module: str,
-        script_name: str,
-        args: List[Arg] = None,
+        source_config: Dict[str, Any],
+        variable_args: List[Arg] = None,
+        action: str = 'plan',
         env: List[str] = None,
         secrets: List[str] = None,
     ):
-        script_path = os.path.join(os.path.dirname(__file__), "scripts", script_name)
+        # Prepare content based on action
+        if action == 'vars':
+            content = """
+# Show variables
+python /opt/scripts/get_module_vars.py '{{ .source_config | toJson }}' || exit 1
+"""
+        else:
+            content = f"""
+# Download hcl2json if needed
+if ! command -v hcl2json &> /dev/null; then
+    curl -L -o /usr/local/bin/hcl2json https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64
+    chmod +x /usr/local/bin/hcl2json
+fi
+
+# Run Terraform {action}
+python /opt/scripts/terraform_{action}.py '{{ .source_config | toJson }}' '{{ .variables | toJson }}' || exit 1
+"""
+
+        # Prepare arguments
+        args = []
+        if action not in ['vars']:  # Plan and apply need variable arguments
+            args.extend(variable_args or [])
         
+        # Add source config argument
+        args.append(
+            Arg(
+                name="source_config",
+                description="Module source configuration",
+                required=True,
+                type="object",
+                default=source_config
+            )
+        )
+
+        # Get script files
+        script_files = {}
+        scripts_dir = os.path.join(os.path.dirname(__file__), "scripts")
+        for script_name in os.listdir(scripts_dir):
+            if script_name.endswith('.py'):
+                with open(os.path.join(scripts_dir, script_name), 'r') as f:
+                    script_files[script_name] = f.read()
+
         super().__init__(
             name=name,
             description=description,
             type="docker",
             image="hashicorp/terraform:latest",
-            content=f"python3 {script_path} {terraform_module}",
-            args=args or [],
+            content=content,
+            args=args,
             env=env or [],
             secrets=secrets or [],
             with_files=[
                 FileSpec(
-                    source=script_path,
-                    destination=f"/usr/local/bin/{script_name}"
+                    destination=f"/opt/scripts/{script_name}",
+                    content=script_content
                 )
+                for script_name, script_content in script_files.items()
             ]
         )
 
-class TerraformGetVarsTool(TerraformBaseTool):
-    def __init__(self, **kwargs):
-        description = """
-        📋 Get Variables for Terraform Module
-        
-        Shows all available variables with their descriptions, types, and default values.
-        Use this to understand what variables you need before planning or applying.
-        """
-        super().__init__(
-            script_name="get_module_vars.py",
-            description=description,
-            **kwargs
-        )
+def create_terraform_tool(
+    name: str,
+    description: str,
+    source_config: Dict[str, Any],
+    variable_args: List[Arg] = None,
+    action: str = 'plan',
+    env: List[str] = None,
+    secrets: List[str] = None,
+) -> TerraformTool:
+    """
+    Create a Terraform tool with the specified configuration.
+    
+    Args:
+        name: Tool name
+        description: Tool description
+        source_config: Module source configuration
+        variable_args: List of variable arguments
+        action: Tool action (plan, apply, vars)
+        env: Required environment variables
+        secrets: Required secrets
+    
+    Returns:
+        Configured TerraformTool instance
+    """
+    return TerraformTool(
+        name=name,
+        description=description,
+        source_config=source_config,
+        variable_args=variable_args,
+        action=action,
+        env=env,
+        secrets=secrets,
+    )
 
-class TerraformPlanTool(TerraformBaseTool):
-    def __init__(self, **kwargs):
-        description = """
-        🔍 Generate Terraform Plan
-        
-        Shows what changes would be made without applying them.
-        Displays additions, modifications, and deletions in a clear format.
-        """
-        super().__init__(
-            script_name="terraform_plan.py",
-            description=description,
-            args=[
-                Arg(
-                    name="variables",
-                    description="JSON string of variables (e.g., '{\"vpc_name\": \"main\"}')",
-                    required=True
-                )
-            ],
-            **kwargs
-        )
-
-class TerraformApplyTool(TerraformBaseTool):
-    def __init__(self, **kwargs):
-        description = """
-        🚀 Apply Terraform Configuration
-        
-        Applies the infrastructure changes with real-time progress updates.
-        Shows detailed status of resource creation/modification/deletion.
-        """
-        super().__init__(
-            script_name="terraform_apply.py",
-            description=description,
-            args=[
-                Arg(
-                    name="variables",
-                    description="JSON string of variables (e.g., '{\"vpc_name\": \"main\"}')",
-                    required=True
-                )
-            ],
-            **kwargs
-        )
+# Export the create function
+__all__ = ['create_terraform_tool']
