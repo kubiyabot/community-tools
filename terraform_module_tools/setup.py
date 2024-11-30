@@ -7,7 +7,8 @@ setup(
     install_requires=[
         "kubiya_sdk>=0.1.0",
         "pyyaml>=5.4.1",
-        # Add any other dependencies
+        "python-hcl2>=4.0.0",
+        "gitpython>=3.1.0",
     ],
     python_requires=">=3.8",
 ) 
