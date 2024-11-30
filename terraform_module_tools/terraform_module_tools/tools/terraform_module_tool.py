@@ -108,6 +108,3 @@ def create_terraform_tool(
         env=env,
         secrets=secrets,
     )
-
-# Export the create function
-__all__ = ['create_terraform_tool']
