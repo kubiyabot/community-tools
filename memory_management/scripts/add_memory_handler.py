@@ -1,15 +1,8 @@
 import sys
 import json
-from mem0 import Memory
-from typing import Optional, List, Union
 import os
-
-# Add scripts directory to Python path for config import
-scripts_dir = os.path.dirname(os.path.abspath(__file__))
-if scripts_dir not in sys.path:
-    sys.path.append(scripts_dir)
-
-from config import MemoryConfig
+from mem0 import MemoryClient
+from typing import Optional, List, Union
 
 def validate_tags(tags_str: Optional[str]) -> Optional[List[str]]:
     """Validate and parse tags JSON string."""
@@ -42,18 +35,15 @@ def add_memory(
         if not memory_content or not isinstance(memory_content, str):
             raise ValueError("Memory content must be a non-empty string")
 
-        # Get configuration with optional custom prompt
-        config = MemoryConfig.get_neo4j_config(custom_prompt)
-        
-        # Initialize Memory client
-        m = Memory.from_config(config_dict=config)
+        # Initialize Memory client with API key from environment
+        client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
         
         # Get user ID
-        user_id = MemoryConfig.get_user_id()
+        user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
 
         # Add the memory with tags
         metadata = {"tags": tags} if tags else {}
-        result = m.add(memory_content, user_id=user_id, metadata=metadata)
+        result = client.add(memory_content, user_id=user_id, metadata=metadata)
         
         # Print success message with extracted entities if available
         print("🧠 User preference added successfully.")
