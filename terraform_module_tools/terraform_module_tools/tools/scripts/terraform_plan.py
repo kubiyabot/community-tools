@@ -4,7 +4,6 @@ import sys
 import json
 import subprocess
 from typing import Optional
-from terraform_module_tools.tools.state_manager import TerraformStateManager
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
