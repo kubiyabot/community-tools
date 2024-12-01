@@ -127,25 +127,76 @@ class TerraformModuleParser:
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
         """Parse variables from a Terraform file."""
         logger.info(f"Parsing variables from: {file_path}")
-        result = subprocess.run(
-            ['hcl2json', file_path],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        try:
+            result = subprocess.run(
+                ['hcl2json', file_path],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+        except subprocess.CalledProcessError as e:
+            error_msg = f"hcl2json failed to parse {file_path}: {e.stderr}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         # Parse JSON output
-        tf_json = json.loads(result.stdout)
+        try:
+            tf_json = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse hcl2json output: {str(e)}\nOutput was: {result.stdout}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         variables = {}
 
+        # Handle variable blocks
         if 'variable' in tf_json:
-            for var_name, var_config in tf_json['variable'].items():
-                variables[var_name] = {
-                    'type': var_config.get('type', 'string'),
-                    'description': var_config.get('description', ''),
-                    'default': var_config.get('default'),
-                    'required': 'default' not in var_config
-                }
-                logger.debug(f"Found variable: {var_name} ({variables[var_name]})")
+            var_blocks = tf_json['variable']
+            logger.debug(f"Raw variable blocks: {json.dumps(var_blocks, indent=2)}")
+            
+            # Handle both list and dict formats from hcl2json
+            if isinstance(var_blocks, list):
+                # Handle list format where each item is a dict with a single key
+                for var_block in var_blocks:
+                    if not isinstance(var_block, dict):
+                        error_msg = f"Invalid variable block format: {var_block}"
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
+                    
+                    for var_name, var_config in var_block.items():
+                        if not isinstance(var_config, dict):
+                            error_msg = f"Invalid variable config format for {var_name}: {var_config}"
+                            logger.error(error_msg)
+                            raise ValueError(error_msg)
+                        
+                        variables[var_name] = {
+                            'type': var_config.get('type', 'string'),
+                            'description': var_config.get('description', ''),
+                            'default': var_config.get('default'),
+                            'required': 'default' not in var_config
+                        }
+                        logger.debug(f"Processed variable {var_name}: {variables[var_name]}")
+            else:
+                # Handle dict format
+                if not isinstance(var_blocks, dict):
+                    error_msg = f"Invalid variables format: expected dict, got {type(var_blocks)}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+                
+                for var_name, var_config in var_blocks.items():
+                    if not isinstance(var_config, dict):
+                        error_msg = f"Invalid variable config format for {var_name}: {var_config}"
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
+                    
+                    variables[var_name] = {
+                        'type': var_config.get('type', 'string'),
+                        'description': var_config.get('description', ''),
+                        'default': var_config.get('default'),
+                        'required': 'default' not in var_config
+                    }
+                    logger.debug(f"Processed variable {var_name}: {variables[var_name]}")
+
+            logger.debug(f"Found variables: {json.dumps(variables, indent=2)}")
 
         return variables
