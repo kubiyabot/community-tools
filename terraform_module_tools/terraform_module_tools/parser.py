@@ -159,12 +159,12 @@ class TerraformModuleParser:
                 # Handle list format where each item is a dict with a single key
                 for var_block in var_blocks:
                     if not isinstance(var_block, dict):
-                        logger.warning(f"Skipping invalid variable block: {var_block}")
+                        logger.warning(f"Invalid variable block format: {var_block}")
                         continue
                     
                     for var_name, var_config in var_block.items():
                         if not isinstance(var_config, dict):
-                            logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
+                            logger.warning(f"Invalid variable config format for {var_name}: {var_config}")
                             continue
                         
                         # Clean up type string (handle ${type} format)
@@ -182,10 +182,15 @@ class TerraformModuleParser:
                         # Generate example value based on type
                         example = self._generate_example(var_name, var_type, var_config)
                         
+                        # Handle default value
+                        default = var_config.get('default')
+                        if isinstance(default, (dict, list)):
+                            default = json.dumps(default)
+                        
                         variables[var_name] = {
                             'type': var_type,
                             'description': var_config.get('description', ''),
-                            'default': var_config.get('default'),
+                            'default': default,
                             'required': 'default' not in var_config,
                             'example': example
                         }
@@ -193,12 +198,12 @@ class TerraformModuleParser:
             else:
                 # Handle dict format
                 if not isinstance(var_blocks, dict):
-                    logger.warning(f"Skipping invalid variables format: {type(var_blocks)}")
+                    logger.warning(f"Invalid variables format: {type(var_blocks)}")
                     return variables
                 
                 for var_name, var_config in var_blocks.items():
                     if not isinstance(var_config, dict):
-                        logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
+                        logger.warning(f"Invalid variable config format for {var_name}: {var_config}")
                         continue
                     
                     # Clean up type string (handle ${type} format)
@@ -216,10 +221,15 @@ class TerraformModuleParser:
                     # Generate example value based on type
                     example = self._generate_example(var_name, var_type, var_config)
                     
+                    # Handle default value
+                    default = var_config.get('default')
+                    if isinstance(default, (dict, list)):
+                        default = json.dumps(default)
+                    
                     variables[var_name] = {
                         'type': var_type,
                         'description': var_config.get('description', ''),
-                        'default': var_config.get('default'),
+                        'default': default,
                         'required': 'default' not in var_config,
                         'example': example
                     }
