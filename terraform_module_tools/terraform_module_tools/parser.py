@@ -228,7 +228,7 @@ class TerraformModuleParser:
         processed_var = {
             'type': var_type,
             'description': description,
-            'default': default,
+            'default': default if default is not None else None,
             'required': required
         }
         logger.debug(f"Processed variable {var_name}: {processed_var}")
