@@ -29,52 +29,6 @@ def truncate_description(description: str) -> str:
         return description[:MAX_DESCRIPTION_LENGTH-3] + "..."
     return description
 
-def generate_example(var_name: str, tf_type: str) -> Any:
-    """Generate example value based on variable name and type."""
-    base_type = tf_type.split('(')[0].lower()
-    
-    if base_type == 'bool':
-        return True
-    elif base_type == 'number':
-        return 42
-    elif base_type in ['list', 'set']:
-        return '["value1", "value2"]'  # JSON string for arrays
-    elif base_type == 'map':
-        return '{"key": "value"}'  # JSON string for maps
-    elif base_type == 'object':
-        return '{"field": "value"}'  # JSON string for objects
-    
-    # Common patterns for string values
-    if 'name' in var_name:
-        return "example-name"
-    elif 'cidr' in var_name:
-        return "10.0.0.0/16"
-    elif 'region' in var_name:
-        return "us-west-2"
-    
-    return "example-value"
-
-def get_default_value(var_config: Dict[str, Any], arg_type: str) -> Any:
-    """Convert default value to correct type."""
-    if 'default' not in var_config:
-        return None
-        
-    default = var_config['default']
-    
-    if arg_type == 'str':
-        if isinstance(default, (dict, list)):
-            return json.dumps(default)  # Convert complex types to JSON string
-        return str(default)
-    elif arg_type == 'int':
-        try:
-            return int(float(default))  # Handle both int and float defaults
-        except (ValueError, TypeError):
-            return None
-    elif arg_type == 'bool':
-        return bool(default)
-    
-    return None
-
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
     def __init__(
@@ -126,16 +80,10 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
 """
 
         # Convert variables to args
-        args = []
+        args = {}  # Using dict instead of list for args
         for var_name, var_config in variables.items():
             # Map to supported type
             arg_type = map_terraform_type_to_arg_type(var_config['type'])
-            
-            # Generate example
-            example = generate_example(var_name, var_config['type'])
-            
-            # Get properly typed default
-            default = get_default_value(var_config, arg_type)
             
             # Create short description
             description = truncate_description(
@@ -148,15 +96,25 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
                     f"{description}\nProvide as JSON string"
                 )
             
-            args.append(
-                Arg(
-                    name=var_name,
-                    description=description,
-                    type=arg_type,
-                    required=var_config.get('required', False),
-                    default=default
-                )
-            )
+            # Create arg as dict entry
+            args[var_name] = {
+                "name": var_name,
+                "description": description,
+                "type": arg_type,
+                "required": var_config.get('required', False)
+            }
+            
+            # Add default if present
+            if 'default' in var_config:
+                if arg_type == 'str':
+                    args[var_name]["default"] = str(var_config['default'])
+                elif arg_type == 'int':
+                    try:
+                        args[var_name]["default"] = int(float(var_config['default']))
+                    except (ValueError, TypeError):
+                        pass
+                elif arg_type == 'bool':
+                    args[var_name]["default"] = bool(var_config['default'])
 
         # Get script files
         script_files = {}
@@ -183,7 +141,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             image="hashicorp/terraform:latest",
             content=content,
             icon_url="https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
-            args=args,
+            args=args,  # Pass args as dict
             env=env,
             secrets=secrets,
             with_files=[
