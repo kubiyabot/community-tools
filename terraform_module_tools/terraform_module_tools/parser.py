@@ -5,6 +5,7 @@ import subprocess
 from typing import Dict, Any, List, Optional, Tuple
 import logging
 import re
+import glob
 
 logger = logging.getLogger(__name__)
 
@@ -45,108 +46,26 @@ class TerraformModuleParser:
         raise ValueError(f"Unsupported source format: {self.source_url}")
 
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Get variables from the Terraform module."""
+        """Parse variables from Terraform module."""
         variables = {}
+        warnings = []
+        errors = []
         try:
-            # Get GitHub URL
-            github_url = self._get_github_url()
-            logger.info(f"Using GitHub URL: {github_url}")
-
-            # Create temporary directory
-            with tempfile.TemporaryDirectory() as temp_dir:
-                # Clone repository
-                logger.info(f"Cloning repository: {github_url}")
-                subprocess.run(
-                    ['git', 'clone', github_url, temp_dir],
-                    check=True,
-                    capture_output=True,
-                    text=True
-                )
-
-                # Checkout specific ref if provided
-                if self.ref:
-                    logger.info(f"Checking out ref: {self.ref}")
-                    subprocess.run(
-                        ['git', 'checkout', self.ref],
-                        cwd=temp_dir,
-                        check=True,
-                        capture_output=True,
-                        text=True
-                    )
-
-                # Get module directory
-                module_dir = os.path.join(temp_dir, self.path) if self.path else temp_dir
-                if not os.path.exists(module_dir):
-                    raise ValueError(f"Module path not found: {self.path}")
-
-                # Look for variables.tf in both root and module directory
-                # First check module directory
-                variables_files = []
-                module_vars_file = os.path.join(module_dir, 'variables.tf')
-                if os.path.exists(module_vars_file):
-                    logger.info(f"Found variables.tf in module directory: {module_vars_file}")
-                    variables_files.append(module_vars_file)
-
-                # Then check root directory if we're in a subdirectory
-                if self.path:
-                    root_vars_file = os.path.join(temp_dir, 'variables.tf')
-                    if os.path.exists(root_vars_file):
-                        logger.info(f"Found variables.tf in root directory: {root_vars_file}")
-                        variables_files.append(root_vars_file)
-
-                # If no variables.tf found, look for other .tf files
-                if not variables_files:
-                    for root, _, files in os.walk(module_dir):
-                        for file in files:
-                            if file.endswith('.tf'):
-                                file_path = os.path.join(root, file)
-                                variables_files.append(file_path)
-
-                if not variables_files:
-                    raise ValueError("No Terraform files found in module")
-
-                # Parse variables from all found files
-                for var_file in variables_files:
-                    logger.info(f"Parsing variables from: {var_file}")
-                    try:
-                        vars_in_file = self._parse_variables_file(var_file)
-                        variables.update(vars_in_file)
-                    except Exception as e:
-                        self.warnings.append(f"Failed to parse {var_file}: {str(e)}")
-
-                if not variables:
-                    raise ValueError("No variables found in module")
-
-                # Get README.md URL if it exists
-                readme_path = os.path.join(module_dir, 'README.md')
-                if os.path.exists(readme_path):
-                    # Construct the GitHub URL to the README.md file
-                    repo_name = github_url.rstrip('/').split('/')[-1]
-                    if self.ref:
-                        self.readme_url = f"{github_url}/blob/{self.ref}/README.md"
-                    else:
-                        self.readme_url = f"{github_url}/blob/master/README.md"
-                    logger.info(f"Found README.md at: {self.readme_url}")
-
-                logger.info(f"Successfully parsed {len(variables)} variables")
-                
-                # Ensure variable descriptions are captured
-                for var_name, var_config in variables.items():
-                    if 'description' not in var_config or not var_config['description']:
-                        var_config['description'] = 'No description provided'
-
-                return variables, self.warnings, self.errors
-
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Git operation failed: {e.stderr}"
-            self.errors.append(error_msg)
-            logger.error(error_msg)
-            return {}, self.warnings, self.errors
+            # Search for all .tf files in the module directory recursively
+            tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
+            if not tf_files:
+                errors.append("No .tf files found in module")
+            else:
+                for tf_file in tf_files:
+                    logging.info(f"Parsing variables from: {tf_file}")
+                    vars_in_file = self.parse_variables(tf_file)
+                    variables.update(vars_in_file)
+            if not variables:
+                errors.append("No variables found in module")
         except Exception as e:
-            error_msg = f"Failed to get variables: {str(e)}"
-            self.errors.append(error_msg)
-            logger.error(error_msg)
-            return {}, self.warnings, self.errors
+            logging.error(f"Failed to get variables: {str(e)}", exc_info=True)
+            errors.append(f"Failed to get variables: {str(e)}")
+        return variables, warnings, errors
 
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
         """Parse variables from a Terraform file."""
