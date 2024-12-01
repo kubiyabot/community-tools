@@ -44,8 +44,7 @@ def load_terraform_tools(config_dir: str = None):
                 # Parse module variables
                 parser = TerraformModuleParser(
                     source_url=config['source']['location'],
-                    ref=config['source'].get('git_config', {}).get('ref'),
-                    subfolder=config['source'].get('git_config', {}).get('subfolder')
+                    ref=config['source'].get('version'),
                 )
                 
                 variables, warnings, errors = parser.get_variables()
@@ -61,11 +60,11 @@ def load_terraform_tools(config_dir: str = None):
                     continue
                 
                 # Create tools for this module
-                for action in ['plan', 'apply']:
+                for action in ['plan', 'apply', 'plan_pr']:
                     tool = create_terraform_module_tool(config, action)
                     tools.append(tool)
                     logger.info(f"✅ Created {action} tool for {module_name}")
-                
+                    
             except Exception as e:
                 logger.error(f"❌ Failed to load module from {filename}: {str(e)}", exc_info=True)
                 continue
