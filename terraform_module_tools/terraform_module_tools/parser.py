@@ -117,7 +117,7 @@ class TerraformModuleParser:
         logger.info(f"Parsing variables from: {file_path}")
         try:
             result = subprocess.run(
-                ['hcl2json', file_path],
+                ['/usr/local/bin/hcl2json', file_path],
                 capture_output=True,
                 text=True,
                 check=True
