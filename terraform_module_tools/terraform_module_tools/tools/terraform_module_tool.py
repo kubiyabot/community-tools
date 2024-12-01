@@ -45,6 +45,7 @@ def format_description(description: str, var_type: str, example: str) -> str:
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
+    module_config: Dict[str, Any]
 
     def __init__(
         self,
