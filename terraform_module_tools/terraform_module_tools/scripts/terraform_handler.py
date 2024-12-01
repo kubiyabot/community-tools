@@ -136,30 +136,14 @@ def build_message_blocks(
                     "text": f":white_check_mark: *Completed:* {step_name}"
                 }]
             })
-        elif step_num < current_step:
+        elif step_num == current_step:
             blocks.append({
                 "type": "context",
                 "elements": [{
                     "type": "mrkdwn",
-                    "text": f":white_check_mark: *Completed:* {step_name}"
+                    "text": f":hourglass_flowing_sand: *In Progress:* {step_name}"
                 }]
             })
-        elif step_num == current_step:
-            blocks.append({
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "image",
-                        "image_url": "https://kubiya-public-20221113173935726800000003.s3.us-east-1.amazonaws.com/spinner.gif",
-                        "alt_text": "in progress"
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*In Progress:* {message}"
-                    }
-                ]
-            })
-            
             if current_resource:
                 blocks.append({
                     "type": "section",
@@ -168,38 +152,37 @@ def build_message_blocks(
                         "text": f"```Creating: {current_resource}```"
                     }
                 })
+        else:
+            blocks.append({
+                "type": "context",
+                "elements": [{
+                    "type": "mrkdwn",
+                    "text": f":black_square_button: *Pending:* {step_name}"
+                }]
+            })
 
-    # Add error message if present
+    # Add error message if any
     if error_message:
-        blocks.extend([
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*:warning: Error Details*"
-                }
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"```{error_message}```"
-                }
+        blocks.append({
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f":red_circle: *Error:* {error_message}"
             }
-        ])
+        })
 
-    # Add elapsed time if available
+    # Add elapsed time if start_time is provided
     if start_time:
-        elapsed = int((time.time() - start_time) / 60)
+        elapsed_time = time.time() - start_time
         blocks.append({
             "type": "context",
             "elements": [{
                 "type": "mrkdwn",
-                "text": f":zap: *Progress:* Phase {current_step}/4 • :clock1: Started {elapsed}m ago"
+                "text": f"⏱️ Elapsed Time: {int(elapsed_time)} seconds"
             }]
         })
 
-    return {"blocks": blocks}
+    return blocks
 
 class SlackNotifier:
     def __init__(self):

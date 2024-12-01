@@ -25,6 +25,8 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
         return 'list'
     elif base_type.startswith('map(') or base_type == 'map':
         return 'dict'
+    elif base_type.startswith('object('):
+        return 'dict'
     elif base_type == 'any':
         return 'str'  # Default to str for 'any' type
     else:

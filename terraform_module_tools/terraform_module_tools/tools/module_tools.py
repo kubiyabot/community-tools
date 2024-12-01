@@ -45,31 +45,25 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
     )
 
 def initialize_module_tools():
-    """Initialize all Terraform module tools."""
-    tools = {}
+    """Initialize and register all Terraform module tools."""
     try:
         module_configs = get_module_configs()
-        
         for module_name, config in module_configs.items():
             # Create plan tool
             plan_tool = create_terraform_module_tool(config, 'plan')
-            tools[plan_tool.name] = plan_tool
-            tool_registry.register("terraform", plan_tool)
+            tool_registry.register(plan_tool)  # Register without category
 
             # Create plan with PR tool
             plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
-            tools[plan_pr_tool.name] = plan_pr_tool
-            tool_registry.register("terraform", plan_pr_tool)
+            tool_registry.register(plan_pr_tool)
 
             # Create apply tool
             apply_tool = create_terraform_module_tool(config, 'apply')
-            tools[apply_tool.name] = apply_tool
-            tool_registry.register("terraform", apply_tool)
+            tool_registry.register(apply_tool)
 
+            print(f"Successfully registered tools for module: {module_name}")
     except Exception as e:
         print(f"Error initializing tools: {e}")
-    
-    return tools
 
 # Initialize tools when module is imported
 tools = initialize_module_tools()
