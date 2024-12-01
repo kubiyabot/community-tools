@@ -187,19 +187,37 @@ class TerraformModuleParser:
                         logger.error(error_msg)
                         raise ValueError(error_msg)
 
-                    for var_name, var_config in var_block.items():
-                        processed_var = self._process_variable(var_name, var_config)
-                        variables[var_name] = processed_var
-            else:
+                    for var_name, var_configs in var_block.items():
+                        # var_configs might be a list
+                        if isinstance(var_configs, list):
+                            for var_config in var_configs:
+                                processed_var = self._process_variable(var_name, var_config)
+                                variables[var_name] = processed_var
+                        elif isinstance(var_configs, dict):
+                            processed_var = self._process_variable(var_name, var_configs)
+                            variables[var_name] = processed_var
+                        else:
+                            error_msg = f"Invalid variable config format for {var_name}: {var_configs}"
+                            logger.error(error_msg)
+                            raise ValueError(error_msg)
+            elif isinstance(var_blocks, dict):
                 # Handle dict format
-                if not isinstance(var_blocks, dict):
-                    error_msg = f"Invalid variables format: expected dict, got {type(var_blocks)}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
-
-                for var_name, var_config in var_blocks.items():
-                    processed_var = self._process_variable(var_name, var_config)
-                    variables[var_name] = processed_var
+                for var_name, var_configs in var_blocks.items():
+                    if isinstance(var_configs, list):
+                        for var_config in var_configs:
+                            processed_var = self._process_variable(var_name, var_config)
+                            variables[var_name] = processed_var
+                    elif isinstance(var_configs, dict):
+                        processed_var = self._process_variable(var_name, var_configs)
+                        variables[var_name] = processed_var
+                    else:
+                        error_msg = f"Invalid variable config format for {var_name}: {var_configs}"
+                        logger.error(error_msg)
+                        raise ValueError(error_msg)
+            else:
+                error_msg = f"Unexpected format for variable blocks: {type(var_blocks)}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
             logger.debug(f"Found variables: {json.dumps(variables, indent=2)}")
 
