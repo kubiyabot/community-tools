@@ -139,7 +139,7 @@ class TerraformModuleTool(Tool):
             'plan_pr': 'Plan infrastructure changes and create PR for'
         }
         current_action = 'plan_pr' if action == 'plan' and with_pr else action
-        description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
+        tool_description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
 
         # Prepare script content
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
@@ -185,7 +185,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         logger.info(f"Initializing tool {name} with {len(args)} arguments")
         super().__init__(
             name=name,
-            description=description,
+            description=tool_description,
             type="docker",
             image="hashicorp/terraform:latest",
             content=content,
