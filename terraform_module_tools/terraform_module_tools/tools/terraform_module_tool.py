@@ -24,13 +24,33 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
     # Everything else (string, list, map, object) becomes str
     return 'str'
 
-def truncate_description(description: str) -> str:
-    """Truncate description to max length."""
-    if not description:
-        return "No description provided"
-    if len(description) > MAX_DESCRIPTION_LENGTH:
-        return description[:MAX_DESCRIPTION_LENGTH-3] + "..."
-    return description
+def format_description(description: str, var_type: str, example: str) -> str:
+    """Format description with type information and example."""
+    # Start with the original description
+    formatted = description if description else "No description provided"
+    
+    # Add type information and input guidance based on type
+    base_type = var_type.split('(')[0].lower()
+    
+    if base_type == 'list':
+        formatted += f"\n\nExpects a JSON array. Example:\n```json\n{example}\n```"
+    elif base_type == 'map':
+        formatted += f"\n\nExpects a JSON object. Example:\n```json\n{example}\n```"
+    elif base_type == 'object':
+        formatted += f"\n\nExpects a JSON object with specific structure. Example:\n```json\n{example}\n```"
+    elif base_type == 'set':
+        formatted += f"\n\nExpects a JSON array (unique values). Example:\n```json\n{example}\n```"
+    elif base_type == 'bool':
+        formatted += f"\n\nExpects a boolean value (true/false). Example: {example}"
+    elif base_type == 'number':
+        formatted += f"\n\nExpects a numeric value. Example: {example}"
+    else:  # string and others
+        formatted += f"\n\nExample: {example}"
+    
+    # Truncate if too long
+    if len(formatted) > MAX_DESCRIPTION_LENGTH:
+        return formatted[:MAX_DESCRIPTION_LENGTH-3] + "..."
+    return formatted
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -84,16 +104,12 @@ class TerraformModuleTool(Tool):
                 arg_type = map_terraform_type_to_arg_type(var_config['type'])
                 logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
                 
-                # Create short description
-                description = truncate_description(
-                    f"{var_config.get('description', 'No description')} (Type: {var_config['type']})"
+                # Format description with type info and example
+                description = format_description(
+                    var_config.get('description', ''),
+                    var_config['type'],
+                    var_config['example']
                 )
-                
-                # Add JSON hint for complex types
-                if var_config['type'] not in ['string', 'number', 'bool']:
-                    description = truncate_description(
-                        f"{description}\nProvide as JSON string"
-                    )
                 
                 # Create Arg object
                 arg = Arg(
