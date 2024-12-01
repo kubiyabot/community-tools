@@ -214,7 +214,7 @@ set -e
 chmod +x /opt/scripts/*.py
 
 # Install required python packages
-pip3 install slack-sdk pydantic pyyaml requests
+pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1
 
 # Prepare terraform.tfvars.json
 echo "🔧 Preparing terraform variables..."
