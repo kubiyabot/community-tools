@@ -3,7 +3,7 @@ import json
 import tempfile
 import subprocess
 import requests
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import urlparse
@@ -173,238 +173,120 @@ class ModuleError:
         return msg
 
 class TerraformModuleParser:
-    def __init__(self, source_url: str, ref: Optional[str] = None, subfolder: Optional[str] = None):
-        """
-        Initialize Terraform module parser.
-        
-        Args:
-            source_url: URL or path to Terraform module
-                Supported formats:
-                - GitHub: https://github.com/org/repo
-                - GitLab: https://gitlab.com/org/repo
-                - Local path: /path/to/module
-                - S3: s3://bucket/path
-                - HTTP(S): https://example.com/module.zip
-            ref: Git reference (branch, tag, commit)
-            subfolder: Path to module within repository
-        """
+    def __init__(
+        self,
+        source_url: str,
+        ref: Optional[str] = None,
+        subfolder: Optional[str] = None
+    ):
         self.source_url = source_url
         self.ref = ref
         self.subfolder = subfolder
         self.warnings = []
         self.errors = []
-        self._ensure_hcl2json()
 
-    def add_warning(self, message: str):
-        """Add a warning message."""
-        self.warnings.append(ModuleWarning(self.source_url, message))
-
-    def add_error(self, error: str, details: Optional[str] = None):
-        """Add an error message."""
-        self.errors.append(ModuleError(self.source_url, error, details))
-
-    def _ensure_hcl2json(self) -> None:
-        """Ensure hcl2json binary is available."""
-        try:
-            result = subprocess.run([HCL2JSON_BINARY, "--version"], 
-                                  capture_output=True, 
-                                  text=True,
-                                  check=True)
-            print(f"✅ hcl2json binary found: {result.stdout.strip()}")
-        except (subprocess.SubprocessError, FileNotFoundError):
-            print("⚙️ Downloading hcl2json binary...")
-            try:
-                response = requests.get(HCL2JSON_URL, timeout=30)
-                response.raise_for_status()
-                
-                bin_path = "/usr/local/bin/hcl2json"
-                with open(bin_path, 'wb') as f:
-                    f.write(response.content)
-                
-                os.chmod(bin_path, 0o755)
-                print("✅ hcl2json binary installed successfully")
-            except Exception as e:
-                raise RuntimeError(f"Failed to download hcl2json binary: {str(e)}")
-
-    def _parse_hcl_file(self, file_path: str) -> Dict[str, Any]:
-        """Parse HCL file using hcl2json binary."""
-        try:
-            result = subprocess.run(
-                [HCL2JSON_BINARY, file_path],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            return json.loads(result.stdout)
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.strip() if e.stderr else str(e)
-            raise ParsingError(f"Failed to parse {file_path}: {error_msg}")
-        except json.JSONDecodeError as e:
-            raise ParsingError(f"Invalid JSON output for {file_path}: {str(e)}")
-
-    def _get_source_type(self) -> Tuple[str, str]:
-        """Determine source type and normalized URL/path."""
-        url = urlparse(self.source_url)
+    def _handle_registry_module(self, source: str) -> str:
+        """Handle Terraform registry module source."""
+        # Parse registry source (format: namespace/name/provider)
+        parts = source.split('/')
+        if len(parts) != 3:
+            raise ValueError(f"Invalid registry source format: {source}")
         
-        if url.scheme in ('http', 'https'):
-            if any(domain in url.netloc for domain in ['github.com', 'gitlab.com']):
-                return 'git', self.source_url
-            return 'http', self.source_url
-        elif url.scheme == 's3':
-            return 's3', self.source_url
-        elif url.scheme == 'git':
-            return 'git', self.source_url
-        elif os.path.exists(self.source_url):
-            return 'local', os.path.abspath(self.source_url)
-        else:
-            raise TerraformSourceError(f"Unsupported or invalid source: {self.source_url}")
-
-    def _clone_repo(self) -> Dict[str, TerraformVariable]:
-        """Clone repository and parse variables."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            try:
-                source_type, source_url = self._get_source_type()
-                
-                if source_type == 'git':
-                    # Handle GitHub/GitLab authentication if token is present
-                    auth_url = source_url
-                    if "GH_TOKEN" in os.environ and "github.com" in source_url:
-                        auth_url = source_url.replace(
-                            "https://github.com",
-                            f"https://{os.environ['GH_TOKEN']}@github.com"
-                        )
-                    elif "GL_TOKEN" in os.environ and "gitlab.com" in source_url:
-                        auth_url = source_url.replace(
-                            "https://gitlab.com",
-                            f"https://oauth2:{os.environ['GL_TOKEN']}@gitlab.com"
-                        )
-                    
-                    print(f"📦 Cloning repository {source_url}...")
-                    
-                    # Use git command line instead of gitpython
-                    try:
-                        subprocess.run(
-                            ["git", "clone", auth_url, temp_dir],
-                            check=True,
-                            capture_output=True,
-                            text=True
-                        )
-                        
-                        if self.ref:
-                            print(f"⚡ Checking out ref: {self.ref}")
-                            subprocess.run(
-                                ["git", "checkout", self.ref],
-                                cwd=temp_dir,
-                                check=True,
-                                capture_output=True,
-                                text=True
-                            )
-                    except subprocess.CalledProcessError as e:
-                        raise GitSourceError(f"Git operation failed: {e.stderr}")
-                    
-                    module_path = temp_dir
-                    if self.subfolder:
-                        module_path = os.path.join(temp_dir, self.subfolder)
-                        if not os.path.exists(module_path):
-                            raise GitSourceError(f"Subfolder not found: {self.subfolder}")
-                    
-                    return self.parse_directory(module_path)
-                else:
-                    return self.parse_directory(source_url)
-                    
-            except Exception as e:
-                raise TerraformSourceError(f"Failed to process source: {str(e)}")
-
-    def parse_directory(self, directory: str) -> Dict[str, TerraformVariable]:
-        """Parse all .tf files in directory and extract variables."""
-        variables = {}
-        critical_error = False
+        namespace, name, provider = parts
+        
+        # Construct registry API URL
+        registry_url = f"https://registry.terraform.io/v1/modules/{namespace}/{name}/{provider}"
         
         try:
-            for root, _, files in os.walk(directory):
-                for file in files:
-                    if file.endswith(('.tf', '.tf.json')):
-                        file_path = os.path.join(root, file)
-                        try:
-                            tf_dict = self._parse_hcl_file(file_path)
-                            if 'variable' in tf_dict:
-                                for var_name, var_config in tf_dict['variable'].items():
-                                    try:
-                                        # Parse type information
-                                        type_str = var_config.get('type', 'string')
-                                        tf_type = parse_terraform_type(type_str, var_config.get('type_info'))
-
-                                        # Parse validation rules
-                                        validation_rules = []
-                                        if 'validation' in var_config:
-                                            for rule in var_config['validation']:
-                                                validation_rules.append({
-                                                    'condition': rule.get('condition', ''),
-                                                    'error_message': rule.get('error_message', '')
-                                                })
-
-                                        variables[var_name] = TerraformVariable(
-                                            name=var_name,
-                                            type=tf_type,
-                                            description=var_config.get('description'),
-                                            default=var_config.get('default'),
-                                            required='default' not in var_config,
-                                            sensitive=var_config.get('sensitive', False),
-                                            validation_rules=validation_rules
-                                        )
-                                    except Exception as e:
-                                        self.add_warning(f"Failed to parse variable '{var_name}' in {file_path}: {str(e)}")
-
-                        except ParsingError as e:
-                            self.add_warning(f"Failed to parse {file_path}: {str(e)}")
-                        except Exception as e:
-                            self.add_error(f"Unexpected error parsing {file_path}", str(e))
-                            critical_error = True
+            # Get module info from registry
+            response = requests.get(registry_url)
+            response.raise_for_status()
+            module_info = response.json()
             
-            if critical_error:
-                print("\n🚨 Critical Errors:")
-                for error in self.errors:
-                    print(f"{error}")
-                print("\nContinuing with partial results...\n")
-
-            if self.warnings:
-                print("\n⚠️ Warnings:")
-                for warning in self.warnings:
-                    print(f"{warning}")
+            # Get the source URL from the latest version or specified version
+            version = self.ref or module_info.get('version')
+            if not version:
+                raise ValueError(f"No version specified for module {source}")
             
-            if not variables:
-                self.add_warning("No variables found in module")
+            # Get download URL for specific version
+            version_url = f"{registry_url}/{version}/download"
+            response = requests.get(version_url)
+            response.raise_for_status()
+            
+            # Extract source URL from response
+            source_url = response.json().get('source')
+            if not source_url:
+                raise ValueError(f"No source URL found for module {source} version {version}")
+            
+            return source_url
+            
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f"Failed to fetch module from registry: {str(e)}")
+
+    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Get variables from the Terraform module."""
+        try:
+            # Handle different source types
+            if '/' in self.source_url and not self.source_url.startswith(('http://', 'https://', 'git@', '/')):
+                # This is a registry module
+                source_url = self._handle_registry_module(self.source_url)
             else:
-                print(f"\n✅ Successfully parsed {len(variables)} variables")
-                print("\n📊 Variable Summary:")
-                print(f"  Required: {sum(1 for v in variables.values() if v.required)}")
-                print(f"  Optional: {sum(1 for v in variables.values() if not v.required)}")
-                print(f"  Sensitive: {sum(1 for v in variables.values() if v.sensitive)}")
-                print("\n🔍 Complex Types:")
-                for name, var in variables.items():
-                    if var.type.base_type in ['object', 'map', 'list', 'set']:
-                        print(f"  - {name}: {var.get_input_format()}")
-            
-            return variables
-            
-        except Exception as e:
-            self.add_error("Failed to parse directory", str(e))
-            return {}
+                source_url = self.source_url
 
-    def get_variables(self) -> Tuple[Dict[str, TerraformVariable], List[ModuleWarning], List[ModuleError]]:
-        """
-        Get all variables from the Terraform module.
-        
-        Returns:
-            Tuple containing:
-            - Dictionary of variables
-            - List of warnings
-            - List of errors
-        """
-        try:
-            source_type, _ = self._get_source_type()
-            variables = self._clone_repo() if source_type == 'git' else self.parse_directory(self.source_url)
-            return variables, self.warnings, self.errors
+            # Create temporary directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # Clone repository
+                if source_url.startswith(('http://', 'https://', 'git@')):
+                    # Git repository
+                    try:
+                        subprocess.run(['git', 'clone', source_url, temp_dir], check=True, capture_output=True, text=True)
+                        if self.ref:
+                            subprocess.run(['git', 'checkout', self.ref], cwd=temp_dir, check=True, capture_output=True, text=True)
+                    except subprocess.CalledProcessError as e:
+                        raise ValueError(f"Git operation failed: {e.stderr}")
+                else:
+                    # Local path
+                    if not os.path.exists(source_url):
+                        raise ValueError(f"Local path not found: {source_url}")
+                    os.system(f"cp -r {source_url}/* {temp_dir}/")
+
+                # Change to module directory if subfolder specified
+                module_dir = os.path.join(temp_dir, self.subfolder) if self.subfolder else temp_dir
+
+                # Find all .tf files
+                variables = {}
+                for root, _, files in os.walk(module_dir):
+                    for file in files:
+                        if file.endswith('.tf'):
+                            file_path = os.path.join(root, file)
+                            try:
+                                # Use hcl2json to parse the file
+                                result = subprocess.run(
+                                    ['hcl2json', file_path],
+                                    capture_output=True,
+                                    text=True,
+                                    check=True
+                                )
+                                tf_json = json.loads(result.stdout)
+                                
+                                # Extract variables
+                                if 'variable' in tf_json:
+                                    for var_name, var_config in tf_json['variable'].items():
+                                        variables[var_name] = {
+                                            'type': var_config.get('type', 'string'),
+                                            'description': var_config.get('description', ''),
+                                            'default': var_config.get('default'),
+                                            'required': 'default' not in var_config
+                                        }
+                            except subprocess.CalledProcessError as e:
+                                self.warnings.append(f"Failed to parse {file_path}: {e.stderr}")
+                            except json.JSONDecodeError as e:
+                                self.warnings.append(f"Invalid JSON from {file_path}: {str(e)}")
+                            except Exception as e:
+                                self.warnings.append(f"Error processing {file_path}: {str(e)}")
+
+                return variables, self.warnings, self.errors
+
         except Exception as e:
-            self.add_error("Failed to get variables", str(e))
-            return {}, self.warnings, self.errors 
+            self.errors.append(f"❌ {self.source_url}: Failed to get variables\nDetails: {str(e)}")
+            return {}, self.warnings, self.errors
