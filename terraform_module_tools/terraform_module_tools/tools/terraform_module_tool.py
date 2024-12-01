@@ -131,10 +131,19 @@ class TerraformModuleTool(Tool):
 
         if not args:
             raise ValueError(f"No valid arguments created for module {name}")
+        
+        # Prepare tool description based on the config and action
+        action_desc = {
+            'plan': 'Plan infrastructure changes for',
+            'apply': 'Apply infrastructure changes to', 
+            'plan_pr': 'Plan infrastructure changes and create PR for'
+        }
+        current_action = 'plan_pr' if action == 'plan' and with_pr else action
+        description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
 
         # Prepare script content
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
-        pre_script = module_config.get('pre_script', '')
+        pre_script = module_config.get('pre_script', '')    
         if pre_script:
             pre_script = f"\n# Run pre-script\ncat > /tmp/pre_script.sh << 'EOF'\n{pre_script}\nEOF\nchmod +x /tmp/pre_script.sh\n/tmp/pre_script.sh || exit 1\n"
 
