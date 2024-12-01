@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
 from ..parser import TerraformModuleParser
-from .module_tools import create_terraform_module_tool
+from . import create_terraform_module_tool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -61,9 +61,10 @@ def load_terraform_tools(config_dir: str = None):
                     continue
                 
                 # Create tools for this module
-                module_tools = create_terraform_module_tool(config, variables)
-                tools.extend(module_tools)
-                logger.info(f"✅ Successfully created tools for {module_name}")
+                for action in ['plan', 'apply']:
+                    tool = create_terraform_module_tool(config, action)
+                    tools.append(tool)
+                    logger.info(f"✅ Created {action} tool for {module_name}")
                 
             except Exception as e:
                 logger.error(f"❌ Failed to load module from {filename}: {str(e)}", exc_info=True)
