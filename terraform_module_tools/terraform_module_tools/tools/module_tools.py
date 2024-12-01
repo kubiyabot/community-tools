@@ -10,8 +10,12 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
     action_suffix = f"_{action}"
     if action == 'plan' and with_pr:
         action_suffix = '_plan_pr'
-    tool_name = f"tf_{config['name'].lower().replace(' ', '_')}{action_suffix}"
-    
+    # Limit name to 50 chars to avoid overly long tool names
+    base_name = config['name'].lower().replace(' ', '_')[:30]
+    # Ensure action suffix is included by removing chars from base_name if needed
+    max_base_len = 50 - len("tf_self_service_") - len(action_suffix)
+    base_name = base_name[:max_base_len]
+    tool_name = f"tf_self_service_{base_name}{action_suffix}"
     # Create tool description
     action_desc = {
         'plan': 'Plan changes for',
