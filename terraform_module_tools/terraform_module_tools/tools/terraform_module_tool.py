@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 import logging
 from pathlib import Path
 from ..parser import TerraformModuleParser
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -45,16 +45,18 @@ def format_description(description: str, var_type: str, example: str) -> str:
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
 
-    # Declare all fields
-    module_config: Dict[str, Any]
+    module_config: Dict[str, Any] = Field(...)
     action: str = 'plan'
     with_pr: bool = False
     env: List[str] = Field(default_factory=list)
     secrets: List[str] = Field(default_factory=list)
     mermaid: Optional[str] = None
 
-    # We can use __post_init__ method for additional initialization
-    def __post_init__(self):
+    class Config:
+        arbitrary_types_allowed = True
+
+    def __init__(self, **data):
+        super().__init__(**data)
         logger.info(f"Creating tool for module: {self.name}")
 
         if not self.module_config.get('source', {}).get('location'):
@@ -161,7 +163,7 @@ fi
 python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .variables | toJson }}}}' || exit 1
 """
 
-        # Set instance attributes
+        # Set additional attributes
         self.type = "docker"
         self.image = "hashicorp/terraform:latest"
         self.content = content
@@ -198,19 +200,19 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         ]
 
         # Generate dynamic mermaid diagram
-        self.mermaid = self._generate_mermaid_diagram(self.name, self.action, self.with_pr)
+        self.mermaid = self._generate_mermaid_diagram()
 
-    def _generate_mermaid_diagram(self, tool_name: str, action: str, with_pr: bool) -> str:
+    def _generate_mermaid_diagram(self) -> str:
         """Generate a dynamic mermaid diagram based on the tool's parameters."""
         module_name = self.module_config['name']
-        action_display = "Plan" if action == 'plan' else "Apply"
+        action_display = "Plan" if self.action == 'plan' else "Apply"
 
         participants = [
             'participant U as 👤 User',
             'participant B as 🤖 Bot',
             'participant T as 🏗️ Terraform',
         ]
-        if with_pr:
+        if self.with_pr:
             participants.append('participant G as 📦 Git/PR')
 
         diagram_steps = [
@@ -220,7 +222,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             f'T-->>B: **{action_display}** ready',
         ]
 
-        if with_pr:
+        if self.with_pr:
             diagram_steps.extend([
                 'B->>G: Creates Pull Request',
                 'G-->>B: PR Created',
