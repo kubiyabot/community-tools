@@ -6,6 +6,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import logging
 import re
 import glob
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ class TerraformModuleParser:
         self.warnings = []
         self.errors = []
         self.readme_url = None  # To store README.md URL if it exists
+        self.module_dir = None  # Will be set after cloning
+        self._clone_repository()
 
     def _get_github_url(self) -> str:
         """Convert module source to GitHub URL."""
@@ -45,11 +48,48 @@ class TerraformModuleParser:
 
         raise ValueError(f"Unsupported source format: {self.source_url}")
 
+    def _clone_repository(self) -> None:
+        """Clone the repository and set the module directory."""
+        github_url = self._get_github_url()
+        temp_dir = tempfile.mkdtemp()
+
+        try:
+            logger.info(f"Cloning repository: {github_url}")
+            subprocess.run(['git', 'clone', github_url, temp_dir], check=True)
+
+            if self.ref:
+                logger.info(f"Checking out ref: {self.ref}")
+                subprocess.run(['git', '-C', temp_dir, 'checkout', self.ref], check=True)
+
+            # Set the module directory based on the provided path
+            if self.path:
+                self.module_dir = os.path.join(temp_dir, self.path)
+                if not os.path.exists(self.module_dir):
+                    error_msg = f"Specified path '{self.path}' does not exist in the repository"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
+            else:
+                self.module_dir = temp_dir
+
+            logger.info(f"Repository cloned to: {self.module_dir}")
+
+            # Optionally, set the README URL
+            readme_path = os.path.join(self.module_dir, 'README.md')
+            if os.path.exists(readme_path):
+                self.readme_url = os.path.join(github_url.replace('.git', ''), 'blob', self.ref or 'master', self.path or '', 'README.md')
+                logger.info(f"README.md found at: {self.readme_url}")
+
+        except subprocess.CalledProcessError as e:
+            error_msg = f"Failed to clone repository {github_url}: {e.stderr}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """Parse variables from Terraform module."""
         variables = {}
         warnings = []
         errors = []
+
         try:
             # Search for all .tf files in the module directory recursively
             tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
@@ -57,14 +97,19 @@ class TerraformModuleParser:
                 errors.append("No .tf files found in module")
             else:
                 for tf_file in tf_files:
-                    logging.info(f"Parsing variables from: {tf_file}")
-                    vars_in_file = self.parse_variables(tf_file)
+                    logger.info(f"Parsing variables from: {tf_file}")
+                    vars_in_file = self._parse_variables_file(tf_file)
                     variables.update(vars_in_file)
             if not variables:
                 errors.append("No variables found in module")
         except Exception as e:
-            logging.error(f"Failed to get variables: {str(e)}", exc_info=True)
+            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
             errors.append(f"Failed to get variables: {str(e)}")
+        finally:
+            # Clean up the cloned repository to free up space
+            if self.module_dir and os.path.exists(self.module_dir):
+                shutil.rmtree(self.module_dir)
+                logger.info(f"Cleaned up temporary directory: {self.module_dir}")
         return variables, warnings, errors
 
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
