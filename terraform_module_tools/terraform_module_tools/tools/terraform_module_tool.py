@@ -172,8 +172,41 @@ class TerraformModuleTool(Tool):
         tool_description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
 
         # Prepare script content
-        script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
-        # Assuming scripts are stored correctly
+        script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'terraform_{action}.py'
+
+        # Read the existing script files
+        script_files = {}
+        scripts_needed = [
+            script_name,
+            'prepare_tfvars.py',
+            'terraform_handler.py'
+        ]
+        scripts_dir = Path(__file__).parent.parent / 'scripts'
+        for script_file in scripts_dir.glob('*.py'):
+            if script_file.name in scripts_needed or script_file.name == 'terraform_handler.py':
+                script_files[script_file.name] = script_file.read_text()
+
+        if not script_files:
+            raise ValueError("No script files found")
+
+        # Create FileSpec objects for scripts
+        with_files = []
+        for s_name, s_content in script_files.items():
+            dest_path = f"/opt/scripts/{s_name}"
+            with_files.append(FileSpec(destination=dest_path, content=s_content))
+
+        # Save module variables signature to a file
+        module_variables_signature = json.dumps(variables, indent=2)
+        module_variables_file = FileSpec(
+            destination="/opt/module_variables.json",
+            content=module_variables_signature
+        )
+        with_files.append(module_variables_file)
+
+        # Update 'with_files' in values
+        values['with_files'] = with_files
+
+        # Prepare the shell content script
         content = f"""
 set -e
 
@@ -192,7 +225,7 @@ fi
 
 # Run Terraform {action}
 echo "🚀 Running Terraform {action}..."
-python /opt/scripts/{script_name}
+python3 /opt/scripts/{script_name}
 """
 
         # Update values dictionary
@@ -202,7 +235,6 @@ python /opt/scripts/{script_name}
             'args': args,
             'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"],
             'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
-            'with_files': values.get('with_files') or [],  # Assuming you set up with_files elsewhere
             'type': "docker",
             'image': "hashicorp/terraform:latest",
             'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
