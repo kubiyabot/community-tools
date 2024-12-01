@@ -220,7 +220,7 @@ class TerraformModuleParser:
         # Handle complex types by defaulting to 'string'
         if var_type not in ['string', 'str', 'number', 'bool']:
             logger.warning(f"Unsupported variable type '{var_type}' for variable '{var_name}'. Defaulting type to 'string'.")
-            var_type = 'string'
+            var_type = 'str'
 
         # Determine if variable is required
         required = 'default' not in var_config
