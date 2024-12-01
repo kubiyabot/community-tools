@@ -1,38 +1,38 @@
 import logging
-from typing import List
-from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
-from .dynamic_tool_loader import load_terraform_tools as _load_tools
+from .module_tools import create_terraform_module_tool, MODULE_CONFIGS
 
 logger = logging.getLogger(__name__)
 
-def initialize_tools(config_dir: str = None) -> List[Tool]:
+# Initialize tools dictionary at module level
+tools = {}
+
+def initialize_tools():
     """Initialize and register all Terraform module tools."""
     try:
-        logger.info("🔄 Initializing Terraform module tools...")
+        logger.info("Initializing Terraform module tools...")
         
-        # Load tools using the dynamic loader
-        tools = _load_tools(config_dir)
-        
-        if not tools:
-            logger.warning("No tools were loaded from the dynamic loader")
-            return []
-            
-        registered_tools = []
-        # Register each tool
-        for tool in tools:
-            try:
-                tool_registry.register("terraform_modules", tool)
-                logger.info(f"✅ Registered tool: {tool.name}")
-                registered_tools.append(tool)
-            except Exception as e:
-                logger.error(f"❌ Failed to register tool {getattr(tool, 'name', 'unknown')}: {str(e)}")
-        
-        return registered_tools
+        # Create and register tools for each module configuration
+        for module_name, config in MODULE_CONFIGS.items():
+            # Create plan tool
+            plan_tool = create_terraform_module_tool(config, 'plan')
+            tools[plan_tool.name] = plan_tool
+            tool_registry.register("terraform", plan_tool)
+
+            # Create plan with PR tool
+            plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
+            tools[plan_pr_tool.name] = plan_pr_tool
+            tool_registry.register("terraform", plan_pr_tool)
+
+            # Create apply tool
+            apply_tool = create_terraform_module_tool(config, 'apply')
+            tools[apply_tool.name] = apply_tool
+            tool_registry.register("terraform", apply_tool)
+
+        return list(tools.values())
         
     except Exception as e:
-        logger.error(f"❌ Failed to initialize tools: {str(e)}", exc_info=True)
-        return []
+        logger.error(f"Failed to initialize tools: {str(e)}")
+        raise
 
-# Export only what's needed
-__all__ = ['initialize_tools']
+__all__ = ['initialize_tools', 'create_terraform_module_tool', 'tools']
