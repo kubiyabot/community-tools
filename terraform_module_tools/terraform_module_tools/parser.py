@@ -159,18 +159,23 @@ class TerraformModuleParser:
                 # Handle list format where each item is a dict with a single key
                 for var_block in var_blocks:
                     if not isinstance(var_block, dict):
-                        error_msg = f"Invalid variable block format: {var_block}"
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
+                        continue
                     
                     for var_name, var_config in var_block.items():
                         if not isinstance(var_config, dict):
-                            error_msg = f"Invalid variable config format for {var_name}: {var_config}"
-                            logger.error(error_msg)
-                            raise ValueError(error_msg)
+                            continue
+                        
+                        # Clean up type string (handle ${type} format)
+                        var_type = var_config.get('type', 'string')
+                        if isinstance(var_type, str):
+                            var_type = var_type.replace('${', '').replace('}', '')
+                        elif isinstance(var_type, list) and len(var_type) > 0:
+                            # Sometimes type comes as a list with one item
+                            type_value = var_type[0].get('type', 'string')
+                            var_type = type_value.replace('${', '').replace('}', '')
                         
                         variables[var_name] = {
-                            'type': var_config.get('type', 'string'),
+                            'type': var_type,
                             'description': var_config.get('description', ''),
                             'default': var_config.get('default'),
                             'required': 'default' not in var_config
@@ -185,12 +190,19 @@ class TerraformModuleParser:
                 
                 for var_name, var_config in var_blocks.items():
                     if not isinstance(var_config, dict):
-                        error_msg = f"Invalid variable config format for {var_name}: {var_config}"
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
+                        continue
+                    
+                    # Clean up type string (handle ${type} format)
+                    var_type = var_config.get('type', 'string')
+                    if isinstance(var_type, str):
+                        var_type = var_type.replace('${', '').replace('}', '')
+                    elif isinstance(var_type, list) and len(var_type) > 0:
+                        # Sometimes type comes as a list with one item
+                        type_value = var_type[0].get('type', 'string')
+                        var_type = type_value.replace('${', '').replace('}', '')
                     
                     variables[var_name] = {
-                        'type': var_config.get('type', 'string'),
+                        'type': var_type,
                         'description': var_config.get('description', ''),
                         'default': var_config.get('default'),
                         'required': 'default' not in var_config
