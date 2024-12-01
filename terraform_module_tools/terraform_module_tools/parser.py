@@ -12,13 +12,12 @@ logger = logging.getLogger(__name__)
 
 HCL2JSON_PATH = '/usr/local/bin/hcl2json'
 
-
 if not os.path.exists(HCL2JSON_PATH):
-    # Download hcl2json
-    subprocess.run(['curl', '-L', '-o', HCL2JSON_PATH, 'https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64'], check=True)
-    subprocess.run(['chmod', '+x', HCL2JSON_PATH], check=True)
-    # Add to PATH
-    os.environ['PATH'] = f"{os.environ['PATH']}:/usr/local/bin"
+    # Download using requests
+    response = requests.get('https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64')
+    with open(HCL2JSON_PATH, 'wb') as f:
+        f.write(response.content)
+    os.chmod(HCL2JSON_PATH, 0o755)
 
 class TerraformModuleParser:
     def __init__(
