@@ -194,10 +194,19 @@ class TerraformModuleParser:
         
         namespace, name, provider = parts
         
-        # Construct registry API URL
-        registry_url = f"https://registry.terraform.io/v1/modules/{namespace}/{name}/{provider}"
+        # For well-known modules, we can use their GitHub URLs directly
+        if namespace == "terraform-aws-modules":
+            # Convert to GitHub URL
+            github_url = f"https://github.com/terraform-aws-modules/terraform-{provider}-{name}"
+            if self.ref:
+                github_url += f"/tree/{self.ref}"
+            return github_url
         
+        # For other modules, try the registry API
         try:
+            # Construct registry API URL
+            registry_url = f"https://registry.terraform.io/v1/modules/{namespace}/{name}/{provider}"
+            
             # Get module info from registry
             response = requests.get(registry_url)
             response.raise_for_status()
@@ -208,15 +217,15 @@ class TerraformModuleParser:
             if not version:
                 raise ValueError(f"No version specified for module {source}")
             
-            # Get download URL for specific version
-            version_url = f"{registry_url}/{version}/download"
-            response = requests.get(version_url)
-            response.raise_for_status()
+            # Get source URL
+            source_url = module_info.get('source') or f"https://github.com/{namespace}/terraform-{provider}-{name}"
             
-            # Extract source URL from response
-            source_url = response.json().get('source')
-            if not source_url:
-                raise ValueError(f"No source URL found for module {source} version {version}")
+            # Add version if specified
+            if version and not source_url.endswith(version):
+                if source_url.startswith('http'):
+                    source_url += f"/tree/{version}"
+                else:
+                    source_url += f"?ref={version}"
             
             return source_url
             
