@@ -3,76 +3,134 @@ import os
 import sys
 import json
 import subprocess
-from typing import Optional
+import time
+import re
+from typing import List, Dict, Any, Optional
+
+# Try to import slack_sdk
+try:
+    from slack_sdk import WebClient
+    SLACK_AVAILABLE = True
+except ImportError:
+    SLACK_AVAILABLE = False
+    print("Warning: slack_sdk not available. Slack notifications will be disabled.")
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
-    print(f"\n{emoji} {message}", flush=True)
-    sys.stdout.flush()
+    print(f"{emoji} {message}", flush=True)
+
+class SlackNotifier:
+    def __init__(self):
+        """Initialize Slack client with error handling."""
+        self.enabled = SLACK_AVAILABLE
+        self.start_time = time.time()
+        if not self.enabled:
+            return
+
+        try:
+            self.client = WebClient(token=os.environ["SLACK_API_TOKEN"])
+            self.channel = os.environ["SLACK_CHANNEL_ID"]
+            self.message_ts = None
+            self.thread_ts = os.environ.get("SLACK_THREAD_TS")
+        except KeyError as e:
+            print(f"Warning: Missing Slack environment variable: {e}. Slack notifications will be disabled.")
+            self.enabled = False
+
+    def send_initial_message(self, text: str) -> None:
+        """Send initial message and store timestamp."""
+        if not self.enabled:
+            return
+
+        try:
+            response = self.client.chat_postMessage(
+                channel=self.channel,
+                text=text,
+                thread_ts=self.thread_ts
+            )
+            self.message_ts = response["ts"]
+        except Exception as e:
+            print(f"Warning: Failed to send Slack message: {str(e)}")
+            self.enabled = False
+
+    def update_progress(self, text: str, blocks: Optional[List[Dict[str, Any]]] = None) -> None:
+        """Update Slack message with new text and blocks."""
+        if not self.enabled or not self.message_ts:
+            return
+
+        try:
+            self.client.chat_update(
+                channel=self.channel,
+                ts=self.message_ts,
+                text=text,
+                blocks=blocks
+            )
+        except Exception as e:
+            print(f"Warning: Failed to update Slack message: {str(e)}")
+            self.enabled = False
+
+    def send_error(self, error_message: str) -> None:
+        """Send error message to Slack."""
+        if not self.enabled:
+            return
+
+        try:
+            self.client.chat_postMessage(
+                channel=self.channel,
+                text=f":x: Error: {error_message}",
+                thread_ts=self.message_ts or self.thread_ts
+            )
+        except Exception as e:
+            print(f"Warning: Failed to send error message to Slack: {str(e)}")
+            self.enabled = False
+
+def run_command(cmd: List[str], capture_output: bool = False) -> Optional[str]:
+    """Run a command and return its output if capture_output is True."""
+    print_progress(f"Running command: {' '.join(cmd)}", "🔄")
+    env = os.environ.copy()
+    env["TF_IN_AUTOMATION"] = "1"
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=capture_output,
+            text=True,
+            env=env
+        )
+        if capture_output:
+            return result.stdout
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr or str(e)
+        print(f"❌ Command failed: {' '.join(cmd)}\n{error_msg}", file=sys.stderr)
+        raise RuntimeError(f"Command failed: {' '.join(cmd)}\n{error_msg}")
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: terraform_plan.py <module_url> <variables_json>", file=sys.stderr)
-        sys.exit(1)
+    print_progress("Starting Terraform plan...", "🚀")
+    slack = SlackNotifier()
+    slack.send_initial_message("Starting Terraform plan...")
 
-    module_url = sys.argv[1]
-    variables = json.loads(sys.argv[2])
-    
     try:
-        # Initialize state manager
-        state_manager = TerraformStateManager(os.environ["KUBIYA_USER_EMAIL"])
-        req_id = state_manager.create_apply_request("plan", variables)
-        
-        print_progress(f"Created plan request: {req_id}", "🎯")
-        
-        # Clone repository
-        workspace_dir = state_manager.get_workspace_dir(req_id)
-        print_progress("Cloning repository...", "📦")
-        
-        clone_cmd = ["git", "clone"]
-        if "GH_TOKEN" in os.environ:
-            auth_url = module_url.replace(
-                "https://github.com",
-                f"https://{os.environ['GH_TOKEN']}@github.com"
-            )
-            clone_cmd.append(auth_url)
-        else:
-            clone_cmd.append(module_url)
-            
-        clone_cmd.append(str(workspace_dir))
-        subprocess.run(clone_cmd, check=True)
-        
-        # Change to workspace directory
-        os.chdir(workspace_dir)
-        
         # Initialize Terraform
         print_progress("Initializing Terraform...", "⚙️")
-        subprocess.run(["terraform", "init"], check=True)
-        
-        # Create variables file
-        print_progress("Generating variables file...", "📝")
-        with open("terraform.tfvars.json", "w") as f:
-            json.dump(variables, f, indent=2)
-        
+        slack.update_progress("Initializing Terraform...")
+        run_command(["terraform", "init"])
+
         # Generate plan
-        print_progress("Generating Terraform plan...", "🔍")
-        plan_output = subprocess.run(
-            ["terraform", "plan", "-no-color"],
-            capture_output=True,
-            text=True,
-            check=True
-        ).stdout
-        
-        # Store plan
-        state_manager.store_plan_output(req_id, plan_output)
-        
-        print_progress(f"Plan generated successfully with ID: {req_id}", "✅")
-        print("\nPlan Output:")
+        print_progress("Generating Terraform plan...", "📋")
+        slack.update_progress("Generating Terraform plan...")
+        plan_output = run_command(["terraform", "plan", "-no-color"], capture_output=True)
         print(plan_output)
-        
+
+        # Optionally parse plan_output and construct a Slack message with the plan summary
+
+        slack.update_progress("Terraform plan completed successfully.")
+
     except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
+        error_msg = str(e)
+        print(f"❌ Error during Terraform plan: {error_msg}", file=sys.stderr)
+        slack.send_error(error_msg)
         sys.exit(1)
+
+    print_progress("Terraform plan completed successfully.", "✅")
 
 if __name__ == "__main__":
     main() 

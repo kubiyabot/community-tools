@@ -3,12 +3,18 @@ import os
 import sys
 import json
 
+def print_progress(message: str, emoji: str) -> None:
+    """Print progress messages with emoji."""
+    print(f"{emoji} {message}", flush=True)
+
 def main():
     if len(sys.argv) != 2:
         print("Usage: prepare_tfvars.py <module_variables_file>", file=sys.stderr)
         sys.exit(1)
     
     module_variables_file = sys.argv[1]
+
+    print_progress(f"Reading module variables from {module_variables_file}", "📄")
 
     # Read module variables signature
     with open(module_variables_file, 'r') as f:
@@ -43,6 +49,8 @@ def main():
     # Write tfvars to file
     with open('terraform.tfvars.json', 'w') as f:
         json.dump(tfvars, f, indent=2)
+
+    print_progress("Successfully prepared terraform.tfvars.json", "✅")
 
 if __name__ == "__main__":
     main() 
