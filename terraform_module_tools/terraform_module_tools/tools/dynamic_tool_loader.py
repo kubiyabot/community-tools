@@ -3,7 +3,8 @@ import json
 from typing import Dict, Any, List
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
-from ..parser import TerraformModuleParser, TerraformVariable
+from ..parser import TerraformModuleParser
+from .module_tools import create_terraform_module_tool
 import logging
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ def load_terraform_tools(config_dir: str = None):
                     continue
                 
                 # Create tools for this module
-                module_tools = create_terraform_tools(module_name, config, variables)
+                module_tools = create_terraform_module_tool(config, variables)
                 tools.extend(module_tools)
                 logger.info(f"✅ Successfully created tools for {module_name}")
                 
@@ -71,4 +72,4 @@ def load_terraform_tools(config_dir: str = None):
     return tools
 
 # Export the loader function
-__all__ = ['load_terraform_tools'] 
+__all__ = ['load_terraform_tools']

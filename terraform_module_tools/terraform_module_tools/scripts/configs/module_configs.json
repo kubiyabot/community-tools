@@ -1,0 +1,26 @@
+{
+    "aws_vpc": {
+        "name": "AWS VPC",
+        "description": "Creates a VPC with public and private subnets",
+        "source": "terraform-aws-modules/vpc/aws",
+        "version": "5.0.0",
+        "variables": {
+            "name": {
+                "type": "string",
+                "description": "Name of the VPC",
+                "required": true
+            },
+            "cidr": {
+                "type": "string",
+                "description": "CIDR block for the VPC",
+                "default": "10.0.0.0/16",
+                "required": false
+            },
+            "azs": {
+                "type": "list(string)",
+                "description": "Availability zones for the VPC",
+                "required": true
+            }
+        }
+    }
+} 
