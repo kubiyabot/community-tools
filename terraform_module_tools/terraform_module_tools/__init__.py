@@ -8,5 +8,5 @@ logger = logging.getLogger(__name__)
 # Initialize tools when module is imported
 tools = initialize_tools()
 
-# Export the tools
+# Export the tools and initialization function
 __all__ = ['tools', 'initialize_tools']
