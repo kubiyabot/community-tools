@@ -55,7 +55,6 @@ class TerraformModuleTool(Tool):
             parser = TerraformModuleParser(
                 source_url=module_config['source']['location'],
                 ref=module_config['source'].get('version'),
-                subfolder=module_config['source'].get('path')
             )
             variables, warnings, errors = parser.get_variables()
             
