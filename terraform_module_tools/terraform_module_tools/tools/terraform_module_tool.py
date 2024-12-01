@@ -10,20 +10,55 @@ logger = logging.getLogger(__name__)
 
 def map_terraform_type_to_arg_type(tf_type: str) -> str:
     """Map Terraform types to Kubiya SDK Arg types."""
+    # Extract base type and nested type if present
+    base_type = tf_type.split('(')[0].lower()
+    nested_type = None
+    if '(' in tf_type and ')' in tf_type:
+        nested_type = tf_type[tf_type.index('(')+1:tf_type.rindex(')')].lower()
+
+    # Direct type mappings
+    if base_type == 'string':
+        return 'string'
+    elif base_type == 'number':
+        return 'number'
+    elif base_type == 'bool':
+        return 'boolean'
+    elif base_type in ['list', 'set']:
+        # For lists and sets, we'll accept string input and parse it as JSON
+        return 'string'
+    elif base_type == 'map':
+        # For maps, we'll accept string input and parse it as JSON
+        return 'string'
+    elif base_type == 'object':
+        # For complex objects, we'll accept string input and parse it as JSON
+        return 'string'
+    
+    # Default to string for unknown types
+    return 'string'
+
+def generate_example(var_name: str, tf_type: str) -> str:
+    """Generate example value based on variable name and type."""
     base_type = tf_type.split('(')[0].lower()
     
-    type_mapping = {
-        'string': 'str',
-        'number': 'float',
-        'bool': 'bool',
-        'list': 'array',
-        'set': 'array',
-        'map': 'str',  # Maps will be passed as JSON strings
-        'object': 'str',  # Complex objects will be passed as JSON strings
-        'any': 'str',
-    }
+    # Common patterns in variable names
+    if 'name' in var_name:
+        return 'example-name'
+    elif 'cidr' in var_name:
+        return '10.0.0.0/16'
+    elif 'region' in var_name:
+        return 'us-west-2'
+    elif 'enabled' in var_name or base_type == 'bool':
+        return 'true'
+    elif base_type == 'number':
+        return '42'
+    elif base_type in ['list', 'set']:
+        return '["value1", "value2"]'
+    elif base_type == 'map':
+        return '{"key1": "value1", "key2": "value2"}'
+    elif base_type == 'object':
+        return '{"field1": "value1", "field2": "value2"}'
     
-    return type_mapping.get(base_type, 'str')
+    return 'example-value'
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -87,10 +122,14 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             # Map Terraform type to Kubiya SDK Arg type
             arg_type = map_terraform_type_to_arg_type(var_config['type'])
             
+            # Generate example value
+            example = generate_example(var_name, var_config['type'])
+            
             # Create argument with enhanced description
             description = (
                 f"{var_config['description']}\n\n"
-                f"Type: `{var_config['type']}`"
+                f"Type: `{var_config['type']}`\n"
+                f"Example: `{example}`"
             )
             
             if var_config.get('validation_rules'):
@@ -98,13 +137,18 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
                     f"- {rule}" for rule in var_config['validation_rules']
                 )
             
+            # For complex types, add JSON format hint
+            if var_config['type'] not in ['string', 'number', 'bool']:
+                description += "\n\nInput should be a valid JSON string."
+            
             args.append(
                 Arg(
                     name=var_name,
                     description=description,
                     type=arg_type,
                     required=var_config.get('required', False),
-                    default=var_config.get('default')
+                    default=var_config.get('default'),
+                    example=example
                 )
             )
 
