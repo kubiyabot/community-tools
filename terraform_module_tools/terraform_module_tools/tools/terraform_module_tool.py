@@ -168,25 +168,8 @@ class TerraformModuleTool(Tool):
 
         # Prepare script content
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
-        pre_script = module_config.get('pre_script', '')    
-        if pre_script:
-            pre_script = f"\n# Run pre-script\ncat > /tmp/pre_script.sh << 'EOF'\n{pre_script}\nEOF\nchmod +x /tmp/pre_script.sh\n/tmp/pre_script.sh || exit 1\n"
 
-        content = f"""
-# Install required packages
-pip install -q slack_sdk requests
-
-# Download hcl2json if needed
-if ! command -v hcl2json &> /dev/null; then
-    curl -L -o /usr/local/bin/hcl2json https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64
-    chmod +x /usr/local/bin/hcl2json
-fi
-{pre_script}
-# Run Terraform {action}
-python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .variables | toJson }}}}' || exit 1
-"""
-
-        # Get script files
+        # Read the existing script files
         script_files = {}
         scripts_dir = Path(__file__).parent.parent / 'scripts'
         for script_file in scripts_dir.glob('*.py'):
@@ -196,15 +179,71 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         if not script_files:
             raise ValueError("No script files found")
 
+        # Save module variables signature to a file
+        module_variables_signature = json.dumps(variables, indent=2)
+        module_variables_file = FileSpec(
+            destination="/opt/module_variables.json",
+            content=module_variables_signature
+        )
+
+        # Read and include the prepare_tfvars.py script
+        prepare_tfvars_script = scripts_dir / 'prepare_tfvars.py'
+        if not prepare_tfvars_script.exists():
+            raise FileNotFoundError("prepare_tfvars.py script not found in scripts directory")
+        prepare_tfvars_content = prepare_tfvars_script.read_text()
+        prepare_tfvars_file = FileSpec(
+            destination="/opt/scripts/prepare_tfvars.py",
+            content=prepare_tfvars_content
+        )
+
+        # Adjust content script to run prepare_tfvars.py before the terraform handler script
+        content = f"""
+#!/bin/sh
+set -e
+
+# Make scripts executable
+chmod +x /opt/scripts/*.py
+
+# Prepare terraform.tfvars.json
+echo "🔧 Preparing terraform variables..."
+python3 /opt/scripts/prepare_tfvars.py /opt/module_variables.json
+
+# Check if terraform.tfvars.json was created
+if [ ! -f terraform.tfvars.json ]; then
+    echo "❌ Failed to create terraform.tfvars.json."
+    exit 1
+fi
+
+# Run Terraform {action}
+echo "🚀 Running Terraform {action}..."
+python /opt/scripts/{script_name}
+"""
+
+        # Get script files
+        # Now include the new files in with_files
+        self.with_files = [
+            FileSpec(
+                destination=f"/opt/scripts/{script_name}",
+                content=script_content
+            )
+            for script_name, script_content in script_files.items()
+        ] + [module_variables_file, prepare_tfvars_file]
+
         # Add common environment variables and secrets
         env = (env or []) + [
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
-            "GIT_TOKEN",
         ]
         
         secrets = (secrets or []) + [
             "SLACK_API_TOKEN",
+            "GH_TOKEN",
+        ]
+
+        # Add environment variables for all args
+        env = (env or []) + [
+            "SLACK_CHANNEL_ID",
+            "SLACK_THREAD_TS",
         ]
 
         logger.info(f"Initializing tool {name} with {len(args)} arguments")
@@ -218,11 +257,5 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             args=args,
             env=env,
             secrets=secrets,
-            with_files=[
-                FileSpec(
-                    destination=f"/opt/scripts/{script_name}",
-                    content=script_content
-                )
-                for script_name, script_content in script_files.items()
-            ]
+            with_files=self.with_files
         )
