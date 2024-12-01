@@ -241,7 +241,3 @@ python3 /opt/scripts/{script_name}
         })
 
         return values
-
-    # Define any helper functions here (e.g., map_terraform_type_to_arg_type, truncate_description)
-
-# ... rest of your helper functions ...
