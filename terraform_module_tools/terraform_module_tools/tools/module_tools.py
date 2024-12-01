@@ -3,13 +3,6 @@ from pathlib import Path
 from .terraform_module_tool import TerraformModuleTool
 from ..scripts.config_loader import get_module_configs
 
-# Load configurations
-try:
-    MODULE_CONFIGS = get_module_configs()
-except Exception as e:
-    print(f"Error loading configurations: {e}")
-    MODULE_CONFIGS = {}
-
 def create_terraform_module_tool(config: dict, action: str, with_pr: bool = False):
     """Create a Terraform module tool from configuration."""
     
@@ -39,5 +32,35 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
         with_pr=with_pr
     )
 
+def initialize_module_tools():
+    """Initialize all Terraform module tools."""
+    tools = {}
+    try:
+        module_configs = get_module_configs()
+        
+        for module_name, config in module_configs.items():
+            # Create plan tool
+            plan_tool = create_terraform_module_tool(config, 'plan')
+            tools[plan_tool.name] = plan_tool
+            tool_registry.register("terraform", plan_tool)
+
+            # Create plan with PR tool
+            plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
+            tools[plan_pr_tool.name] = plan_pr_tool
+            tool_registry.register("terraform", plan_pr_tool)
+
+            # Create apply tool
+            apply_tool = create_terraform_module_tool(config, 'apply')
+            tools[apply_tool.name] = apply_tool
+            tool_registry.register("terraform", apply_tool)
+
+    except Exception as e:
+        print(f"Error initializing tools: {e}")
+    
+    return tools
+
+# Initialize tools when module is imported
+tools = initialize_module_tools()
+
 # Export necessary components
-__all__ = ['create_terraform_module_tool', 'MODULE_CONFIGS'] 
+__all__ = ['create_terraform_module_tool', 'tools', 'initialize_module_tools'] 
