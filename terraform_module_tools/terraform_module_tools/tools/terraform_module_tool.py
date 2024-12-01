@@ -198,7 +198,6 @@ class TerraformModuleTool(Tool):
 
         # Adjust content script to run prepare_tfvars.py before the terraform handler script
         content = f"""
-#!/bin/sh
 set -e
 
 # Make scripts executable
