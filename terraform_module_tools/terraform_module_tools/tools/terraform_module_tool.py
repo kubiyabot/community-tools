@@ -81,8 +81,8 @@ class TerraformModuleTool(Tool):
         module_config: Dict[str, Any],
         action: str = 'plan',
         with_pr: bool = False,
-        env: Optional[List[str]] = None,
-        secrets: Optional[List[str]] = None,
+        env: List[str] = [],
+        secrets: List[str] = [],
     ) -> 'TerraformModuleTool':
         logger.info(f"Creating tool for module: {name}")
 
