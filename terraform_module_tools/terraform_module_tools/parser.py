@@ -7,7 +7,7 @@ import logging
 import re
 import glob
 import shutil
-
+import requests
 logger = logging.getLogger(__name__)
 
 HCL2JSON_PATH = '/usr/local/bin/hcl2json'
@@ -18,6 +18,10 @@ if not os.path.exists(HCL2JSON_PATH):
     with open(HCL2JSON_PATH, 'wb') as f:
         f.write(response.content)
     os.chmod(HCL2JSON_PATH, 0o755)
+
+# if the binary is not found, raise an error
+if not os.path.exists(HCL2JSON_PATH):
+    raise ValueError("hcl2json binary not found. The discovery process has tried to install it directly but failed. Please install it manually on the base image of the tool manager SDK container on namespace kubiya on your cluster.")
 
 class TerraformModuleParser:
     def __init__(
