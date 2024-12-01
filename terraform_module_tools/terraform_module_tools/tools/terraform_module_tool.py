@@ -191,6 +191,8 @@ class TerraformModuleTool(Tool):
         requirements_content = requirements_file.read_text()
         script_files['requirements.txt'] = requirements_content
 
+        with_files.append(FileSpec(destination="/opt/scripts/requirements.txt", content=requirements_content))
+
         if not script_files:
             raise ValueError("No script files found")
 
