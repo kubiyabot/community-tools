@@ -120,6 +120,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
                     arg.default = bool(var_config['default'])
             
             args.append(arg)
+            print(f"->> Added arg: {arg}")
 
         # Get script files
         script_files = {}
