@@ -4,6 +4,7 @@ import os
 import json
 import logging
 from pathlib import Path
+from pydantic import BaseModel
 from ..parser import TerraformModuleParser
 
 logger = logging.getLogger(__name__)
@@ -63,21 +64,31 @@ def truncate_description(description: str, var_config: dict) -> str:
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
-    def __init__(
-        self,
+
+    # Define class attributes (Pydantic fields)
+    module_config: Dict[str, Any]
+    action: str = 'plan'
+    with_pr: bool = False
+    env: Optional[List[str]] = None
+    secrets: Optional[List[str]] = None
+    with_files: List[FileSpec] = []
+
+    @classmethod
+    def from_module_config(
+        cls,
         name: str,
         description: str,
         module_config: Dict[str, Any],
         action: str = 'plan',
         with_pr: bool = False,
-        env: List[str] = None,
-        secrets: List[str] = None,
-    ):
+        env: Optional[List[str]] = None,
+        secrets: Optional[List[str]] = None,
+    ) -> 'TerraformModuleTool':
         logger.info(f"Creating tool for module: {name}")
-        
+
         if not module_config.get('source', {}).get('location'):
             raise ValueError(f"Module {name} is missing source location")
-        
+
         # Auto-discover variables
         try:
             logger.info(f"Discovering variables from: {module_config['source']['location']}")
@@ -87,20 +98,20 @@ class TerraformModuleTool(Tool):
                 max_workers=8
             )
             variables, warnings, errors = parser.get_variables()
-            
+
             if errors:
                 for error in errors:
                     logger.error(f"Variable discovery error: {error}")
                 raise ValueError(f"Failed to discover variables: {errors[0]}")
-            
+
             for warning in warnings:
                 logger.warning(f"Variable discovery warning: {warning}")
-            
+
             if not variables:
                 raise ValueError(f"No variables found in module {name}")
-            
+
             logger.info(f"Found {len(variables)} variables")
-            
+
         except Exception as e:
             logger.error(f"Failed to auto-discover variables: {str(e)}", exc_info=True)
             raise ValueError(f"Variable discovery failed: {str(e)}")
@@ -156,17 +167,17 @@ class TerraformModuleTool(Tool):
 
         if not args:
             raise ValueError(f"No valid arguments created for module {name}")
-        
-        # Prepare tool description based on the config and action
+
+        # Prepare tool description
         action_desc = {
             'plan': 'Plan infrastructure changes for',
-            'apply': 'Apply infrastructure changes to', 
+            'apply': 'Apply infrastructure changes to',
             'plan_pr': 'Plan infrastructure changes and create PR for'
         }
         current_action = 'plan_pr' if action == 'plan' and with_pr else action
         tool_description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
 
-        # Prepare script content
+        # Prepare script content and files
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
 
         # Read the existing script files
@@ -196,7 +207,7 @@ class TerraformModuleTool(Tool):
             content=prepare_tfvars_content
         )
 
-        # Adjust content script to run prepare_tfvars.py before the terraform handler script
+        # Adjust content script
         content = f"""
 #!/bin/sh
 set -e
@@ -219,9 +230,8 @@ echo "🚀 Running Terraform {action}..."
 python /opt/scripts/{script_name}
 """
 
-        # Get script files
-        # Now include the new files in with_files
-        self.with_files = [
+        # Collect files to include
+        with_files = [
             FileSpec(
                 destination=f"/opt/scripts/{script_name}",
                 content=script_content
@@ -229,25 +239,22 @@ python /opt/scripts/{script_name}
             for script_name, script_content in script_files.items()
         ] + [module_variables_file, prepare_tfvars_file]
 
-        # Add common environment variables and secrets
+        # Add environment variables and secrets
         env = (env or []) + [
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
+            *[arg.name for arg in args],
         ]
-        
+
         secrets = (secrets or []) + [
             "SLACK_API_TOKEN",
             "GH_TOKEN",
         ]
 
-        # Add environment variables for all args
-        env = (env or []) + [
-            "SLACK_CHANNEL_ID",
-            "SLACK_THREAD_TS",
-        ]
-
         logger.info(f"Initializing tool {name} with {len(args)} arguments")
-        super().__init__(
+
+        # Create an instance of TerraformModuleTool
+        return cls(
             name=name,
             description=tool_description,
             type="docker",
@@ -257,5 +264,11 @@ python /opt/scripts/{script_name}
             args=args,
             env=env,
             secrets=secrets,
-            with_files=self.with_files
+            with_files=with_files,
+            module_config=module_config,
+            action=action,
+            with_pr=with_pr,
         )
+
+    class Config:
+        arbitrary_types_allowed = True
