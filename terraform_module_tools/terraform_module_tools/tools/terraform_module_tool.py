@@ -243,7 +243,6 @@ python /opt/scripts/{script_name}
         env = (env or []) + [
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
-            *[arg.name for arg in args],
         ]
 
         secrets = (secrets or []) + [
