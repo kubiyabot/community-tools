@@ -240,12 +240,12 @@ python /opt/scripts/{script_name}
         ] + [module_variables_file, prepare_tfvars_file]
 
         # Add environment variables and secrets
-        env = (env or []) + [
+        env = [
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
         ]
 
-        secrets = (secrets or []) + [
+        secrets = [
             "SLACK_API_TOKEN",
             "GH_TOKEN",
         ]
