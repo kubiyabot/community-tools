@@ -186,13 +186,6 @@ class TerraformModuleTool(Tool):
             if script_file.name in scripts_needed or script_file.name == 'terraform_handler.py':
                 script_files[script_file.name] = script_file.read_text()
 
-        # requirements.txt
-        requirements_file = scripts_dir / 'requirements.txt'
-        requirements_content = requirements_file.read_text()
-        script_files['requirements.txt'] = requirements_content
-
-        with_files.append(FileSpec(destination="/opt/scripts/requirements.txt", content=requirements_content))
-
         if not script_files:
             raise ValueError("No script files found")
 
@@ -221,7 +214,7 @@ set -e
 chmod +x /opt/scripts/*.py
 
 # Install required python packages
-pip3 install -r /opt/scripts/requirements.txt > /dev/null 2>&1
+pip3 install slack-sdk pydantic pyyaml requests
 
 # Prepare terraform.tfvars.json
 echo "🔧 Preparing terraform variables..."
