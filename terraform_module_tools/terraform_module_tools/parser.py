@@ -225,18 +225,11 @@ class TerraformModuleParser:
     def _clean_type(self, var_type: Any) -> str:
         """Clean and normalize the variable type."""
         if isinstance(var_type, str):
-            var_type = var_type.replace('${', '').replace('}', '').strip()
-        elif isinstance(var_type, list) and len(var_type) > 0:
-            # Sometimes type comes as a list
-            if isinstance(var_type[0], dict):
-                var_type_dict = var_type[0]
-                if 'type' in var_type_dict:
-                    var_type = var_type_dict['type']
-                    var_type = self._clean_type(var_type)
-                else:
-                    var_type = 'string'
-            else:
-                var_type = str(var_type[0]).replace('${', '').replace('}', '').strip()
+            var_type = var_type.strip().replace('${', '').replace('}', '')
+        elif isinstance(var_type, list) and var_type:
+            var_type = self._clean_type(var_type[0])
+        elif isinstance(var_type, dict) and var_type.get('type'):
+            var_type = self._clean_type(var_type['type'])
         else:
             var_type = 'string'
         return var_type

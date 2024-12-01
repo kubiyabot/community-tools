@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 from ..parser import TerraformModuleParser
 from pydantic import BaseModel, Field
+import json
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -12,27 +13,37 @@ MAX_DESCRIPTION_LENGTH = 1024
 
 def map_terraform_type_to_arg_type(tf_type: str) -> str:
     """Map Terraform types to Kubiya SDK Arg types."""
-    base_type = tf_type.split('(')[0].lower()
+    base_type = tf_type.lower().strip()
 
     if base_type == 'bool':
         return 'bool'
-    elif base_type == 'number':
-        return 'int'  # Map all numbers to int
-
-    # Everything else becomes 'str'
-    return 'str'
+    elif base_type in ['number', 'int', 'float']:
+        return 'int'
+    elif base_type in ['string']:
+        return 'str'
+    elif base_type.startswith('list(') or base_type.startswith('set('):
+        return 'list'
+    elif base_type.startswith('map(') or base_type == 'map':
+        return 'dict'
+    elif base_type == 'any':
+        return 'str'  # Default to str for 'any' type
+    else:
+        # Default to str for complex or unknown types
+        return 'str'
 
 def format_description(description: str, var_type: str, example: str) -> str:
     """Format description with type information and example."""
     formatted = description if description else "No description provided"
 
-    base_type = var_type.split('(')[0].lower()
+    base_type = var_type.lower().strip()
 
-    if base_type in ['list', 'map', 'object', 'set']:
-        formatted += f"\n\nExpects a JSON structure. Example:\n```json\n{example}\n```"
+    if base_type.startswith('list(') or base_type.startswith('set('):
+        formatted += f"\n\nExpects a JSON array. Example:\n```json\n{example}\n```"
+    elif base_type.startswith('map(') or base_type == 'map':
+        formatted += f"\n\nExpects a JSON object. Example:\n```json\n{example}\n```"
     elif base_type == 'bool':
         formatted += f"\n\nExpects a boolean value (`true` or `false`). Example: `{example}`"
-    elif base_type == 'number':
+    elif base_type in ['number', 'int', 'float']:
         formatted += f"\n\nExpects a numeric value. Example: `{example}`"
     else:
         formatted += f"\n\nExample: `{example}`"
@@ -93,14 +104,17 @@ class TerraformModuleTool(Tool):
         args = []
         for var_name, var_config in variables.items():
             try:
+                # Get the cleaned and normalized type
+                var_type = var_config['type']
+
                 # Map to supported type
-                arg_type = map_terraform_type_to_arg_type(var_config['type'])
-                logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
+                arg_type = map_terraform_type_to_arg_type(var_type)
+                logger.debug(f"Mapping variable {var_name} of type {var_type} to {arg_type}")
 
                 # Format description with type info and example
                 description = format_description(
                     var_config.get('description', ''),
-                    var_config['type'],
+                    var_type,
                     var_config['example']
                 )
 
@@ -115,18 +129,17 @@ class TerraformModuleTool(Tool):
 
                 # Add default if present
                 if 'default' in var_config and var_config['default'] is not None:
-                    if arg_type == 'str':
-                        if isinstance(var_config['default'], (dict, list)):
-                            arg.default = json.dumps(var_config['default'])
-                        else:
-                            arg.default = str(var_config['default'])
-                    elif arg_type == 'int':
+                    if arg_type in ['str']:
+                        arg.default = str(var_config['default'])
+                    elif arg_type in ['int']:
                         try:
-                            arg.default = int(float(var_config['default']))
+                            arg.default = int(var_config['default'])
                         except (ValueError, TypeError):
                             logger.warning(f"Could not convert default value for {var_name} to int")
                     elif arg_type == 'bool':
                         arg.default = bool(var_config['default'])
+                    elif arg_type in ['list', 'dict']:
+                        arg.default = json.loads(var_config['default']) if isinstance(var_config['default'], str) else var_config['default']
 
                 args.append(arg)
                 logger.info(f"Added argument: {var_name} ({arg_type})")
