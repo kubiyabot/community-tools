@@ -26,7 +26,7 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
     module_config = {
         'name': config['name'],
         'description': config['description'],
-        'source': config['source'],  # This already contains location, version, path, and auth
+        'source': config['source'],  # Pass the entire source object
         'pre_script': config.get('pre_script')
     }
 
@@ -46,20 +46,29 @@ def initialize_tools():
         module_configs = get_module_configs()
         
         for module_name, config in module_configs.items():
-            # Create plan tool
-            plan_tool = create_terraform_module_tool(config, 'plan')
-            tools[plan_tool.name] = plan_tool
-            tool_registry.register("terraform", plan_tool)
+            try:
+                logger.info(f"Creating tools for module: {module_name}")
+                
+                # Create plan tool
+                plan_tool = create_terraform_module_tool(config, 'plan')
+                tools[plan_tool.name] = plan_tool
+                tool_registry.register("terraform", plan_tool)
 
-            # Create plan with PR tool
-            plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
-            tools[plan_pr_tool.name] = plan_pr_tool
-            tool_registry.register("terraform", plan_pr_tool)
+                # Create plan with PR tool
+                plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
+                tools[plan_pr_tool.name] = plan_pr_tool
+                tool_registry.register("terraform", plan_pr_tool)
 
-            # Create apply tool
-            apply_tool = create_terraform_module_tool(config, 'apply')
-            tools[apply_tool.name] = apply_tool
-            tool_registry.register("terraform", apply_tool)
+                # Create apply tool
+                apply_tool = create_terraform_module_tool(config, 'apply')
+                tools[apply_tool.name] = apply_tool
+                tool_registry.register("terraform", apply_tool)
+                
+                logger.info(f"Successfully created tools for module: {module_name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+                continue
 
         return list(tools.values())
         
