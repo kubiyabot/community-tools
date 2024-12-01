@@ -84,10 +84,6 @@ def handle_repository(source_config: Dict[str, Any], workspace: WorkspaceManager
         if module_dir.exists():
             shutil.rmtree(module_dir)
         shutil.copytree(location, module_dir)
-
-    # Handle subfolder if specified
-    if source_type == 'git' and source_config.get('git_config', {}).get('subfolder'):
-        return module_dir / source_config['git_config']['subfolder']
     
     return module_dir
 
