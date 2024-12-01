@@ -8,52 +8,49 @@ from ..parser import TerraformModuleParser
 
 logger = logging.getLogger(__name__)
 
+MAX_DESCRIPTION_LENGTH = 1024
+
 def map_terraform_type_to_arg_type(tf_type: str) -> str:
     """Map Terraform types to Kubiya SDK Arg types."""
-    # Extract base type and nested type if present
+    # Only use supported types: "str", "bool", "int"
     base_type = tf_type.split('(')[0].lower()
-    nested_type = None
-    if '(' in tf_type and ')' in tf_type:
-        nested_type = tf_type[tf_type.index('(')+1:tf_type.rindex(')')].lower()
-
-    # Map to valid Arg types: "str", "array", "bool", "int", "float"
+    
     if base_type == 'bool':
         return 'bool'
     elif base_type == 'number':
-        if '.' in str(base_type) or nested_type == 'float':
-            return 'float'
-        return 'int'
-    elif base_type in ['list', 'set']:
-        return 'array'
-    elif base_type == 'string':
-        return 'str'
+        return 'int'  # Map all numbers to int
     
-    # All complex types (map, object) default to str (will be passed as JSON)
+    # Everything else (string, list, map, object) becomes str
     return 'str'
+
+def truncate_description(description: str) -> str:
+    """Truncate description to max length."""
+    if len(description) > MAX_DESCRIPTION_LENGTH:
+        return description[:MAX_DESCRIPTION_LENGTH-3] + "..."
+    return description
 
 def generate_example(var_name: str, tf_type: str) -> Any:
     """Generate example value based on variable name and type."""
     base_type = tf_type.split('(')[0].lower()
     
-    # Common patterns in variable names
+    if base_type == 'bool':
+        return True
+    elif base_type == 'number':
+        return 42
+    elif base_type in ['list', 'set']:
+        return '["value1", "value2"]'  # JSON string for arrays
+    elif base_type == 'map':
+        return '{"key": "value"}'  # JSON string for maps
+    elif base_type == 'object':
+        return '{"field": "value"}'  # JSON string for objects
+    
+    # Common patterns for string values
     if 'name' in var_name:
         return "example-name"
     elif 'cidr' in var_name:
         return "10.0.0.0/16"
     elif 'region' in var_name:
         return "us-west-2"
-    elif 'enabled' in var_name or base_type == 'bool':
-        return True
-    elif base_type == 'number':
-        if '.' in str(base_type):
-            return 42.0
-        return 42
-    elif base_type in ['list', 'set']:
-        return ["value1", "value2"]
-    elif base_type == 'map':
-        return json.dumps({"key1": "value1", "key2": "value2"})
-    elif base_type == 'object':
-        return json.dumps({"field1": "value1", "field2": "value2"})
     
     return "example-value"
 
@@ -65,17 +62,18 @@ def get_default_value(var_config: Dict[str, Any], arg_type: str) -> Any:
     default = var_config['default']
     
     if arg_type == 'str':
+        if isinstance(default, (dict, list)):
+            return json.dumps(default)  # Convert complex types to JSON string
         return str(default)
     elif arg_type == 'int':
-        return int(default)
-    elif arg_type == 'float':
-        return float(default)
+        try:
+            return int(float(default))  # Handle both int and float defaults
+        except (ValueError, TypeError):
+            return None
     elif arg_type == 'bool':
         return bool(default)
-    elif arg_type == 'array':
-        return list(default)
     
-    return default
+    return None
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -89,7 +87,7 @@ class TerraformModuleTool(Tool):
         env: List[str] = None,
         secrets: List[str] = None,
     ):
-        # Auto-discover variables from the source
+        # Auto-discover variables
         try:
             parser = TerraformModuleParser(
                 source_url=module_config['source']['location'],
@@ -98,7 +96,6 @@ class TerraformModuleTool(Tool):
             )
             variables, warnings, errors = parser.get_variables()
             
-            # Log any warnings or errors
             for warning in warnings:
                 logger.warning(f"Variable discovery warning: {warning}")
             for error in errors:
@@ -108,13 +105,8 @@ class TerraformModuleTool(Tool):
             logger.error(f"Failed to auto-discover variables: {str(e)}")
             variables = {}
 
-        # Prepare content based on action
-        if action == 'plan':
-            script_name = 'plan.py' if not with_pr else 'plan_with_pr.py'
-        else:
-            script_name = f'{action}.py'
-
-        # Add pre-script if provided
+        # Prepare script content
+        script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
         pre_script = module_config.get('pre_script', '')
         if pre_script:
             pre_script = f"\n# Run pre-script\ncat > /tmp/pre_script.sh << 'EOF'\n{pre_script}\nEOF\nchmod +x /tmp/pre_script.sh\n/tmp/pre_script.sh || exit 1\n"
@@ -133,32 +125,28 @@ fi
 python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .variables | toJson }}}}' || exit 1
 """
 
-        # Convert discovered variables to tool arguments
+        # Convert variables to args
         args = []
         for var_name, var_config in variables.items():
-            # Map Terraform type to Kubiya SDK Arg type
+            # Map to supported type
             arg_type = map_terraform_type_to_arg_type(var_config['type'])
             
-            # Generate example value
+            # Generate example
             example = generate_example(var_name, var_config['type'])
             
-            # Get properly typed default value
+            # Get properly typed default
             default = get_default_value(var_config, arg_type)
             
-            # Create argument with enhanced description
-            description = (
-                f"{var_config['description']}\n\n"
-                f"Type: `{var_config['type']}`"
+            # Create short description
+            description = truncate_description(
+                f"{var_config['description']} (Type: {var_config['type']})"
             )
             
-            if var_config.get('validation_rules'):
-                description += "\nValidation Rules:\n" + "\n".join(
-                    f"- {rule}" for rule in var_config['validation_rules']
-                )
-            
-            # For complex types, add JSON format hint
+            # Add JSON hint for complex types
             if var_config['type'] not in ['string', 'number', 'bool']:
-                description += "\n\nInput should be a valid JSON string."
+                description = truncate_description(
+                    f"{description}\nProvide as JSON string"
+                )
             
             args.append(
                 Arg(
@@ -166,8 +154,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
                     description=description,
                     type=arg_type,
                     required=var_config.get('required', False),
-                    default=default,
-                    example=example
+                    default=default
                 )
             )
 
@@ -182,7 +169,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         env = (env or []) + [
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
-            "GIT_TOKEN",  # For PR creation if needed
+            "GIT_TOKEN",
         ]
         
         secrets = (secrets or []) + [
