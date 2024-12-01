@@ -3,6 +3,24 @@ from typing import List, Dict, Any
 import os
 from pathlib import Path
 
+def map_terraform_type_to_arg_type(tf_type: str) -> str:
+    """Map Terraform types to Kubiya SDK Arg types."""
+    # Remove any nested type information (e.g., list(string) -> list)
+    base_type = tf_type.split('(')[0].lower()
+    
+    type_mapping = {
+        'string': 'str',
+        'number': 'float',
+        'bool': 'bool',
+        'list': 'array',
+        'set': 'array',
+        'map': 'str',  # Maps will be passed as JSON strings
+        'object': 'str',  # Complex objects will be passed as JSON strings
+        'any': 'str',
+    }
+    
+    return type_mapping.get(base_type, 'str')
+
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
     def __init__(
@@ -22,6 +40,9 @@ class TerraformModuleTool(Tool):
             script_name = f'{action}.py'
 
         content = f"""
+# Install required packages
+pip install -q slack_sdk requests
+
 # Download hcl2json if needed
 if ! command -v hcl2json &> /dev/null; then
     curl -L -o /usr/local/bin/hcl2json https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64
@@ -35,11 +56,15 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         # Convert module variables to tool arguments
         args = []
         for var_name, var_config in module_config['variables'].items():
+            # Map Terraform type to Kubiya SDK Arg type
+            arg_type = map_terraform_type_to_arg_type(var_config['type'])
+            
+            # Create argument
             args.append(
                 Arg(
                     name=var_name,
                     description=var_config['description'],
-                    type=var_config['type'].split('(')[0],  # Handle list(string) -> list
+                    type=arg_type,
                     required=var_config.get('required', False),
                     default=var_config.get('default')
                 )
@@ -52,6 +77,17 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             if script_file.name.endswith('.py'):
                 script_files[script_file.name] = script_file.read_text()
 
+        # Add common environment variables and secrets
+        env = (env or []) + [
+            "SLACK_CHANNEL_ID",
+            "SLACK_THREAD_TS",
+            "GIT_TOKEN",  # For PR creation if needed
+        ]
+        
+        secrets = (secrets or []) + [
+            "SLACK_API_TOKEN",
+        ]
+
         super().__init__(
             name=name,
             description=description,
@@ -59,8 +95,8 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             image="hashicorp/terraform:latest",
             content=content,
             args=args,
-            env=env or [],
-            secrets=secrets or [],
+            env=env,
+            secrets=secrets,
             with_files=[
                 FileSpec(
                     destination=f"/opt/scripts/{script_name}",
