@@ -44,8 +44,8 @@ def load_terraform_tools(config_dir: str = None):
                 # Parse module variables
                 parser = TerraformModuleParser(
                     source_url=config['source']['location'],
-                    ref=config['source'].get('git_config', {}).get('ref'),
-                    subfolder=config['source'].get('git_config', {}).get('subfolder')
+                    ref=config['source'].get('version'),
+                    path=config['source'].get('path')
                 )
                 
                 variables, warnings, errors = parser.get_variables()
