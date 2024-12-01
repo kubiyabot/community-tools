@@ -4,7 +4,7 @@ import os
 import json
 import logging
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from ..parser import TerraformModuleParser
 
 logger = logging.getLogger(__name__)
@@ -69,9 +69,10 @@ class TerraformModuleTool(Tool):
     module_config: Dict[str, Any]
     action: str = 'plan'
     with_pr: bool = False
-    env: List[str] = []
-    secrets: List[str] = []
-    with_files: List[FileSpec] = []
+    env: List[str] = Field(default_factory=list)
+    secrets: List[str] = Field(default_factory=list)
+    with_files: List[FileSpec] = Field(default_factory=list)
+    mermaid: str = ''
 
     @classmethod
     def from_module_config(
@@ -81,9 +82,15 @@ class TerraformModuleTool(Tool):
         module_config: Dict[str, Any],
         action: str = 'plan',
         with_pr: bool = False,
-        env: List[str] = [],
-        secrets: List[str] = [],
+        env: Optional[List[str]] = None,
+        secrets: Optional[List[str]] = None,
     ) -> 'TerraformModuleTool':
+        if env is None:
+            env = []
+        if secrets is None:
+            secrets = []
+        mermaid = ''
+
         logger.info(f"Creating tool for module: {name}")
 
         if not module_config.get('source', {}).get('location'):
@@ -239,16 +246,23 @@ python /opt/scripts/{script_name}
             for script_name, script_content in script_files.items()
         ] + [module_variables_file, prepare_tfvars_file]
 
-        # Add environment variables and secrets
-        env = [
+        # Ensure that env and secrets are lists
+        env.extend([
             "SLACK_CHANNEL_ID",
             "SLACK_THREAD_TS",
-        ]
+        ])
 
-        secrets = [
+        secrets.extend([
             "SLACK_API_TOKEN",
             "GH_TOKEN",
-        ]
+        ])
+
+        # Prepare the mermaid diagram if needed
+        mermaid = f"""
+        flowchart TD
+            User -->|Starts| Terraform_{action}
+            Terraform_{action} -->|Uses| Module["{module_config['name']}"]
+        """
 
         logger.info(f"Initializing tool {name} with {len(args)} arguments")
 
@@ -267,6 +281,7 @@ python /opt/scripts/{script_name}
             module_config=module_config,
             action=action,
             with_pr=with_pr,
+            mermaid=mermaid,  # Set the mermaid diagram
         )
 
     class Config:
