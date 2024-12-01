@@ -116,7 +116,7 @@ class TerraformModuleParser:
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=10  # Add timeout to prevent hanging
+                timeout=10
             )
             
             tf_json = json.loads(result.stdout)
@@ -125,24 +125,26 @@ class TerraformModuleParser:
             if 'variable' in tf_json:
                 var_blocks = tf_json['variable']
                 
-                # Process variables in parallel for large files
-                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                    future_to_var = {
-                        executor.submit(self._process_variable, var_name, var_config): var_name
-                        for var_name, var_config in (
-                            var_blocks.items() if isinstance(var_blocks, dict)
-                            else ((list(var.keys())[0], list(var.values())[0]) for var in var_blocks)
-                        )
-                    }
-                    
-                    for future in as_completed(future_to_var):
-                        var_name = future_to_var[future]
-                        try:
-                            result = future.result()
-                            if result:
-                                variables[var_name] = result
-                        except Exception as e:
-                            logger.warning(f"Failed to process variable {var_name}: {str(e)}")
+                # Handle both list and dict formats
+                if isinstance(var_blocks, dict):
+                    # Direct dictionary format
+                    for var_name, var_config in var_blocks.items():
+                        if isinstance(var_config, list):
+                            # Take first element if it's a list
+                            var_config = var_config[0] if var_config else {}
+                        processed_var = self._process_variable(var_name, var_config)
+                        if processed_var:
+                            variables[var_name] = processed_var
+                elif isinstance(var_blocks, list):
+                    # List of single-key dictionaries format
+                    for var_block in var_blocks:
+                        if isinstance(var_block, dict):
+                            for var_name, var_config in var_block.items():
+                                if isinstance(var_config, list):
+                                    var_config = var_config[0] if var_config else {}
+                                processed_var = self._process_variable(var_name, var_config)
+                                if processed_var:
+                                    variables[var_name] = processed_var
 
             return variables
 
@@ -194,36 +196,35 @@ class TerraformModuleParser:
 
         return variables, self.warnings, self.errors
 
-    def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process individual variable configuration."""
-        if not isinstance(var_config, dict):
-            error_msg = f"Invalid variable config format for {var_name}: {var_config}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        try:
+            # Extract type, default, and description
+            var_type = var_config.get('type', 'string')
+            default = var_config.get('default')
+            description = var_config.get('description', '')
 
-        # Extract type, default, and description
-        var_type = var_config.get('type', 'string')
-        default = var_config.get('default')
-        description = var_config.get('description', '')
+            # Clean up type string (remove interpolation syntax if any)
+            if isinstance(var_type, str):
+                var_type = re.sub(r'^\${(.*)}$', r'\1', var_type)
+                var_type = var_type.strip()
 
-        # Clean up type string (remove interpolation syntax if any)
-        if isinstance(var_type, str):
-            var_type = re.sub(r'^\${(.*)}$', r'\1', var_type)
-            var_type = var_type.strip()
+            # Handle complex types by defaulting to 'string'
+            if var_type not in ['string', 'str', 'number', 'bool']:
+                logger.warning(f"Complex type '{var_type}' for variable '{var_name}' will be handled as 'string'")
+                var_type = 'str'
 
-        # Handle complex types by defaulting to 'string'
-        if var_type not in ['string', 'str', 'number', 'bool']:
-            logger.warning(f"Unsupported variable type '{var_type}' for variable '{var_name}'. Defaulting type to 'string'.")
-            var_type = 'str'
+            # Determine if variable is required
+            required = 'default' not in var_config
 
-        # Determine if variable is required
-        required = 'default' not in var_config
+            processed_var = {
+                'type': var_type,
+                'description': description,
+                'default': default if default is not None else None,
+                'required': required
+            }
+            return processed_var
 
-        processed_var = {
-            'type': var_type,
-            'description': description,
-            'default': default if default is not None else None,
-            'required': required
-        }
-        logger.debug(f"Processed variable {var_name}: {processed_var}")
-        return processed_var
+        except Exception as e:
+            logger.warning(f"Failed to process variable {var_name}: {str(e)}")
+            return None
