@@ -61,13 +61,16 @@ class TerraformModuleTool(Tool):
         if not module_config.get('source', {}).get('location'):
             raise ValueError(f"Module {name} is missing source location")
 
+        # Assign module_config to an instance variable
+        self.module_config = module_config
+
         # Auto-discover variables
         try:
-            logger.info(f"Discovering variables from: {module_config['source']['location']}")
+            logger.info(f"Discovering variables from: {self.module_config['source']['location']}")
             parser = TerraformModuleParser(
-                source_url=module_config['source']['location'],
-                ref=module_config['source'].get('version'),
-                path=module_config['source'].get('path')
+                source_url=self.module_config['source']['location'],
+                ref=self.module_config['source'].get('version'),
+                path=self.module_config['source'].get('path')
             )
             variables, warnings, errors = parser.get_variables()
 
@@ -138,7 +141,7 @@ class TerraformModuleTool(Tool):
 
         # Prepare script content
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
-        pre_script = module_config.get('pre_script', '')
+        pre_script = self.module_config.get('pre_script', '')
         if pre_script:
             pre_script = (
                 f"\n# Run pre-script\n"
