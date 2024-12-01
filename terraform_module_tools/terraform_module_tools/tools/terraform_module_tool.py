@@ -79,8 +79,8 @@ fi
 python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .variables | toJson }}}}' || exit 1
 """
 
-        # Convert variables to args
-        args = {}  # Using dict instead of list for args
+        # Convert variables to args list
+        args = []
         for var_name, var_config in variables.items():
             # Map to supported type
             arg_type = map_terraform_type_to_arg_type(var_config['type'])
@@ -96,25 +96,30 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
                     f"{description}\nProvide as JSON string"
                 )
             
-            # Create arg as dict entry
-            args[var_name] = {
-                "name": var_name,
-                "description": description,
-                "type": arg_type,
-                "required": var_config.get('required', False)
-            }
+            # Create Arg object
+            arg = Arg(
+                name=var_name,
+                description=description,
+                type=arg_type,
+                required=var_config.get('required', False)
+            )
             
             # Add default if present
             if 'default' in var_config:
                 if arg_type == 'str':
-                    args[var_name]["default"] = str(var_config['default'])
+                    if isinstance(var_config['default'], (dict, list)):
+                        arg.default = json.dumps(var_config['default'])
+                    else:
+                        arg.default = str(var_config['default'])
                 elif arg_type == 'int':
                     try:
-                        args[var_name]["default"] = int(float(var_config['default']))
+                        arg.default = int(float(var_config['default']))
                     except (ValueError, TypeError):
                         pass
                 elif arg_type == 'bool':
-                    args[var_name]["default"] = bool(var_config['default'])
+                    arg.default = bool(var_config['default'])
+            
+            args.append(arg)
 
         # Get script files
         script_files = {}
@@ -141,7 +146,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             image="hashicorp/terraform:latest",
             content=content,
             icon_url="https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
-            args=args,  # Pass args as dict
+            args=args,  # Pass args as list of Arg objects
             env=env,
             secrets=secrets,
             with_files=[
