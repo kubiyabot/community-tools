@@ -16,49 +16,44 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
     if '(' in tf_type and ')' in tf_type:
         nested_type = tf_type[tf_type.index('(')+1:tf_type.rindex(')')].lower()
 
-    # Direct type mappings
-    if base_type == 'string':
-        return 'string'
+    # Direct type mappings - using only supported Kubiya SDK types
+    if base_type == 'bool':
+        return 'bool'
     elif base_type == 'number':
-        return 'number'
-    elif base_type == 'bool':
-        return 'boolean'
+        if '.' in str(base_type) or nested_type == 'float':
+            return 'float'
+        return 'int'
     elif base_type in ['list', 'set']:
-        # For lists and sets, we'll accept string input and parse it as JSON
-        return 'string'
-    elif base_type == 'map':
-        # For maps, we'll accept string input and parse it as JSON
-        return 'string'
-    elif base_type == 'object':
-        # For complex objects, we'll accept string input and parse it as JSON
-        return 'string'
+        if nested_type in ['number', 'float', 'int']:
+            return 'array'  # For numeric arrays
+        return 'array'  # For string arrays
     
-    # Default to string for unknown types
-    return 'string'
+    # Default to str for all other types (string, map, object)
+    return 'str'
 
-def generate_example(var_name: str, tf_type: str) -> str:
+def generate_example(var_name: str, tf_type: str) -> Any:
     """Generate example value based on variable name and type."""
     base_type = tf_type.split('(')[0].lower()
     
     # Common patterns in variable names
     if 'name' in var_name:
-        return 'example-name'
+        return "example-name"
     elif 'cidr' in var_name:
-        return '10.0.0.0/16'
+        return "10.0.0.0/16"
     elif 'region' in var_name:
-        return 'us-west-2'
+        return "us-west-2"
     elif 'enabled' in var_name or base_type == 'bool':
-        return 'true'
+        return True
     elif base_type == 'number':
-        return '42'
+        return 42
     elif base_type in ['list', 'set']:
-        return '["value1", "value2"]'
+        return ["value1", "value2"]
     elif base_type == 'map':
-        return '{"key1": "value1", "key2": "value2"}'
+        return {"key1": "value1", "key2": "value2"}
     elif base_type == 'object':
-        return '{"field1": "value1", "field2": "value2"}'
+        return {"field1": "value1", "field2": "value2"}
     
-    return 'example-value'
+    return "example-value"
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -128,8 +123,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             # Create argument with enhanced description
             description = (
                 f"{var_config['description']}\n\n"
-                f"Type: `{var_config['type']}`\n"
-                f"Example: `{example}`"
+                f"Type: `{var_config['type']}`"
             )
             
             if var_config.get('validation_rules'):
@@ -141,16 +135,31 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             if var_config['type'] not in ['string', 'number', 'bool']:
                 description += "\n\nInput should be a valid JSON string."
             
-            args.append(
-                Arg(
-                    name=var_name,
-                    description=description,
-                    type=arg_type,
-                    required=var_config.get('required', False),
-                    default=var_config.get('default'),
-                    example=example
+            # Create argument with proper type and handling
+            if arg_type == 'array':
+                # For arrays, we need to specify item type
+                args.append(
+                    Arg(
+                        name=var_name,
+                        description=description,
+                        type='array',
+                        required=var_config.get('required', False),
+                        default=var_config.get('default', []),
+                        example=example
+                    )
                 )
-            )
+            else:
+                # For other types, use direct mapping
+                args.append(
+                    Arg(
+                        name=var_name,
+                        description=description,
+                        type=arg_type,
+                        required=var_config.get('required', False),
+                        default=var_config.get('default'),
+                        example=example
+                    )
+                )
 
         # Get script files
         script_files = {}
@@ -176,6 +185,7 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             type="docker",
             image="hashicorp/terraform:latest",
             content=content,
+            icon_url="https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
             args=args,
             env=env,
             secrets=secrets,
