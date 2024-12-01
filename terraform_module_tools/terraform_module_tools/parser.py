@@ -152,17 +152,19 @@ class TerraformModuleParser:
         # Handle variable blocks
         if 'variable' in tf_json:
             var_blocks = tf_json['variable']
-            logger.debug(f"Raw variable blocks: {json.dumps(var_blocks, indent=2)}")
+            logger.debug(f"Raw variable blocks from {file_path}: {json.dumps(var_blocks, indent=2)}")
             
             # Handle both list and dict formats from hcl2json
             if isinstance(var_blocks, list):
                 # Handle list format where each item is a dict with a single key
                 for var_block in var_blocks:
                     if not isinstance(var_block, dict):
+                        logger.warning(f"Skipping invalid variable block: {var_block}")
                         continue
                     
                     for var_name, var_config in var_block.items():
                         if not isinstance(var_config, dict):
+                            logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
                             continue
                         
                         # Clean up type string (handle ${type} format)
@@ -171,25 +173,32 @@ class TerraformModuleParser:
                             var_type = var_type.replace('${', '').replace('}', '')
                         elif isinstance(var_type, list) and len(var_type) > 0:
                             # Sometimes type comes as a list with one item
-                            type_value = var_type[0].get('type', 'string')
-                            var_type = type_value.replace('${', '').replace('}', '')
+                            if isinstance(var_type[0], dict):
+                                type_value = var_type[0].get('type', 'string')
+                                var_type = type_value.replace('${', '').replace('}', '')
+                            else:
+                                var_type = str(var_type[0]).replace('${', '').replace('}', '')
+                        
+                        # Generate example value based on type
+                        example = self._generate_example(var_name, var_type, var_config)
                         
                         variables[var_name] = {
                             'type': var_type,
                             'description': var_config.get('description', ''),
                             'default': var_config.get('default'),
-                            'required': 'default' not in var_config
+                            'required': 'default' not in var_config,
+                            'example': example
                         }
-                        logger.debug(f"Processed variable {var_name}: {variables[var_name]}")
+                        logger.debug(f"Added variable {var_name}: {variables[var_name]}")
             else:
                 # Handle dict format
                 if not isinstance(var_blocks, dict):
-                    error_msg = f"Invalid variables format: expected dict, got {type(var_blocks)}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+                    logger.warning(f"Skipping invalid variables format: {type(var_blocks)}")
+                    return variables
                 
                 for var_name, var_config in var_blocks.items():
                     if not isinstance(var_config, dict):
+                        logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
                         continue
                     
                     # Clean up type string (handle ${type} format)
@@ -198,17 +207,78 @@ class TerraformModuleParser:
                         var_type = var_type.replace('${', '').replace('}', '')
                     elif isinstance(var_type, list) and len(var_type) > 0:
                         # Sometimes type comes as a list with one item
-                        type_value = var_type[0].get('type', 'string')
-                        var_type = type_value.replace('${', '').replace('}', '')
+                        if isinstance(var_type[0], dict):
+                            type_value = var_type[0].get('type', 'string')
+                            var_type = type_value.replace('${', '').replace('}', '')
+                        else:
+                            var_type = str(var_type[0]).replace('${', '').replace('}', '')
+                    
+                    # Generate example value based on type
+                    example = self._generate_example(var_name, var_type, var_config)
                     
                     variables[var_name] = {
                         'type': var_type,
                         'description': var_config.get('description', ''),
                         'default': var_config.get('default'),
-                        'required': 'default' not in var_config
+                        'required': 'default' not in var_config,
+                        'example': example
                     }
-                    logger.debug(f"Processed variable {var_name}: {variables[var_name]}")
+                    logger.debug(f"Added variable {var_name}: {variables[var_name]}")
 
-            logger.debug(f"Found variables: {json.dumps(variables, indent=2)}")
+            logger.debug(f"Found {len(variables)} variables in {file_path}")
 
         return variables
+
+    def _generate_example(self, var_name: str, var_type: str, var_config: Dict[str, Any]) -> str:
+        """Generate example value based on variable name and type."""
+        # Check for default value first
+        if 'default' in var_config:
+            if isinstance(var_config['default'], (dict, list)):
+                return json.dumps(var_config['default'], indent=2)
+            return str(var_config['default'])
+
+        # Handle different types
+        base_type = var_type.split('(')[0].lower()
+        
+        # Common patterns in variable names
+        if 'name' in var_name:
+            return '"example-name"'
+        elif 'cidr' in var_name:
+            return '"10.0.0.0/16"'
+        elif 'region' in var_name:
+            return '"us-west-2"'
+        elif 'enabled' in var_name or base_type == 'bool':
+            return 'true'
+        elif base_type == 'number':
+            return '42'
+        
+        # Complex types
+        elif base_type == 'list':
+            if 'string' in var_type:
+                return '["value1", "value2"]'
+            elif 'number' in var_type:
+                return '[1, 2, 3]'
+            elif 'bool' in var_type:
+                return '[true, false]'
+            return '["example1", "example2"]'
+        
+        elif base_type == 'map':
+            if 'string' in var_type:
+                return '{"key1": "value1", "key2": "value2"}'
+            elif 'number' in var_type:
+                return '{"key1": 1, "key2": 2}'
+            elif 'bool' in var_type:
+                return '{"key1": true, "key2": false}'
+            return '{"example_key": "example_value"}'
+        
+        elif base_type == 'object':
+            return '''{
+  "field1": "value1",
+  "field2": "value2",
+  "nested": {
+    "key": "value"
+  }
+}'''
+        
+        # Default to string
+        return '"example-value"'
