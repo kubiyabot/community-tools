@@ -200,3 +200,30 @@ class TerraformModuleParser:
             logger.debug(f"Found variables: {json.dumps(variables, indent=2)}")
 
         return variables
+
+    def parse_variable_block(self, block_content: str) -> Dict[str, Any]:
+        """Parse a Terraform variable block and return its configuration."""
+
+        # ... existing code ...
+
+        # Handle complex types by defaulting to 'str'
+        var_type = config.get('type', 'string')
+        if var_type not in ['string', 'str', 'number', 'bool']:
+            logger.warning(f"Unsupported variable type '{var_type}' for variable '{var_name}'. Defaulting type to 'string'.")
+            var_type = 'string'
+
+        config['type'] = var_type
+
+        # ... existing code ...
+
+    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Get variables from variables.tf file."""
+
+        # ... existing code ...
+
+        # Ensure variable descriptions are captured
+        for var_name, var_config in variables.items():
+            if 'description' not in var_config or not var_config['description']:
+                var_config['description'] = 'No description provided'
+
+        return variables, warnings, errors

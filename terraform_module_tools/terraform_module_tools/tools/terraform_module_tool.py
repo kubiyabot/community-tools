@@ -13,16 +13,17 @@ MAX_DESCRIPTION_LENGTH = 1024
 
 def map_terraform_type_to_arg_type(tf_type: str) -> str:
     """Map Terraform types to Kubiya SDK Arg types."""
-    # Only use supported types: "str", "bool", "int"
     base_type = tf_type.split('(')[0].lower()
     
     if base_type == 'bool':
         return 'bool'
     elif base_type == 'number':
         return 'int'  # Map all numbers to int
-    
-    # Everything else (string, list, map, object) becomes str
-    return 'str'
+    elif base_type in ['string', 'str']:
+        return 'str'
+    else:
+        # Fallback to 'str' for complex or unsupported types
+        return 'str'
 
 def truncate_description(description: str) -> str:
     """Truncate description to max length."""
@@ -31,6 +32,14 @@ def truncate_description(description: str) -> str:
     if len(description) > MAX_DESCRIPTION_LENGTH:
         return description[:MAX_DESCRIPTION_LENGTH-3] + "..."
     return description
+
+def generate_arg_example(var_type: str) -> str:
+    """Generate an example input for complex variable types."""
+    # Provide a JSON example for complex types
+    example_value = {
+        "key": "value"
+    }
+    return json.dumps(example_value)
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -84,16 +93,16 @@ class TerraformModuleTool(Tool):
                 arg_type = map_terraform_type_to_arg_type(var_config['type'])
                 logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
                 
-                # Create short description
-                description = truncate_description(
-                    f"{var_config.get('description', 'No description')} (Type: {var_config['type']})"
-                )
+                # Inherit variable description
+                description = var_config.get('description', 'No description provided')
                 
-                # Add JSON hint for complex types
-                if var_config['type'] not in ['string', 'number', 'bool']:
-                    description = truncate_description(
-                        f"{description}\nProvide as JSON string"
-                    )
+                # Add example for complex types
+                if arg_type == 'str' and var_config['type'] not in ['string', 'str', 'number', 'bool']:
+                    example_input = generate_arg_example(var_config['type'])
+                    description += f"\n\nExample input (as JSON string): `{example_input}`"
+                
+                # Truncate description if necessary
+                description = truncate_description(description)
                 
                 # Create Arg object
                 arg = Arg(
@@ -168,6 +177,10 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         secrets = (secrets or []) + [
             "SLACK_API_TOKEN",
         ]
+
+        # Include reference to README.md in the tool description if it exists
+        if parser.readme_url:
+            description += f"\n\nFor more details, please refer to the [module's README.md]({parser.readme_url})."
 
         logger.info(f"Initializing tool {name} with {len(args)} arguments")
         super().__init__(
