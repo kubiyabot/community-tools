@@ -8,50 +8,47 @@ import re
 import glob
 import shutil
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
+
 logger = logging.getLogger(__name__)
 
-HCL2JSON_PATH = '/usr/local/bin/hcl2json'
-
-if not os.path.exists(HCL2JSON_PATH):
-    # Download using requests
-    response = requests.get('https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64')
-    with open(HCL2JSON_PATH, 'wb') as f:
-        f.write(response.content)
-    os.chmod(HCL2JSON_PATH, 0o755)
-
-# if the binary is not found, raise an error
-if not os.path.exists(HCL2JSON_PATH):
-    raise ValueError("hcl2json binary not found. The discovery process has tried to install it directly but failed. Please install it manually on the base image of the tool manager SDK container on namespace kubiya on your cluster.")
+# Cache the hcl2json binary download
+@lru_cache(maxsize=1)
+def ensure_hcl2json():
+    HCL2JSON_PATH = '/usr/local/bin/hcl2json'
+    if not os.path.exists(HCL2JSON_PATH):
+        response = requests.get('https://github.com/tmccombs/hcl2json/releases/download/v0.6.4/hcl2json_linux_amd64')
+        with open(HCL2JSON_PATH, 'wb') as f:
+            f.write(response.content)
+        os.chmod(HCL2JSON_PATH, 0o755)
+    return HCL2JSON_PATH
 
 class TerraformModuleParser:
     def __init__(
         self,
         source_url: str,
         ref: Optional[str] = None,
-        path: Optional[str] = None
+        path: Optional[str] = None,
+        max_workers: int = 4  # Number of parallel workers
     ):
-        """Initialize parser with GitHub source.
-        
-        Args:
-            source_url: Module source (e.g., 'terraform-aws-modules/vpc/aws')
-            ref: Git reference (e.g., 'v5.1.2')
-            path: Path to module within repository
-        """
         self.source_url = source_url
         self.ref = ref
         self.path = path
         self.warnings = []
         self.errors = []
-        self.readme_url = None  # To store README.md URL if it exists
-        self.module_dir = None  # Will be set after cloning
+        self.readme_url = None
+        self.module_dir = None
+        self.max_workers = max_workers
         self._clone_repository()
+        ensure_hcl2json()
 
+    @lru_cache(maxsize=128)
     def _get_github_url(self) -> str:
-        """Convert module source to GitHub URL."""
+        """Convert module source to GitHub URL with caching."""
         if self.source_url.startswith(('http://', 'https://', 'git@')):
             return self.source_url
 
-        # Handle terraform-aws-modules format
         if self.source_url.startswith('terraform-aws-modules/'):
             parts = self.source_url.split('/')
             if len(parts) != 3:
@@ -62,143 +59,140 @@ class TerraformModuleParser:
         raise ValueError(f"Unsupported source format: {self.source_url}")
 
     def _clone_repository(self) -> None:
-        """Clone the repository and set the module directory."""
+        """Clone the repository with optimized git operations."""
         github_url = self._get_github_url()
         temp_dir = tempfile.mkdtemp()
 
         try:
             logger.info(f"Cloning repository: {github_url}")
-            subprocess.run(['git', 'clone', github_url, temp_dir], check=True)
-
+            # Use shallow clone to speed up the process
+            clone_cmd = [
+                'git', 'clone', '--depth', '1', 
+                '--single-branch'
+            ]
+            
             if self.ref:
-                logger.info(f"Checking out ref: {self.ref}")
-                subprocess.run(['git', '-C', temp_dir, 'checkout', self.ref], check=True)
-
-            # Set the module directory based on the provided path
-            if self.path:
-                self.module_dir = os.path.join(temp_dir, self.path)
-                if not os.path.exists(self.module_dir):
-                    error_msg = f"Specified path '{self.path}' does not exist in the repository"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+                clone_cmd.extend(['--branch', self.ref])
+            
+            if "GH_TOKEN" in os.environ:
+                auth_url = github_url.replace(
+                    "https://github.com",
+                    f"https://{os.environ['GH_TOKEN']}@github.com"
+                )
+                clone_cmd.append(auth_url)
             else:
-                self.module_dir = temp_dir
+                clone_cmd.append(github_url)
+            
+            clone_cmd.append(str(temp_dir))
+            
+            subprocess.run(clone_cmd, check=True, capture_output=True)
+            
+            # Set the module directory
+            self.module_dir = os.path.join(temp_dir, self.path or '')
+            if self.path and not os.path.exists(self.module_dir):
+                raise ValueError(f"Specified path '{self.path}' does not exist")
 
-            logger.info(f"Repository cloned to: {self.module_dir}")
-
-            # Optionally, set the README URL
+            # Set README URL if exists
             readme_path = os.path.join(self.module_dir, 'README.md')
             if os.path.exists(readme_path):
-                self.readme_url = os.path.join(github_url.replace('.git', ''), 'blob', self.ref or 'master', self.path or '', 'README.md')
-                logger.info(f"README.md found at: {self.readme_url}")
+                self.readme_url = os.path.join(
+                    github_url.replace('.git', ''),
+                    'blob',
+                    self.ref or 'master',
+                    self.path or '',
+                    'README.md'
+                )
 
         except subprocess.CalledProcessError as e:
             error_msg = f"Failed to clone repository {github_url}: {e.stderr}"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Parse variables from Terraform module."""
-        variables = {}
-        warnings = []
-        errors = []
-
-        try:
-            # Search for all .tf files in the module directory recursively
-            tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
-            if not tf_files:
-                errors.append("No .tf files found in module")
-            else:
-                for tf_file in tf_files:
-                    logger.info(f"Parsing variables from: {tf_file}")
-                    vars_in_file = self._parse_variables_file(tf_file)
-                    variables.update(vars_in_file)
-            if not variables:
-                errors.append("No variables found in module")
-        except Exception as e:
-            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
-            errors.append(f"Failed to get variables: {str(e)}")
-        finally:
-            # Clean up the cloned repository to free up space
-            if self.module_dir and os.path.exists(self.module_dir):
-                shutil.rmtree(self.module_dir)
-                logger.info(f"Cleaned up temporary directory: {self.module_dir}")
-        return variables, warnings, errors
-
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
-        """Parse variables from a Terraform file."""
-        logger.info(f"Parsing variables from: {file_path}")
+        """Parse variables from a Terraform file with error handling."""
         try:
             result = subprocess.run(
                 ['/usr/local/bin/hcl2json', file_path],
                 capture_output=True,
                 text=True,
-                check=True
+                check=True,
+                timeout=10  # Add timeout to prevent hanging
             )
-        except subprocess.CalledProcessError as e:
-            error_msg = f"hcl2json failed to parse {file_path}: {e.stderr}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        # Parse JSON output
-        try:
+            
             tf_json = json.loads(result.stdout)
-        except json.JSONDecodeError as e:
-            error_msg = f"Failed to parse hcl2json output: {str(e)}\nOutput was: {result.stdout}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            variables = {}
 
+            if 'variable' in tf_json:
+                var_blocks = tf_json['variable']
+                
+                # Process variables in parallel for large files
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    future_to_var = {
+                        executor.submit(self._process_variable, var_name, var_config): var_name
+                        for var_name, var_config in (
+                            var_blocks.items() if isinstance(var_blocks, dict)
+                            else ((list(var.keys())[0], list(var.values())[0]) for var in var_blocks)
+                        )
+                    }
+                    
+                    for future in as_completed(future_to_var):
+                        var_name = future_to_var[future]
+                        try:
+                            result = future.result()
+                            if result:
+                                variables[var_name] = result
+                        except Exception as e:
+                            logger.warning(f"Failed to process variable {var_name}: {str(e)}")
+
+            return variables
+
+        except subprocess.TimeoutExpired:
+            logger.error(f"Timeout while parsing {file_path}")
+            return {}
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+            logger.error(f"Failed to parse {file_path}: {str(e)}")
+            return {}
+
+    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Parse variables from Terraform module with parallel processing."""
         variables = {}
+        
+        try:
+            # Find all .tf files
+            tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
+            
+            if not tf_files:
+                self.errors.append("No .tf files found in module")
+                return {}, self.warnings, self.errors
 
-        # Handle variable blocks
-        if 'variable' in tf_json:
-            var_blocks = tf_json['variable']
-            logger.debug(f"Raw variable blocks: {json.dumps(var_blocks, indent=2)}")
+            # Process files in parallel
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_file = {
+                    executor.submit(self._parse_variables_file, tf_file): tf_file
+                    for tf_file in tf_files
+                }
+                
+                for future in as_completed(future_to_file):
+                    tf_file = future_to_file[future]
+                    try:
+                        vars_in_file = future.result()
+                        variables.update(vars_in_file)
+                    except Exception as e:
+                        logger.error(f"Failed to process {tf_file}: {str(e)}")
 
-            # Handle both list and dict formats from hcl2json
-            if isinstance(var_blocks, list):
-                # Handle list format where each item is a dict with a single key
-                for var_block in var_blocks:
-                    if not isinstance(var_block, dict):
-                        error_msg = f"Invalid variable block format: {var_block}"
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
+        except Exception as e:
+            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
+            self.errors.append(f"Failed to get variables: {str(e)}")
+        finally:
+            # Clean up the cloned repository
+            if self.module_dir and os.path.exists(os.path.dirname(self.module_dir)):
+                shutil.rmtree(os.path.dirname(self.module_dir))
+                logger.info(f"Cleaned up temporary directory: {self.module_dir}")
 
-                    for var_name, var_configs in var_block.items():
-                        # var_configs might be a list
-                        if isinstance(var_configs, list):
-                            for var_config in var_configs:
-                                processed_var = self._process_variable(var_name, var_config)
-                                variables[var_name] = processed_var
-                        elif isinstance(var_configs, dict):
-                            processed_var = self._process_variable(var_name, var_configs)
-                            variables[var_name] = processed_var
-                        else:
-                            error_msg = f"Invalid variable config format for {var_name}: {var_configs}"
-                            logger.error(error_msg)
-                            raise ValueError(error_msg)
-            elif isinstance(var_blocks, dict):
-                # Handle dict format
-                for var_name, var_configs in var_blocks.items():
-                    if isinstance(var_configs, list):
-                        for var_config in var_configs:
-                            processed_var = self._process_variable(var_name, var_config)
-                            variables[var_name] = processed_var
-                    elif isinstance(var_configs, dict):
-                        processed_var = self._process_variable(var_name, var_configs)
-                        variables[var_name] = processed_var
-                    else:
-                        error_msg = f"Invalid variable config format for {var_name}: {var_configs}"
-                        logger.error(error_msg)
-                        raise ValueError(error_msg)
-            else:
-                error_msg = f"Unexpected format for variable blocks: {type(var_blocks)}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+        if not variables:
+            self.errors.append("No variables found in module")
 
-            logger.debug(f"Found variables: {json.dumps(variables, indent=2)}")
-
-        return variables
+        return variables, self.warnings, self.errors
 
     def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Dict[str, Any]:
         """Process individual variable configuration."""

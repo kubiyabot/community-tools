@@ -24,10 +24,39 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
     # Everything else (string, list, map, object) becomes str
     return 'str'
 
-def truncate_description(description: str) -> str:
-    """Truncate description to max length."""
+def truncate_description(description: str, var_config: dict) -> str:
+    """Truncate description and add default/optional information."""
     if not description:
-        return "No description provided"
+        description = "No description provided"
+    
+    # Add optional/required status
+    status = "Optional" if not var_config.get('required', False) else "Required"
+    description = f"{description}\n[{status}]"
+    
+    # Add default value if present
+    if 'default' in var_config and var_config['default'] is not None:
+        default_str = str(var_config['default'])
+        if isinstance(var_config['default'], (dict, list)):
+            default_str = json.dumps(var_config['default'])
+        description = f"{description}\n(Default value if not passed: {default_str})"
+
+    # Add JSON format example for complex types
+    if var_config['type'] not in ['string', 'number', 'bool']:
+        example = None
+        if 'list' in var_config['type'].lower():
+            example = '["item1", "item2"]'
+            if var_config['default']:
+                example = json.dumps(var_config['default'])
+        elif 'map' in var_config['type'].lower() or 'object' in var_config['type'].lower():
+            example = '{"key1": "value1", "key2": "value2"}'
+            if var_config['default']:
+                example = json.dumps(var_config['default'])
+        
+        if example:
+            description = f"{description}\nProvide as JSON string, example: {example}"
+        else:
+            description = f"{description}\nProvide as JSON string"
+
     if len(description) > MAX_DESCRIPTION_LENGTH:
         return description[:MAX_DESCRIPTION_LENGTH-3] + "..."
     return description
@@ -55,6 +84,7 @@ class TerraformModuleTool(Tool):
             parser = TerraformModuleParser(
                 source_url=module_config['source']['location'],
                 ref=module_config['source'].get('version'),
+                max_workers=8
             )
             variables, warnings, errors = parser.get_variables()
             
@@ -83,16 +113,11 @@ class TerraformModuleTool(Tool):
                 arg_type = map_terraform_type_to_arg_type(var_config['type'])
                 logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
                 
-                # Create short description
+                # Create description with optional/required status and default value
                 description = truncate_description(
-                    f"{var_config.get('description', 'No description')} (Type: {var_config['type']})"
+                    var_config.get('description', 'No description'),
+                    var_config
                 )
-                
-                # Add JSON hint for complex types
-                if var_config['type'] not in ['string', 'number', 'bool']:
-                    description = truncate_description(
-                        f"{description}\nProvide as JSON string"
-                    )
                 
                 # Create Arg object
                 arg = Arg(
