@@ -20,14 +20,26 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
     }
     description = f"{action_desc.get(action, 'Manage')} {config['description']}"
 
+    # Extract source configuration
+    source_config = {
+        'location': config['source']['location'],
+        'version': config['source'].get('version'),
+        'path': config['source'].get('path'),
+        'auth': config['source'].get('auth', {})
+    }
+
+    # Create module configuration
+    module_config = {
+        'name': config['name'],
+        'description': config['description'],
+        'source': source_config,
+        'pre_script': config.get('pre_script')
+    }
+
     return TerraformModuleTool(
         name=tool_name,
         description=description,
-        module_config={
-            'source': config['source'],
-            'version': config['version'],
-            'variables': config['variables']
-        },
+        module_config=module_config,
         action=action,
         with_pr=with_pr
     )
