@@ -16,7 +16,7 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
     if '(' in tf_type and ')' in tf_type:
         nested_type = tf_type[tf_type.index('(')+1:tf_type.rindex(')')].lower()
 
-    # Direct type mappings - using only supported Kubiya SDK types
+    # Map to valid Arg types: "str", "array", "bool", "int", "float"
     if base_type == 'bool':
         return 'bool'
     elif base_type == 'number':
@@ -24,11 +24,11 @@ def map_terraform_type_to_arg_type(tf_type: str) -> str:
             return 'float'
         return 'int'
     elif base_type in ['list', 'set']:
-        if nested_type in ['number', 'float', 'int']:
-            return 'array'  # For numeric arrays
-        return 'array'  # For string arrays
+        return 'array'
+    elif base_type == 'string':
+        return 'str'
     
-    # Default to str for all other types (string, map, object)
+    # All complex types (map, object) default to str (will be passed as JSON)
     return 'str'
 
 def generate_example(var_name: str, tf_type: str) -> Any:
@@ -45,15 +45,37 @@ def generate_example(var_name: str, tf_type: str) -> Any:
     elif 'enabled' in var_name or base_type == 'bool':
         return True
     elif base_type == 'number':
+        if '.' in str(base_type):
+            return 42.0
         return 42
     elif base_type in ['list', 'set']:
         return ["value1", "value2"]
     elif base_type == 'map':
-        return {"key1": "value1", "key2": "value2"}
+        return json.dumps({"key1": "value1", "key2": "value2"})
     elif base_type == 'object':
-        return {"field1": "value1", "field2": "value2"}
+        return json.dumps({"field1": "value1", "field2": "value2"})
     
     return "example-value"
+
+def get_default_value(var_config: Dict[str, Any], arg_type: str) -> Any:
+    """Convert default value to correct type."""
+    if 'default' not in var_config:
+        return None
+        
+    default = var_config['default']
+    
+    if arg_type == 'str':
+        return str(default)
+    elif arg_type == 'int':
+        return int(default)
+    elif arg_type == 'float':
+        return float(default)
+    elif arg_type == 'bool':
+        return bool(default)
+    elif arg_type == 'array':
+        return list(default)
+    
+    return default
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
@@ -120,6 +142,9 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             # Generate example value
             example = generate_example(var_name, var_config['type'])
             
+            # Get properly typed default value
+            default = get_default_value(var_config, arg_type)
+            
             # Create argument with enhanced description
             description = (
                 f"{var_config['description']}\n\n"
@@ -135,31 +160,16 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
             if var_config['type'] not in ['string', 'number', 'bool']:
                 description += "\n\nInput should be a valid JSON string."
             
-            # Create argument with proper type and handling
-            if arg_type == 'array':
-                # For arrays, we need to specify item type
-                args.append(
-                    Arg(
-                        name=var_name,
-                        description=description,
-                        type='array',
-                        required=var_config.get('required', False),
-                        default=var_config.get('default', []),
-                        example=example
-                    )
+            args.append(
+                Arg(
+                    name=var_name,
+                    description=description,
+                    type=arg_type,
+                    required=var_config.get('required', False),
+                    default=default,
+                    example=example
                 )
-            else:
-                # For other types, use direct mapping
-                args.append(
-                    Arg(
-                        name=var_name,
-                        description=description,
-                        type=arg_type,
-                        required=var_config.get('required', False),
-                        default=var_config.get('default'),
-                        example=example
-                    )
-                )
+            )
 
         # Get script files
         script_files = {}
