@@ -1,10 +1,9 @@
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 from typing import List, Dict, Any, Optional
-import os
-import json
 import logging
 from pathlib import Path
 from ..parser import TerraformModuleParser
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -45,25 +44,21 @@ def format_description(description: str, var_type: str, example: str) -> str:
 
 class TerraformModuleTool(Tool):
     """Base class for Terraform module tools."""
+
+    # Declare all fields
     module_config: Dict[str, Any]
+    action: str = 'plan'
+    with_pr: bool = False
+    env: List[str] = Field(default_factory=list)
+    secrets: List[str] = Field(default_factory=list)
+    mermaid: Optional[str] = None
 
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        module_config: Dict[str, Any],
-        action: str = 'plan',
-        with_pr: bool = False,
-        env: List[str] = None,
-        secrets: List[str] = None,
-    ):
-        logger.info(f"Creating tool for module: {name}")
+    # We can use __post_init__ method for additional initialization
+    def __post_init__(self):
+        logger.info(f"Creating tool for module: {self.name}")
 
-        if not module_config.get('source', {}).get('location'):
-            raise ValueError(f"Module {name} is missing source location")
-
-        # Assign module_config to an instance variable
-        self.module_config = module_config
+        if not self.module_config.get('source', {}).get('location'):
+            raise ValueError(f"Module {self.name} is missing source location")
 
         # Auto-discover variables
         try:
@@ -84,7 +79,7 @@ class TerraformModuleTool(Tool):
                 logger.warning(f"Variable discovery warning: {warning}")
 
             if not variables:
-                raise ValueError(f"No variables found in module {name}")
+                raise ValueError(f"No variables found in module {self.name}")
 
             logger.info(f"Found {len(variables)} variables")
 
@@ -112,7 +107,8 @@ class TerraformModuleTool(Tool):
                     name=var_name,
                     description=description,
                     type=arg_type,
-                    required=var_config.get('required', False)
+                    required=var_config.get('required', False),
+                    default=None  # We will set default below if available
                 )
 
                 # Add default if present
@@ -138,10 +134,10 @@ class TerraformModuleTool(Tool):
                 raise ValueError(f"Failed to process variable {var_name}: {str(e)}")
 
         if not args:
-            raise ValueError(f"No valid arguments created for module {name}")
+            raise ValueError(f"No valid arguments created for module {self.name}")
 
         # Prepare script content
-        script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'{action}.py'
+        script_name = 'plan_with_pr.py' if self.action == 'plan' and self.with_pr else f'{self.action}.py'
         pre_script = self.module_config.get('pre_script', '')
         if pre_script:
             pre_script = (
@@ -161,9 +157,27 @@ if ! command -v hcl2json &> /dev/null; then
     chmod +x /usr/local/bin/hcl2json
 fi
 {pre_script}
-# Run Terraform {action}
+# Run Terraform {self.action}
 python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .variables | toJson }}}}' || exit 1
 """
+
+        # Set instance attributes
+        self.type = "docker"
+        self.image = "hashicorp/terraform:latest"
+        self.content = content
+        self.icon_url = "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png"
+        self.args = args
+
+        # Append common environment variables and secrets
+        self.env = (self.env or []) + [
+            "SLACK_CHANNEL_ID",
+            "SLACK_THREAD_TS",
+            "GIT_TOKEN",
+        ]
+
+        self.secrets = (self.secrets or []) + [
+            "SLACK_API_TOKEN",
+        ]
 
         # Get script files
         script_files = {}
@@ -175,42 +189,16 @@ python /opt/scripts/{script_name} '{{{{ .module_config | toJson }}}}' '{{{{ .var
         if not script_files:
             raise ValueError("No script files found")
 
-        # Add common environment variables and secrets
-        env = (env or []) + [
-            "SLACK_CHANNEL_ID",
-            "SLACK_THREAD_TS",
-            "GIT_TOKEN",
+        self.with_files = [
+            FileSpec(
+                destination=f"/opt/scripts/{script_name}",
+                content=script_content
+            )
+            for script_name, script_content in script_files.items()
         ]
-
-        secrets = (secrets or []) + [
-            "SLACK_API_TOKEN",
-        ]
-
-        logger.info(f"Initializing tool {name} with {len(args)} arguments")
 
         # Generate dynamic mermaid diagram
-        mermaid_diagram = self._generate_mermaid_diagram(name, action, with_pr)
-
-        # Pass the mermaid diagram to the Tool constructor
-        super().__init__(
-            name=name,
-            description=description,
-            type="docker",
-            image="hashicorp/terraform:latest",
-            content=content,
-            icon_url="https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
-            args=args,
-            env=env,
-            secrets=secrets,
-            mermaid=mermaid_diagram,
-            with_files=[
-                FileSpec(
-                    destination=f"/opt/scripts/{script_name}",
-                    content=script_content
-                )
-                for script_name, script_content in script_files.items()
-            ]
-        )
+        self.mermaid = self._generate_mermaid_diagram(self.name, self.action, self.with_pr)
 
     def _generate_mermaid_diagram(self, tool_name: str, action: str, with_pr: bool) -> str:
         """Generate a dynamic mermaid diagram based on the tool's parameters."""
