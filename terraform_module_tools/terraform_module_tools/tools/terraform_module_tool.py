@@ -102,23 +102,28 @@ class TerraformModuleTool(Tool):
                     required=var_config.get('required', False)
                 )
                 
-                # Add default if present
-                if 'default' in var_config:
+                # Handle default value conversion
+                if 'default' in var_config and var_config['default'] is not None:
+                    default_value = var_config['default']
+                    
+                    # Convert default value to string based on type
                     if arg_type == 'str':
-                        if isinstance(var_config['default'], (dict, list)):
-                            arg.default = json.dumps(var_config['default'])
+                        if isinstance(default_value, (dict, list)):
+                            arg.default = json.dumps(default_value)
                         else:
-                            arg.default = str(var_config['default'])
+                            arg.default = str(default_value)
                     elif arg_type == 'int':
                         try:
-                            arg.default = int(float(var_config['default']))
+                            arg.default = str(int(float(default_value)))
                         except (ValueError, TypeError):
-                            logger.warning(f"Could not convert default value for {var_name} to int")
+                            logger.warning(f"Could not convert default value for {var_name} to int, setting to '0'")
+                            arg.default = '0'
                     elif arg_type == 'bool':
-                        arg.default = bool(var_config['default'])
+                        # Convert boolean to string 'true' or 'false'
+                        arg.default = str(default_value).lower()
                 
                 args.append(arg)
-                logger.info(f"Added argument: {var_name} ({arg_type})")
+                logger.info(f"Added argument: {var_name} ({arg_type}) with default: {arg.default}")
                 
             except Exception as e:
                 logger.error(f"Failed to process variable {var_name}: {str(e)}", exc_info=True)
