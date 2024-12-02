@@ -223,20 +223,8 @@ class TerraformModuleTool(Tool):
         module_path = module_config['source'].get('path', '')
         
         content = f"""#!/bin/sh
-# Exit on error, unset variables, and pipe failures
+# Exit on error and unset variables
 set -eu
-set -o pipefail
-
-# Enhanced error handler for POSIX shell
-error_handler() {{
-    line_no="$1"
-    error_code="$2"
-    printf "❌ Error occurred at line %s (exit code: %s)\\n" "$line_no" "$error_code" >&2
-    exit "$error_code"
-}}
-
-# Set error trap (POSIX-compliant)
-trap 'error_handler "$LINENO" "$?"' EXIT
 
 # Install Terraform if not already installed
 install_terraform() {{
@@ -308,8 +296,7 @@ if [ -z "$KUBIYA_USER_EMAIL" ]; then
     exit 1
 fi
 
-# Generate workspace name from email (POSIX-compliant)
-# Convert email to lowercase, replace @ and . with -, and limit length
+# Generate workspace name from email
 WORKSPACE_NAME=$(printf "%s" "$KUBIYA_USER_EMAIL" | tr '[:upper:]' '[:lower:]' | sed 's/@/-/g; s/\\./-/g')
 WORKSPACE_NAME="$(printf "%.30s" "$WORKSPACE_NAME")-{action}"
 export WORKSPACE_NAME
@@ -324,7 +311,7 @@ MODULE_DIR="$WORK_DIR/$REPO_NAME{f'/{module_path}' if module_path else ''}"
 # Create workspace directory
 mkdir -p "$WORK_DIR"
 
-# Clone and setup repository
+# Clone repository
 printf "📦 Cloning module repository...\\n"
 if [ -n "${{GH_TOKEN:-}}" ]; then
     REPO_URL=$(printf "%s" "{module_config['source']['location']}" | sed "s#https://#https://$GH_TOKEN@#")
@@ -340,7 +327,6 @@ if [ ! -d "$MODULE_DIR" ]; then
     printf "Contents of %s:\\n" "$WORK_DIR/$REPO_NAME"
     ls -la "$WORK_DIR/$REPO_NAME"
     
-    # If a specific path was provided but not found, show available directories
     if [ -n "{module_path}" ]; then
         printf "\\nAvailable directories in repository:\\n"
         find "$WORK_DIR/$REPO_NAME" -type d -not -path '*/\.*'
@@ -348,7 +334,7 @@ if [ ! -d "$MODULE_DIR" ]; then
     exit 1
 fi
 
-# Check for Terraform files (POSIX-compliant)
+# Check for Terraform files
 printf "Checking for Terraform files in %s\\n" "$MODULE_DIR"
 TF_FILES=$(find "$MODULE_DIR" -maxdepth 1 -type f -name "*.tf" | wc -l)
 if [ "$TF_FILES" -eq 0 ]; then
@@ -369,19 +355,8 @@ printf "📍 Working in directory: %s\\n" "$MODULE_DIR"
 printf "Terraform files in working directory:\\n"
 ls -l *.tf
 
-# Make scripts executable
-chmod +x /opt/scripts/*.py
-
-# Install Python dependencies
-printf "📦 Validating runtime dependencies...\\n"
-# create __init__.py in /opt/scripts/
-touch /opt/scripts/__init__.py
-if ! pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
-    printf "❌ Failed to install Python dependencies\\n" >&2
-    # Show the actual error for debugging
-    pip3 install slack-sdk pydantic pyyaml requests
-    exit 1
-fi
+# Set up Python environment
+printf "📦 Setting up Python environment...\\n"
 
 # Create Python package structure
 mkdir -p /opt/scripts/terraform_tools
@@ -409,11 +384,10 @@ EOF
 
 # Install package and dependencies
 printf "📦 Installing package and dependencies...\\n"
-if ! pip3 install -e . > /dev/null 2>&1; then
+pip3 install -e . || {{
     printf "❌ Failed to install package\\n" >&2
-    pip3 install -e .
     exit 1
-fi
+}}
 
 # Export module path for scripts
 export MODULE_PATH="$MODULE_DIR"
@@ -421,10 +395,10 @@ export MODULE_VARS_FILE="/opt/module_variables.json"
 
 # Prepare terraform.tfvars.json
 printf "🔧 Preparing terraform variables...\\n"
-if ! python3 -m terraform_tools.prepare_tfvars; then
+python3 -m terraform_tools.prepare_tfvars || {{
     printf "❌ Failed to prepare terraform variables\\n" >&2
     exit 1
-fi
+}}
 
 # Verify tfvars file was created
 if [ ! -f "$MODULE_DIR/terraform.tfvars.json" ]; then
@@ -432,7 +406,7 @@ if [ ! -f "$MODULE_DIR/terraform.tfvars.json" ]; then
     exit 1
 fi
 
-# Run Terraform {action}
+# Run Terraform action
 printf "🚀 Running Terraform {action}...\\n"
 python3 -m terraform_tools.{script_name[:-3]}
 """
