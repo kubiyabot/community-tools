@@ -207,6 +207,9 @@ class TerraformModuleTool(Tool):
         values['with_files'] = with_files
 
         # Prepare the shell content script with POSIX-compliant shell
+        # Get the source path, defaulting to empty string if not present
+        module_path = module_config['source'].get('path', '')
+        
         content = f"""#!/bin/sh
 # Exit on error, unset variables, and pipe failures
 set -eu
@@ -239,8 +242,8 @@ printf "🔧 Using workspace name: %s\\n" "$WORKSPACE_NAME"
 
 # Working directory setup
 WORK_DIR="/workspace/$WORKSPACE_NAME"
-MODULE_DIR=""
 REPO_NAME=$(basename {module_config['source']['location']} .git)
+MODULE_DIR="$WORK_DIR/$REPO_NAME{f'/{module_path}' if module_path else ''}"
 
 # Create workspace directory
 mkdir -p "$WORK_DIR"
@@ -255,18 +258,17 @@ fi
 
 git clone --depth 1 "$REPO_URL" "$WORK_DIR/$REPO_NAME"
 
-# Set module directory based on source configuration
-MODULE_DIR="$WORK_DIR/$REPO_NAME"
-if [ -n "{module_config['source'].get('path', '')}" ]; then
-    MODULE_DIR="$MODULE_DIR/{module_config['source']['path']}"
-fi
-
 # Validate module directory
 if [ ! -d "$MODULE_DIR" ]; then
     printf "❌ Module directory not found: %s\\n" "$MODULE_DIR" >&2
-    # Print directory contents for debugging
     printf "Contents of %s:\\n" "$WORK_DIR/$REPO_NAME"
     ls -la "$WORK_DIR/$REPO_NAME"
+    
+    # If a specific path was provided but not found, show available directories
+    if [ -n "{module_path}" ]; then
+        printf "\\nAvailable directories in repository:\\n"
+        find "$WORK_DIR/$REPO_NAME" -type d -not -path '*/\.*'
+    fi
     exit 1
 fi
 
@@ -275,6 +277,8 @@ if ! find "$MODULE_DIR" -maxdepth 1 -name "*.tf" | grep -q .; then
     printf "❌ No Terraform files found in module directory: %s\\n" "$MODULE_DIR" >&2
     printf "Contents of %s:\\n" "$MODULE_DIR"
     ls -la "$MODULE_DIR"
+    printf "\\nAvailable .tf files in repository:\\n"
+    find "$WORK_DIR/$REPO_NAME" -name "*.tf"
     exit 1
 fi
 
