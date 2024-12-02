@@ -206,9 +206,8 @@ class TerraformModuleTool(Tool):
         # Update 'with_files' in values
         values['with_files'] = with_files
 
-        # Prepare the shell content script with POSIX-compliant shell
-        # Get the source path, defaulting to empty string if not present
-        module_path = module_config['source'].get('path', '')
+        # Get Terraform version from environment or use latest
+        tf_version = os.environ.get("TERRAFORM_VERSION", "1.6.5")
         
         content = f"""#!/bin/sh
 # Exit on error, unset variables, and pipe failures
@@ -225,6 +224,70 @@ error_handler() {{
 
 # Set error trap (POSIX-compliant)
 trap 'error_handler "$LINENO" "$?"' EXIT
+
+# Install Terraform if not already installed
+install_terraform() {{
+    if command -v terraform >/dev/null 2>&1; then
+        current_version=$(terraform version | head -n1 | cut -d'v' -f2)
+        if [ "$current_version" = "{tf_version}" ]; then
+            printf "✅ Terraform {tf_version} is already installed\\n"
+            return 0
+        fi
+    fi
+
+    printf "📦 Installing Terraform {tf_version}...\\n"
+
+    # Create bin directory
+    mkdir -p /usr/local/bin
+
+    # Download Terraform binary
+    if ! curl -fsSL "https://releases.hashicorp.com/terraform/{tf_version}/terraform_{tf_version}_linux_amd64.zip" -o /tmp/terraform.zip; then
+        printf "❌ Failed to download Terraform\\n" >&2
+        return 1
+    fi
+
+    # Install unzip if not present
+    if ! command -v unzip >/dev/null 2>&1; then
+        apk add unzip >/dev/null 2>&1 || {{
+            printf "❌ Failed to install unzip\\n" >&2
+            return 1
+        }}
+    fi
+
+    # Extract Terraform binary
+    if ! unzip -o /tmp/terraform.zip -d /usr/local/bin >/dev/null 2>&1; then
+        printf "❌ Failed to extract Terraform binary\\n" >&2
+        return 1
+    fi
+    
+    # Make binary executable
+    chmod +x /usr/local/bin/terraform
+
+    # Cleanup
+    rm -f /tmp/terraform.zip
+
+    # Verify installation
+    if ! terraform version | grep -q "{tf_version}"; then
+        printf "❌ Terraform installation verification failed\\n" >&2
+        return 1
+    fi
+
+    printf "✅ Successfully installed Terraform {tf_version}\\n"
+    return 0
+}}
+
+# Install system dependencies
+printf "📦 Installing system dependencies...\\n"
+apk add curl git > /dev/null 2>&1 || {{
+    printf "❌ Failed to install system dependencies\\n" >&2
+    exit 1
+}}
+
+# Install Terraform
+if ! install_terraform; then
+    printf "❌ Failed to install Terraform\\n" >&2
+    exit 1
+fi
 
 # Validate required environment variables
 if [ -z "$KUBIYA_USER_EMAIL" ]; then
@@ -296,10 +359,12 @@ ls -l *.tf
 # Make scripts executable
 chmod +x /opt/scripts/*.py
 
-# Install required python packages
-printf "📦 Installing dependencies...\\n"
-if ! pip3 install --quiet slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
+# Install Python dependencies
+printf "📦 Installing Python dependencies...\\n"
+if ! pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
     printf "❌ Failed to install Python dependencies\\n" >&2
+    # Show the actual error for debugging
+    pip3 install slack-sdk pydantic pyyaml requests
     exit 1
 fi
 
@@ -325,15 +390,15 @@ printf "🚀 Running Terraform {action}...\\n"
 python3 /opt/scripts/{script_name}
 """
 
-        # Update values dictionary with KUBIYA_USER_EMAIL requirement
+        # Update values dictionary with KUBIYA_USER_EMAIL requirement and new base image
         values.update({
             'description': tool_description,
             'content': content,
             'args': args,
-            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
+            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL", "TERRAFORM_VERSION"],
             'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
             'type': "docker",
-            'image': "hashicorp/terraform:latest",
+            'image': "python:3.9-alpine",  # Using Python Alpine as base image
             'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
         })
 
