@@ -5,7 +5,7 @@ import subprocess
 import time
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-from .error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+from terraform_tools.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
 
 # Try to import slack_sdk
 try:

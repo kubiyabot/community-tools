@@ -383,13 +383,45 @@ if ! pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
     exit 1
 fi
 
+# Create Python package structure
+mkdir -p /opt/scripts/terraform_tools
+mv /opt/scripts/*.py /opt/scripts/terraform_tools/
+mv /opt/scripts/configs /opt/scripts/terraform_tools/
+touch /opt/scripts/terraform_tools/__init__.py
+
+# Install the package in development mode
+cd /opt/scripts
+cat > setup.py << 'EOF'
+from setuptools import setup, find_packages
+
+setup(
+    name="terraform_tools",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "slack-sdk",
+        "pydantic",
+        "pyyaml",
+        "requests"
+    ]
+)
+EOF
+
+# Install package and dependencies
+printf "📦 Installing package and dependencies...\\n"
+if ! pip3 install -e . > /dev/null 2>&1; then
+    printf "❌ Failed to install package\\n" >&2
+    pip3 install -e .
+    exit 1
+fi
+
 # Export module path for scripts
 export MODULE_PATH="$MODULE_DIR"
 export MODULE_VARS_FILE="/opt/module_variables.json"
 
 # Prepare terraform.tfvars.json
 printf "🔧 Preparing terraform variables...\\n"
-if ! python3 /opt/scripts/prepare_tfvars.py; then
+if ! python3 -m terraform_tools.prepare_tfvars; then
     printf "❌ Failed to prepare terraform variables\\n" >&2
     exit 1
 fi
@@ -402,7 +434,7 @@ fi
 
 # Run Terraform {action}
 printf "🚀 Running Terraform {action}...\\n"
-python3 /opt/scripts/{script_name}
+python3 -m terraform_tools.{script_name[:-3]}
 """
 
         # Update values dictionary with KUBIYA_USER_EMAIL requirement and new base image
