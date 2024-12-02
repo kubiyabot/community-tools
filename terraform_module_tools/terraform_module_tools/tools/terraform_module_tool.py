@@ -185,7 +185,6 @@ class TerraformModuleTool(Tool):
             'terraform_handler.py',
             'get_module_vars.py',
             'error_handler.py',
-            '__init__.py',
             # Config files
             'configs/module_configs.json',
             'configs/__init__.py',
@@ -389,6 +388,8 @@ chmod +x /opt/scripts/*.py
 
 # Install Python dependencies
 printf "📦 Validating runtime dependencies...\\n"
+# create __init__.py in /opt/scripts/
+touch /opt/scripts/__init__.py
 if ! pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
     printf "❌ Failed to install Python dependencies\\n" >&2
     # Show the actual error for debugging
