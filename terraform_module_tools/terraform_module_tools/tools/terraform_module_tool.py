@@ -256,21 +256,25 @@ fi
 git clone --depth 1 "$REPO_URL" "$WORK_DIR/$REPO_NAME"
 
 # Set module directory based on source configuration
+MODULE_DIR="$WORK_DIR/$REPO_NAME"
 if [ -n "{module_config['source'].get('path', '')}" ]; then
-    MODULE_DIR="$WORK_DIR/$REPO_NAME/{module_config['source']['path']}"
-else
-    MODULE_DIR="$WORK_DIR/$REPO_NAME"
+    MODULE_DIR="$MODULE_DIR/{module_config['source']['path']}"
 fi
 
 # Validate module directory
 if [ ! -d "$MODULE_DIR" ]; then
     printf "❌ Module directory not found: %s\\n" "$MODULE_DIR" >&2
+    # Print directory contents for debugging
+    printf "Contents of %s:\\n" "$WORK_DIR/$REPO_NAME"
+    ls -la "$WORK_DIR/$REPO_NAME"
     exit 1
 fi
 
 # Check for Terraform files (POSIX-compliant)
 if ! find "$MODULE_DIR" -maxdepth 1 -name "*.tf" | grep -q .; then
     printf "❌ No Terraform files found in module directory: %s\\n" "$MODULE_DIR" >&2
+    printf "Contents of %s:\\n" "$MODULE_DIR"
+    ls -la "$MODULE_DIR"
     exit 1
 fi
 
