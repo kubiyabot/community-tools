@@ -174,26 +174,45 @@ class TerraformModuleTool(Tool):
         # Prepare script content
         script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'terraform_{action}.py'
 
-        # Read the existing script files
+        # Read all script files from the scripts directory
         script_files = {}
-        scripts_needed = [
-            script_name,
-            'prepare_tfvars.py',
-            'terraform_handler.py'
-        ]
         scripts_dir = Path(__file__).parent.parent / 'scripts'
-        for script_file in scripts_dir.glob('*.py'):
-            if script_file.name in scripts_needed or script_file.name == 'terraform_handler.py':
-                script_files[script_file.name] = script_file.read_text()
+        required_files = {
+            # Core script files
+            'terraform_plan.py',
+            'terraform_apply.py',
+            'prepare_tfvars.py',
+            'terraform_handler.py',
+            'get_module_vars.py',
+            'error_handler.py',
+            '__init__.py',
+            # Config files
+            'configs/module_configs.json',
+            'configs/__init__.py',
+            # Requirements file
+            'requirements.txt'
+        }
 
-        if not script_files:
-            raise ValueError("No script files found")
-
-        # Create FileSpec objects for scripts
+        # Create FileSpec objects for all required files
         with_files = []
-        for s_name, s_content in script_files.items():
-            dest_path = f"/opt/scripts/{s_name}"
-            with_files.append(FileSpec(destination=dest_path, content=s_content))
+        for filename in required_files:
+            file_path = scripts_dir / filename
+            if file_path.exists():
+                dest_path = f"/opt/scripts/{filename}"
+                # Create parent directories in destination path if needed
+                if '/' in filename:
+                    with_files.append(FileSpec(
+                        destination=f"/opt/scripts/{os.path.dirname(filename)}/__init__.py",
+                        content=""
+                    ))
+                
+                # Add the actual file
+                with_files.append(FileSpec(
+                    destination=dest_path,
+                    content=file_path.read_text()
+                ))
+            else:
+                logger.warning(f"Required script file not found: {filename}")
 
         # Save module variables signature to a file
         module_variables_signature = json.dumps(variables, indent=2)
@@ -203,11 +222,20 @@ class TerraformModuleTool(Tool):
         )
         with_files.append(module_variables_file)
 
+        # Create scripts directory structure
+        with_files.append(FileSpec(
+            destination="/opt/scripts/__init__.py",
+            content=""
+        ))
+
         # Update 'with_files' in values
         values['with_files'] = with_files
 
         # Get Terraform version from environment or use latest
-        tf_version = os.environ.get("TERRAFORM_VERSION", "1.6.5")
+        tf_version = os.environ.get("TERRAFORM_VERSION", "1.10.0")
+        
+        # Get module path from source config
+        module_path = module_config['source'].get('path', '')
         
         content = f"""#!/bin/sh
 # Exit on error, unset variables, and pipe failures
@@ -360,7 +388,7 @@ ls -l *.tf
 chmod +x /opt/scripts/*.py
 
 # Install Python dependencies
-printf "📦 Installing Python dependencies...\\n"
+printf "📦 Validating runtime dependencies...\\n"
 if ! pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
     printf "❌ Failed to install Python dependencies\\n" >&2
     # Show the actual error for debugging
