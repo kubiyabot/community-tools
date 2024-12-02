@@ -187,7 +187,6 @@ class TerraformModuleTool(Tool):
             'error_handler.py',
             # Config files
             'configs/module_configs.json',
-            'configs/__init__.py',
             # Requirements file
             'requirements.txt'
         }
@@ -198,13 +197,6 @@ class TerraformModuleTool(Tool):
             file_path = scripts_dir / filename
             if file_path.exists():
                 dest_path = f"/opt/scripts/{filename}"
-                # Create parent directories in destination path if needed
-                if '/' in filename:
-                    with_files.append(FileSpec(
-                        destination=f"/opt/scripts/{os.path.dirname(filename)}/__init__.py",
-                        content=""
-                    ))
-                
                 # Add the actual file
                 with_files.append(FileSpec(
                     destination=dest_path,
@@ -220,12 +212,6 @@ class TerraformModuleTool(Tool):
             content=module_variables_signature
         )
         with_files.append(module_variables_file)
-
-        # Create scripts directory structure
-        with_files.append(FileSpec(
-            destination="/opt/scripts/__init__.py",
-            content=""
-        ))
 
         # Update 'with_files' in values
         values['with_files'] = with_files
