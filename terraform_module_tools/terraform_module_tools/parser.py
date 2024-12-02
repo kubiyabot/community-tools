@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 import subprocess
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Set
 import logging
 import re
 import glob
@@ -10,6 +10,7 @@ import shutil
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
+from kubiya_sdk.tools.models import FileSpec
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,20 @@ def ensure_hcl2json():
     return HCL2JSON_PATH
 
 class TerraformModuleParser:
+    PROVIDER_REQUIREMENTS = {
+        'aws': {
+            'env': ['AWS_PROFILE'],
+            'files': [
+                FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+                FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+            ]
+        },
+        'github': {
+            'env': [],  # No env vars needed since GH_TOKEN is already in secrets
+            'files': []
+        }
+    }
+
     def __init__(
         self,
         source_url: str,
@@ -40,6 +55,7 @@ class TerraformModuleParser:
         self.readme_url = None
         self.module_dir = None
         self.max_workers = max_workers
+        self.providers: Set[str] = set()
         self._clone_repository()
         ensure_hcl2json()
 
@@ -155,6 +171,88 @@ class TerraformModuleParser:
             logger.error(f"Failed to parse {file_path}: {str(e)}")
             return {}
 
+    def _parse_providers(self, file_path: str) -> Set[str]:
+        """Parse provider blocks from a Terraform file."""
+        providers = set()
+        try:
+            result = subprocess.run(
+                ['/usr/local/bin/hcl2json', file_path],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10
+            )
+            
+            tf_json = json.loads(result.stdout)
+            
+            # Check terraform required_providers block
+            if 'terraform' in tf_json:
+                terraform_block = tf_json['terraform']
+                if isinstance(terraform_block, list):
+                    terraform_block = terraform_block[0]
+                required_providers = terraform_block.get('required_providers', {})
+                if required_providers:
+                    if isinstance(required_providers, dict):
+                        # Handle nested provider configurations
+                        for provider_name, provider_config in required_providers.items():
+                            if isinstance(provider_config, dict):
+                                # Get the actual provider type from source
+                                source = provider_config.get('source', '')
+                                if '/' in source:
+                                    provider_type = source.split('/')[-1]
+                                    if provider_type in ['aws', 'github']:
+                                        providers.add(provider_type)
+                                elif provider_name in ['aws', 'github']:
+                                    providers.add(provider_name)
+                            elif provider_name in ['aws', 'github']:
+                                providers.add(provider_name)
+
+            # Check direct provider blocks
+            if 'provider' in tf_json:
+                provider_blocks = tf_json['provider']
+                if isinstance(provider_blocks, dict):
+                    for provider_name in provider_blocks.keys():
+                        base_provider = provider_name.split('.')[0]  # Handle provider.alias syntax
+                        if base_provider in ['aws', 'github']:
+                            providers.add(base_provider)
+                elif isinstance(provider_blocks, list):
+                    for block in provider_blocks:
+                        for provider_name in block.keys():
+                            base_provider = provider_name.split('.')[0]
+                            if base_provider in ['aws', 'github']:
+                                providers.add(base_provider)
+
+        except Exception as e:
+            logger.warning(f"Failed to parse providers from {file_path}: {str(e)}")
+
+        return providers
+
+    def get_provider_requirements(self) -> Tuple[List[str], List[FileSpec]]:
+        """Get required environment variables and file mounts based on detected providers."""
+        required_env = []
+        required_files = []
+
+        # Add provider-specific requirements
+        for provider in self.providers:
+            if provider in self.PROVIDER_REQUIREMENTS:
+                config = self.PROVIDER_REQUIREMENTS[provider]
+                required_env.extend(config['env'])
+                required_files.extend(config['files'])
+
+        # Remove duplicates while preserving order
+        seen_env = set()
+        unique_env = [x for x in required_env if not (x in seen_env or seen_env.add(x))]
+
+        seen_files = set()
+        unique_files = []
+        for file in required_files:
+            file_key = (file.source, file.destination)
+            if file_key not in seen_files:
+                seen_files.add(file_key)
+                unique_files.append(file)
+
+        return unique_env, unique_files
+
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """Parse variables from Terraform module with parallel processing."""
         variables = {}
@@ -169,22 +267,39 @@ class TerraformModuleParser:
 
             # Process files in parallel
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                future_to_file = {
+                # Parse variables
+                var_futures = {
                     executor.submit(self._parse_variables_file, tf_file): tf_file
                     for tf_file in tf_files
                 }
                 
-                for future in as_completed(future_to_file):
-                    tf_file = future_to_file[future]
+                # Parse providers
+                provider_futures = {
+                    executor.submit(self._parse_providers, tf_file): tf_file
+                    for tf_file in tf_files
+                }
+                
+                # Collect variables
+                for future in as_completed(var_futures):
+                    tf_file = var_futures[future]
                     try:
                         vars_in_file = future.result()
                         variables.update(vars_in_file)
                     except Exception as e:
-                        logger.error(f"Failed to process {tf_file}: {str(e)}")
+                        logger.error(f"Failed to process variables in {tf_file}: {str(e)}")
+
+                # Collect providers
+                for future in as_completed(provider_futures):
+                    tf_file = provider_futures[future]
+                    try:
+                        providers_in_file = future.result()
+                        self.providers.update(providers_in_file)
+                    except Exception as e:
+                        logger.error(f"Failed to process providers in {tf_file}: {str(e)}")
 
         except Exception as e:
-            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
-            self.errors.append(f"Failed to get variables: {str(e)}")
+            logger.error(f"Failed to get variables and providers: {str(e)}", exc_info=True)
+            self.errors.append(f"Failed to get variables and providers: {str(e)}")
         finally:
             # Clean up the cloned repository
             if self.module_dir and os.path.exists(os.path.dirname(self.module_dir)):

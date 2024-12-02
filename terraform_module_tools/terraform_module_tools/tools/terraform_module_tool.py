@@ -449,4 +449,11 @@ python3 -m terraform_tools.{script_name[:-3]}
             'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
         })
 
+        # Get provider requirements
+        required_env, required_files = parser.get_provider_requirements()
+        
+        # Add provider-specific requirements to values
+        values['env'] = (env or []) + required_env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"]
+        values['with_files'] = (with_files or []) + required_files
+
         return values
