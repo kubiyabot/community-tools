@@ -410,6 +410,68 @@ fi
 printf "🚀 Running Terraform {action}...\\n"
 python3 -m terraform_tools.{script_name[:-3]}
 """
+        mermaid_diagram = f"""
+sequenceDiagram
+    participant U as 👤 User
+    participant B as 🤖 Bot
+    participant V as 🔍 Parser
+    participant T as 🏗️ Terraform
+    participant G as 📦 Git/PR
+    participant A as ✅ Approver
+
+    Note over U,A: 🚀 Terraform Self-Service Flow
+
+    U->>B: 💬 "Need new env in eu-west-1!"
+
+    rect rgb(240, 240, 240)
+        Note over B,V: 📝 Parse & Prep
+        B->>V: Read Request
+        V->>V: Get Variables
+        V->>V: Set Defaults
+        V->>B: Ready!
+    end
+
+    rect rgb(235, 245, 255)
+        Note over B,U: ⚙️ Setup
+        B->>U: Missing info?
+        U->>B: Here you go!
+        B->>B: Quick check
+    end
+
+    rect rgb(245, 240, 255)
+        Note over B,T: 📋 Plan
+        B->>T: Init
+        T->>T: Load config
+        T->>T: Make plan
+        T-->>B: Plan ready!
+    end
+
+    alt PR Wanted 📬
+        B->>G: New PR
+        B->>G: Add plan
+        Note over G: 🎯 PR Ready!
+    end
+
+    alt Need Approval 🔒
+        B->>A: Please review
+        
+        alt Approved ✨
+            A->>B: Good to go!
+            B->>T: Apply now
+            T-->>B: Done!
+            B->>U: 🎉 All set!
+        else Rejected ❌
+            A->>B: Nope
+            B->>U: 😕 Rejected
+        end
+    else Direct Apply ⚡
+        B->>T: Do it!
+        T-->>B: Complete
+        B->>U: 🎉 Ready!
+    end
+
+    Note over U,B: 🏁 All Done!
+"""
 
         # Update values dictionary with KUBIYA_USER_EMAIL requirement and new base image
         values.update({
@@ -419,6 +481,7 @@ python3 -m terraform_tools.{script_name[:-3]}
             'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
             'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
             'type': "docker",
+            'mermaid': mermaid_diagram,
             'image': "python:3.9-alpine",  # Using Python Alpine as base image
             'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
         })
