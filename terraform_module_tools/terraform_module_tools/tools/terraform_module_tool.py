@@ -273,17 +273,25 @@ if [ ! -d "$MODULE_DIR" ]; then
 fi
 
 # Check for Terraform files (POSIX-compliant)
-if ! find "$MODULE_DIR" -maxdepth 1 -name "*.tf" | grep -q .; then
+printf "Checking for Terraform files in %s\\n" "$MODULE_DIR"
+TF_FILES=$(find "$MODULE_DIR" -maxdepth 1 -type f -name "*.tf" | wc -l)
+if [ "$TF_FILES" -eq 0 ]; then
     printf "❌ No Terraform files found in module directory: %s\\n" "$MODULE_DIR" >&2
     printf "Contents of %s:\\n" "$MODULE_DIR"
     ls -la "$MODULE_DIR"
     printf "\\nAvailable .tf files in repository:\\n"
     find "$WORK_DIR/$REPO_NAME" -name "*.tf"
     exit 1
+else
+    printf "Found %d Terraform files in module directory\\n" "$TF_FILES"
 fi
 
 cd "$MODULE_DIR"
 printf "📍 Working in directory: %s\\n" "$MODULE_DIR"
+
+# List found Terraform files for verification
+printf "Terraform files in working directory:\\n"
+ls -l *.tf
 
 # Make scripts executable
 chmod +x /opt/scripts/*.py
