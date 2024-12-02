@@ -395,7 +395,7 @@ python3 /opt/scripts/{script_name}
             'description': tool_description,
             'content': content,
             'args': args,
-            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL", "TERRAFORM_VERSION"],
+            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
             'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
             'type': "docker",
             'image': "python:3.9-alpine",  # Using Python Alpine as base image
