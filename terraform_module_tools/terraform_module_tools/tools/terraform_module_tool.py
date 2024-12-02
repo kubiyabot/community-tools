@@ -206,37 +206,115 @@ class TerraformModuleTool(Tool):
         # Update 'with_files' in values
         values['with_files'] = with_files
 
-        # Prepare the shell content script
-        content = f"""
-set -e
+        # Prepare the shell content script with POSIX-compliant shell
+        content = f"""#!/bin/sh
+# Exit on error, unset variables, and pipe failures
+set -eu
+set -o pipefail
+
+# Enhanced error handler for POSIX shell
+error_handler() {{
+    line_no="$1"
+    error_code="$2"
+    printf "❌ Error occurred at line %s (exit code: %s)\\n" "$line_no" "$error_code" >&2
+    exit "$error_code"
+}}
+
+# Set error trap (POSIX-compliant)
+trap 'error_handler "$LINENO" "$?"' EXIT
+
+# Validate required environment variables
+if [ -z "$KUBIYA_USER_EMAIL" ]; then
+    printf "❌ KUBIYA_USER_EMAIL environment variable is required\\n" >&2
+    exit 1
+fi
+
+# Generate workspace name from email (POSIX-compliant)
+# Convert email to lowercase, replace @ and . with -, and limit length
+WORKSPACE_NAME=$(printf "%s" "$KUBIYA_USER_EMAIL" | tr '[:upper:]' '[:lower:]' | sed 's/@/-/g; s/\\./-/g')
+WORKSPACE_NAME="$(printf "%.30s" "$WORKSPACE_NAME")-{action}"
+export WORKSPACE_NAME
+
+printf "🔧 Using workspace name: %s\\n" "$WORKSPACE_NAME"
+
+# Working directory setup
+WORK_DIR="/workspace/$WORKSPACE_NAME"
+MODULE_DIR=""
+REPO_NAME=$(basename {module_config['source']['location']} .git)
+
+# Create workspace directory
+mkdir -p "$WORK_DIR"
+
+# Clone and setup repository
+printf "📦 Cloning module repository...\\n"
+if [ -n "${{GH_TOKEN:-}}" ]; then
+    REPO_URL=$(printf "%s" "{module_config['source']['location']}" | sed "s#https://#https://$GH_TOKEN@#")
+else
+    REPO_URL="{module_config['source']['location']}"
+fi
+
+git clone --depth 1 "$REPO_URL" "$WORK_DIR/$REPO_NAME"
+
+# Set module directory based on source configuration
+if [ -n "{module_config['source'].get('path', '')}" ]; then
+    MODULE_DIR="$WORK_DIR/$REPO_NAME/{module_config['source']['path']}"
+else
+    MODULE_DIR="$WORK_DIR/$REPO_NAME"
+fi
+
+# Validate module directory
+if [ ! -d "$MODULE_DIR" ]; then
+    printf "❌ Module directory not found: %s\\n" "$MODULE_DIR" >&2
+    exit 1
+fi
+
+# Check for Terraform files (POSIX-compliant)
+if ! find "$MODULE_DIR" -maxdepth 1 -name "*.tf" | grep -q .; then
+    printf "❌ No Terraform files found in module directory: %s\\n" "$MODULE_DIR" >&2
+    exit 1
+fi
+
+cd "$MODULE_DIR"
+printf "📍 Working in directory: %s\\n" "$MODULE_DIR"
 
 # Make scripts executable
 chmod +x /opt/scripts/*.py
 
 # Install required python packages
-pip3 install slack-sdk pydantic pyyaml requests > /dev/null 2>&1
+printf "📦 Installing dependencies...\\n"
+if ! pip3 install --quiet slack-sdk pydantic pyyaml requests > /dev/null 2>&1; then
+    printf "❌ Failed to install Python dependencies\\n" >&2
+    exit 1
+fi
+
+# Export module path for scripts
+export MODULE_PATH="$MODULE_DIR"
+export MODULE_VARS_FILE="/opt/module_variables.json"
 
 # Prepare terraform.tfvars.json
-echo "🔧 Preparing terraform variables..."
-python3 /opt/scripts/prepare_tfvars.py /opt/module_variables.json
+printf "🔧 Preparing terraform variables...\\n"
+if ! python3 /opt/scripts/prepare_tfvars.py; then
+    printf "❌ Failed to prepare terraform variables\\n" >&2
+    exit 1
+fi
 
-# Check if terraform.tfvars.json was created
-if [ ! -f terraform.tfvars.json ]; then
-    echo "❌ Failed to create terraform.tfvars.json."
+# Verify tfvars file was created
+if [ ! -f "$MODULE_DIR/terraform.tfvars.json" ]; then
+    printf "❌ Failed to create terraform.tfvars.json\\n" >&2
     exit 1
 fi
 
 # Run Terraform {action}
-echo "🚀 Running Terraform {action}..."
+printf "🚀 Running Terraform {action}...\\n"
 python3 /opt/scripts/{script_name}
 """
 
-        # Update values dictionary
+        # Update values dictionary with KUBIYA_USER_EMAIL requirement
         values.update({
             'description': tool_description,
             'content': content,
             'args': args,
-            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS"],
+            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
             'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
             'type': "docker",
             'image': "hashicorp/terraform:latest",
