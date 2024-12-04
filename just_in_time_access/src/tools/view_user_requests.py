@@ -22,13 +22,7 @@ view_user_requests_tool = JustInTimeAccessTool(
     pip install requests==2.32.3 2>&1 | grep -v '[notice]'
     python /opt/scripts/view_user_requests.py "{{ .user_email }}"
     """,
-    args=[
-        Arg(
-            name="user_email",
-            description="The email address of the user whose requests to view.",
-            required=True
-        ),
-    ],
+    args=[],
     with_files=[
         FileSpec(
             destination="/opt/scripts/view_user_requests.py",
