@@ -6,7 +6,7 @@ project_root = str(Path(__file__).resolve().parents[2])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from kubiya_sdk.tools import Arg, FileSpec, Volume
+from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
@@ -17,6 +17,9 @@ view_user_requests_tool = JustInTimeAccessTool(
     description="View all access requests for a specific user.",
     content="""
     set -e
+    python -m venv /opt/venv > /dev/null
+    . /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
     python /opt/scripts/view_user_requests.py "{{ .user_email }}"
     """,
     args=[
@@ -32,13 +35,8 @@ view_user_requests_tool = JustInTimeAccessTool(
             content=inspect.getsource(view_user_requests_script),
         ),
     ],
-    with_volumes=[
-        Volume(
-            name="db_data",
-            path="/var/lib/database"
-        )
-    ],
 )
 
+# Register the tool
 tool_registry.register("just_in_time_access", view_user_requests_tool)
-__all__ = ['view_user_requests_tool'] 
+__all__ = ['view_user_requests_tool']

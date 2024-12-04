@@ -1,42 +1,42 @@
 import sys
-
+import os
 try:
-    import sqlite3
+    import requests
 except ImportError:
-    # During discovery phase, sqlite3 might not be available
-    pass
-def view_user_requests(user_email):
-    conn = sqlite3.connect('/var/lib/database/access_requests.db')
-    cursor = conn.cursor()
+    print("requests library not found. Please install it using 'pip install requests'")
+    sys.exit(1)
 
-    cursor.execute('''
-        SELECT request_id, tool_name, tool_params, ttl, status
-        FROM requests 
-        WHERE user_email=?
-        ORDER BY request_id DESC
-    ''', (user_email,))
-    rows = cursor.fetchall()
-
-    if not rows:
-        print(f"No access requests found for user {user_email}.")
-        return
-
-    print(f"\n🔐 Access Requests for {user_email} 🔐\n")
-    for row in rows:
-        request_id, tool_name, tool_params, ttl, status = row
-        print(f"📝 Request {request_id}:")
-        print(f"  🛠️  Tool: {tool_name}")
-        print(f"  ⚙️  Parameters: {tool_params}")
-        print(f"  ⏱️  TTL: {ttl}")
-        print(f"  📊 Status: {status}")
-        print("  " + "─" * 30)
-
-    conn.close()
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: view_user_requests.py <user_email>")
+def view_user_requests():
+    # Get user email from environment variable
+    user_email = os.getenv('KUBIYA_USER_EMAIL')
+    if not user_email:
+        print("Error: KUBIYA_USER_EMAIL environment variable not set")
         sys.exit(1)
 
-    user_email = sys.argv[1]
-    view_user_requests(user_email) 
+    try:
+        res = requests.get("http://enforcer.kubiya:5001/requests/list")
+        res.raise_for_status()
+        
+        all_requests = res.json()
+        if not all_requests:
+            print("No requests found.")
+            return
+
+        # Filter requests for the specific user
+        user_requests = [
+            req for req in all_requests 
+            if req.get('request', {}).get('user', {}).get('email') == user_email
+        ]
+        
+        if not user_requests:
+            print(f"No requests found for user: {user_email}")
+            return
+        
+        print(user_requests)  # This will print the JSON objects as-is
+        
+    except requests.RequestException as e:
+        print(f"Failed to fetch requests: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    view_user_requests()
