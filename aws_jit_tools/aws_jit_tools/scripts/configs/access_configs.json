@@ -5,5 +5,12 @@
         "account_id": "876809951775",
         "permission_set": "ECRReadOnly",
         "session_duration": "PT1H"
+    },
+    "DB Access to Staging": {
+        "name": "Database Access to Staging 2",
+        "description": "Grants access to all staging RDS databases",
+        "account_id": "876809951778",
+        "permission_set": "EKSReadOnly",
+        "session_duration": "PT1.5H"
     }
-} 
+}
