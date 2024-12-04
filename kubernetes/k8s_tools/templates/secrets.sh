@@ -7,25 +7,45 @@ NAME=$(echo "$name" | sed 's/[^a-zA-Z0-9-]//g')
 
 case "$ACTION" in
   create)
-    # Create secret from literal values if provided
+    # Create secret YAML and apply it
+    cat <<EOF | kubectl $KUBECTL_AUTH_ARGS apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $NAME
+  namespace: $NAMESPACE
+type: Opaque
+data:
+EOF
+
+    # Add literal data if provided
     if [ -n "${from_literal:-}" ]; then
-      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
-        --namespace "$NAMESPACE" \
-        --from-literal="$from_literal"
+      # Split key-value pairs and add to YAML
+      IFS=',' read -ra PAIRS <<< "$from_literal"
+      for PAIR in "${PAIRS[@]}"; do
+        KEY="${PAIR%%=*}"
+        VALUE="${PAIR#*=}"
+        echo "  $KEY: $(echo -n "$VALUE" | base64)" | kubectl $KUBECTL_AUTH_ARGS apply -f -
+      done
     fi
 
-    # Create secret from files if provided
+    # Add file contents if provided
     if [ -n "${from_file:-}" ]; then
-      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
-        --namespace "$NAMESPACE" \
-        --from-file="$from_file"
+      # Split multiple files if provided
+      IFS=',' read -ra FILES <<< "$from_file"
+      for FILE in "${FILES[@]}"; do
+        KEY=$(basename "$FILE")
+        echo "  $KEY: $(cat "$FILE" | base64)" | kubectl $KUBECTL_AUTH_ARGS apply -f -
+      done
     fi
 
-    # Create secret from env file if provided
+    # Add env file contents if provided
     if [ -n "${from_env_file:-}" ]; then
-      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
-        --namespace "$NAMESPACE" \
-        --from-env-file="$from_env_file"
+      while IFS='=' read -r KEY VALUE; do
+        # Skip comments and empty lines
+        [[ $KEY =~ ^#.*$ ]] || [ -z "$KEY" ] && continue
+        echo "  $KEY: $(echo -n "$VALUE" | base64)" | kubectl $KUBECTL_AUTH_ARGS apply -f -
+      done < "$from_env_file"
     fi
     ;;
 
