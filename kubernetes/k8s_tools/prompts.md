@@ -6,7 +6,7 @@
 - "@Kubi Deploy nginx with 3 replicas and expose it on port 90. Please call this deployment 'delete-me-later' "
 - "@Kubi Create a web deployment with health checks and resource limits, share configuration"
 - "@Kubi Deploy Redis in default namespace: Create a Redis deployment (image: redis:latest) with 1 replica, memory limit 1Gi, CPU limit 500m, readiness probe on port 6379, and persistence enabled. For storage, create a 10GB persistent volume and corresponding PVC mounted at /data. Expose Redis as a service on port 6379, and display the connection string. Instead of creating yaml files for this setup you must do everything imparatively using kubectl."
-- "@Kubi Set up MySQL database with secrets and show deployment status in the default namespace"
+- "@Kubi Set up MySQL database with secrets and show deployment status in the default namespace. First create the necessary secrets for MySQL root and user credentials, then deploy MySQL using those secrets and configure persistent storage. Finally, show me the deployment status including pod health, secret verification, and service endpoints."
 
 ## Monitoring & Health Checks 📊
 > Monitor cluster and application health
