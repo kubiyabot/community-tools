@@ -2,11 +2,12 @@ import inspect
 import sys
 from pathlib import Path
 
+# Add the project root to Python path
 project_root = str(Path(__file__).resolve().parents[2])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from kubiya_sdk.tools import Arg, FileSpec, Volume
+from kubiya_sdk.tools import Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
@@ -17,7 +18,10 @@ search_access_requests_tool = JustInTimeAccessTool(
     description="Search for access requests based on status and/or tool name.",
     content="""
     set -e
-    python /opt/scripts/search_access_requests.py "{{ .status }}" "{{ .tool_name }}"
+    python -m venv /opt/venv > /dev/null
+    . /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
+    python /opt/scripts/search_access_requests.py "{{ .status }}" "{{ .tool_name }}" {{ if .user_email }}--user_email "{{ .user_email }}"{{ end }}
     """,
     args=[
         Arg(
@@ -30,6 +34,11 @@ search_access_requests_tool = JustInTimeAccessTool(
             description="Filter by tool name (partial matches are supported).",
             required=False
         ),
+        Arg(
+            name="user_email",
+            description="Filter by requester's email address.",
+            required=False
+        )
     ],
     with_files=[
         FileSpec(
@@ -37,13 +46,9 @@ search_access_requests_tool = JustInTimeAccessTool(
             content=inspect.getsource(search_requests_script),
         ),
     ],
-    with_volumes=[
-        Volume(
-            name="db_data",
-            path="/var/lib/database"
-        )
-    ],
 )
 
+# Register the tool
 tool_registry.register("just_in_time_access", search_access_requests_tool)
-__all__ = ['search_access_requests_tool'] 
+
+__all__ = ["search_access_requests_tool"]
