@@ -173,6 +173,23 @@ for dest in ${slack_destination}; do
                 continue
             fi
             ;;
+        "<#"*)
+            # Remove # prefix and get channel name
+            channel_name=${dest#"<#"}  # Removes the leading "<#"
+            channel_name=${channel_name%">"}  # Removes the trailing ">"
+            # Try to get channel ID
+            channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+                "https://slack.com/api/conversations.list?limit=1000" | \
+                jq -r --arg name "$channel_name" '.channels[] | select(.name == $name) | .id')
+
+            if [ -n "$channel_info" ]; then
+                channel="$channel_info"
+                echo "✅ Found channel ID for ${dest}"
+            else
+                echo "❌ Could not find channel: ${dest}"
+                continue
+            fi
+            ;;
         "@"*)
             # Remove @ prefix and get username
             username=${dest#"@"}
