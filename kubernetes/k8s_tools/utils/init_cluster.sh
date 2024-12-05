@@ -74,10 +74,22 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
+kubectl apply -f - <<EOT
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubewatch-config
+  namespace: default
+data:
+  .kubewatch.yaml: |
+$(cat "$CONFIG_PATH" | sed 's/^/    /')
+EOT
+
+
 # Create values file for helm
 HELM_VALUES=$(cat <<EOF
 configmap:
-  create: true
+  create: false # do not create config map from helm
   name: kubiya-kubewatch-config
   data:
     .kubewatch.yaml: |
