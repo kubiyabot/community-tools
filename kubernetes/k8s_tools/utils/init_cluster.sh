@@ -164,6 +164,23 @@ else
     check_command "kubiya-kubewatch upgrade failed" "Updated kubiya-kubewatch configuration"
 fi
 
+# Load kubewatch config
+CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
+if [ ! -f "$CONFIG_PATH" ]; then
+    log "❌ Error: Kubewatch config not found at $CONFIG_PATH"
+    exit 1
+fi
+
+kubectl apply -n kubiya -f - <<EOT
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubiya-kubewatch-config
+data:
+  .kubewatch.yaml: |
+$(cat "$CONFIG_PATH" | sed 's/^/    /')
+EOT
+
 # Clean up temporary file
 rm -f "$VALUES_FILE"
 
