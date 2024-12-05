@@ -141,8 +141,6 @@ for dest in ${slack_destination}; do
 
     channel=""
     full_comment="${comment}${thread_ref}"
-
-    echo "✅ Channel ID: ${dest}" | base64
     
     # Handle channel format
     case "$dest" in
