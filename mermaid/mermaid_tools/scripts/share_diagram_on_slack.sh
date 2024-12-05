@@ -60,7 +60,8 @@ if [ "$output_format" = "svg" ]; then
         fi
     fi
 fi
-printf '%s' "${diagram_content}" > tmp.txt
+
+echo "${diagram_content}"  > tmp.txt
 
 echo "🖌️ Generating diagram..."
 if ! curl -s --location "http://mermaidsvc-svc:80/generate?type=${output_format}" \
@@ -143,6 +144,16 @@ for dest in ${slack_destination}; do
 
     # Handle channel format
     case "$dest" in
+        "c"*)
+            # Handle case where input starts with "c" and is 11 characters long
+            if [[ ${#dest} -eq 11 ]]; then
+                channel="$dest"
+                echo "✅ Using provided channel ID: ${dest}"
+            else
+                echo "❌ Invalid channel ID format: ${dest}"
+                continue
+            fi
+            ;;
         "#"*)
             # Remove # prefix and get channel name
             channel_name=${dest#"#"}
@@ -177,23 +188,18 @@ for dest in ${slack_destination}; do
             fi
             ;;
         *)
-            # First try to use it as a channel ID
-            if echo "$dest" | grep -qE '^[UCGD][A-Z0-9]{8,}$'; then
-                channel="$dest"
-                echo "✅ Using provided Slack ID: ${dest}"
-            else
-                # Try to get channel ID from exact name match
-                channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-                    "https://slack.com/api/conversations.list" | \
-                    jq -r --arg name "$dest" '.channels[] | select(.name == $name) | .id')
 
-                if [ -n "$channel_info" ]; then
-                    channel="$channel_info"
-                    echo "✅ Found channel ID for ${dest}"
-                else
-                    echo "❌ Invalid destination format or channel not found: ${dest}"
-                    continue
-                fi
+                # Try to get channel ID from exact name match
+            channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
+            "https://slack.com/api/conversations.list" | \
+            jq -r --arg name "$dest" '.channels[] | select(.name == $name) | .id')
+            if [ -n "$channel_info" ]; then
+                channel="$channel_info"
+                echo "✅ Found channel ID for ${dest}"
+            else
+                echo "❌ Invalid destination format or channel not found: ${dest}"
+                continue
+
             fi
             ;;
     esac

@@ -55,5 +55,5 @@ exec {script_path}
             secrets=secrets,
             env=env,
             with_files=with_files,
-            with_services=[ServiceSpec(name="mermaidsvc",image="tomwright/mermaid-server:latest",exposed_ports=[80])]
+            with_services=[ServiceSpec(name="mermaidsvc",image="ghcr.io/kubiyabot/mermaid-server:v0.0.0",exposed_ports=[80])]
         )
