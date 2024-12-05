@@ -15,6 +15,11 @@ check_command() {
     log "✅ $2"
 }
 
+# Helper function to check if a resource exists
+resource_exists() {
+    kubectl get "$1" -n "$2" "$3" &> /dev/null
+}
+
 log "🚀 Initializing Kubernetes tools..."
 
 # Check prerequisites
@@ -49,39 +54,73 @@ else
     log "✅ Kubiya namespace already exists"
 fi
 
-# Create kubewatch config
-log "Creating kubewatch configuration..."
+# Check if kubiya-kubewatch is already deployed
+log "Checking kubiya-kubewatch deployment..."
+if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
+    # Only install if not already present
+    log "kubiya-kubewatch not found, installing..."
+    
+    # Add helm repo if needed
+    helm repo add robusta https://robusta-charts.storage.googleapis.com || true
+    helm repo update
+    check_command "helm repo setup failed" "Helm repository configured"
+
+    helm install kubiya-kubewatch robusta/kubewatch \
+        --namespace kubiya \
+        --create-namespace \
+        --set rbac.create=true \
+        --set image.repository=ghcr.io/kubiyabot/kubewatch \
+        --set image.tag=latest \
+        --wait \
+        --timeout 5m
+    check_command "kubiya-kubewatch installation failed" "Installed kubiya-kubewatch"
+else
+    log "✅ kubiya-kubewatch is already installed"
+fi
+
+# Update kubiya-kubewatch config
+log "Updating kubiya-kubewatch configuration..."
 CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
 if [ ! -f "$CONFIG_PATH" ]; then
     log "❌ Error: Kubewatch config not found at $CONFIG_PATH"
     exit 1
 fi
 
-kubectl delete configmap kubewatch-config -n kubiya --ignore-not-found
-check_command "failed to delete old configmap" "Cleaned up old configmap"
+# Update the configmap with latest configuration
+kubectl create configmap kubiya-kubewatch-config -n kubiya \
+    --from-file=.kubewatch.yaml="$CONFIG_PATH" \
+    -o yaml --dry-run=client | kubectl apply -f -
+check_command "configmap update failed" "Updated kubiya-kubewatch configuration"
 
-kubectl create configmap kubewatch-config -n kubiya --from-file=.kubewatch.yaml="$CONFIG_PATH"
-check_command "configmap creation failed" "Created kubewatch configmap"
+# Restart the kubiya-kubewatch pod to pick up new config
+log "Restarting kubiya-kubewatch to apply new configuration..."
+kubectl rollout restart deployment/kubiya-kubewatch -n kubiya
+check_command "restart failed" "Restarted kubiya-kubewatch deployment"
 
-# Deploy kubewatch
-log "Setting up helm repository..."
-helm repo add robusta https://robusta-charts.storage.googleapis.com
-helm repo update
-check_command "helm repo setup failed" "Helm repository configured"
-
-log "Deploying kubewatch..."
-helm upgrade --install kubewatch robusta/kubewatch \
-    --namespace kubiya \
-    --set config.handler.webhook.enabled=true \
-    --set config.handler.webhook.url=https://webhooksource-kubiya.hooks.kubiya.ai:8443/webhook \
-    --set rbac.create=true \
-    --set image.repository=ghcr.io/kubiyabot/kubewatch \
-    --set image.tag=latest
-check_command "kubewatch deployment failed" "Deployed kubewatch"
-
-# Wait for deployment
-log "Waiting for kubewatch deployment..."
-kubectl rollout status deployment/kubewatch -n kubiya --timeout=300s
-check_command "deployment verification failed" "Kubewatch deployment is ready"
+# Verify deployment
+log "Verifying kubiya-kubewatch deployment..."
+ATTEMPTS=0
+MAX_ATTEMPTS=30
+while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+    if kubectl get pods -n kubiya -l app=kubiya-kubewatch | grep -q "Running"; then
+        log "✅ kubiya-kubewatch pod is running"
+        
+        # Check logs for successful startup
+        if kubectl logs -n kubiya -l app=kubiya-kubewatch --tail=10 | grep -q "Starting kubewatch controller"; then
+            log "✅ kubiya-kubewatch is properly initialized"
+            break
+        fi
+    fi
+    
+    ATTEMPTS=$((ATTEMPTS + 1))
+    if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
+        log "❌ Error: kubiya-kubewatch failed to start properly"
+        kubectl describe pods -n kubiya -l app=kubiya-kubewatch
+        exit 1
+    fi
+    
+    log "Waiting for kubiya-kubewatch to start... (attempt $ATTEMPTS/$MAX_ATTEMPTS)"
+    sleep 10
+done
 
 log "🎉 Initialization completed successfully" 
