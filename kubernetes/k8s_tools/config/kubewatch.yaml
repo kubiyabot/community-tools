@@ -1,0 +1,47 @@
+version: "1"
+filter:
+  watch_for:
+    - kind: Pod
+      reasons: 
+        - "*BackOff*"
+        - "*Error*"
+        - "*Failed*"
+      severity: critical
+      prompt: |
+        🔥 Issue detected with Pod {{.Name}} in {{.Namespace}}
+        Status: {{.Phase}}
+        Issue: {{.WaitingReason}}
+        Details: {{.WaitingMessage}}
+        Container State: {{.ContainerState}}
+        Restart Count: {{.RestartCount}}
+        {{if .ExitCode}}Exit Code: {{.ExitCode}}{{end}}
+        {{if .LastTerminationReason}}Last Termination: {{.LastTerminationReason}}
+        Last Termination Message: {{.LastTerminationMessage}}{{end}}
+    - kind: Node
+      reasons:
+        - "*NotReady*"
+        - "*Pressure*"
+      severity: critical
+      prompt: |
+        ⚠️ Node Issue Detected
+        Node: {{.Name}}
+        Status: {{.Reason}}
+        Message: {{.Message}}
+        Time: {{.Timestamp}}
+        Count: {{.Count}}
+  namespaces:
+    - default
+    - kube-system
+  settings:
+    dedup_interval: 1m
+    include_labels: true
+handler:
+  webhook:
+    url: "https://webhooksource-kubiya.hooks.kubiya.ai:8443/webhook"
+    cert: ""
+    tlsSkip: true
+resource:
+  pod: true
+  node: true
+  deployment: true
+  event: true 
