@@ -11,13 +11,42 @@ from typing import Tuple, Optional
 import time
 import json
 import threading
+from .utils.script_runner import run_command
 
-# Configure detailed logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure detailed logging with colors
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter with colors"""
+    grey = "\x1b[38;21m"
+    blue = "\x1b[38;5;39m"
+    yellow = "\x1b[38;5;226m"
+    red = "\x1b[38;5;196m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+
+    def __init__(self, fmt):
+        super().__init__()
+        self.fmt = fmt
+        self.FORMATS = {
+            logging.DEBUG: self.grey + self.fmt + self.reset,
+            logging.INFO: self.blue + self.fmt + self.reset,
+            logging.WARNING: self.yellow + self.fmt + self.reset,
+            logging.ERROR: self.red + self.fmt + self.reset,
+            logging.CRITICAL: self.bold_red + self.fmt + self.reset
+        }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+# Configure logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = ColoredFormatter('%(asctime)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 class KubernetesSetupError(Exception):
     """Custom exception for Kubernetes setup errors with troubleshooting steps."""
@@ -27,257 +56,169 @@ class KubernetesSetupError(Exception):
         super().__init__(self.format_message())
 
     def format_message(self) -> str:
-        formatted = f"\n❌ Error: {self.message}\n\n"
-        formatted += "🛠️ Manual Troubleshooting Steps:\n"
+        formatted = f"\n{'='*80}\n"
+        formatted += f"❌ Error: {self.message}\n\n"
+        formatted += "🛠️  Troubleshooting Steps:\n"
         for i, step in enumerate(self.troubleshooting_steps, 1):
             formatted += f"{i}. {step}\n"
+        formatted += f"{'='*80}\n"
         return formatted
 
-def create_helm_values() -> Optional[str]:
-    """Create custom values.yaml for helm with all required configuration."""
+def validate_prerequisites() -> bool:
+    """Validate all prerequisites are installed and configured correctly."""
+    logger.info("🔍 Validating prerequisites...")
+    
+    # Check kubectl
     try:
-        # Define helm values
-        values = {
-            "image": {
-                "repository": "ghcr.io/kubiyabot/kubewatch",
-                "tag": "dd496405c04f285b3d164f11e4463b3ea02e6ea1",
-                "pullPolicy": "Always"
-            },
-            "rbac": {
-                "create": True,
-                "serviceAccount": {
-                    "create": True,
-                    "name": "kubewatch"
-                }
-            },
-            "resourcesToWatch": {
-                "deployment": True,
-                "pod": True,
-                "daemonset": True,
-                "service": True,
-                "configmap": True,
-                "namespace": True,
-                "job": True,
-                "persistentvolume": True,
-                "secret": False,
-                "ingress": True
-            },
-            "extraVolumes": [
-                {
-                    "name": "config-volume",
-                    "configMap": {
-                        "name": "kubewatch-config"
-                    }
-                }
-            ],
-            "extraVolumeMounts": [
-                {
-                    "name": "config-volume",
-                    "mountPath": "/root/.kubewatch.yaml",
-                    "subPath": ".kubewatch.yaml"
-                }
-            ],
-            "resources": {
-                "limits": {
-                    "cpu": "100m",
-                    "memory": "128Mi"
-                },
-                "requests": {
-                    "cpu": "50m",
-                    "memory": "64Mi"
-                }
-            },
-            "config": {
-                "handler": {
-                    "webhook": {
-                        "enabled": True,
-                        "url": "${WEBHOOK_URL}"
-                    }
-                }
-            },
-            "replicaCount": 1,
-            "nodeSelector": {},
-            "tolerations": [],
-            "affinity": {}
-        }
-
-        # Create temporary values file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
-            yaml.dump(values, temp_file)
-            values_path = temp_file.name
-            logger.info(f"✅ Created helm values file at {values_path}")
-            return values_path
-
+        version = run_command("kubectl version --client --output=json")
+        logger.info(f"✅ kubectl is installed: {json.loads(version)['clientVersion']['gitVersion']}")
     except Exception as e:
-        troubleshooting = [
-            "Manually create values.yaml with the following content:\n" +
-            "image:\n" +
-            "  repository: ghcr.io/kubiyabot/kubewatch\n" +
-            "  tag: dd496405c04f285b3d164f11e4463b3ea02e6ea1\n" +
-            "rbac:\n" +
-            "  create: true\n" +
-            "resourcesToWatch:\n" +
-            "  daemonset: true\n" +
-            "  pod: true\n" +
-            "extraVolumes:\n" +
-            "  - name: config-volume\n" +
-            "    configMap:\n" +
-            "      name: kubewatch-config\n" +
-            "extraVolumeMounts:\n" +
-            "  - name: config-volume\n" +
-            "    mountPath: /root/.kubewatch.yaml\n" +
-            "    subPath: .kubewatch.yaml",
-            "Verify yaml syntax:\n" +
-            "   yamllint values.yaml",
-            "Check file permissions:\n" +
-            "   ls -la values.yaml"
-        ]
         raise KubernetesSetupError(
-            f"Failed to create helm values file: {str(e)}",
-            troubleshooting
+            "kubectl is not installed or not working properly",
+            [
+                "Install kubectl:\n   curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl",
+                "Make kubectl executable:\n   chmod +x kubectl",
+                "Move to PATH:\n   sudo mv kubectl /usr/local/bin/",
+                "Verify installation:\n   kubectl version --client"
+            ]
         )
 
-def verify_command_exists(command: str) -> Tuple[bool, str]:
-    """Verify if a command exists and return its path."""
+    # Check helm
     try:
-        result = subprocess.run(["which", command], capture_output=True, text=True)
-        if result.returncode == 0:
-            return True, result.stdout.strip()
-        return False, ""
-    except Exception:
-        return False, ""
+        version = run_command("helm version --short")
+        logger.info(f"✅ helm is installed: {version}")
+    except Exception as e:
+        raise KubernetesSetupError(
+            "helm is not installed or not working properly",
+            [
+                "Install helm:\n   curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash",
+                "Verify installation:\n   helm version",
+                "Add required repos:\n   helm repo add stable https://charts.helm.sh/stable"
+            ]
+        )
 
-def install_prerequisites() -> bool:
-    """Install required binaries (kubectl, helm)."""
+    # Validate cluster access
     try:
-        # Check if kubectl exists
-        kubectl_exists, kubectl_path = verify_command_exists("kubectl")
-        if not kubectl_exists:
-            logger.info("🔄 Installing kubectl...")
-            kubectl_commands = [
-                "curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl",
-                "chmod +x kubectl",
-                "mv kubectl /usr/local/bin/"
+        context = run_command("kubectl config current-context")
+        logger.info(f"✅ Connected to cluster: {context}")
+    except Exception as e:
+        raise KubernetesSetupError(
+            "Cannot connect to Kubernetes cluster",
+            [
+                "Check kubeconfig:\n   kubectl config view",
+                "Verify cluster access:\n   kubectl cluster-info",
+                "Check credentials:\n   kubectl auth can-i get pods",
+                "Verify network connectivity:\n   curl -k https://<cluster-ip>"
             ]
-            for cmd in kubectl_commands:
-                subprocess.run(cmd, shell=True, check=True)
-        
-        # Check if helm exists
-        helm_exists, helm_path = verify_command_exists("helm")
-        if not helm_exists:
-            logger.info("🔄 Installing helm...")
-            helm_commands = [
-                "curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3",
-                "chmod +x get_helm.sh",
-                "./get_helm.sh",
-                "rm get_helm.sh"
-            ]
-            for cmd in helm_commands:
-                subprocess.run(cmd, shell=True, check=True)
+        )
 
+    return True
+
+def verify_namespace_exists(namespace: str = "kubiya") -> bool:
+    """Verify namespace exists or create it."""
+    try:
+        run_command(f"kubectl get namespace {namespace}")
+        logger.info(f"✅ Namespace {namespace} exists")
         return True
-    except Exception as e:
-        troubleshooting = [
-            "Manually install kubectl:\n" +
-            "   curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl\n" +
-            "   chmod +x kubectl\n" +
-            "   sudo mv kubectl /usr/local/bin/",
-            "Manually install helm:\n" +
-            "   curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3\n" +
-            "   chmod +x get_helm.sh\n" +
-            "   ./get_helm.sh",
-            "Verify installations:\n" +
-            "   kubectl version\n" +
-            "   helm version",
-            "Check directory permissions:\n" +
-            "   ls -la /usr/local/bin\n" +
-            "   sudo chown -R $(whoami) /usr/local/bin"
-        ]
-        raise KubernetesSetupError(
-            f"Failed to install prerequisites: {str(e)}", 
-            troubleshooting
-        )
-
-def setup_cluster_permissions() -> bool:
-    """Setup required cluster permissions."""
-    try:
-        # Create cluster role binding for kubiya service account
-        cmd = [
-            "kubectl", "create", "clusterrolebinding", "kubiya-sa-cluster-admin",
-            "--clusterrole=cluster-admin",
-            "--serviceaccount=kubiya:kubiya-service-account"
-        ]
-        subprocess.run(cmd, check=True)
-        
-        # Verify permissions
-        cmd = [
-            "kubectl", "auth", "can-i", "list", "pods",
-            "--as=system:serviceaccount:kubiya:kubiya-service-account",
-            "--all-namespaces"
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        if "yes" not in result.stdout.lower():
-            troubleshooting = [
-                "Verify the kubiya namespace exists:\n" +
-                "   kubectl get namespace kubiya",
-                "Create the namespace if it doesn't exist:\n" +
-                "   kubectl create namespace kubiya",
-                "Verify the service account exists:\n" +
-                "   kubectl get serviceaccount kubiya-service-account -n kubiya",
-                "Create the service account if it doesn't exist:\n" +
-                "   kubectl create serviceaccount kubiya-service-account -n kubiya",
-                "Manually create the cluster role binding:\n" +
-                "   kubectl create clusterrolebinding kubiya-sa-cluster-admin \\\n" +
-                "   --clusterrole=cluster-admin \\\n" +
-                "   --serviceaccount=kubiya:kubiya-service-account",
-                "Verify permissions:\n" +
-                "   kubectl auth can-i --list --as=system:serviceaccount:kubiya:kubiya-service-account"
-            ]
+    except:
+        try:
+            run_command(f"kubectl create namespace {namespace}")
+            logger.info(f"✅ Created namespace {namespace}")
+            return True
+        except Exception as e:
             raise KubernetesSetupError(
-                "Service account does not have required permissions",
-                troubleshooting
+                f"Failed to create namespace {namespace}",
+                [
+                    "Check permissions:\n   kubectl auth can-i create namespace",
+                    f"Try manually:\n   kubectl create namespace {namespace}",
+                    "Verify namespace list:\n   kubectl get namespaces"
+                ]
             )
+
+def verify_kubewatch_deployment(timeout: int = 300) -> bool:
+    """Verify kubewatch deployment is running properly."""
+    logger.info("🔍 Verifying kubewatch deployment...")
+    start_time = time.time()
+    
+    while time.time() - start_time < timeout:
+        try:
+            # Check deployment status
+            status = run_command("kubectl get deployment kubewatch -n kubiya -o json")
+            deploy = json.loads(status)
+            
+            available = deploy['status'].get('availableReplicas', 0)
+            desired = deploy['status'].get('replicas', 0)
+            
+            if available == desired and desired > 0:
+                logger.info("✅ Kubewatch deployment is ready and running")
+                
+                # Verify it's actually working by checking logs
+                logs = run_command("kubectl logs -l app=kubewatch -n kubiya --tail=1")
+                if "watching" in logs.lower():
+                    logger.info("✅ Kubewatch is actively monitoring the cluster")
+                    return True
+                
+            logger.info(f"⏳ Waiting for kubewatch deployment ({available}/{desired} ready)...")
+            
+        except Exception as e:
+            logger.warning(f"⚠️  Deployment check failed: {str(e)}")
         
-        return True
-    except subprocess.CalledProcessError as e:
-        troubleshooting = [
-            "Verify you have cluster-admin permissions:\n" +
-            "   kubectl auth can-i create clusterrolebinding",
-            "Check if the binding already exists:\n" +
-            "   kubectl get clusterrolebinding kubiya-sa-cluster-admin",
-            "Delete existing binding if needed:\n" +
-            "   kubectl delete clusterrolebinding kubiya-sa-cluster-admin",
-            "Verify the kubiya namespace and service account:\n" +
-            "   kubectl get namespace kubiya\n" +
-            "   kubectl get serviceaccount -n kubiya"
+        time.sleep(5)
+    
+    raise KubernetesSetupError(
+        "Kubewatch deployment verification timed out",
+        [
+            "Check deployment status:\n   kubectl describe deployment kubewatch -n kubiya",
+            "View pod logs:\n   kubectl logs -l app=kubewatch -n kubiya",
+            "Check events:\n   kubectl get events -n kubiya",
+            "Verify resources:\n   kubectl top pods -n kubiya"
         ]
-        raise KubernetesSetupError(
-            f"Failed to setup cluster permissions: {e.stderr.decode() if e.stderr else str(e)}",
-            troubleshooting
-        )
+    )
 
 def create_kubewatch_config() -> bool:
-    """Create kubewatch ConfigMap."""
+    """Create and validate kubewatch ConfigMap from config file."""
+    logger.info("🔄 Creating kubewatch configuration...")
+    
     try:
         # Load configuration from our config file
         config_path = Path(__file__).parent / 'config' / 'kubewatch.yaml'
         if not config_path.exists():
-            troubleshooting = [
-                f"Verify config file exists:\n" +
-                f"   ls -l {config_path}",
-                "Create the config file manually:\n" +
-                "   mkdir -p kubernetes/k8s_tools/config\n" +
-                "   vim kubernetes/k8s_tools/config/kubewatch.yaml",
-                "Check file permissions:\n" +
-                f"   ls -la {config_path.parent}"
-            ]
             raise KubernetesSetupError(
                 f"Kubewatch config not found at {config_path}",
-                troubleshooting
+                [
+                    f"Verify config file exists:\n   ls -l {config_path}",
+                    "Create the config file manually:\n   mkdir -p kubernetes/k8s_tools/config",
+                    "Copy the default config:\n   cp config/kubewatch.yaml.example config/kubewatch.yaml",
+                    "Check file permissions:\n   ls -la config/"
+                ]
             )
 
-        with open(config_path) as f:
-            kubewatch_config = yaml.safe_load(f)
+        # Load and validate YAML
+        try:
+            with open(config_path) as f:
+                kubewatch_config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise KubernetesSetupError(
+                f"Invalid YAML in kubewatch config: {str(e)}",
+                [
+                    "Check YAML syntax:\n   yamllint config/kubewatch.yaml",
+                    "Validate against schema:\n   kubectl create configmap --dry-run=client -o yaml",
+                    "Use online YAML validator:\n   http://www.yamllint.com/"
+                ]
+            )
+
+        # Validate required fields
+        required_fields = ['handler', 'resource']
+        missing_fields = [field for field in required_fields if field not in kubewatch_config]
+        if missing_fields:
+            raise KubernetesSetupError(
+                f"Missing required fields in kubewatch config: {', '.join(missing_fields)}",
+                [
+                    "Required fields are:\n   - handler\n   - resource",
+                    "Check example config:\n   cat config/kubewatch.yaml.example",
+                    "Verify config structure:\n   https://github.com/kubeshark/kubewatch#configuration"
+                ]
+            )
 
         # Create ConfigMap manifest
         config_map = {
@@ -292,188 +233,70 @@ def create_kubewatch_config() -> bool:
             }
         }
 
-        # Apply ConfigMap
+        # Create temporary file for the ConfigMap
         with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
             yaml.dump(config_map, temp_file)
             config_path = temp_file.name
 
         try:
-            subprocess.run(["kubectl", "apply", "-f", config_path], check=True)
-        except subprocess.CalledProcessError as e:
-            troubleshooting = [
-                "Manually create the ConfigMap:\n" +
-                "   kubectl create configmap kubewatch-config --from-file=.kubewatch.yaml=config/kubewatch.yaml -n kubiya",
-                "Check if ConfigMap already exists:\n" +
-                "   kubectl get configmap kubewatch-config -n kubiya",
-                "Delete existing ConfigMap if needed:\n" +
-                "   kubectl delete configmap kubewatch-config -n kubiya",
-                "Verify permissions:\n" +
-                "   kubectl auth can-i create configmap -n kubiya"
-            ]
+            # Try to delete existing ConfigMap if it exists
+            try:
+                run_command("kubectl delete configmap kubewatch-config -n kubiya --ignore-not-found")
+                logger.info("🗑️  Cleaned up existing kubewatch config")
+            except Exception:
+                pass
+
+            # Apply new ConfigMap
+            result = run_command(f"kubectl apply -f {config_path}")
+            logger.info("✅ Applied kubewatch configuration")
+
+            # Verify ConfigMap was created
+            verify_result = run_command("kubectl get configmap kubewatch-config -n kubiya -o name")
+            if "configmap/kubewatch-config" in verify_result:
+                logger.info("✅ Verified kubewatch ConfigMap exists")
+                return True
+            else:
+                raise Exception("ConfigMap verification failed")
+
+        except Exception as e:
             raise KubernetesSetupError(
-                f"Failed to create ConfigMap: {e.stderr.decode() if e.stderr else str(e)}",
-                troubleshooting
+                f"Failed to create ConfigMap: {str(e)}",
+                [
+                    "Check kubectl access:\n   kubectl auth can-i create configmap -n kubiya",
+                    "Try manually:\n   kubectl create configmap kubewatch-config --from-file=.kubewatch.yaml=config/kubewatch.yaml -n kubiya",
+                    "Verify namespace exists:\n   kubectl get namespace kubiya",
+                    "Check events:\n   kubectl get events -n kubiya"
+                ]
             )
         finally:
+            # Clean up temporary file
             os.unlink(config_path)
-        
-        return True
+
     except Exception as e:
         if not isinstance(e, KubernetesSetupError):
-            troubleshooting = [
-                "Check kubectl configuration:\n" +
-                "   kubectl config view",
-                "Verify cluster access:\n" +
-                "   kubectl cluster-info",
-                "Check namespace permissions:\n" +
-                "   kubectl auth can-i create configmap -n kubiya"
-            ]
             raise KubernetesSetupError(
                 f"Failed to create kubewatch config: {str(e)}",
-                troubleshooting
+                [
+                    "Verify config file exists and is readable",
+                    "Check YAML syntax in config file",
+                    "Ensure kubectl has necessary permissions",
+                    "Verify kubiya namespace exists"
+                ]
             )
         raise
 
-def deploy_kubewatch() -> bool:
-    """Deploy kubewatch using helm."""
-    try:
-        # Add helm repo
-        subprocess.run(
-            ["helm", "repo", "add", "robusta", "https://robusta-charts.storage.googleapis.com"],
-            check=True
-        )
-        subprocess.run(["helm", "repo", "update"], check=True)
+    return False
 
-        # Create values file
-        values_file = create_helm_values()
-        if not values_file:
-            troubleshooting = [
-                "Manually create values.yaml:\n" +
-                "   vim values.yaml  # Copy content from create_helm_values()",
-                "Verify file permissions:\n" +
-                "   ls -la values.yaml"
-            ]
-            raise KubernetesSetupError(
-                "Failed to create helm values file",
-                troubleshooting
-            )
-
-        try:
-            # Deploy kubewatch
-            subprocess.run([
-                "helm", "upgrade", "--install", "kubewatch",
-                "robusta/kubewatch", "-f", values_file
-            ], check=True)
-            
-            return True
-        except subprocess.CalledProcessError as e:
-            troubleshooting = [
-                "Verify helm installation:\n" +
-                "   helm version",
-                "Check helm repositories:\n" +
-                "   helm repo list\n" +
-                "   helm repo update",
-                "Manually install kubewatch:\n" +
-                "   helm upgrade --install kubewatch robusta/kubewatch -f values.yaml",
-                "Check existing installation:\n" +
-                "   helm list -A | grep kubewatch",
-                "Debug helm installation:\n" +
-                "   helm upgrade --install kubewatch robusta/kubewatch -f values.yaml --debug",
-                "Verify Tiller permissions (if using Helm 2):\n" +
-                "   kubectl get serviceaccount tiller -n kube-system"
-            ]
-            raise KubernetesSetupError(
-                f"Failed to deploy kubewatch (failed to apply helm chart):\n\n" +
-                f"{e.stderr.decode() if e.stderr else str(e)}" +
-                "\n\n" +
-                f"Stdout:\n{e.stdout.decode() if e.stdout else 'No relevant output from helm'}",
-                troubleshooting
-            )
-        finally:
-            os.unlink(values_file)
-
-    except Exception as e:
-        if not isinstance(e, KubernetesSetupError):
-            troubleshooting = [
-                "Verify helm and kubectl are installed:\n" +
-                "   which helm kubectl",
-                "Check cluster access:\n" +
-                "   kubectl cluster-info",
-                "Verify helm repositories:\n" +
-                "   helm repo list"
-            ]
-            raise KubernetesSetupError(
-                f"Failed to deploy kubewatch (failed to install helm chart):\n\n" +
-                f"{str(e)}",
-                troubleshooting
-            )
-        raise
-
-def verify_kubewatch_deployment() -> bool:
-    """Verify that kubewatch is properly deployed and running."""
-    try:
-        # Check pod status
-        result = subprocess.run(
-            ["kubectl", "get", "pods", "-n", "default", "-l", "app=kubewatch", "-o", "json"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        pods = json.loads(result.stdout)
-        
-        if not pods.get('items'):
-            logger.info("⏳ Kubewatch pod not yet created")
-            return False
-
-        pod = pods['items'][0]
-        status = pod.get('status', {})
-        phase = status.get('phase')
-        
-        if phase == 'Running':
-            conditions = status.get('conditions', [])
-            ready = any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in conditions)
-            if ready:
-                logger.info("✅ Kubewatch pod is running and ready")
-                return True
-        
-        logger.info(f"⏳ Kubewatch pod status: {phase}")
-        return False
-            
-    except Exception as e:
-        logger.error(f"❌ Failed to verify kubewatch deployment: {str(e)}")
-        return False
-
-def background_setup():
-    """Run the full setup process in the background."""
-    try:
-        # Deploy kubewatch
-        if not deploy_kubewatch():
-            logger.error("Failed to deploy kubewatch")
-            return
-
-        # Verify deployment
-        max_attempts = 30
-        attempt = 0
-        while attempt < max_attempts:
-            if verify_kubewatch_deployment():
-                logger.info("✅ Kubewatch deployment completed successfully")
-                return
-            attempt += 1
-            time.sleep(2)
-            
-        logger.error("❌ Timeout waiting for kubewatch deployment")
-    except Exception as e:
-        logger.error(f"❌ Background setup failed: {str(e)}")
-
-# Initialize with minimal requirements
+# Initialize with proper validation
 try:
     logger.info("🚀 Initializing Kubernetes tools...")
     
-    # Install required binaries
-    if not install_prerequisites():
-        raise Exception("Failed to install prerequisites")
-    logger.info("✅ Prerequisites installed successfully")
-
+    # Validate prerequisites
+    validate_prerequisites()
+    
+    # Verify namespace
+    verify_namespace_exists()
+    
     # Setup cluster permissions
     if not setup_cluster_permissions():
         raise Exception("Failed to setup cluster permissions")
@@ -484,8 +307,18 @@ try:
         raise Exception("Failed to create kubewatch config")
     logger.info("✅ Kubewatch config created successfully")
 
-    # Start background deployment
-    setup_thread = threading.Thread(target=background_setup)
+    # Start background deployment with proper verification
+    def deploy_and_verify():
+        try:
+            if deploy_kubewatch():
+                if verify_kubewatch_deployment():
+                    logger.info("🎉 Kubewatch deployment completed successfully")
+                    return
+            raise Exception("Deployment failed")
+        except Exception as e:
+            logger.error(f"❌ Kubewatch deployment failed: {str(e)}")
+    
+    setup_thread = threading.Thread(target=deploy_and_verify)
     setup_thread.daemon = True
     setup_thread.start()
     logger.info("✅ Background deployment started")
@@ -497,7 +330,7 @@ except Exception as e:
     logger.error(f"❌ Unexpected error during initialization: {str(e)}")
     sys.exit(1)
 
-# Import tools after initialization
+# Import tools after successful initialization
 from .tools import *
 
 # Export the initialization functions
