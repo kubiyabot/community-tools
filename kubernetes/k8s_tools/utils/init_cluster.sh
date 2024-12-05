@@ -17,6 +17,15 @@ check_command() {
 
 log "🚀 Initializing Kubernetes tools..."
 
+# Ensure curl is installed
+if ! command -v curl &> /dev/null; then
+    log "Installing curl..."
+    apt-get update && apt-get install -y curl
+    check_command "curl installation failed" "curl installed successfully"
+else
+    log "✅ curl is already installed"
+fi
+
 # Ensure required binaries directory exists
 TOOLS_DIR="/usr/local/bin"
 mkdir -p "$TOOLS_DIR"

@@ -1,8 +1,8 @@
 FROM python:3.9-slim
 
-# Install required system packages
+# Install sudo for apt operations
 RUN apt-get update && apt-get install -y \
-    curl \
+    sudo \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
