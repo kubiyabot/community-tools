@@ -74,12 +74,11 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-kubectl apply -f - <<EOT
+kubectl apply -n kubiya -f - <<EOT
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubewatch-config
-  namespace: default
+  name: kubiya-kubewatch-config
 data:
   .kubewatch.yaml: |
 $(cat "$CONFIG_PATH" | sed 's/^/    /')
