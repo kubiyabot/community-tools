@@ -5,6 +5,7 @@ import logging
 import json
 import time
 import sys
+import requests
 from pathlib import Path
 from typing import List, Dict, Any, Tuple
 from collections import defaultdict
@@ -78,24 +79,46 @@ class RuntimeVerifier:
         self.errors = defaultdict(list)
         self.warnings = defaultdict(list)
 
-    def check_python_dependencies(self) -> bool:
-        """Check required Python dependencies."""
-        self.report.add_section("Python Dependencies")
-        success = True
-        required_packages = ['kubernetes', 'yaml']
-        
-        for package in required_packages:
-            try:
-                __import__(package)
-                self.report.add_success(f"Found package: {package}")
-            except ImportError as e:
-                success = False
-                self.report.add_error(
-                    f"Missing package: {package}\n" +
-                    f"  Details: {str(e)}\n" +
-                    f"  Fix: pip install {package}"
-                )
-        return success
+    def download_binary(self, binary: str) -> bool:
+        """Download and install a binary."""
+        try:
+            if binary == 'kubectl':
+                # Get latest stable version
+                version_url = "https://dl.k8s.io/release/stable.txt"
+                version = requests.get(version_url).text.strip()
+                
+                # Download kubectl
+                download_url = f"https://dl.k8s.io/release/{version}/bin/linux/amd64/kubectl"
+                binary_path = "/usr/local/bin/kubectl"
+                
+                response = requests.get(download_url)
+                with open(binary_path, 'wb') as f:
+                    f.write(response.content)
+                
+                # Make executable
+                os.chmod(binary_path, 0o755)
+                return True
+                
+            elif binary == 'helm':
+                # Download Helm install script
+                script_url = "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+                script_path = "/tmp/get_helm.sh"
+                
+                response = requests.get(script_url)
+                with open(script_path, 'wb') as f:
+                    f.write(response.content)
+                
+                # Make executable and run
+                os.chmod(script_path, 0o755)
+                subprocess.run([script_path], check=True)
+                os.remove(script_path)
+                return True
+                
+        except Exception as e:
+            logger.error(f"Failed to download {binary}: {str(e)}")
+            return False
+            
+        return False
 
     def verify_binary_installation(self) -> bool:
         """Verify that required binaries are installed and accessible."""
@@ -116,7 +139,10 @@ class RuntimeVerifier:
             try:
                 location = subprocess.run(['which', binary], capture_output=True, text=True)
                 if location.returncode != 0:
-                    raise FileNotFoundError(f"Binary not found: {binary}")
+                    logger.info(f"Binary {binary} not found. Attempting to download...")
+                    if not self.download_binary(binary):
+                        raise FileNotFoundError(f"Failed to download and install {binary}")
+                    location = subprocess.run(['which', binary], capture_output=True, text=True)
                 
                 version = subprocess.run(info['version_cmd'], capture_output=True, text=True)
                 if version.returncode != 0:
@@ -170,7 +196,6 @@ class RuntimeVerifier:
         self.report.add_section("🔍 KUBERNETES TOOLS VERIFICATION", "=")
         
         checks = [
-            (self.check_python_dependencies, "Python Dependencies"),
             (self.verify_binary_installation, "Binary Installation"),
             (self.verify_cluster_access, "Cluster Access"),
         ]
