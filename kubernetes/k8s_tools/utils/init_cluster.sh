@@ -82,10 +82,6 @@ configmap:
   data:
     .kubewatch.yaml: |
 $(sed 's/^/      /' "$CONFIG_PATH")
-  mountPath: /config
-
-config:
-  path: /config/.kubewatch.yaml
 
 rbac:
   create: true
@@ -99,14 +95,14 @@ resources:
     memory: 64Mi
 
 command: ["kubewatch"]
-args: ["run", "--config", "/config/.kubewatch.yaml"]
+args: ["run", "--config", "/opt/bitnami/kubewatch/conf/.kubewatch.yaml"]
 
-volumeMounts:
+extraVolumeMounts:
   - name: config-volume
-    mountPath: /config
+    mountPath: /opt/bitnami/kubewatch/conf
     readOnly: true
 
-volumes:
+extraVolumes:
   - name: config-volume
     configMap:
       name: kubiya-kubewatch-config
