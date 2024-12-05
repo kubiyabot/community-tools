@@ -99,8 +99,9 @@ resources:
     memory: 64Mi
 
 command:
-  - /kubewatch
+  - /usr/local/bin/kubewatch
 args:
+  - run
   - --config
   - /config/.kubewatch.yaml
 
