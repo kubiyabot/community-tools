@@ -138,7 +138,7 @@ if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
         --create-namespace \
         --set rbac.create=true \
         --set image.repository=ghcr.io/kubiyabot/kubewatch \
-        --set image.tag=dd496405c04f285b3d164f11e4463b3ea02e6ea1 \
+        --set image.tag=main \
         -f "$VALUES_FILE"
     check_command "kubiya-kubewatch installation failed" "Initiated kubiya-kubewatch installation"
 else
