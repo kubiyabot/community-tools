@@ -206,12 +206,15 @@ data:
                 ["helm", "repo", "add", "robusta", "https://robusta-charts.storage.googleapis.com"],
                 check=True
             )
+
+            # Check if repository is updated
+            self.logger.info("🔄 Checking helm repository...")
             subprocess.run(["helm", "repo", "update"], check=True)
 
             # Create values file
             values_file = self.create_helm_values()
             if not values_file:
-                raise Exception("Failed to create helm values file")
+                raise Exception("Failed to create helm values file: values file not found")
 
             try:
                 # Deploy kubewatch
@@ -433,7 +436,7 @@ class RuntimeVerifier:
         try:
             # Check if kubewatch is already deployed
             result = subprocess.run(
-                ["kubectl", "get", "deployment", "kubewatch", "-n", "default"],
+                ["kubectl", "get", "deployment", "kubewatch", "-n", "kubiya"],
                 capture_output=True
             )
             
