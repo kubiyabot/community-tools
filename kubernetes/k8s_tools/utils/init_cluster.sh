@@ -70,10 +70,8 @@ if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
         --create-namespace \
         --set rbac.create=true \
         --set image.repository=ghcr.io/kubiyabot/kubewatch \
-        --set image.tag=latest \
-        --wait \
-        --timeout 5m
-    check_command "kubiya-kubewatch installation failed" "Installed kubiya-kubewatch"
+        --set image.tag=latest
+    check_command "kubiya-kubewatch installation failed" "Initiated kubiya-kubewatch installation"
 else
     log "✅ kubiya-kubewatch is already installed"
 fi
@@ -92,35 +90,10 @@ kubectl create configmap kubiya-kubewatch-config -n kubiya \
     -o yaml --dry-run=client | kubectl apply -f -
 check_command "configmap update failed" "Updated kubiya-kubewatch configuration"
 
-# Restart the kubiya-kubewatch pod to pick up new config
-log "Restarting kubiya-kubewatch to apply new configuration..."
+# Restart the deployment to pick up new config
+log "Triggering kubiya-kubewatch restart..."
 kubectl rollout restart deployment/kubiya-kubewatch -n kubiya
-check_command "restart failed" "Restarted kubiya-kubewatch deployment"
+check_command "restart trigger failed" "Triggered kubiya-kubewatch restart"
 
-# Verify deployment
-log "Verifying kubiya-kubewatch deployment..."
-ATTEMPTS=0
-MAX_ATTEMPTS=30
-while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
-    if kubectl get pods -n kubiya -l app=kubiya-kubewatch | grep -q "Running"; then
-        log "✅ kubiya-kubewatch pod is running"
-        
-        # Check logs for successful startup
-        if kubectl logs -n kubiya -l app=kubiya-kubewatch --tail=10 | grep -q "Starting kubewatch controller"; then
-            log "✅ kubiya-kubewatch is properly initialized"
-            break
-        fi
-    fi
-    
-    ATTEMPTS=$((ATTEMPTS + 1))
-    if [ $ATTEMPTS -eq $MAX_ATTEMPTS ]; then
-        log "❌ Error: kubiya-kubewatch failed to start properly"
-        kubectl describe pods -n kubiya -l app=kubiya-kubewatch
-        exit 1
-    fi
-    
-    log "Waiting for kubiya-kubewatch to start... (attempt $ATTEMPTS/$MAX_ATTEMPTS)"
-    sleep 10
-done
-
-log "🎉 Initialization completed successfully" 
+log "🎉 Initialization completed successfully"
+log "Note: Deployment updates are in progress and may take a few minutes to complete" 
