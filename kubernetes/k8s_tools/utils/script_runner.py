@@ -91,31 +91,88 @@ class RuntimeVerifier:
                 download_url = f"https://dl.k8s.io/release/{version}/bin/linux/amd64/kubectl"
                 binary_path = "/usr/local/bin/kubectl"
                 
+                logger.info(f"Downloading kubectl from {download_url}")
                 response = requests.get(download_url)
+                response.raise_for_status()  # Raise error for bad status codes
+                
+                # Ensure directory exists
+                os.makedirs("/usr/local/bin", exist_ok=True)
+                
                 with open(binary_path, 'wb') as f:
                     f.write(response.content)
                 
                 # Make executable
                 os.chmod(binary_path, 0o755)
+                logger.info("✅ kubectl installed successfully")
                 return True
                 
             elif binary == 'helm':
-                # Download Helm install script
-                script_url = "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
-                script_path = "/tmp/get_helm.sh"
+                try:
+                    # First try using package manager
+                    logger.info("Attempting to install helm via package manager...")
+                    subprocess.run(["apt-get", "update"], check=True)
+                    subprocess.run(["apt-get", "install", "-y", "apt-transport-https"], check=True)
+                    
+                    # Add helm repository
+                    subprocess.run([
+                        "curl", "https://baltocdn.com/helm/signing.asc", 
+                        "|", "gpg", "--dearmor", 
+                        "|", "tee", "/usr/share/keyrings/helm.gpg", ">/dev/null"
+                    ], shell=True, check=True)
+                    
+                    # Add helm repository
+                    with open("/etc/apt/sources.list.d/helm-stable-debian.list", "w") as f:
+                        f.write("deb [arch=amd64 signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main\n")
+                    
+                    subprocess.run(["apt-get", "update"], check=True)
+                    subprocess.run(["apt-get", "install", "-y", "helm"], check=True)
+                    
+                    logger.info("✅ Helm installed successfully via package manager")
+                    return True
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to install helm via package manager: {str(e)}")
+                    logger.info("Attempting alternative helm installation method...")
+                    
+                    # Alternative method: Direct binary download
+                    # Get latest version
+                    version_url = "https://get.helm.sh/helm-v3.12.3-linux-amd64.tar.gz"
+                    temp_dir = "/tmp/helm-install"
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                    # Download and extract
+                    logger.info(f"Downloading helm from {version_url}")
+                    response = requests.get(version_url)
+                    response.raise_for_status()
+                    
+                    tar_path = f"{temp_dir}/helm.tar.gz"
+                    with open(tar_path, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Extract
+                    subprocess.run(["tar", "-zxvf", tar_path, "-C", temp_dir], check=True)
+                    
+                    # Move binary
+                    os.makedirs("/usr/local/bin", exist_ok=True)
+                    subprocess.run(["mv", f"{temp_dir}/linux-amd64/helm", "/usr/local/bin/"], check=True)
+                    
+                    # Cleanup
+                    subprocess.run(["rm", "-rf", temp_dir], check=True)
+                    
+                    logger.info("✅ Helm installed successfully via direct download")
+                    return True
                 
-                response = requests.get(script_url)
-                with open(script_path, 'wb') as f:
-                    f.write(response.content)
-                
-                # Make executable and run
-                os.chmod(script_path, 0o755)
-                subprocess.run([script_path], check=True)
-                os.remove(script_path)
-                return True
-                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error while downloading {binary}: {str(e)}")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Command failed while installing {binary}: {str(e)}")
+            return False
+        except PermissionError as e:
+            logger.error(f"Permission error while installing {binary}. Try running with sudo: {str(e)}")
+            return False
         except Exception as e:
-            logger.error(f"Failed to download {binary}: {str(e)}")
+            logger.error(f"Unexpected error while installing {binary}: {str(e)}")
             return False
             
         return False
