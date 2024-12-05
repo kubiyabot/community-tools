@@ -9,9 +9,14 @@ import tempfile
 import os
 from kubernetes import client, config
 from typing import Tuple, Optional
+import time
+import json
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 class KubernetesSetupError(Exception):
@@ -401,25 +406,160 @@ def deploy_kubewatch() -> bool:
             )
         raise
 
-# Initialize everything when module is imported
+def verify_kubewatch_deployment() -> bool:
+    """Verify that kubewatch is properly deployed and running."""
+    try:
+        # Wait for pod to be ready
+        max_attempts = 30
+        attempt = 0
+        while attempt < max_attempts:
+            try:
+                # Check pod status
+                result = subprocess.run(
+                    ["kubectl", "get", "pods", "-n", "default", "-l", "app=kubewatch", "-o", "json"],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                pods = json.loads(result.stdout)
+                
+                if not pods.get('items'):
+                    logger.info("⏳ Waiting for kubewatch pod to be created...")
+                    attempt += 1
+                    time.sleep(2)
+                    continue
+
+                pod = pods['items'][0]
+                status = pod.get('status', {})
+                phase = status.get('phase')
+                
+                if phase == 'Running':
+                    conditions = status.get('conditions', [])
+                    ready = any(c.get('type') == 'Ready' and c.get('status') == 'True' for c in conditions)
+                    if ready:
+                        logger.info("✅ Kubewatch pod is running and ready")
+                        
+                        # Verify ConfigMap is mounted
+                        result = subprocess.run(
+                            ["kubectl", "exec", pod['metadata']['name'], "--", "cat", "/root/.kubewatch.yaml"],
+                            capture_output=True,
+                            text=True
+                        )
+                        if result.returncode == 0:
+                            logger.info("✅ Kubewatch config is properly mounted")
+                            return True
+                        else:
+                            logger.error("❌ Kubewatch config mount verification failed")
+                            return False
+                
+                logger.info(f"⏳ Waiting for kubewatch pod to be ready (Status: {phase})")
+                attempt += 1
+                time.sleep(2)
+            
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Error checking pod status: {e.stderr}")
+                attempt += 1
+                time.sleep(2)
+                
+        logger.error("❌ Timeout waiting for kubewatch pod to be ready")
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to verify kubewatch deployment: {str(e)}")
+        return False
+
+def verify_kubewatch_functionality() -> bool:
+    """Verify that kubewatch is functioning by creating a test event."""
+    try:
+        logger.info("🔍 Testing kubewatch functionality...")
+        
+        # Create a test pod to trigger an event
+        test_pod = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "kubewatch-test",
+                "labels": {
+                    "app": "kubewatch-test"
+                }
+            },
+            "spec": {
+                "containers": [{
+                    "name": "test",
+                    "image": "busybox",
+                    "command": ["sh", "-c", "echo 'test' && sleep 5"]
+                }]
+            }
+        }
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
+            yaml.dump(test_pod, temp_file)
+            pod_path = temp_file.name
+            
+        try:
+            # Apply the test pod
+            subprocess.run(["kubectl", "apply", "-f", pod_path], check=True)
+            logger.info("✅ Test pod created successfully")
+            
+            # Wait for pod completion
+            time.sleep(10)
+            
+            # Check kubewatch logs for the event
+            result = subprocess.run(
+                ["kubectl", "logs", "-l", "app=kubewatch", "--tail=50"],
+                capture_output=True,
+                text=True
+            )
+            
+            if "kubewatch-test" in result.stdout:
+                logger.info("✅ Kubewatch successfully detected test pod event")
+                return True
+            else:
+                logger.error("❌ Kubewatch did not detect test pod event")
+                return False
+                
+        finally:
+            # Cleanup
+            subprocess.run(["kubectl", "delete", "pod", "kubewatch-test", "--force"], check=True)
+            os.unlink(pod_path)
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to verify kubewatch functionality: {str(e)}")
+        return False
+
+# Add verification steps to the initialization
 try:
     logger.info("🚀 Initializing Kubernetes tools...")
     
     # Install required binaries
     if not install_prerequisites():
         raise Exception("Failed to install prerequisites")
+    logger.info("✅ Prerequisites installed successfully")
 
     # Setup cluster permissions
     if not setup_cluster_permissions():
         raise Exception("Failed to setup cluster permissions")
+    logger.info("✅ Cluster permissions configured successfully")
 
     # Create kubewatch config
     if not create_kubewatch_config():
         raise Exception("Failed to create kubewatch config")
+    logger.info("✅ Kubewatch config created successfully")
 
     # Deploy kubewatch
     if not deploy_kubewatch():
         raise Exception("Failed to deploy kubewatch")
+    logger.info("✅ Kubewatch deployment initiated")
+
+    # Verify deployment
+    if not verify_kubewatch_deployment():
+        raise Exception("Failed to verify kubewatch deployment")
+    logger.info("✅ Kubewatch deployment verified")
+
+    # Verify functionality
+    if not verify_kubewatch_functionality():
+        raise Exception("Failed to verify kubewatch functionality")
+    logger.info("✅ Kubewatch functionality verified")
 
     logger.info("✅ Kubernetes tools initialized successfully")
 
@@ -434,4 +574,11 @@ except Exception as e:
 from .tools import *
 
 # Export the initialization functions
-__all__ = ['deploy_kubewatch', 'create_kubewatch_config', 'setup_cluster_permissions', 'KubernetesSetupError']
+__all__ = [
+    'deploy_kubewatch',
+    'create_kubewatch_config',
+    'setup_cluster_permissions',
+    'verify_kubewatch_deployment',
+    'verify_kubewatch_functionality',
+    'KubernetesSetupError'
+]
