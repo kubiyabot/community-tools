@@ -82,6 +82,31 @@ configmap:
   data:
     .kubewatch.yaml: |
 $(sed 's/^/      /' "$CONFIG_PATH")
+  mountPath: /config
+
+config:
+  path: /config/.kubewatch.yaml
+
+rbac:
+  create: true
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+volumeMounts:
+  - name: config-volume
+    mountPath: /config
+    readOnly: true
+
+volumes:
+  - name: config-volume
+    configMap:
+      name: kubiya-kubewatch-config
 EOF
 )
 
