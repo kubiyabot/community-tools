@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_sdk.tools import Tool, Arg, FileSpec, ServiceSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
@@ -41,8 +41,6 @@ fi
 mkdir -p /tmp/scripts
 chmod +x {script_path}
 
-# Run in /data directory as expected by mermaid-cli
-cd /data
 exec {script_path}
 """
 
@@ -50,11 +48,12 @@ exec {script_path}
             name=name,
             description=description,
             type="docker",
-            image="minlag/mermaid-cli:latest",  # Pre-configured image with mermaid-cli
+            image="alpine:3.14",
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
             secrets=secrets,
             env=env,
             with_files=with_files,
+            with_services=[ServiceSpec(name="mermaidsvc",image="ghcr.io/kubiyabot/mermaid-server:v0.0.0",exposed_ports=[80])]
         )
