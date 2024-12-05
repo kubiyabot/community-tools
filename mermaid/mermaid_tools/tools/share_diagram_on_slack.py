@@ -58,3 +58,9 @@ share_diagram_on_slack_tool = MermaidTool(
 )
 
 tool_registry.register("mermaid", share_diagram_on_slack_tool)
+
+print("#################################################################################################################")
+
+print(tool_registry.dynamic_config)
+
+print("#################################################################################################################")

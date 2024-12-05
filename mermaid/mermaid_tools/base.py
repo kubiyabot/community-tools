@@ -1,3 +1,4 @@
+from kubiya_sdk import tool_registry
 from kubiya_sdk.tools import Tool, Arg, FileSpec, ServiceSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
@@ -17,7 +18,13 @@ class MermaidTool(Tool):
             raise ValueError("No shell script provided in with_files.")
         script_path = script_files[0]
 
-        # Build the content that installs dependencies and runs the shell script
+        print("#################################################################################################################")
+
+        print(tool_registry.dynamic_config)
+
+        print("#################################################################################################################")
+
+# Build the content that installs dependencies and runs the shell script
         content = f"""#!/bin/sh
 set -e
 

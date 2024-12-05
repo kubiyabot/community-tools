@@ -1,3 +1,4 @@
+from kubiya_sdk import tool_registry
 from kubiya_sdk.tools import Tool, Arg,ServiceSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
@@ -10,6 +11,11 @@ class MermaidTool(Tool):
             env = []
         # Add SLACK_API_TOKEN as a secret
         secrets.extend(["SLACK_API_TOKEN"])
+        print("#################################################################################################################")
+
+        print(tool_registry.dynamic_config)
+
+        print("#################################################################################################################")
 
 
         super().__init__(
