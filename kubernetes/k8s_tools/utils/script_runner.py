@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 from collections import defaultdict
 from io import StringIO
+import sys
 
 # Configure detailed logging
 logging.basicConfig(
