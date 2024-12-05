@@ -73,11 +73,189 @@ class KubernetesVerificationError(Exception):
 {'='*80}
 """
 
+class KubewatchDeployer:
+    def __init__(self, logger):
+        self.logger = logger
+
+    def setup_service_account(self) -> bool:
+        """Setup required service account and permissions."""
+        try:
+            # Create namespace if it doesn't exist
+            subprocess.run([
+                "kubectl", "create", "namespace", "kubiya",
+                "--dry-run=client", "-o", "yaml"
+            ], check=True)
+
+            # Create service account binding
+            self.logger.info("🔄 Setting up kubiya service account permissions...")
+            subprocess.run([
+                "kubectl", "create", "clusterrolebinding", "kubiya-sa-cluster-admin",
+                "--clusterrole=cluster-admin",
+                "--serviceaccount=kubiya:kubiya-service-account"
+            ], check=True)
+
+            # Verify permissions
+            result = subprocess.run([
+                "kubectl", "auth", "can-i", "list", "pods",
+                "--as=system:serviceaccount:kubiya:kubiya-service-account",
+                "--all-namespaces"
+            ], capture_output=True, text=True, check=True)
+
+            if "yes" not in result.stdout.lower():
+                raise Exception("Service account does not have required permissions")
+
+            self.logger.info("✅ Service account permissions verified")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to setup service account: {str(e)}")
+            return False
+
+    def create_kubewatch_config(self) -> bool:
+        """Create or update kubewatch ConfigMap."""
+        try:
+            self.logger.info("🔄 Creating kubewatch ConfigMap...")
+            
+            # Load config from file
+            config_path = Path(__file__).parent.parent / 'config' / 'kubewatch.yaml'
+            if not config_path.exists():
+                raise FileNotFoundError(f"Kubewatch config not found at {config_path}")
+
+            with open(config_path) as f:
+                config_content = f.read()
+
+            # Create ConfigMap
+            config_cmd = [
+                "kubectl", "apply", "-f", "-"
+            ]
+
+            config_yaml = f"""
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubewatch-config
+  namespace: default
+data:
+  .kubewatch.yaml: |
+{config_content}
+"""
+            self.logger.info("📝 Applying kubewatch configuration...")
+            process = subprocess.Popen(
+                config_cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = process.communicate(input=config_yaml)
+
+            if process.returncode != 0:
+                raise Exception(f"Failed to create ConfigMap: {stderr}")
+
+            self.logger.info("✅ Kubewatch ConfigMap created successfully")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create kubewatch config: {str(e)}")
+            return False
+
+    def create_helm_values(self) -> Optional[str]:
+        """Create helm values file."""
+        try:
+            values = {
+                "image": {
+                    "repository": "ghcr.io/kubiyabot/kubewatch",
+                    "tag": "dd496405c04f285b3d164f11e4463b3ea02e6ea1"
+                },
+                "rbac": {
+                    "create": True
+                },
+                "resourcesToWatch": {
+                    "daemonset": True,
+                    "pod": True
+                },
+                "extraVolumes": [{
+                    "name": "config-volume",
+                    "configMap": {
+                        "name": "kubewatch-config"
+                    }
+                }],
+                "extraVolumeMounts": [{
+                    "name": "config-volume",
+                    "mountPath": "/root/.kubewatch.yaml",
+                    "subPath": ".kubewatch.yaml"
+                }]
+            }
+
+            # Create temporary values file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
+                json.dump(values, temp_file, indent=2)
+                return temp_file.name
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to create helm values: {str(e)}")
+            return None
+
+    def deploy_kubewatch(self) -> bool:
+        """Deploy kubewatch using helm."""
+        try:
+            # Add helm repository
+            self.logger.info("🔄 Adding helm repository...")
+            subprocess.run(
+                ["helm", "repo", "add", "robusta", "https://robusta-charts.storage.googleapis.com"],
+                check=True
+            )
+            subprocess.run(["helm", "repo", "update"], check=True)
+
+            # Create values file
+            values_file = self.create_helm_values()
+            if not values_file:
+                raise Exception("Failed to create helm values file")
+
+            try:
+                # Deploy kubewatch
+                self.logger.info("🚀 Deploying kubewatch...")
+                subprocess.run([
+                    "helm", "upgrade", "--install", "kubewatch",
+                    "robusta/kubewatch", "-f", values_file
+                ], check=True)
+                
+                self.logger.info("✅ Kubewatch deployed successfully")
+                return True
+
+            finally:
+                # Cleanup values file
+                if values_file:
+                    os.unlink(values_file)
+
+        except Exception as e:
+            self.logger.error(f"❌ Failed to deploy kubewatch: {str(e)}")
+            return False
+
+    def deploy(self) -> bool:
+        """Run the complete deployment process."""
+        steps = [
+            (self.setup_service_account, "Setting up service account"),
+            (self.create_kubewatch_config, "Creating kubewatch config"),
+            (self.deploy_kubewatch, "Deploying kubewatch")
+        ]
+
+        for step_func, step_name in steps:
+            self.logger.info(f"\n{'='*80}\n🔄 {step_name}...\n{'='*80}")
+            if not step_func():
+                self.logger.error(f"❌ Failed at step: {step_name}")
+                return False
+            self.logger.info(f"✅ Completed: {step_name}")
+
+        self.logger.info("\n✨ Kubewatch deployment completed successfully!")
+        return True
+
 class RuntimeVerifier:
     def __init__(self):
         self.report = VerificationReport()
         self.errors = defaultdict(list)
         self.warnings = defaultdict(list)
+        self.kubewatch_deployer = KubewatchDeployer(logger)
 
     def download_binary(self, binary: str) -> bool:
         """Download and install a binary."""
@@ -248,6 +426,32 @@ class RuntimeVerifier:
             )
             return False
 
+    def deploy_kubewatch_if_needed(self) -> bool:
+        """Deploy kubewatch if not already deployed."""
+        self.report.add_section("Kubewatch Deployment")
+        try:
+            # Check if kubewatch is already deployed
+            result = subprocess.run(
+                ["kubectl", "get", "deployment", "kubewatch", "-n", "default"],
+                capture_output=True
+            )
+            
+            if result.returncode == 0:
+                self.report.add_success("Kubewatch is already deployed")
+                return True
+
+            self.report.add_warning("Kubewatch not found, initiating deployment...")
+            if self.kubewatch_deployer.deploy():
+                self.report.add_success("Kubewatch deployed successfully")
+                return True
+            else:
+                self.report.add_error("Failed to deploy kubewatch")
+                return False
+
+        except Exception as e:
+            self.report.add_error(f"Error checking/deploying kubewatch: {str(e)}")
+            return False
+
     def run_verification(self) -> bool:
         """Run all verification checks."""
         self.report.add_section("🔍 KUBERNETES TOOLS VERIFICATION", "=")
@@ -255,6 +459,7 @@ class RuntimeVerifier:
         checks = [
             (self.verify_binary_installation, "Binary Installation"),
             (self.verify_cluster_access, "Cluster Access"),
+            (self.deploy_kubewatch_if_needed, "Kubewatch Deployment"),
         ]
         
         success = True
