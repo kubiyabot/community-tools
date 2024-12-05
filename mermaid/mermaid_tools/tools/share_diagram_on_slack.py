@@ -39,27 +39,9 @@ share_diagram_on_slack_tool = MermaidTool(
         Arg(
             name="output_format",
             type="str",
-            description="Output format (png, svg, pdf)",
+            description="Output format (png, svg)",
             required=False,
             default="png"
-        ),
-        Arg(
-            name="theme",
-            type="str",
-            description="Theme (default, dark, forest, neutral)",
-            required=False
-        ),
-        Arg(
-            name="background_color",
-            type="str",
-            description="Background color (e.g., #ffffff, transparent)",
-            required=False
-        ),
-        Arg(
-            name="custom_css",
-            type="str",
-            description="Optional raw CSS for SVG customization",
-            required=False
         ),
     ],
     with_files=[
