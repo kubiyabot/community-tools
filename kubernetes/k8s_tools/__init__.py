@@ -201,34 +201,13 @@ def install_prerequisites() -> bool:
 def setup_cluster_permissions() -> bool:
     """Setup required cluster permissions."""
     try:
-        # Check if namespace exists, create if not
-        try:
-            subprocess.run(["kubectl", "get", "namespace", "kubiya"], check=True)
-            logger.info("✅ Kubiya namespace already exists")
-        except subprocess.CalledProcessError:
-            subprocess.run(["kubectl", "create", "namespace", "kubiya"], check=True)
-            logger.info("✅ Created kubiya namespace")
-
-        # Check if service account exists, create if not
-        try:
-            subprocess.run(["kubectl", "get", "serviceaccount", "kubiya-service-account", "-n", "kubiya"], check=True)
-            logger.info("✅ Service account already exists")
-        except subprocess.CalledProcessError:
-            subprocess.run(["kubectl", "create", "serviceaccount", "kubiya-service-account", "-n", "kubiya"], check=True)
-            logger.info("✅ Created service account")
-
-        # Check if cluster role binding exists
-        try:
-            subprocess.run(["kubectl", "get", "clusterrolebinding", "kubiya-sa-cluster-admin"], check=True)
-            logger.info("✅ Cluster role binding already exists")
-        except subprocess.CalledProcessError:
-            # Create cluster role binding if it doesn't exist
-            subprocess.run([
-                "kubectl", "create", "clusterrolebinding", "kubiya-sa-cluster-admin",
-                "--clusterrole=cluster-admin",
-                "--serviceaccount=kubiya:kubiya-service-account"
-            ], check=True)
-            logger.info("✅ Created cluster role binding")
+        # Create cluster role binding for kubiya service account
+        cmd = [
+            "kubectl", "create", "clusterrolebinding", "kubiya-sa-cluster-admin",
+            "--clusterrole=cluster-admin",
+            "--serviceaccount=kubiya:kubiya-service-account"
+        ]
+        subprocess.run(cmd, check=True)
         
         # Verify permissions
         cmd = [
