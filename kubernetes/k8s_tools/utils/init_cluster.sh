@@ -15,26 +15,30 @@ check_command() {
     log "✅ $2"
 }
 
-# Helper function to check if a resource exists
-resource_exists() {
-    kubectl get "$1" -n "$2" "$3" &> /dev/null
-}
-
 log "🚀 Initializing Kubernetes tools..."
 
-# Check prerequisites
-log "Checking prerequisites..."
-if ! command -v kubectl &> /dev/null; then
-    log "❌ Error: kubectl is not installed"
-    exit 1
-fi
-check_command "kubectl check failed" "kubectl is available"
+# Ensure required binaries directory exists
+TOOLS_DIR="/usr/local/bin"
+mkdir -p "$TOOLS_DIR"
 
-if ! command -v helm &> /dev/null; then
-    log "❌ Error: helm is not installed"
-    exit 1
+# Install kubectl if not present
+if ! command -v kubectl &> /dev/null; then
+    log "Installing kubectl..."
+    curl -Lo "$TOOLS_DIR/kubectl" "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    chmod +x "$TOOLS_DIR/kubectl"
+    check_command "kubectl installation failed" "kubectl installed successfully"
+else
+    log "✅ kubectl is already installed"
 fi
-check_command "helm check failed" "helm is available"
+
+# Install helm if not present
+if ! command -v helm &> /dev/null; then
+    log "Installing helm..."
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | HELM_INSTALL_DIR="$TOOLS_DIR" bash
+    check_command "helm installation failed" "helm installed successfully"
+else
+    log "✅ helm is already installed"
+fi
 
 # Test kubectl connection
 log "Testing kubectl connection..."
