@@ -54,6 +54,16 @@ else
     log "✅ Kubiya namespace already exists"
 fi
 
+# Load kubewatch config
+CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
+if [ ! -f "$CONFIG_PATH" ]; then
+    log "❌ Error: Kubewatch config not found at $CONFIG_PATH"
+    exit 1
+fi
+
+# Convert config to base64
+CONFIG_CONTENT=$(cat "$CONFIG_PATH" | base64 -w 0)
+
 # Check if kubiya-kubewatch is already deployed
 log "Checking kubiya-kubewatch deployment..."
 if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
@@ -70,25 +80,19 @@ if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
         --create-namespace \
         --set rbac.create=true \
         --set image.repository=ghcr.io/kubiyabot/kubewatch \
-        --set image.tag=latest
+        --set image.tag=latest \
+        --set configmap.create=true \
+        --set configmap.data.".kubewatch\\.yaml"="$CONFIG_CONTENT"
     check_command "kubiya-kubewatch installation failed" "Initiated kubiya-kubewatch installation"
 else
-    log "✅ kubiya-kubewatch is already installed"
+    # Update existing installation with new config
+    log "Updating existing kubiya-kubewatch installation..."
+    helm upgrade kubiya-kubewatch robusta/kubewatch \
+        --namespace kubiya \
+        --reuse-values \
+        --set configmap.data.".kubewatch\\.yaml"="$CONFIG_CONTENT"
+    check_command "kubiya-kubewatch upgrade failed" "Updated kubiya-kubewatch configuration"
 fi
-
-# Update kubiya-kubewatch config
-log "Updating kubiya-kubewatch configuration..."
-CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
-if [ ! -f "$CONFIG_PATH" ]; then
-    log "❌ Error: Kubewatch config not found at $CONFIG_PATH"
-    exit 1
-fi
-
-# Update the configmap with latest configuration
-kubectl create configmap kubiya-kubewatch-config -n kubiya \
-    --from-file=.kubewatch.yaml="$CONFIG_PATH" \
-    -o yaml --dry-run=client | kubectl apply -f -
-check_command "configmap update failed" "Updated kubiya-kubewatch configuration"
 
 # Restart the deployment to pick up new config
 log "Triggering kubiya-kubewatch restart..."
