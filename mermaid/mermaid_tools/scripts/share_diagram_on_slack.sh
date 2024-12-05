@@ -199,6 +199,7 @@ for dest in ${slack_destination}; do
             else
                 echo "❌ Invalid destination format or channel not found: ${dest}"
                 continue
+
             fi
             ;;
     esac
