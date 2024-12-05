@@ -89,17 +89,26 @@ EOF
 VALUES_FILE=$(mktemp)
 echo "$HELM_VALUES" > "$VALUES_FILE"
 
+# Add helm repo if needed
+helm repo add robusta https://robusta-charts.storage.googleapis.com || true
+helm repo update
+check_command "helm repo setup failed" "Helm repository configured"
+
+# Check current helm release status
+HELM_STATUS=$(helm status kubiya-kubewatch -n kubiya 2>/dev/null || echo "not_found")
+
+if echo "$HELM_STATUS" | grep -q "pending-install\|failed"; then
+    log "Found failed or pending installation, cleaning up..."
+    helm uninstall kubiya-kubewatch -n kubiya || true
+    # Wait for resources to be cleaned up
+    sleep 5
+fi
+
 # Check if kubiya-kubewatch is already deployed
-log "Checking kubiya-kubewatch deployment..."
 if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
     # Only install if not already present
     log "kubiya-kubewatch not found, installing..."
     
-    # Add helm repo if needed
-    helm repo add robusta https://robusta-charts.storage.googleapis.com || true
-    helm repo update
-    check_command "helm repo setup failed" "Helm repository configured"
-
     helm install kubiya-kubewatch robusta/kubewatch \
         --namespace kubiya \
         --create-namespace \
