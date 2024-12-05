@@ -74,8 +74,20 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# Convert config to base64
-CONFIG_CONTENT=$(cat "$CONFIG_PATH" | base64 -w 0)
+# Create values file for helm
+HELM_VALUES=$(cat <<EOF
+configmap:
+  create: true
+  name: kubiya-kubewatch-config
+  data:
+    .kubewatch.yaml: |
+$(sed 's/^/      /' "$CONFIG_PATH")
+EOF
+)
+
+# Save values to temporary file
+VALUES_FILE=$(mktemp)
+echo "$HELM_VALUES" > "$VALUES_FILE"
 
 # Check if kubiya-kubewatch is already deployed
 log "Checking kubiya-kubewatch deployment..."
@@ -94,8 +106,7 @@ if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
         --set rbac.create=true \
         --set image.repository=ghcr.io/kubiyabot/kubewatch \
         --set image.tag=latest \
-        --set configmap.create=true \
-        --set configmap.data.".kubewatch\\.yaml"="$CONFIG_CONTENT"
+        -f "$VALUES_FILE"
     check_command "kubiya-kubewatch installation failed" "Initiated kubiya-kubewatch installation"
 else
     # Update existing installation with new config
@@ -103,9 +114,12 @@ else
     helm upgrade kubiya-kubewatch robusta/kubewatch \
         --namespace kubiya \
         --reuse-values \
-        --set configmap.data.".kubewatch\\.yaml"="$CONFIG_CONTENT"
+        -f "$VALUES_FILE"
     check_command "kubiya-kubewatch upgrade failed" "Updated kubiya-kubewatch configuration"
 fi
+
+# Clean up temporary file
+rm -f "$VALUES_FILE"
 
 # Restart the deployment to pick up new config
 log "Triggering kubiya-kubewatch restart..."
