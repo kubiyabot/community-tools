@@ -177,6 +177,7 @@ for dest in ${slack_destination}; do
             # Remove # prefix and get channel name
             channel_name=${dest#"<#"}  # Removes the leading "<#"
             channel_name=${channel_name%">"}  # Removes the trailing ">"
+            echo "✅ Parsed Channel ID ${channel_name}"
             # Try to get channel ID
             channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
                 "https://slack.com/api/conversations.list?limit=1000" | \
