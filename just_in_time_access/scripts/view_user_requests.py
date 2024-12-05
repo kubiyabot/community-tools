@@ -32,8 +32,17 @@ def view_user_requests():
             print(f"No requests found for user: {user_email}")
             return
         
-        print(user_requests)  # This will print the JSON objects as-is
-        
+        # Format and print the filtered results
+        for req in user_requests:
+            print("\n" + "-" * 50)
+            print(f"Request ID: {req['id']}")
+            print(f"User Email: {req['request']['user']['email']}")
+            print(f"Tool: {req['request']['tool']['name']}")
+            print(f"Status: {'Approved' if req['approved'] else 'Pending'}")
+            print(f"Created At: {req['created_at']}")
+            if req.get('ttl') and req['ttl'] != '0001-01-01T00:00:00Z':
+                print(f"TTL: {req['ttl']}")
+
     except requests.RequestException as e:
         print(f"Failed to fetch requests: {str(e)}")
         sys.exit(1)
