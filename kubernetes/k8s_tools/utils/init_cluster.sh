@@ -98,12 +98,8 @@ resources:
     cpu: 50m
     memory: 64Mi
 
-command:
-  - /usr/local/bin/kubewatch
-args:
-  - run
-  - --config
-  - /config/.kubewatch.yaml
+command: ["kubewatch"]
+args: ["run", "--config", "/config/.kubewatch.yaml"]
 
 volumeMounts:
   - name: config-volume
