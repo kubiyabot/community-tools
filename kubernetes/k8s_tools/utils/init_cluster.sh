@@ -123,7 +123,7 @@ else
     helm upgrade kubiya-kubewatch robusta/kubewatch \
         --namespace kubiya \
         --reuse-values \
-        --set image.repository=ghcr.io/kubiyabot/kubewatch:gha-build \
+        --set image.repository=ghcr.io/kubiyabot/kubewatch \
         --set image.tag=dd496405c04f285b3d164f11e4463b3ea02e6ea1 \
         -f "$VALUES_FILE"
     check_command "kubiya-kubewatch upgrade failed" "Updated kubiya-kubewatch configuration"
