@@ -287,6 +287,149 @@ def create_kubewatch_config() -> bool:
 
     return False
 
+def setup_cluster_permissions() -> bool:
+    """Setup required cluster permissions."""
+    logger.info("🔄 Setting up cluster permissions...")
+    try:
+        # Create cluster role binding for kubiya service account
+        binding_manifest = {
+            "apiVersion": "rbac.authorization.k8s.io/v1",
+            "kind": "ClusterRoleBinding",
+            "metadata": {
+                "name": "kubiya-sa-cluster-admin"
+            },
+            "roleRef": {
+                "apiGroup": "rbac.authorization.k8s.io",
+                "kind": "ClusterRole",
+                "name": "cluster-admin"
+            },
+            "subjects": [{
+                "kind": "ServiceAccount",
+                "name": "kubiya-service-account",
+                "namespace": "kubiya"
+            }]
+        }
+
+        # Create service account if it doesn't exist
+        try:
+            run_command("kubectl create serviceaccount kubiya-service-account -n kubiya")
+            logger.info("✅ Created service account")
+        except Exception:
+            logger.info("ℹ️  Service account already exists")
+
+        # Apply the cluster role binding
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
+            yaml.dump(binding_manifest, temp_file)
+            binding_path = temp_file.name
+
+        try:
+            run_command(f"kubectl apply -f {binding_path}")
+            logger.info("✅ Applied cluster role binding")
+        finally:
+            os.unlink(binding_path)
+        
+        # Verify permissions
+        result = run_command(
+            "kubectl auth can-i '*' '*' --as=system:serviceaccount:kubiya:kubiya-service-account"
+        )
+        
+        if "yes" in result.lower():
+            logger.info("✅ Verified cluster permissions")
+            return True
+            
+        raise Exception("Permission verification failed")
+        
+    except Exception as e:
+        raise KubernetesSetupError(
+            f"Failed to setup cluster permissions: {str(e)}",
+            [
+                "Verify cluster-admin access:\n   kubectl auth can-i create clusterrolebinding",
+                "Check existing binding:\n   kubectl get clusterrolebinding kubiya-sa-cluster-admin",
+                "Verify service account:\n   kubectl get serviceaccount kubiya-service-account -n kubiya",
+                "Check RBAC permissions:\n   kubectl auth can-i --list"
+            ]
+        )
+
+def deploy_kubewatch() -> bool:
+    """Deploy kubewatch using helm."""
+    logger.info("🚀 Deploying kubewatch...")
+    try:
+        # Add helm repo
+        run_command("helm repo add robusta https://robusta-charts.storage.googleapis.com")
+        run_command("helm repo update")
+        logger.info("✅ Updated helm repositories")
+
+        # Create helm values
+        values = {
+            "image": {
+                "repository": "ghcr.io/kubiyabot/kubewatch",
+                "tag": "latest",
+                "pullPolicy": "Always"
+            },
+            "rbac": {
+                "create": True,
+                "serviceAccount": {
+                    "create": True,
+                    "name": "kubewatch"
+                }
+            },
+            "config": {
+                "handler": {
+                    "webhook": {
+                        "enabled": True,
+                        "url": "${WEBHOOK_URL}"
+                    }
+                }
+            },
+            "resources": {
+                "limits": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                },
+                "requests": {
+                    "cpu": "50m",
+                    "memory": "64Mi"
+                }
+            }
+        }
+
+        # Create values file
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as temp_file:
+            yaml.dump(values, temp_file)
+            values_path = temp_file.name
+
+        try:
+            # Deploy kubewatch
+            run_command(f"helm upgrade --install kubewatch robusta/kubewatch -n kubiya -f {values_path}")
+            logger.info("✅ Deployed kubewatch chart")
+            return True
+            
+        except Exception as e:
+            raise KubernetesSetupError(
+                f"Failed to deploy kubewatch: {str(e)}",
+                [
+                    "Check helm status:\n   helm list -n kubiya",
+                    "Verify chart:\n   helm show chart robusta/kubewatch",
+                    "Check values:\n   helm get values kubewatch -n kubiya",
+                    "View resources:\n   kubectl get all -n kubiya -l app=kubewatch"
+                ]
+            )
+        finally:
+            os.unlink(values_path)
+            
+    except Exception as e:
+        if not isinstance(e, KubernetesSetupError):
+            raise KubernetesSetupError(
+                f"Failed to deploy kubewatch: {str(e)}",
+                [
+                    "Verify helm installation",
+                    "Check helm repository access",
+                    "Verify cluster connection",
+                    "Check namespace permissions"
+                ]
+            )
+        raise
+
 # Initialize with proper validation
 try:
     logger.info("🚀 Initializing Kubernetes tools...")
