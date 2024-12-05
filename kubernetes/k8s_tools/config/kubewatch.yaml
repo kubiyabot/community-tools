@@ -1,0 +1,148 @@
+version: "1"
+filter:
+  watch_for:
+    - kind: Pod
+      reasons: 
+        - "*BackOff*"
+        - "*Error*"
+        - "*Failed*"
+        - "*OOMKilled*"
+        - "*Evicted*"
+      severity: critical
+      prompt: |
+        🚨 Critical Pod Issue Detected!
+        
+        Pod Details:
+        📦 Pod: {{.Name}}
+        🌐 Namespace: {{.Namespace}}
+        🔄 Status: {{.Phase}}
+        ❌ Issue: {{.WaitingReason}}
+        ℹ️ Details: {{.WaitingMessage}}
+        🔋 Container State: {{.ContainerState}}
+        🔁 Restart Count: {{.RestartCount}}
+        {{if .ExitCode}}🚪 Exit Code: {{.ExitCode}}{{end}}
+        {{if .LastTerminationReason}}
+        🔍 Last Termination: {{.LastTerminationReason}}
+        📝 Last Termination Message: {{.LastTerminationMessage}}
+        {{end}}
+
+        🛠️ Troubleshooting Steps:
+        1️⃣ View current logs:
+           $ kubectl logs {{.Name}} -n {{.Namespace}}
+        
+        2️⃣ Check previous container logs:
+           $ kubectl logs {{.Name}} -n {{.Namespace}} --previous
+        
+        3️⃣ Inspect pod details:
+           $ kubectl describe pod {{.Name}} -n {{.Namespace}}
+        
+        4️⃣ Review related events:
+           $ kubectl get events -n {{.Namespace}} --field-selector involvedObject.name={{.Name}}
+        
+        5️⃣ Check resource usage:
+           $ kubectl top pod {{.Name}} -n {{.Namespace}}
+
+        ⚡ Quick Actions:
+        • Delete pod: kubectl delete pod {{.Name}} -n {{.Namespace}}
+        • Debug with shell: kubectl debug {{.Name}} -n {{.Namespace}} --image=busybox -it
+        • Copy logs: kubectl logs {{.Name}} -n {{.Namespace}} > {{.Name}}.log
+
+    - kind: Node
+      reasons:
+        - "*NotReady*"
+        - "*Pressure*"
+        - "*DiskPressure*"
+        - "*MemoryPressure*"
+        - "*NetworkUnavailable*"
+      severity: critical
+      prompt: |
+        🔥 Critical Node Issue Detected!
+
+        Node Information:
+        🖥️ Node: {{.Name}}
+        ⚠️ Status: {{.Reason}}
+        📝 Message: {{.Message}}
+        🕒 Time: {{.Timestamp}}
+        🔢 Count: {{.Count}}
+
+        💥 Impact Assessment:
+        • Node issues may affect workload availability
+        • Pods might be rescheduled or evicted
+        • Services might experience disruption
+
+        🛠️ Required Actions:
+        1️⃣ Check node status:
+           $ kubectl describe node {{.Name}}
+        
+        2️⃣ Monitor resource usage:
+           $ kubectl top node {{.Name}}
+        
+        3️⃣ Review node events:
+           $ kubectl get events --field-selector involvedObject.name={{.Name}},involvedObject.kind=Node
+        
+        4️⃣ Check node logs:
+           $ kubectl logs -n kube-system {{.Name}}
+        
+        5️⃣ Verify node conditions:
+           $ kubectl get node {{.Name}} -o json | jq .status.conditions
+
+        ⚡ Quick Actions:
+        • Cordon node: kubectl cordon {{.Name}}
+        • Drain node: kubectl drain {{.Name}} --ignore-daemonsets
+        • Uncordon node: kubectl uncordon {{.Name}}
+
+    - kind: Deployment
+      reasons:
+        - "*FailedCreate*"
+        - "*ProgressDeadlineExceeded*"
+      severity: warning
+      prompt: |
+        ⚠️ Deployment Issue Detected!
+
+        Deployment Details:
+        🚀 Deployment: {{.Name}}
+        🌐 Namespace: {{.Namespace}}
+        ❌ Issue: {{.Reason}}
+        📝 Message: {{.Message}}
+
+        🔍 Troubleshooting Steps:
+        1️⃣ Check deployment status:
+           $ kubectl rollout status deployment/{{.Name}} -n {{.Namespace}}
+        
+        2️⃣ View deployment details:
+           $ kubectl describe deployment {{.Name}} -n {{.Namespace}}
+        
+        3️⃣ Check replica sets:
+           $ kubectl get rs -l app={{.Name}} -n {{.Namespace}}
+
+        ⚡ Quick Actions:
+        • Rollback: kubectl rollout undo deployment/{{.Name}} -n {{.Namespace}}
+        • Scale down: kubectl scale deployment/{{.Name}} -n {{.Namespace}} --replicas=0
+        • Pause rollout: kubectl rollout pause deployment/{{.Name}} -n {{.Namespace}}
+
+  # namespaces:  # uncomment to filter by namespaces
+  settings:
+    dedup_interval: 2m
+    include_labels: true
+    include_annotations: true
+
+handler:
+  webhook:
+    url: "https://webhook-test.com/1d0ca9e26150baaf85f85b1a7ba2a1c2"
+    cert: ""
+    tlsSkip: true
+
+resource:
+  pod: true
+  node: true
+  deployment: true
+  service: true
+  event: true
+  configmap: true
+  secret: false
+  namespace: true
+  replicaset: true
+  daemonset: true
+  statefulset: true
+  job: true
+  cronjob: true

@@ -1,0 +1,19 @@
+plugins:
+  - rakkess
+  - cluster-compare
+  - cluster-group
+  - conditioner
+  - cyclonus
+  - explore
+  - fields
+  - flame
+  - fuzzy
+  - gadget
+  - grep
+  - history
+  - kluster-capacity
+  - kopilot
+  - neat
+  - node-restart
+  - node-shell
+  - popeye 
