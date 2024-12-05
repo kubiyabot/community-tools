@@ -404,7 +404,11 @@ def deploy_kubewatch() -> bool:
                 "   helm repo list"
             ]
             raise KubernetesSetupError(
-                f"Failed to deploy kubewatch: {str(e)}",
+                f"Failed to deploy kubewatch (failed to install helm chart):\n\n" +
+                f"{str(e)}" +
+                "\n\n" +
+                f"Stdout:\n{e.stdout.decode() if e.stdout else 'No relevant output from helm'}",
+                f"Stderr:\n{e.stderr.decode() if e.stderr else 'No relevant error stream from helm'}",
                 troubleshooting
             )
         raise
