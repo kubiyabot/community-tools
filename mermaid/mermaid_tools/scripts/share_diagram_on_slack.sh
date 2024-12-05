@@ -179,9 +179,7 @@ for dest in ${slack_destination}; do
             channel_name=${channel_name%">"}  # Removes the trailing ">"
             echo "✅ Parsed Channel ID ${channel_name}"
             # Try to get channel ID
-            channel_info=$(curl -s -H "Authorization: Bearer ${SLACK_API_TOKEN}" \
-                "https://slack.com/api/conversations.list?limit=1000" | \
-                jq -r --arg name "$channel_name" '.channels[] | select(.name == $name) | .id')
+            channel_info="${channel_name}"
 
             if [ -n "$channel_info" ]; then
                 channel="$channel_info"
