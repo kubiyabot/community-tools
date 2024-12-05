@@ -7,9 +7,10 @@ import time
 import sys
 import requests
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Optional
 from collections import defaultdict
 from io import StringIO
+import tempfile
 
 # Configure detailed logging
 logging.basicConfig(
