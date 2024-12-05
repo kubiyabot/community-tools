@@ -98,6 +98,12 @@ resources:
     cpu: 50m
     memory: 64Mi
 
+command:
+  - /kubewatch
+args:
+  - --config
+  - /config/.kubewatch.yaml
+
 volumeMounts:
   - name: config-volume
     mountPath: /config
