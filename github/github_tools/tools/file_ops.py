@@ -13,6 +13,48 @@ FILE_OPS_SCRIPT = '''
 #!/bin/sh
 set -e
 
+# Function to setup git repository
+setup_repo() {
+    local repo="$1"
+    local branch="$2"
+    
+    # Clean working directory
+    rm -rf ./*
+    
+    echo "🔄 Cloning repository..."
+    gh repo clone "$repo" . || exit 1
+    
+    if [ -n "$branch" ]; then
+        echo "🌱 Checking out branch: $branch"
+        git checkout "$branch" || git checkout -b "$branch"
+    fi
+}
+
+# Function to get file contents
+get_file_contents() {
+    local repo="$1"
+    local file_path="$2"
+    local ref="$3"
+
+    echo "📄 Fetching file: $file_path"
+    if [ -n "$ref" ]; then
+        echo "📌 From ref: $ref"
+        content=$(gh api "repos/$repo/contents/$file_path?ref=$ref" --jq '.content' | base64 -d)
+    else
+        content=$(gh api "repos/$repo/contents/$file_path" --jq '.content' | base64 -d)
+    fi
+
+    if [ -n "$content" ]; then
+        echo "📝 File content:"
+        echo "-------------------"
+        echo "$content"
+        echo "-------------------"
+    else
+        echo "❌ File not found or empty"
+        exit 1
+    fi
+}
+
 # Function to search files
 search_files() {
     local pattern="$1"
@@ -108,9 +150,121 @@ remote_search() {
     echo "=== Summary ==="
     printf "✨ Found %d matches\\n" "$total"
 }
+
+# Function to preview changes before committing
+preview_changes() {
+    local modifications="$1"
+    local create_branch="$2"
+    local branch_name="$3"
+    
+    if [ "$create_branch" = "true" ]; then
+        new_branch="${branch_name:-feature/auto-update-preview-$(date +%s)}"
+        echo "🌱 Would create new branch: $new_branch"
+    fi
+    
+    echo "📝 Previewing file modifications..."
+    echo "$modifications" | jq -c '.[]' | while read -r mod; do
+        file=$(echo "$mod" | jq -r '.file')
+        pattern=$(echo "$mod" | jq -r '.pattern')
+        replacement=$(echo "$mod" | jq -r '.replacement')
+        
+        echo "✏️  Would modify: $file"
+        if [ ! -f "$file" ]; then
+            echo "❌ File not found: $file"
+            continue
+        fi
+        
+        # Create temporary file for preview
+        cp "$file" "$file.preview"
+        sed -i "s/$pattern/$replacement/g" "$file.preview"
+        
+        # Show preview diff
+        echo "📊 Preview of changes for $file:"
+        diff --color "$file" "$file.preview" || true
+        rm "$file.preview"
+    done
+}
+
+# Function to modify files and commit changes
+modify_and_commit() {
+    local modifications="$1"
+    local commit_message="$2"
+    local create_branch="$3"
+    local branch_name="$4"
+    local dry_run="$5"
+    
+    if [ "$dry_run" = "true" ]; then
+        preview_changes "$modifications" "$create_branch" "$branch_name"
+        return
+    fi
+
+    if [ "$create_branch" = "true" ]; then
+        new_branch="${branch_name:-feature/auto-update-$(date +%s)}"
+        echo "🌱 Creating new branch: $new_branch"
+        git checkout -b "$new_branch"
+    fi
+    
+    echo "📝 Processing file modifications..."
+    echo "$modifications" | jq -c '.[]' | while read -r mod; do
+        file=$(echo "$mod" | jq -r '.file')
+        pattern=$(echo "$mod" | jq -r '.pattern')
+        replacement=$(echo "$mod" | jq -r '.replacement')
+        
+        echo "✏️  Modifying: $file"
+        if [ ! -f "$file" ]; then
+            echo "❌ File not found: $file"
+            continue
+        fi
+        
+        # Create backup
+        cp "$file" "$file.bak"
+        
+        # Perform replacement
+        sed -i "s/$pattern/$replacement/g" "$file"
+        
+        # Show diff
+        echo "📊 Changes for $file:"
+        diff "$file.bak" "$file" || true
+        rm "$file.bak"
+    done
+    
+    if [ -n "$(git status --porcelain)" ]; then
+        echo "📦 Staging changes..."
+        git add .
+        
+        echo "💾 Committing changes..."
+        git commit -m "${commit_message:-Auto-update: $(date)}"
+        
+        echo "🚀 Pushing changes..."
+        git push origin HEAD
+        
+        echo "✨ Changes pushed successfully"
+    else
+        echo "ℹ️  No changes to commit"
+    fi
+}
 '''
 
 # Tool definitions using the shared script
+get_file = GitHubCliTool(
+    name="github_get_file",
+    description="""Get contents of a specific file from a repository.
+    
+WHEN TO USE:
+- Need to view file contents
+- Want to fetch file from specific branch/ref""",
+    content=f'''
+{FILE_OPS_SCRIPT}
+
+get_file_contents "${{repo}}" "${{file_path}}" "${{ref}}"
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="file_path", type="str", description="Path to file in repository", required=True),
+        Arg(name="ref", type="str", description="Branch, tag, or commit SHA (optional)", required=False),
+    ]
+)
+
 stateful_search_files = GitHubCliTool(
     name="github_stateful_search_files",
     description="""Search for patterns in repository files.
@@ -157,7 +311,29 @@ remote_search "${{repo}}" "${{pattern}}" "${{file}}"
     ]
 )
 
-# Add these file modification tools
+preview_modifications = GitHubCliTool(
+    name="github_preview_modifications",
+    description="""Preview file modifications without committing.
+    
+WHEN TO USE:
+- Want to see changes before applying
+- Need to validate modifications
+- Want to check branch creation""",
+    content=f'''
+{FILE_OPS_SCRIPT}
+
+setup_repo "${{repo}}" "${{branch}}"
+preview_changes "${{modifications}}" "${{create_branch}}" "${{branch_name}}"
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="modifications", type="str", description='JSON array of modifications: [{"file": "path", "pattern": "old", "replacement": "new"}]', required=True),
+        Arg(name="branch", type="str", description="Base branch to preview from", required=False),
+        Arg(name="create_branch", type="bool", description="Preview branch creation", required=False),
+        Arg(name="branch_name", type="str", description="Name for new branch", required=False),
+    ],
+    with_volumes=[GIT_VOLUME]
+)
 
 stateful_modify_and_commit = GitHubCliTool(
     name="github_modify_and_commit",
@@ -166,58 +342,13 @@ stateful_modify_and_commit = GitHubCliTool(
 WHEN TO USE:
 - Need to modify multiple files
 - Want to commit changes
-- Need to create/switch branches""",
+- Need to create/switch branches
+- Want to preview changes (dry run)""",
     content=f'''
-#!/bin/sh
-set -e
+{FILE_OPS_SCRIPT}
 
-echo "🔧 Setting up repository..."
 setup_repo "${{repo}}" "${{branch}}"
-
-echo "📝 Processing file modifications..."
-for mod in $(echo "${{modifications}}" | jq -c '.[]'); do
-    file=$(echo "$mod" | jq -r '.file')
-    pattern=$(echo "$mod" | jq -r '.pattern')
-    replacement=$(echo "$mod" | jq -r '.replacement')
-    
-    echo "✏️  Modifying: $file"
-    if [ ! -f "$file" ]; then
-        echo "❌ File not found: $file"
-        continue
-    fi
-    
-    # Create backup
-    cp "$file" "$file.bak"
-    
-    # Perform replacement
-    sed -i "s/$pattern/$replacement/g" "$file"
-    
-    # Show diff
-    echo "📊 Changes for $file:"
-    diff "$file.bak" "$file" || true
-    rm "$file.bak"
-done
-
-if [ "${{create_branch}}" = "true" ]; then
-    new_branch="${{branch_name:-feature/auto-update-$(date +%s)}}"
-    echo "🌱 Creating new branch: $new_branch"
-    git checkout -b "$new_branch"
-fi
-
-if [ -n "$(git status --porcelain)" ]; then
-    echo "📦 Staging changes..."
-    git add .
-    
-    echo "💾 Committing changes..."
-    git commit -m "${{commit_message:-Auto-update: $(date)}}"
-    
-    echo "🚀 Pushing changes..."
-    git push origin HEAD
-    
-    echo "✨ Changes pushed successfully"
-else
-    echo "ℹ️  No changes to commit"
-fi
+modify_and_commit "${{modifications}}" "${{commit_message}}" "${{create_branch}}" "${{branch_name}}" "${{dry_run}}"
 ''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
@@ -226,12 +357,13 @@ fi
         Arg(name="create_branch", type="bool", description="Create new branch for changes", required=False),
         Arg(name="branch_name", type="str", description="Name for new branch (if creating)", required=False),
         Arg(name="commit_message", type="str", description="Custom commit message", required=False),
+        Arg(name="dry_run", type="bool", description="Preview changes without committing", required=False),
     ],
     with_volumes=[GIT_VOLUME]
 )
 
 stateful_create_pr = GitHubCliTool(
-    name="github_create_pr",
+    name="github_create_pr", 
     description="""Create pull request from changes.
     
 WHEN TO USE:
@@ -239,10 +371,8 @@ WHEN TO USE:
 - Need to create PR
 - Want to add reviewers""",
     content=f'''
-#!/bin/sh
-set -e
+{FILE_OPS_SCRIPT}
 
-echo "🔍 Checking repository state..."
 setup_repo "${{repo}}" "${{branch}}"
 
 echo "📋 Creating pull request..."
@@ -270,8 +400,10 @@ echo "🔗 URL: $PR_URL"
 
 # Update the tools list
 tools = [
+    get_file,
     stateful_search_files,
     remote_search,
+    preview_modifications,
     stateful_modify_and_commit,
     stateful_create_pr
 ]
@@ -280,8 +412,10 @@ for tool in tools:
     tool_registry.register("github", tool)
 
 __all__ = [
+    'get_file',
     'stateful_search_files',
     'remote_search',
+    'preview_modifications',
     'stateful_modify_and_commit',
     'stateful_create_pr'
 ]
