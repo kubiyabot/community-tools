@@ -35,6 +35,30 @@ function process_logs() {
         }
     '
 }
+
+# Function to parse timestamp from log line
+function parse_timestamp() {
+    local line="$1"
+    echo "$line" | grep -o "[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T[0-9]\{2\}:[0-9]\{2\}:[0-9]\{2\}Z" || echo ""
+}
+
+# Function to determine log level
+function get_log_level() {
+    local line="$1"
+    if echo "$line" | grep -qi "error\\|failed\\|exception"; then
+        echo "ERROR"
+    elif echo "$line" | grep -qi "warning\\|warn"; then
+        echo "WARN"
+    elif echo "$line" | grep -qi "info\\|notice"; then
+        echo "INFO"
+    elif echo "$line" | grep -qi "debug"; then
+        echo "DEBUG"
+    elif echo "$line" | grep -qi "success\\|completed"; then
+        echo "SUCCESS"
+    else
+        echo "INFO"
+    fi
+}
 '''
 
 # Core workflow tools
@@ -101,27 +125,31 @@ workflow_disable = GitHubCliTool(
 workflow_logs = GitHubCliTool(
     name="github_workflow_logs",
     description="View workflow run logs with error context",
-    content='''
+    content=f'''
 #!/bin/sh
 set -e
+{LOG_PROCESSING_FUNCTIONS}
 
-echo " Fetching logs for run ID: $run_id"
+echo "🔍 Fetching logs for run ID: $run_id"
 
 # Try to get logs with multiple methods
 LOGS=""
 
 # First try: Get failed logs
 if [ -z "$LOGS" ]; then
+    echo "->> Attempting to get failed logs..."
     LOGS=$(gh run view --repo "$repo" "$run_id" --log-failed 2>/dev/null || true)
 fi
 
 # Second try: Get all logs
 if [ -z "$LOGS" ]; then
+    echo "->> Attempting to get all logs..."
     LOGS=$(gh run view --repo "$repo" "$run_id" --log 2>/dev/null || true)
 fi
 
 # Third try: Get raw logs via API
 if [ -z "$LOGS" ]; then
+    echo "->> Failed to get logs via gh run view, trying API..."
     LOGS=$(gh api "repos/$repo/actions/runs/$run_id/logs" --raw 2>/dev/null || true)
 fi
 
@@ -140,18 +168,23 @@ if [ -n "$search" ]; then
     echo "🔍 Filtering logs for: $search"
     echo "$LOGS" | grep -A 2 -B 2 "$search" || echo "No matches found"
 else
-    # Show logs with basic formatting
+    # Show logs with structured formatting
     echo "$LOGS" | while IFS= read -r line; do
-        # Highlight errors and important messages
-        if echo "$line" | grep -qi "error\\|failed\\|exception"; then
-            echo "❌ $line"
-        elif echo "$line" | grep -qi "warning"; then
-            echo "⚠️  $line"
-        elif echo "$line" | grep -qi "success\\|completed"; then
-            echo "✅ $line"
-        else
-            echo "   $line"
+        # Extract timestamp if present
+        timestamp=$(parse_timestamp "$line")
+        if [ -z "$timestamp" ]; then
+            timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         fi
+        
+        # Determine log level and format line
+        level=$(get_log_level "$line")
+        case "$level" in
+            "ERROR")   printf "[%s] %-7s ❌ %s\\n" "$timestamp" "$level" "$line" ;;
+            "WARN")    printf "[%s] %-7s ⚠️  %s\\n" "$timestamp" "$level" "$line" ;;
+            "SUCCESS") printf "[%s] %-7s ✅ %s\\n" "$timestamp" "$level" "$line" ;;
+            "DEBUG")   printf "[%s] %-7s 🔍 %s\\n" "$timestamp" "$level" "$line" ;;
+            *)        printf "[%s] %-7s ℹ️  %s\\n" "$timestamp" "$level" "$line" ;;
+        esac
     done
 fi
 ''',
