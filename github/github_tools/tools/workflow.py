@@ -61,7 +61,14 @@ workflow_view = GitHubCliTool(
 workflow_run = GitHubCliTool(
     name="github_workflow_run",
     description="Run a workflow",
-    content="gh workflow run --repo $repo $workflow $([[ -n \"$ref\" ]] && echo \"--ref $ref\") $([[ -n \"$inputs\" ]] && echo \"--raw-field $inputs\")",
+    content="""
+echo "🚀 Triggering workflow..."
+RESULT=$(gh workflow run --repo $repo $workflow $([[ -n "$ref" ]] && echo "--ref $ref") $([[ -n "$inputs" ]] && echo "--raw-field $inputs"))
+
+echo "✨ Workflow triggered successfully"
+echo "📋 Details:"
+echo "$RESULT"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
@@ -158,7 +165,18 @@ fi
 workflow_run_list = GitHubCliTool(
     name="github_workflow_run_list",
     description="List workflow runs",
-    content="gh run list --repo $repo $([[ -n \"$workflow\" ]] && echo \"--workflow $workflow\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
+    content="""
+echo "📋 Fetching workflow runs..."
+if [ -n "$workflow" ]; then
+    echo "🔍 Filtering for workflow: $workflow"
+fi
+
+gh run list --repo $repo \
+    $([[ -n "$workflow" ]] && echo "--workflow $workflow") \
+    $([[ -n "$limit" ]] && echo "--limit $limit") \
+    --json status,databaseId,headBranch,event,title \
+    --jq '.[] | "🔄 Run #\\(.databaseId) [\\(.status)] \\(.title) (\\(.event) on \\(.headBranch))"'
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Optional: Workflow name/ID", required=False),

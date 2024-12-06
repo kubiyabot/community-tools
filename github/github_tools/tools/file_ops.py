@@ -134,10 +134,132 @@ remote_search "${{repo}}" "${{pattern}}"
     ]
 )
 
-# Register tools
-tools = [stateful_search_files, remote_search]
+# Add these file modification tools
+
+stateful_modify_and_commit = GitHubCliTool(
+    name="github_modify_and_commit",
+    description="""Modify files and commit changes.
+    
+WHEN TO USE:
+- Need to modify multiple files
+- Want to commit changes
+- Need to create/switch branches""",
+    content=f'''
+#!/bin/sh
+set -e
+
+echo "🔧 Setting up repository..."
+setup_repo "${{repo}}" "${{branch}}"
+
+echo "📝 Processing file modifications..."
+for mod in $(echo "${{modifications}}" | jq -c '.[]'); do
+    file=$(echo "$mod" | jq -r '.file')
+    pattern=$(echo "$mod" | jq -r '.pattern')
+    replacement=$(echo "$mod" | jq -r '.replacement')
+    
+    echo "✏️  Modifying: $file"
+    if [ ! -f "$file" ]; then
+        echo "❌ File not found: $file"
+        continue
+    fi
+    
+    # Create backup
+    cp "$file" "$file.bak"
+    
+    # Perform replacement
+    sed -i "s/$pattern/$replacement/g" "$file"
+    
+    # Show diff
+    echo "📊 Changes for $file:"
+    diff "$file.bak" "$file" || true
+    rm "$file.bak"
+done
+
+if [ "${{create_branch}}" = "true" ]; then
+    new_branch="${{branch_name:-feature/auto-update-$(date +%s)}}"
+    echo "🌱 Creating new branch: $new_branch"
+    git checkout -b "$new_branch"
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "📦 Staging changes..."
+    git add .
+    
+    echo "💾 Committing changes..."
+    git commit -m "${{commit_message:-Auto-update: $(date)}}"
+    
+    echo "🚀 Pushing changes..."
+    git push origin HEAD
+    
+    echo "✨ Changes pushed successfully"
+else
+    echo "ℹ️  No changes to commit"
+fi
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="modifications", type="str", description='JSON array of modifications: [{"file": "path", "pattern": "old", "replacement": "new"}]', required=True),
+        Arg(name="branch", type="str", description="Base branch to start from", required=False),
+        Arg(name="create_branch", type="bool", description="Create new branch for changes", required=False),
+        Arg(name="branch_name", type="str", description="Name for new branch (if creating)", required=False),
+        Arg(name="commit_message", type="str", description="Custom commit message", required=False),
+    ],
+    with_volumes=[GIT_VOLUME]
+)
+
+stateful_create_pr = GitHubCliTool(
+    name="github_create_pr",
+    description="""Create pull request from changes.
+    
+WHEN TO USE:
+- After modifying files
+- Need to create PR
+- Want to add reviewers""",
+    content=f'''
+#!/bin/sh
+set -e
+
+echo "🔍 Checking repository state..."
+setup_repo "${{repo}}" "${{branch}}"
+
+echo "📋 Creating pull request..."
+PR_URL=$(gh pr create \
+    --title "${{title}}" \
+    --body "${{body}}" \
+    --base "${{target_branch}}" \
+    $([[ -n "${{reviewers}}" ]] && echo "--reviewer ${{reviewers}}") \
+    $([[ -n "${{labels}}" ]] && echo "--label ${{labels}}"))
+
+echo "✨ Pull request created successfully"
+echo "🔗 URL: $PR_URL"
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="branch", type="str", description="Source branch with changes", required=True),
+        Arg(name="target_branch", type="str", description="Target branch for PR", required=True),
+        Arg(name="title", type="str", description="PR title", required=True),
+        Arg(name="body", type="str", description="PR description", required=True),
+        Arg(name="reviewers", type="str", description="Comma-separated list of reviewers", required=False),
+        Arg(name="labels", type="str", description="Comma-separated list of labels", required=False),
+    ],
+    with_volumes=[GIT_VOLUME]
+)
+
+# Update the tools list
+tools = [
+    stateful_search_files,
+    remote_search,
+    stateful_modify_and_commit,
+    stateful_create_pr
+]
+
 for tool in tools:
     tool_registry.register("github", tool)
 
-__all__ = ['stateful_search_files', 'remote_search']
+__all__ = [
+    'stateful_search_files',
+    'remote_search',
+    'stateful_modify_and_commit',
+    'stateful_create_pr'
+]
 
