@@ -348,13 +348,9 @@ if [ -z "$LOGS" ]; then
     exit 1
 fi
 
-# Create a temporary file for the logs
-TEMP_LOG_FILE=$(mktemp)
-echo "$LOGS" > "$TEMP_LOG_FILE"
-
 if [ -n "$pattern" ]; then
     echo "🔍 Searching for pattern '$pattern' in logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
+    RESULTS=$(echo "$LOGS" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
     if [ -n "$RESULTS" ]; then
         echo "$RESULTS"
     else
@@ -362,18 +358,15 @@ if [ -n "$pattern" ]; then
     fi
 else
     echo "🔍 Extracting error context from logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | extract_error_context)
+    RESULTS=$(echo "$LOGS" | extract_error_context)
     if [ -n "$RESULTS" ]; then
         echo "$RESULTS" | tail -n $LINES
     else
         echo "❌ No error patterns found in the logs"
         echo "Showing last $LINES lines of logs instead:"
-        tail -n $LINES "$TEMP_LOG_FILE"
+        echo "$LOGS" | tail -n $LINES
     fi
 fi
-
-# Clean up
-rm -f "$TEMP_LOG_FILE"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),

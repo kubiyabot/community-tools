@@ -7,85 +7,22 @@ GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 class GitHubCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
-        enhanced_content = f"""
-#!/bin/sh
-set -e
-
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --quiet jq >/dev/null 2>&1
-fi
-
-check_and_set_org() {{
-    if [ -n "$org" ]; then
-        echo "Using organization: $org"
-    else
-        orgs=$(gh api user/orgs --jq '.[].login')
-        org_count=$(echo "$orgs" | wc -l)
-        if [ "$org_count" -eq 0 ]; then
-            echo "You are not part of any organization."
-        elif [ "$org_count" -eq 1 ]; then
-            org=$orgs
-            echo "You are part of one organization: $org. Using this organization."
-        else
-            echo "You are part of the following organizations:"
-            echo "$orgs"
-            echo "Please specify the organization in your command if needed."
-        fi
-    fi
-}}
-
-get_repo_context() {{
-    if [ -z "$repo" ]; then
-        if [ -n "$org" ]; then
-            echo "No repository specified. Here are your 10 most recently updated repositories in the $org organization:"
-            gh repo list $org --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
-        else
-            echo "No repository specified. Here are your 10 most recently updated repositories:"
-            gh repo list --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
-        fi
-        echo "NOTE: This is not a complete list of your repositories."
-        echo "Please specify a repository name in your command."
-        exit 1
-    else
-        if [[ "$repo" != *"/"* ]]; then
-            if [ -n "$org" ]; then
-                repo="${{org}}/${{repo}}"
-            else
-                current_user=$(gh api user --jq '.login')
-                repo="${{current_user}}/${{repo}}"
-            fi
-        fi
-        echo "Using repository: $repo"
-    fi
-}}
-
-check_and_set_org
-get_repo_context
-
-{content}
-"""
-
-        updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
-        updated_args.extend([
-            Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False),
-            Arg(name="repo", type="str", description="Repository name. If org is provided or auto-detected, you can just specify the repo name. Otherwise, use the format 'owner/repo'.", required=False)
-        ])
-
+        # Add a temporary directory volume for tools that need it
+        volumes = ["/tmp:/tmp"] if "$(mktemp)" in content else []
+        
         super().__init__(
             name=name,
             description=description,
             icon_url=GITHUB_ICON_URL,
             type="docker",
             image=GITHUB_CLI_DOCKER_IMAGE,
-            content=enhanced_content,
-            args=updated_args,
+            content=content,
+            args=args,
             env=COMMON_ENV,
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
             long_running=long_running,
-            with_volumes=[Volume(name="git_data", path="/var/git_data")]
-
+            volumes=volumes  # Add volumes parameter
         )
 
 # Add this new tool for streaming GitHub Actions workflow logs
@@ -138,7 +75,7 @@ set -e
 
 if ! command -v jq >/dev/null 2>&1; then
     # Silently install jq and git
-    apk add --no-cache --quiet jq git >/dev/null 2>&1
+    apk add --quiet jq git >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
