@@ -6,10 +6,58 @@ from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
+KUBIYA_DISCLAIMER_MARKDOWN = '''
+
+---
+> 🤖 **Automated Action Notice**
+> 
+> This action was performed by [Kubiya.ai](https://kubiya.ai) teammate **${KUBIYA_AGENT_PROFILE}** on behalf of @${GITHUB_ACTOR}.
+> 
+> <details>
+> <summary>Action Details</summary>
+>
+> - **Teammate ID**: [${KUBIYA_AGENT_UUID}](https://app.kubiya.ai/teammates/${KUBIYA_AGENT_UUID})
+> - **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+> - **Operation**: ${OPERATION_TYPE}
+> </details>
+'''
+
+KUBIYA_DISCLAIMER_TEXT = '''
+---
+🤖 Automated Action by Kubiya.ai
+• Teammate: ${KUBIYA_AGENT_PROFILE}
+• On behalf of: @${GITHUB_ACTOR}
+• Teammate Configuration URL: https://app.kubiya.ai/teammates/${KUBIYA_AGENT_UUID}
+• Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+'''
+
 class GitHubCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, with_volumes=None):
         if with_volumes is None:
             with_volumes = []
+
+        # Add disclaimer to content based on operation type
+        enhanced_content = f'''
+#!/bin/sh
+set -e
+
+# Set operation type for disclaimer
+OPERATION_TYPE="{name}"
+
+# Function to add disclaimer
+add_disclaimer() {{
+    local format="$1"
+    local message="$2"
+    
+    if [ "$format" = "markdown" ]; then
+        echo "{KUBIYA_DISCLAIMER_MARKDOWN}" | envsubst
+    else
+        echo "{KUBIYA_DISCLAIMER_TEXT}" | envsubst
+    fi
+}}
+
+{content}
+'''
 
         # Generate operation-specific mermaid diagram
         mermaid_diagram = self._generate_mermaid_diagram(name, args)
@@ -20,9 +68,13 @@ class GitHubCliTool(Tool):
             icon_url=GITHUB_ICON_URL,
             type="docker",
             image=GITHUB_CLI_DOCKER_IMAGE,
-            content=content,
+            content=enhanced_content,
             args=args,
-            env=COMMON_ENV,
+            env=COMMON_ENV + [
+                "KUBIYA_AGENT_PROFILE",
+                "KUBIYA_AGENT_UUID",
+                "GITHUB_ACTOR"
+            ],
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
             long_running=long_running,

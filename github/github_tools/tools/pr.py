@@ -2,6 +2,13 @@ from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# Common disclaimer for automated actions
+KUBIYA_DISCLAIMER = """
+
+---
+> **Note**: This action was performed on behalf of @${GITHUB_ACTOR} using an automated AI workflow powered by [Kubiya.ai](https://kubiya.ai)
+"""
+
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository.",
@@ -11,7 +18,13 @@ echo "📝 Title: $title"
 echo "📄 Base branch: $base"
 echo "🔀 Head branch: $head"
 
-RESULT=$(gh pr create --repo $repo --title "$title" --body "$body" --base $base --head $head $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$reviewer" ]] && echo "--reviewer $reviewer"))
+# Append disclaimer to PR body
+GITHUB_ACTOR=$(gh api user --jq '.login')
+FULL_BODY="$body
+
+${KUBIYA_DISCLAIMER}"
+
+RESULT=$(gh pr create --repo $repo --title "$title" --body "$FULL_BODY" --base $base --head $head $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$reviewer" ]] && echo "--reviewer $reviewer"))
 
 PR_URL=$(echo "$RESULT" | grep -o 'https://github.com/[^[:space:]]*')
 echo "✨ Pull request created successfully!"
@@ -87,7 +100,8 @@ echo "🔄 Attempting to merge pull request #$number in $repo..."
 echo "📝 Using merge method: $merge_method"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 
-gh pr merge --repo $repo $number --$merge_method
+GITHUB_ACTOR=$(gh api user --jq '.login')
+gh pr merge --repo $repo $number --$merge_method -b "Merged via automated workflow${KUBIYA_DISCLAIMER}"
 
 echo "✅ Pull request merged successfully!"
 """,
@@ -104,7 +118,8 @@ pr_close = GitHubCliTool(
     content="""
 echo "🚫 Closing pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr close --repo $repo $number
+GITHUB_ACTOR=$(gh api user --jq '.login')
+gh pr close --repo $repo $number -c "Closed via automated workflow${KUBIYA_DISCLAIMER}"
 echo "✅ Pull request closed successfully!"
 """,
     args=[
@@ -119,7 +134,9 @@ pr_comment = GitHubCliTool(
     content="""
 echo "💬 Adding comment to pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr comment --repo $repo $number --body "$body"
+GITHUB_ACTOR=$(gh api user --jq '.login')
+FULL_COMMENT="$body${KUBIYA_DISCLAIMER}"
+gh pr comment --repo $repo $number --body "$FULL_COMMENT"
 echo "✅ Comment added successfully!"
 """,
     args=[
@@ -136,7 +153,9 @@ pr_review = GitHubCliTool(
 echo "👀 Adding review to pull request #$number in $repo..."
 echo "📝 Review type: $review_type"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$body\\"")
+GITHUB_ACTOR=$(gh api user --jq '.login')
+FULL_BODY="$body${KUBIYA_DISCLAIMER}"
+gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 echo "✅ Review submitted successfully!"
 """,
     args=[
