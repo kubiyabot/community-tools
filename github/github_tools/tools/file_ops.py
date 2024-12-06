@@ -1,6 +1,12 @@
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, Volume
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
+
+# Define the volume for git operations
+GIT_VOLUME = Volume(
+    name="gh_files",
+    path="/opt/gh_files"
+)
 
 # Efficient repository management with user-specific state
 REPO_MANAGEMENT = '''
@@ -10,6 +16,39 @@ get_user_hash() {
         exit 1
     fi
     echo "$KUBIYA_USER_EMAIL" | sha256sum | cut -d' ' -f1 | head -c 8
+}
+
+list_user_repos() {
+    local org="$1"
+    local page=1
+    local per_page=30
+    local total_repos=0
+    
+    echo "📚 Fetching repositories..."
+    if [ -n "$org" ]; then
+        echo "🏢 Organization: $org"
+        while true; do
+            local repos=$(gh api "orgs/$org/repos?page=$page&per_page=$per_page" --jq '.[] | {name: .name, visibility: .visibility, updated_at: .updated_at}')
+            if [ -z "$repos" ]; then
+                break
+            fi
+            echo "$repos"
+            total_repos=$((total_repos + $(echo "$repos" | wc -l)))
+            page=$((page + 1))
+        done
+    else
+        echo "👤 User repositories"
+        while true; do
+            local repos=$(gh api "user/repos?page=$page&per_page=$per_page" --jq '.[] | {name: .name, visibility: .visibility, updated_at: .updated_at}')
+            if [ -z "$repos" ]; then
+                break
+            fi
+            echo "$repos"
+            total_repos=$((total_repos + $(echo "$repos" | wc -l)))
+            page=$((page + 1))
+        done
+    fi
+    echo "📊 Total repositories: $total_repos"
 }
 
 check_state_age() {
@@ -32,15 +71,19 @@ update_timestamp() {
 
 cleanup_old_states() {
     local user_hash=$(get_user_hash)
-    local base_dir="/var/gh_files/$user_hash"
+    local base_dir="/opt/gh_files/$user_hash"
     [ ! -d "$base_dir" ] && return 0
     
+    local cleaned=0
+    echo "🧹 Checking for old states..."
     find "$base_dir" -mindepth 1 -maxdepth 1 -type d | while read dir; do
         if ! check_state_age "$dir"; then
-            echo "🧹 Removing old state: $(basename "$dir")"
+            echo "   🗑️  Removing old state: $(basename "$dir")"
             rm -rf "$dir"
+            cleaned=$((cleaned + 1))
         fi
     done
+    [ $cleaned -gt 0 ] && echo "   ✨ Cleaned up $cleaned old states"
 }
 
 setup_repo() {
@@ -54,7 +97,14 @@ setup_repo() {
     WORK_DIR="/opt/gh_files/$user_hash/$(echo "$repo" | sed 's/[^a-zA-Z0-9]/_/g')"
     
     echo "👤 User workspace: $user_hash"
-    echo "📁 Repository: $repo"
+    echo "📦 Repository: $repo"
+    
+    # Get organization from repo
+    local org=$(echo "$repo" | cut -d'/' -f1)
+    echo "🏢 Organization: $org"
+    
+    # Show available repositories
+    list_user_repos "$org"
     
     # Clean up old states first
     cleanup_old_states
@@ -72,6 +122,11 @@ setup_repo() {
                 # Fetch latest changes
                 echo "🔄 Updating repository..."
                 git fetch origin
+                
+                # Show some repo stats
+                echo "📊 Repository stats:"
+                echo "   📝 Latest commit: $(git log -1 --format='%h - %s')"
+                echo "   👥 Contributors: $(git shortlog -sn --no-merges | wc -l)"
                 
                 # Check if working directory is clean
                 if [ -z "$(git status --porcelain)" ]; then
@@ -105,11 +160,18 @@ setup_repo() {
         exit 1
     fi
 
+    # Show initial repo info
+    echo "📊 Repository information:"
+    echo "   📝 Default branch: $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')"
+    echo "   📚 Total branches: $(git branch -r | wc -l)"
+    echo "   📦 Repository size: $(du -sh . | cut -f1)"
+
     # Handle branch
     if [ -n "$branch" ]; then
         echo "🔄 Switching to branch: $branch"
         if ! git checkout "$branch" 2>/dev/null; then
             if ! git checkout -b "$branch" "origin/$branch" 2>/dev/null; then
+                echo "🌱 Creating new branch: $branch"
                 git checkout -b "$branch"
             fi
         fi
@@ -123,6 +185,7 @@ setup_repo() {
 cleanup_on_error() {
     if [ -d "$WORK_DIR" ]; then
         cd "$WORK_DIR"
+        echo "🧹 Cleaning up after error..."
         git reset --hard HEAD 2>/dev/null || rm -rf "$WORK_DIR"
     fi
 }
@@ -187,7 +250,7 @@ fi
         Arg(name="branch", type="str", description="Branch to modify", required=False),
         Arg(name="commit", type="bool", description="Commit and push changes", required=False),
     ],
-    with_volumes=["/opt/gh_files:/opt/gh_files"]
+    with_volumes=[GIT_VOLUME]
 )
 
 # Register tool

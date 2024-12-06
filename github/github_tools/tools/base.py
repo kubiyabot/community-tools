@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Tool, FileSpec
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, Volume
 from kubiya_sdk.tools.registry import tool_registry
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
@@ -7,7 +7,10 @@ GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 class GitHubCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, with_volumes=[]):      
+    def __init__(self, name, description, content, args, long_running=False, with_volumes=None):      
+        if with_volumes is None:
+            with_volumes = []
+            
         super().__init__(
             name=name,
             description=description,
@@ -20,12 +23,15 @@ class GitHubCliTool(Tool):
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
             long_running=long_running,
-            with_volumes=with_volumes  # Use volumes parameter consistently
+            with_volumes=with_volumes
         )
 
 
 class GitHubRepolessCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, with_volumes=[]):
+    def __init__(self, name, description, content, args, long_running=False, with_volumes=None):
+        if with_volumes is None:
+            with_volumes = []
+            
         enhanced_content = f"""
 #!/bin/sh
 set -e
