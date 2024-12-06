@@ -93,29 +93,65 @@ workflow_disable = GitHubCliTool(
 # Log viewing tools with efficient processing
 workflow_logs = GitHubCliTool(
     name="github_workflow_logs",
-    description="View workflow run logs",
-    content=f"""
-{LOG_PROCESSING_FUNCTIONS}
+    description="View workflow run logs with error context",
+    content='''
+#!/bin/sh
+set -e
 
-LOGS=$(gh run view --repo "$repo" "$run_id" --log 2>/dev/null || \
-       gh run view --repo "$repo" "$run_id" --log-failed 2>/dev/null)
+echo " Fetching logs for run ID: $run_id"
+
+# Try to get logs with multiple methods
+LOGS=""
+
+# First try: Get failed logs
+if [ -z "$LOGS" ]; then
+    LOGS=$(gh run view --repo "$repo" "$run_id" --log-failed 2>/dev/null || true)
+fi
+
+# Second try: Get all logs
+if [ -z "$LOGS" ]; then
+    LOGS=$(gh run view --repo "$repo" "$run_id" --log 2>/dev/null || true)
+fi
+
+# Third try: Get raw logs via API
+if [ -z "$LOGS" ]; then
+    LOGS=$(gh api "repos/$repo/actions/runs/$run_id/logs" --raw 2>/dev/null || true)
+fi
 
 if [ -z "$LOGS" ]; then
-    echo "No logs available"
+    echo "❌ No logs available for run ID: $run_id"
+    echo "Possible reasons:"
+    echo "  • Run is still in progress"
+    echo "  • Run has been deleted"
+    echo "  • No permission to access logs"
+    echo "  • Logs have expired"
     exit 1
 fi
 
+# Process and display logs
 if [ -n "$search" ]; then
-    echo "$LOGS" | process_logs "$search" "$max_lines"
+    echo "🔍 Filtering logs for: $search"
+    echo "$LOGS" | grep -A 2 -B 2 "$search" || echo "No matches found"
 else
-    echo "$LOGS" | process_logs "" "$max_lines"
+    # Show logs with basic formatting
+    echo "$LOGS" | while IFS= read -r line; do
+        # Highlight errors and important messages
+        if echo "$line" | grep -qi "error\\|failed\\|exception"; then
+            echo "❌ $line"
+        elif echo "$line" | grep -qi "warning"; then
+            echo "⚠️  $line"
+        elif echo "$line" | grep -qi "success\\|completed"; then
+            echo "✅ $line"
+        else
+            echo "   $line"
+        fi
+    done
 fi
-""",
+''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID", required=True),
         Arg(name="search", type="str", description="Optional: Search pattern", required=False),
-        Arg(name="max_lines", type="int", description="Maximum lines to show (default 100)", required=False),
     ],
 )
 
