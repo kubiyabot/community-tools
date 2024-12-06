@@ -2,6 +2,10 @@ from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# Remove datetime imports since we'll handle dates in shell
+# import json
+# from datetime import datetime, timedelta
+
 # Essential log processing functions
 LOG_PROCESSING_FUNCTIONS = '''
 # Generic log processor with minimal buffer
@@ -443,11 +447,158 @@ echo "✨ Successfully deleted workflow!"
     ],
 )
 
+workflow_usage_stats = GitHubCliTool(
+    name="github_workflow_usage_stats",
+    description="Get workflow usage statistics for visualization",
+    content="""
+echo "📊 Fetching workflow usage statistics..."
+echo "📈 Analysis period: ${days:-30} days"
+
+# Calculate date range using shell date command
+START_DATE=$(date -d "$days days ago" +%Y-%m-%d)
+
+# Get workflow runs with detailed information
+RUNS=$(gh run list --repo $repo \
+    --json startedAt,status,workflowName,durationInSeconds,conclusion \
+    --created ">=$START_DATE" \
+    --limit ${limit:-100})
+
+# Process and output statistics in JSON format
+echo "$RUNS" | jq -c '{
+    total_runs: length,
+    success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100,
+    avg_duration: ([.[] | .durationInSeconds] | add / length),
+    by_workflow: group_by(.workflowName) | map({
+        name: .[0].workflowName,
+        count: length,
+        success_count: map(select(.conclusion == "success")) | length,
+        avg_duration: map(.durationInSeconds) | add / length
+    }),
+    by_status: group_by(.status) | map({
+        status: .[0].status,
+        count: length
+    })
+}'
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="days", type="int", description="Number of days to analyze", required=False),
+        Arg(name="limit", type="int", description="Maximum number of runs to analyze", required=False),
+    ],
+)
+
+workflow_performance_metrics = GitHubCliTool(
+    name="github_workflow_performance_metrics",
+    description="Get detailed performance metrics for specific workflow",
+    content="""
+echo "⚡ Analyzing workflow performance..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow: $workflow"
+echo "  • Period: ${days:-30} days"
+
+# Calculate date range using shell date command
+START_DATE=$(date -d "$days days ago" +%Y-%m-%d)
+
+# Get detailed run information for specific workflow
+RUNS=$(gh run list --repo $repo \
+    --workflow $workflow \
+    --json startedAt,conclusion,durationInSeconds,event,headBranch \
+    --created ">=$START_DATE" \
+    --limit ${limit:-50})
+
+# Process and output performance metrics in JSON format
+echo "$RUNS" | jq -c '{
+    workflow_metrics: {
+        total_executions: length,
+        success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100,
+        performance: {
+            min_duration: ([.[] | .durationInSeconds] | min),
+            max_duration: ([.[] | .durationInSeconds] | max),
+            avg_duration: ([.[] | .durationInSeconds] | add / length)
+        },
+        trigger_analysis: group_by(.event) | map({
+            event_type: .[0].event,
+            count: length,
+            avg_duration: map(.durationInSeconds) | add / length
+        }),
+        branch_metrics: group_by(.headBranch) | map({
+            branch: .[0].headBranch,
+            runs: length,
+            success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100
+        })
+    }
+}'
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
+        Arg(name="days", type="int", description="Number of days to analyze", required=False),
+        Arg(name="limit", type="int", description="Maximum runs to analyze", required=False),
+    ],
+)
+
+workflow_time_analysis = GitHubCliTool(
+    name="github_workflow_time_analysis",
+    description="Analyze workflow execution times and patterns",
+    content="""
+echo "⏱️ Analyzing workflow timing patterns..."
+echo "📊 Analysis Configuration:"
+echo "  • Repository: $repo"
+echo "  • Days: ${days:-30}"
+echo "  • Page: ${page:-1}"
+echo "  • Per Page: ${per_page:-50}"
+
+# Calculate date range using shell date command
+START_DATE=$(date -d "$days days ago" +%Y-%m-%d)
+
+# Calculate offset based on page and per_page
+OFFSET=$(( (${page:-1} - 1) * ${per_page:-50} ))
+
+# Get workflow runs with timing information
+RUNS=$(gh run list --repo $repo \
+    --json startedAt,durationInSeconds,workflowName,conclusion \
+    --created ">=$START_DATE" \
+    --limit ${per_page:-50} \
+    --jq ".[$OFFSET:$(($OFFSET + ${per_page:-50}))]")
+
+# Process and output timing analysis in JSON format
+echo "$RUNS" | jq -c '{
+    time_analysis: {
+        execution_times: map({
+            workflow: .workflowName,
+            duration_minutes: (.durationInSeconds / 60),
+            started_at: .startedAt,
+            succeeded: (.conclusion == "success")
+        }),
+        summary: {
+            total_time_hours: ([.[] | .durationInSeconds] | add / 3600),
+            avg_duration_minutes: ([.[] | .durationInSeconds] | add / length / 60),
+            success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100
+        }
+    },
+    pagination: {
+        page: '${page:-1}',
+        per_page: '${per_page:-50}',
+        has_more: (length >= '${per_page:-50}')
+    }
+}'
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="days", type="int", description="Number of days to analyze", required=False),
+        Arg(name="page", type="int", description="Page number for pagination", required=False),
+        Arg(name="per_page", type="int", description="Items per page", required=False),
+    ],
+)
+
 # Register all tools
 WORKFLOW_TOOLS = [
     workflow_list, workflow_view, workflow_run, workflow_enable, workflow_disable,
     workflow_logs, workflow_run_list, workflow_run_view, workflow_run_cancel,
-    workflow_run_rerun, workflow_create, workflow_delete
+    workflow_run_rerun, workflow_create, workflow_delete,
+    # analytics tools
+    workflow_usage_stats, workflow_performance_metrics, workflow_time_analysis
 ]
 
 for tool in WORKFLOW_TOOLS:
