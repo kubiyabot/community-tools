@@ -14,6 +14,7 @@ function extract_error_context() {
             buffer_size = 0     # Current buffer size
             buffer_start = 0    # Start position in circular buffer
             printing = 0        # Number of lines left to print after match
+            found_error = 0     # Track if we found any errors
             
             # Error patterns
             err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
@@ -37,6 +38,7 @@ function extract_error_context() {
             
             # Check for errors
             if ($0 ~ err_pattern) {
+                found_error = 1
                 # Generate a hash of the surrounding context to avoid duplicates
                 context = ""
                 for (i = 0; i < 3; i++) {  # Use 3 lines for context hash
@@ -72,6 +74,12 @@ function extract_error_context() {
                 }
             }
         }
+        
+        END {
+            if (!found_error) {
+                print "No error patterns found in the logs."
+            }
+        }
     '
 }
 
@@ -88,6 +96,7 @@ function search_logs_with_context() {
             buffer_size = 0
             buffer_start = 0
             printing = 0
+            found_match = 0
             
             # Noise pattern to filter
             noise_pattern = "(Download|Progress|download|progress)"
@@ -109,6 +118,7 @@ function search_logs_with_context() {
             
             # Check for pattern match
             if ($0 ~ pattern) {
+                found_match = 1
                 # Generate context hash to avoid duplicates
                 context_hash = $0  # Use matching line as hash
                 
@@ -136,6 +146,12 @@ function search_logs_with_context() {
                 if (printing == 0) {
                     print "\\n=== End of Match ===\\n"
                 }
+            }
+        }
+        
+        END {
+            if (!found_match) {
+                print "No matches found for pattern: " pattern
             }
         }
     '
@@ -298,14 +314,17 @@ fi
 
 workflow_run_logs_failed = GitHubCliTool(
     name="workflow_run_logs_failed",
-    description="""View failed job outputs from GitHub Actions workflow run with advanced search.
+    description="""View failed job outputs from GitHub Actions workflow run with advanced error detection.
     
-Shows only the failed job logs (maximum 150 lines) with options to:
-- Search for specific patterns with case sensitivity control
-- Control context lines around matches (up to 5 lines before/after)
-- Use exact match or regular expressions for searching
+Shows only the failed job logs with:
+- Automatic error context extraction
+- Smart filtering of noise
+- Configurable context lines around errors
 - Default shows last 100 lines if not searching""",
     content="""
+# Include the log processing functions
+{LOG_PROCESSING_FUNCTIONS}
+
 # Enforce maximum lines limit
 MAX_LINES=150
 LINES=${tail_lines:-100}
@@ -314,31 +333,47 @@ if [ $LINES -gt $MAX_LINES ]; then
     LINES=$MAX_LINES
 fi
 
-if [ -n "$pattern" ]; then
-    # Build grep options
-    GREP_OPTS=""
-    if [ "$case_sensitive" != "true" ]; then
-        GREP_OPTS="$GREP_OPTS -i"  # Case insensitive by default
-    fi
-    if [ "$exact_match" = "true" ]; then
-        GREP_OPTS="$GREP_OPTS -w"  # Word match
-    fi
-    
-    # Set context lines (max 5 each)
-    BEFORE_LINES=${before_context:-2}
-    AFTER_LINES=${after_context:-2}
-    if [ $BEFORE_LINES -gt 5 ]; then BEFORE_LINES=5; fi
-    if [ $AFTER_LINES -gt 5 ]; then AFTER_LINES=5; fi
-    
-    echo "🔍 Searching for pattern '$pattern' in failed logs (📄 showing $BEFORE_LINES lines before and $AFTER_LINES lines after matches) 🎯"
-    gh run view --repo $repo $run_id --log-failed | tail -n $MAX_LINES | \
-        grep $GREP_OPTS -B $BEFORE_LINES -A $AFTER_LINES "$pattern" | \
-        head -n $LINES
-else
-    # Just show the last N lines
-    echo "Showing last $LINES lines of failed logs"
-    gh run view --repo $repo $run_id --log-failed | tail -n $LINES
+echo "📊 Fetching failed job logs for run ID: $run_id"
+
+# First attempt - try getting failed logs directly
+LOGS=$(gh run view --repo $repo $run_id --log-failed 2>/dev/null)
+if [ -z "$LOGS" ]; then
+    echo "⚠️ No failed logs found directly, attempting to get full logs..."
+    # Second attempt - get full logs and filter for errors
+    LOGS=$(gh run view --repo $repo $run_id --log 2>/dev/null)
 fi
+
+if [ -z "$LOGS" ]; then
+    echo "❌ No logs available for this run. The run may still be in progress or logs have expired."
+    exit 1
+fi
+
+# Create a temporary file for the logs
+TEMP_LOG_FILE=$(mktemp)
+echo "$LOGS" > "$TEMP_LOG_FILE"
+
+if [ -n "$pattern" ]; then
+    echo "🔍 Searching for pattern '$pattern' in logs..."
+    RESULTS=$(cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
+    if [ -n "$RESULTS" ]; then
+        echo "$RESULTS"
+    else
+        echo "❌ No matches found for pattern: $pattern"
+    fi
+else
+    echo "🔍 Extracting error context from logs..."
+    RESULTS=$(cat "$TEMP_LOG_FILE" | extract_error_context)
+    if [ -n "$RESULTS" ]; then
+        echo "$RESULTS" | tail -n $LINES
+    else
+        echo "❌ No error patterns found in the logs"
+        echo "Showing last $LINES lines of logs instead:"
+        tail -n $LINES "$TEMP_LOG_FILE"
+    fi
+fi
+
+# Clean up
+rm -f "$TEMP_LOG_FILE"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
