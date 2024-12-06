@@ -73,7 +73,6 @@ add_disclaimer() {{
             env=COMMON_ENV + [
                 "KUBIYA_AGENT_PROFILE",
                 "KUBIYA_AGENT_UUID",
-                "GITHUB_ACTOR"
             ],
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
