@@ -65,7 +65,22 @@ function get_log_level() {
 workflow_list = GitHubCliTool(
     name="github_workflow_list",
     description="List GitHub Actions workflows",
-    content="gh workflow list --repo $repo $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
+    content="""
+echo "📋 Fetching workflow list..."
+echo "🔗 Workflows URL: https://github.com/$repo/actions"
+echo "📊 Resource Overview:"
+echo "  • Repository: $repo"
+echo "  • Limit: ${limit:-'No limit'}"
+
+if ! gh workflow list --repo $repo $([[ -n \"$limit\" ]] && echo \"--limit $limit\"); then
+    echo "❌ Failed to list workflows. Common issues:"
+    echo "  • Repository may not exist"
+    echo "  • No workflows configured"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully retrieved workflow list!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="limit", type="int", description="Maximum workflows to list", required=False),
@@ -75,7 +90,22 @@ workflow_list = GitHubCliTool(
 workflow_view = GitHubCliTool(
     name="github_workflow_view",
     description="View workflow details",
-    content="gh workflow view --repo $repo $workflow",
+    content="""
+echo "🔍 Fetching workflow details..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow: $workflow"
+echo "  • URL: https://github.com/$repo/actions/workflows/$workflow"
+
+if ! gh workflow view --repo $repo $workflow; then
+    echo "❌ Failed to view workflow. Common issues:"
+    echo "  • Workflow ID/name may be invalid"
+    echo "  • Workflow may have been deleted"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully retrieved workflow details!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
@@ -87,7 +117,19 @@ workflow_run = GitHubCliTool(
     description="Run a workflow",
     content="""
 echo "🚀 Triggering workflow..."
-RESULT=$(gh workflow run --repo $repo $workflow $([[ -n "$ref" ]] && echo "--ref $ref") $([[ -n "$inputs" ]] && echo "--raw-field $inputs"))
+echo "📊 Run Configuration:"
+echo "  • Repository: $repo"
+echo "  • Workflow: $workflow"
+echo "  • Branch/Ref: ${ref:-'default'}"
+echo "  • Inputs: ${inputs:-'none'}"
+
+if ! RESULT=$(gh workflow run --repo $repo $workflow $([[ -n "$ref" ]] && echo "--ref $ref") $([[ -n "$inputs" ]] && echo "--raw-field $inputs")); then
+    echo "❌ Failed to trigger workflow. Common issues:"
+    echo "  • Workflow may be disabled"
+    echo "  • Invalid inputs provided"
+    echo "  • Branch/ref may not exist"
+    exit 1
+fi
 
 echo "✨ Workflow triggered successfully"
 echo "📋 Details:"
@@ -104,7 +146,22 @@ echo "$RESULT"
 workflow_enable = GitHubCliTool(
     name="github_workflow_enable",
     description="Enable a workflow",
-    content="gh workflow enable --repo $repo $workflow",
+    content="""
+echo "🔓 Enabling workflow..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow: $workflow"
+echo "  • URL: https://github.com/$repo/actions/workflows/$workflow"
+
+if ! gh workflow enable --repo $repo $workflow; then
+    echo "❌ Failed to enable workflow. Common issues:"
+    echo "  • Workflow may not exist"
+    echo "  • Insufficient permissions"
+    echo "  • Workflow already enabled"
+    exit 1
+fi
+echo "✨ Workflow enabled successfully!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
@@ -114,7 +171,22 @@ workflow_enable = GitHubCliTool(
 workflow_disable = GitHubCliTool(
     name="github_workflow_disable",
     description="Disable a workflow",
-    content="gh workflow disable --repo $repo $workflow",
+    content="""
+echo "🔒 Disabling workflow..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow: $workflow"
+echo "  • URL: https://github.com/$repo/actions/workflows/$workflow"
+
+if ! gh workflow disable --repo $repo $workflow; then
+    echo "❌ Failed to disable workflow. Common issues:"
+    echo "  • Workflow may not exist"
+    echo "  • Insufficient permissions"
+    echo "  • Workflow already disabled"
+    exit 1
+fi
+echo "✨ Workflow disabled successfully!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
@@ -131,6 +203,10 @@ set -e
 {LOG_PROCESSING_FUNCTIONS}
 
 echo "🔍 Fetching logs for run ID: $run_id"
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Run ID: $run_id"
+echo "  • URL: https://github.com/$repo/actions/runs/$run_id"
 
 # Try to get logs with multiple methods
 LOGS=""
@@ -187,6 +263,7 @@ else
         esac
     done
 fi
+echo "✨ Log processing completed!"
 ''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
@@ -196,19 +273,32 @@ fi
 )
 
 workflow_run_list = GitHubCliTool(
-    name="github_workflow_run_list",
+    name="github_workflow_run_list", 
     description="List workflow runs",
     content="""
 echo "📋 Fetching workflow runs..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow: ${workflow:-'All workflows'}"
+echo "  • Limit: ${limit:-'No limit'}"
+echo "  • URL: https://github.com/$repo/actions"
+
 if [ -n "$workflow" ]; then
     echo "🔍 Filtering for workflow: $workflow"
 fi
 
-gh run list --repo $repo \
+if ! gh run list --repo $repo \
     $([[ -n "$workflow" ]] && echo "--workflow $workflow") \
     $([[ -n "$limit" ]] && echo "--limit $limit") \
     --json status,databaseId,headBranch,event,title \
-    --jq '.[] | "🔄 Run #\\(.databaseId) [\\(.status)] \\(.title) (\\(.event) on \\(.headBranch))"'
+    --jq '.[] | "🔄 Run #\\(.databaseId) [\\(.status)] \\(.title) (\\(.event) on \\(.headBranch))"'; then
+    echo "❌ Failed to list workflow runs. Common issues:"
+    echo "  • Repository may not exist"
+    echo "  • No workflow runs available"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully retrieved workflow runs!"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
@@ -220,7 +310,22 @@ gh run list --repo $repo \
 workflow_run_view = GitHubCliTool(
     name="github_workflow_run_view",
     description="View workflow run details",
-    content="gh run view --repo $repo $run_id",
+    content="""
+echo "🔍 Fetching run details..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Run ID: $run_id"
+echo "  • URL: https://github.com/$repo/actions/runs/$run_id"
+
+if ! gh run view --repo $repo $run_id; then
+    echo "❌ Failed to view run. Common issues:"
+    echo "  • Run ID may be invalid"
+    echo "  • Run may have been deleted"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully retrieved run details!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Run ID to view", required=True),
@@ -230,7 +335,22 @@ workflow_run_view = GitHubCliTool(
 workflow_run_cancel = GitHubCliTool(
     name="github_workflow_run_cancel",
     description="Cancel a workflow run",
-    content="gh run cancel --repo $repo $run_id",
+    content="""
+echo "🛑 Canceling workflow run..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Run ID: $run_id"
+echo "  • URL: https://github.com/$repo/actions/runs/$run_id"
+
+if ! gh run cancel --repo $repo $run_id; then
+    echo "❌ Failed to cancel run. Common issues:"
+    echo "  • Run ID may be invalid"
+    echo "  • Run may have already completed"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully canceled workflow run!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Run ID to cancel", required=True),
@@ -240,7 +360,22 @@ workflow_run_cancel = GitHubCliTool(
 workflow_run_rerun = GitHubCliTool(
     name="github_workflow_run_rerun",
     description="Rerun a workflow",
-    content="gh run rerun --repo $repo $run_id",
+    content="""
+echo "🔄 Rerunning workflow..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Run ID: $run_id"
+echo "  • URL: https://github.com/$repo/actions/runs/$run_id"
+
+if ! gh run rerun --repo $repo $run_id; then
+    echo "❌ Failed to rerun workflow. Common issues:"
+    echo "  • Run ID may be invalid"
+    echo "  • Run may not be rerunnable"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully triggered workflow rerun!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Run ID to rerun", required=True),
@@ -251,9 +386,30 @@ workflow_create = GitHubCliTool(
     name="github_workflow_create",
     description="Create a workflow",
     content="""
-mkdir -p .github/workflows
-echo "$content" > .github/workflows/$name
-gh workflow enable --repo $repo .github/workflows/$name
+echo "📝 Creating new workflow..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow Name: $name"
+echo "  • Path: .github/workflows/$name"
+
+if ! mkdir -p .github/workflows; then
+    echo "❌ Failed to create workflows directory"
+    exit 1
+fi
+
+if ! echo "$content" > .github/workflows/$name; then
+    echo "❌ Failed to write workflow file"
+    exit 1
+fi
+
+if ! gh workflow enable --repo $repo .github/workflows/$name; then
+    echo "❌ Failed to enable workflow. Common issues:"
+    echo "  • Invalid YAML syntax"
+    echo "  • Insufficient permissions"
+    echo "  • Repository not found"
+    exit 1
+fi
+echo "✨ Successfully created and enabled workflow!"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
@@ -265,7 +421,22 @@ gh workflow enable --repo $repo .github/workflows/$name
 workflow_delete = GitHubCliTool(
     name="github_workflow_delete",
     description="Delete a workflow",
-    content="gh api --method DELETE /repos/$repo/actions/workflows/$workflow",
+    content="""
+echo "🗑️  Deleting workflow..."
+echo "📊 Resource Details:"
+echo "  • Repository: $repo"
+echo "  • Workflow ID: $workflow"
+echo "  • URL: https://github.com/$repo/actions/workflows/$workflow"
+
+if ! gh api --method DELETE /repos/$repo/actions/workflows/$workflow; then
+    echo "❌ Failed to delete workflow. Common issues:"
+    echo "  • Workflow ID may be invalid"
+    echo "  • Workflow may be in use"
+    echo "  • Insufficient permissions"
+    exit 1
+fi
+echo "✨ Successfully deleted workflow!"
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow ID", required=True),
