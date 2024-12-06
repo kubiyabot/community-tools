@@ -233,7 +233,11 @@ modify_and_commit() {
         git add .
         
         echo "💾 Committing changes..."
-        git commit -m "${commit_message:-Auto-update: $(date)}"
+        COMMIT_MSG="${{commit_message:-Auto-update: $(date)}}
+
+$(add_disclaimer text)"
+        
+        git commit -m "$COMMIT_MSG"
         
         echo "🚀 Pushing changes..."
         git push origin HEAD
@@ -337,18 +341,32 @@ preview_changes "${{modifications}}" "${{create_branch}}" "${{branch_name}}"
 
 stateful_modify_and_commit = GitHubCliTool(
     name="github_modify_and_commit",
-    description="""Modify files and commit changes.
-    
-WHEN TO USE:
-- Need to modify multiple files
-- Want to commit changes
-- Need to create/switch branches
-- Want to preview changes (dry run)""",
+    description="Modify files and commit changes.",
     content=f'''
 {FILE_OPS_SCRIPT}
 
 setup_repo "${{repo}}" "${{branch}}"
-modify_and_commit "${{modifications}}" "${{commit_message}}" "${{create_branch}}" "${{branch_name}}" "${{dry_run}}"
+
+# ... rest of the setup code ...
+
+if [ -n "$(git status --porcelain)" ]; then
+    echo "📦 Staging changes..."
+    git add .
+    
+    echo "💾 Committing changes..."
+    COMMIT_MSG="${{commit_message:-Auto-update: $(date)}}
+
+$(add_disclaimer text)"
+    
+    git commit -m "$COMMIT_MSG"
+    
+    echo "🚀 Pushing changes..."
+    git push origin HEAD
+    
+    echo "✨ Changes pushed successfully"
+else
+    echo "ℹ️  No changes to commit"
+fi
 ''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
@@ -363,7 +381,7 @@ modify_and_commit "${{modifications}}" "${{commit_message}}" "${{create_branch}}
 )
 
 stateful_create_pr = GitHubCliTool(
-    name="github_create_pr", 
+    name="github_create_pr",
     description="""Create pull request from changes.
     
 WHEN TO USE:
@@ -376,9 +394,15 @@ WHEN TO USE:
 setup_repo "${{repo}}" "${{branch}}"
 
 echo "📋 Creating pull request..."
+
+# Add disclaimer to PR body
+PR_BODY="${{body}}
+
+$(add_disclaimer markdown)"
+
 PR_URL=$(gh pr create \
     --title "${{title}}" \
-    --body "${{body}}" \
+    --body "$PR_BODY" \
     --base "${{target_branch}}" \
     $([[ -n "${{reviewers}}" ]] && echo "--reviewer ${{reviewers}}") \
     $([[ -n "${{labels}}" ]] && echo "--label ${{labels}}"))
