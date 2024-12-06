@@ -64,25 +64,46 @@ search_files() {
 remote_search() {
     local repo="$1"
     local pattern="$2"
+    local file="$3"
     local page=1
     local per_page=100
     local total=0
     
     echo "=== Search Results ==="
-    
-    while true; do
-        local results=$(gh api -X GET "search/code" \
-            -f "q=repo:$repo $pattern" \
-            -f "per_page=$per_page" \
-            -f "page=$page" \
-            --jq ".items[] | \\"📄 \\(.path)\\n   🔗 \\(.html_url)\\n   📝 \\(.text_matches[].fragment // \\"No preview\\")\\n\\"")
+
+    if [ -n "$file" ]; then
+        # Direct file content fetch
+        echo "📄 Fetching specific file: $file"
+        content=$(gh api "repos/$repo/contents/$file" --jq '.content' | base64 -d)
+        if [ -n "$content" ]; then
+            echo "📝 File content:"
+            echo "-------------------"
+            if [ -n "$pattern" ]; then
+                echo "$content" | grep --color=always -n "$pattern" || echo "Pattern not found in file"
+            else
+                echo "$content"
+            fi
+            echo "-------------------"
+            total=1
+        else
+            echo "❌ File not found or empty"
+        fi
+    else
+        # Pattern search across repo
+        while true; do
+            local results=$(gh api -X GET "search/code" \
+                -f "q=repo:$repo $pattern" \
+                -f "per_page=$per_page" \
+                -f "page=$page" \
+                --jq ".items[] | \\"📄 \\(.path)\\n   🔗 \\(.html_url)\\n   📝 \\(.text_matches[].fragment // \\"No preview\\")\\n\\"")
+                
+            [ -z "$results" ] && break
             
-        [ -z "$results" ] && break
-        
-        echo "$results"
-        total=$((total + $(echo "$results" | grep -c "^📄" || true)))
-        page=$((page + 1))
-    done
+            echo "$results"
+            total=$((total + $(echo "$results" | grep -c "^📄" || true)))
+            page=$((page + 1))
+        done
+    fi
     
     echo "=== Summary ==="
     printf "✨ Found %d matches\\n" "$total"
@@ -122,15 +143,17 @@ remote_search = GitHubCliTool(
 WHEN TO USE:
 - Need quick search without cloning
 - Want to search across branches
-- Need to search large repositories""",
+- Need to search large repositories
+- Want to fetch specific file contents""",
     content=f'''
 {FILE_OPS_SCRIPT}
 
-remote_search "${{repo}}" "${{pattern}}"
+remote_search "${{repo}}" "${{pattern}}" "${{file}}"
 ''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="pattern", type="str", description="Search pattern", required=True),
+        Arg(name="pattern", type="str", description="Search pattern (optional if fetching specific file)", required=False),
+        Arg(name="file", type="str", description="Specific file path to fetch/search", required=False),
     ]
 )
 
@@ -262,4 +285,3 @@ __all__ = [
     'stateful_modify_and_commit',
     'stateful_create_pr'
 ]
-
