@@ -3,66 +3,67 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from jsonschema import validate
 
 logger = logging.getLogger(__name__)
 
-# Default configuration schema
-CONFIG_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "jenkins_url": {
-            "type": "string",
-            "description": "Jenkins server URL"
-        },
-        "auth": {
-            "type": "object",
-            "properties": {
-                "username": {"type": "string"},
-                "password_env": {"type": "string"}
-            },
-            "required": ["username", "password_env"]
-        },
-        "jobs": {
-            "type": "object",
-            "properties": {
-                "sync_all": {
-                    "type": "boolean",
-                    "default": False
-                },
-                "include": {
-                    "type": "array",
-                    "items": {"type": "string"}
-                },
-                "exclude": {
-                    "type": "array",
-                    "items": {"type": "string"}
-                }
-            }
-        },
-        "defaults": {
-            "type": "object",
-            "properties": {
-                "stream_logs": {
-                    "type": "boolean",
-                    "default": True,
-                    "description": "Stream job logs while running"
-                },
-                "poll_interval": {
-                    "type": "integer",
-                    "default": 30,
-                    "description": "Interval in seconds to poll job status"
-                },
-                "long_running_threshold": {
-                    "type": "integer",
-                    "default": 300,
-                    "description": "Jobs longer than this (in seconds) will be marked as long-running"
-                }
-            }
-        }
-    },
-    "required": ["jenkins_url", "auth"]
-}
+def validate_config(config: Dict[str, Any]) -> bool:
+    """Basic configuration validation without jsonschema dependency."""
+    try:
+        # Validate required fields
+        if not isinstance(config, dict):
+            raise ValueError("Configuration must be a JSON object")
+
+        # Validate jenkins_url
+        if 'jenkins_url' not in config:
+            raise ValueError("Missing required field 'jenkins_url'")
+        if not isinstance(config['jenkins_url'], str):
+            raise ValueError("'jenkins_url' must be a string")
+
+        # Validate auth
+        if 'auth' not in config:
+            raise ValueError("Missing required field 'auth'")
+        if not isinstance(config['auth'], dict):
+            raise ValueError("'auth' must be an object")
+        if 'username' not in config['auth']:
+            raise ValueError("Missing required field 'auth.username'")
+        if 'password_env' not in config['auth']:
+            raise ValueError("Missing required field 'auth.password_env'")
+
+        # Validate jobs configuration if present
+        if 'jobs' in config:
+            jobs = config['jobs']
+            if not isinstance(jobs, dict):
+                raise ValueError("'jobs' must be an object")
+            
+            if 'sync_all' in jobs and not isinstance(jobs['sync_all'], bool):
+                raise ValueError("'jobs.sync_all' must be a boolean")
+            
+            if 'include' in jobs and not isinstance(jobs['include'], list):
+                raise ValueError("'jobs.include' must be an array")
+            
+            if 'exclude' in jobs and not isinstance(jobs['exclude'], list):
+                raise ValueError("'jobs.exclude' must be an array")
+
+        # Validate defaults if present
+        if 'defaults' in config:
+            defaults = config['defaults']
+            if not isinstance(defaults, dict):
+                raise ValueError("'defaults' must be an object")
+            
+            if 'stream_logs' in defaults and not isinstance(defaults['stream_logs'], bool):
+                raise ValueError("'defaults.stream_logs' must be a boolean")
+            
+            if 'poll_interval' in defaults and not isinstance(defaults['poll_interval'], int):
+                raise ValueError("'defaults.poll_interval' must be an integer")
+            
+            if 'long_running_threshold' in defaults and not isinstance(defaults['long_running_threshold'], int):
+                raise ValueError("'defaults.long_running_threshold' must be an integer")
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Configuration validation failed: {str(e)}")
+        raise ValueError(f"Invalid configuration: {str(e)}")
 
 def get_jenkins_config() -> Optional[Dict[str, Any]]:
     """Load and validate Jenkins configuration."""
@@ -77,7 +78,7 @@ def get_jenkins_config() -> Optional[Dict[str, Any]]:
             config = json.load(f)
 
         # Validate configuration
-        validate(instance=config, schema=CONFIG_SCHEMA)
+        validate_config(config)
 
         # Set default values
         if 'defaults' not in config:
