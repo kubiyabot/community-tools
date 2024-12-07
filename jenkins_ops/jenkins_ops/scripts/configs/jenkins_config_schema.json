@@ -1,0 +1,35 @@
+{
+    "type": "object",
+    "properties": {
+        "jenkins_url": {
+            "type": "string",
+            "description": "Jenkins server URL"
+        },
+        "auth": {
+            "type": "object",
+            "properties": {
+                "username": {"type": "string"},
+                "password_env": {"type": "string"}
+            },
+            "required": ["username", "password_env"]
+        },
+        "jobs": {
+            "type": "object",
+            "properties": {
+                "sync_all": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "include": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "exclude": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
+            }
+        }
+    },
+    "required": ["jenkins_url", "auth"]
+} 
