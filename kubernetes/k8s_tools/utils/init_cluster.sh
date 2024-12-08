@@ -66,11 +66,6 @@ else
     log "✅ Kubiya namespace already exists"
 fi
 
-# Clean up any existing resources in default namespace
-log "Cleaning up any existing kubewatch resources in default namespace..."
-kubectl delete deployment,serviceaccount,configmap -l app.kubernetes.io/name=kubewatch -n default --ignore-not-found
-check_command "cleanup failed" "Cleaned up existing resources"
-
 # Load kubewatch config
 CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
 if [ ! -f "$CONFIG_PATH" ]; then
