@@ -33,6 +33,29 @@ class JenkinsJobRunner:
         self.poll_interval = poll_interval
         self.server = None
 
+    def _unsanitize_parameters(self, parameters: Dict[str, Any], param_types: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+        """Convert parameters back to their original names and types for Jenkins API."""
+        unsanitized = {}
+        
+        for param_name, value in parameters.items():
+            # Get the original parameter info
+            param_info = param_types.get(param_name, {})
+            original_name = param_info.get('original_name', param_name)
+            param_type = param_info.get('type', 'str')
+            
+            # Convert value based on type
+            if param_type == 'bool':
+                # Convert string 'true'/'false' back to boolean for Jenkins
+                value = str(value).lower() == 'true'
+            elif param_type == 'str':
+                # Ensure string type
+                value = str(value)
+            
+            # Use original parameter name when sending to Jenkins
+            unsanitized[original_name] = value
+            
+        return unsanitized
+
     def connect(self) -> None:
         """Establish connection to Jenkins server."""
         try:
@@ -51,8 +74,21 @@ class JenkinsJobRunner:
     def trigger_build(self, parameters: Dict[str, Any]) -> int:
         """Trigger Jenkins build with parameters."""
         try:
-            # Queue the build
-            queue_id = self.server.build_job(self.job_name, parameters=parameters)
+            # Load parameter type information
+            with open('/tmp/jenkins_config.json', 'r') as f:
+                config = json.load(f)
+            
+            # Get parameter types from config
+            param_types = config.get('parameters', {})
+            
+            # Unsanitize parameters before sending to Jenkins
+            jenkins_params = self._unsanitize_parameters(parameters, param_types)
+            
+            logger.debug(f"Original parameters: {parameters}")
+            logger.debug(f"Unsanitized parameters for Jenkins: {jenkins_params}")
+            
+            # Queue the build with unsanitized parameters
+            queue_id = self.server.build_job(self.job_name, parameters=jenkins_params)
             
             # Get build number from queue
             while True:
@@ -99,39 +135,35 @@ def get_parameters_from_env() -> Dict[str, Any]:
     """Get job parameters from environment variables and convert to appropriate types."""
     parameters = {}
     
-    # Load job config to get parameter names
+    # Load job config to get parameter information
     with open('/tmp/jenkins_config.json', 'r') as f:
         config = json.load(f)
     
     # Get parameters from environment variables
-    for param_name in config.get('parameters', []):
+    for param_name, param_info in config.get('parameters', {}).items():
         env_value = os.environ.get(param_name)
         if env_value is not None:
-            # All values come as strings, try to convert based on content
+            param_type = param_info.get('type', 'str')
+            
             try:
-                # Try JSON first for complex types
-                if env_value.startswith('{') or env_value.startswith('['):
-                    parameters[param_name] = json.loads(env_value)
-                    continue
-                
-                # Handle boolean values
-                if env_value.lower() in ('true', 'false'):
-                    parameters[param_name] = env_value.lower() == 'true'
-                    continue
-                
-                # Handle numeric values
-                if env_value.isdigit():
-                    parameters[param_name] = int(env_value)
-                    continue
-                if env_value.replace('.', '', 1).isdigit():
-                    parameters[param_name] = float(env_value)
-                    continue
-                
-                # Default to string
-                parameters[param_name] = env_value
-                
-            except json.JSONDecodeError:
-                # If JSON parsing fails, use raw string
+                # Convert value based on parameter type
+                if param_type == 'bool':
+                    parameters[param_name] = str(env_value).lower() == 'true'
+                elif param_type == 'str':
+                    # Handle JSON strings for complex types
+                    if env_value.startswith('{') or env_value.startswith('['):
+                        try:
+                            parameters[param_name] = json.loads(env_value)
+                        except json.JSONDecodeError:
+                            parameters[param_name] = env_value
+                    else:
+                        parameters[param_name] = env_value
+                else:
+                    # Default to string for unknown types
+                    parameters[param_name] = str(env_value)
+                    
+            except Exception as e:
+                logger.warning(f"Error converting parameter {param_name}: {str(e)}")
                 parameters[param_name] = env_value
     
     return parameters

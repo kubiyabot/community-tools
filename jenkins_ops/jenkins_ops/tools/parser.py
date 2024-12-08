@@ -6,6 +6,7 @@ import requests
 from urllib.parse import urljoin
 import base64
 import os
+import re
 logger = logging.getLogger(__name__)
 
 os.environ['JENKINS_API_TOKEN'] = "KYlJppNVnJQP5K1r"
@@ -53,6 +54,45 @@ class JenkinsJobParser:
             logger.error(f"Request failed for {url}: {str(e)}")
             raise
 
+    def _sanitize_name(self, name: str, max_length: int = 50) -> str:
+        """
+        Sanitize and normalize parameter names.
+        
+        Args:
+            name: The original parameter name
+            max_length: Maximum allowed length for the name (default: 50)
+        
+        Returns:
+            Sanitized and normalized name
+        """
+        if not name:
+            return ""
+        
+        # Replace spaces, dashes, and other special characters with underscores
+        sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+        
+        # Replace multiple underscores with a single underscore
+        sanitized = re.sub(r'_+', '_', sanitized)
+        
+        # Remove leading/trailing underscores
+        sanitized = sanitized.strip('_')
+        
+        # Convert to lowercase for consistency
+        sanitized = sanitized.lower()
+        
+        # Truncate if too long, but keep it meaningful
+        if len(sanitized) > max_length:
+            # Keep the first and last parts if we need to truncate
+            parts = sanitized.split('_')
+            if len(parts) > 2:
+                # Keep first and last part
+                sanitized = f"{parts[0]}_{parts[-1]}"
+            else:
+                # Just truncate
+                sanitized = sanitized[:max_length]
+        
+        return sanitized
+
     def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
         try:
@@ -69,12 +109,26 @@ class JenkinsJobParser:
                 if 'parameterDefinitions' in prop:
                     logger.debug(f"Found parameters for job {job_name}: {prop['parameterDefinitions']}")
                     for param in prop['parameterDefinitions']:
-                        param_type = param.get('_class', '').split('.')[-1]
-                        param_name = param.get('name')
+                        # Log the raw parameter data for debugging
+                        logger.debug(f"Raw parameter data: {param}")
                         
-                        if not param_name:
-                            logger.warning(f"Found parameter without name in job {job_name}")
+                        param_type = param.get('_class', '').split('.')[-1]
+                        # Try different possible name fields
+                        raw_name = (
+                            param.get('name') or 
+                            param.get('parameterName') or 
+                            param.get('id') or 
+                            param.get('displayName')
+                        )
+                        
+                        if not raw_name:
+                            logger.warning(f"Found parameter without name in job {job_name}. Raw data: {param}")
                             continue
+
+                        # Sanitize and normalize the parameter name
+                        param_name = self._sanitize_name(raw_name)
+                        if param_name != raw_name:
+                            logger.debug(f"Sanitized parameter name from '{raw_name}' to '{param_name}'")
                         
                         logger.debug(f"Processing parameter: {param_name} of type {param_type}")
                         
@@ -90,6 +144,8 @@ class JenkinsJobParser:
                         
                         # Build parameter description
                         description = param.get('description', 'No description provided')
+                        if raw_name != param_name:
+                            description = f"Original name: {raw_name}\n{description}"
                         if 'choices' in param:
                             choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
                             description += f"\nAllowed values: [{choices_str}]"

@@ -3,12 +3,54 @@ from kubiya_sdk.tools.registry import tool_registry
 from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
 from .config import DEFAULT_JENKINS_CONFIG
-import json
+import re
 
 logger = logging.getLogger(__name__)
 
 # Initialize tools dictionary at module level
 tools = {}
+
+def _sanitize_tool_name(name: str, max_length: int = 50) -> str:
+    """
+    Sanitize and normalize tool names.
+    
+    Args:
+        name: The original job name
+        max_length: Maximum allowed length for the name (default: 50)
+    
+    Returns:
+        Sanitized and normalized name suitable for a tool
+    """
+    if not name:
+        return ""
+    
+    # Remove any path-like components (for jobs in folders)
+    name = name.split('/')[-1]
+    
+    # Replace spaces, dashes, and other special characters with underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    
+    # Replace multiple underscores with a single underscore
+    sanitized = re.sub(r'_+', '_', sanitized)
+    
+    # Remove leading/trailing underscores
+    sanitized = sanitized.strip('_')
+    
+    # Convert to lowercase for consistency
+    sanitized = sanitized.lower()
+    
+    # Truncate if too long, but keep it meaningful
+    if len(sanitized) > max_length:
+        # Keep the first and last parts if we need to truncate
+        parts = sanitized.split('_')
+        if len(parts) > 2:
+            # Keep first and last part
+            sanitized = f"{parts[0]}_{parts[-1]}"
+        else:
+            # Just truncate
+            sanitized = sanitized[:max_length]
+    
+    return f"jenkins_job_{sanitized}"
 
 def initialize_tools():
     """Initialize and register Jenkins tools."""
@@ -39,41 +81,24 @@ def initialize_tools():
                     "3. Jenkins API token is properly configured\n"
                     "4. Jenkins server has jobs configured"
                 )
-        
+
         if warnings:
             warning_msg = "\n- ".join(warnings)
-            logger.warning(f"Warnings during job discovery:\n- {warning_msg}")
-
-        if not jobs_info:
-            raise Exception(
-                "No Jenkins jobs were found on the server.\n"
-                "Please verify:\n"
-                "1. Jenkins server has jobs configured\n"
-                "2. The configured user has permission to view jobs\n"
-                "3. Jobs are not filtered by configuration"
-            )
+            logger.warning(f"Warnings during job fetching:\n- {warning_msg}")
 
         # Create and register tools for each job
         for job_name, job_info in jobs_info.items():
             try:
-                # Convert all parameter defaults to strings
-                parameters = {}
-                for param_name, param_config in job_info.get('parameters', {}).items():
-                    param_config = param_config.copy()
-                    if 'default' in param_config:
-                        # Ensure default value is a string
-                        if isinstance(param_config['default'], (dict, list)):
-                            param_config['default'] = json.dumps(param_config['default'])
-                        else:
-                            param_config['default'] = str(param_config['default'])
-                    parameters[param_name] = param_config
+                # Sanitize the tool name
+                tool_name = _sanitize_tool_name(job_name)
+                logger.debug(f"Creating tool '{tool_name}' for job '{job_name}'")
 
                 tool_config = {
-                    "name": f"jenkins_job_{job_name}",
+                    "name": tool_name,
                     "description": f"Execute Jenkins job: {job_name}\n{job_info.get('description', '')}",
                     "job_config": {
-                        "name": job_name,
-                        "parameters": parameters,
+                        "name": job_name,  # Keep original job name for Jenkins
+                        "parameters": job_info.get('parameters', {}),
                         "auth": DEFAULT_JENKINS_CONFIG['auth']
                     },
                     "long_running": True,
@@ -87,9 +112,9 @@ def initialize_tools():
                 
                 # Register tool
                 tool_registry.register("jenkins", tool)
-                tools[tool.name] = tool
+                tools[tool_name] = tool
                 
-                logger.info(f"Successfully registered tool for job: {job_name}")
+                logger.info(f"Successfully registered tool '{tool_name}' for job '{job_name}'")
                 
             except Exception as e:
                 logger.error(f"Failed to create tool for job {job_name}: {str(e)}")
