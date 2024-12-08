@@ -83,29 +83,6 @@ J-->>T: Final Status
 end
 T-->>K: Build Results
 K-->>U: Final Results
-json
-{
-"jenkins_url": "http://jenkins.example.com",
-"auth": {
-"username": "admin",
-"password_env": "JENKINS_API_TOKEN"
-},
-"jobs": {
-"sync_all": false,
-"include": [
-"deploy-to-production",
-"run-integration-tests"
-],
-"exclude": [
-"internal-builds"
-]
-},
-"defaults": {
-"stream_logs": true,
-"poll_interval": 30,
-"long_running_threshold": 300
-}
-}
 ```
 
 ```mermaid
