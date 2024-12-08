@@ -5,8 +5,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from urllib.parse import urljoin
 import base64
-
+import os
 logger = logging.getLogger(__name__)
+
+os.environ['JENKINS_API_TOKEN'] = "KYlJppNVnJQP5K1r"
 
 class JenkinsJobParser:
     """Parser for Jenkins jobs using direct HTTP requests and JSON API."""
