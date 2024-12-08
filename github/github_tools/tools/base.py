@@ -44,6 +44,11 @@ set -e
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
 
+if ! command -v jq >/dev/null 2>&1; then
+    # Silently install jq (TODO:: install git as well for git operations)
+    apk add --quiet jq >/dev/null 2>&1
+fi
+
 # Function to add disclaimer
 add_disclaimer() {{
     local format="$1"
@@ -164,7 +169,7 @@ set -e
 echo "🔌 Connecting to GitHub..."
 
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq and git
+    # Silently install jq
     apk add --quiet jq git >/dev/null 2>&1
 fi
 

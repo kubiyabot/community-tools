@@ -50,12 +50,12 @@ exec {script_path}
             name=name,
             description=description,
             type="docker",
-            image="alpine:latest",
+            image="alpine:3.14",
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
             secrets=secrets,
             env=env,
             with_files=with_files,
-            with_services=[mermaid_service]
+            with_services=[ServiceSpec(name="mermaidsvc",image="ghcr.io/kubiyabot/mermaid-server:v0.0.0",exposed_ports=[80])]
         )
