@@ -179,7 +179,10 @@ def initialize_tools() -> List[JenkinsJobTool]:
 
     except JenkinsConfigError as e:
         logger.error(f"Jenkins configuration error: {str(e)}")
-        raise
+        raise JenkinsConfigError(
+            "Failed to initialize Jenkins tools. See logs for details.\n"
+            f"Error: {str(e)}"
+        )
     except Exception as e:
         logger.error(f"Unexpected error during Jenkins tools initialization: {str(e)}")
         raise JenkinsConfigError(
