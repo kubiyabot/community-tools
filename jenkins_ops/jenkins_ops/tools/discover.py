@@ -29,8 +29,13 @@ def discover():
         # Setup environment
         setup_default_environment()
         
-        # Initialize tools
-        discovered_tools = initialize_tools()
+        try:
+            # Initialize tools
+            discovered_tools = initialize_tools()
+        except Exception as e:
+            error_msg = f"Failed to initialize Jenkins tools: {str(e)}"
+            logger.error(error_msg)
+            raise JenkinsOpsError(error_msg) from e
         
         if not discovered_tools:
             error_msg = "No Jenkins tools were discovered. Check Jenkins connection and configuration."

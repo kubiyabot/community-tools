@@ -51,7 +51,7 @@ def discover():
     except Exception as e:
         error_msg = f"Failed to initialize Jenkins tools: {str(e)}"
         logger.error(error_msg)
-        raise JenkinsOpsError(error_msg)
+        raise JenkinsOpsError(error_msg) from e
 
 # Export the tools
 __all__ = ['tools', 'discover']
