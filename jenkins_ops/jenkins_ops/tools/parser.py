@@ -231,6 +231,59 @@ class JenkinsJobParser:
         except Exception:
             return None
 
+    def _get_all_jobs_recursive(self, url: str = None) -> List[Dict[str, str]]:
+        """Recursively get all jobs from Jenkins, including those in folders."""
+        try:
+            if url is None:
+                url = f"{self.jenkins_url}/api/json"
+            
+            logger.debug(f"Fetching jobs from: {url}")
+            response = self._make_request(url)
+            
+            if not response:
+                logger.warning(f"No response from {url}")
+                return []
+
+            jobs = []
+            for item in response.get('jobs', []):
+                try:
+                    item_class = item.get('_class', '')
+                    item_name = item.get('name', '')
+                    item_url = item.get('url', '')
+                    
+                    logger.debug(f"Processing item: {item_name} ({item_class})")
+                    
+                    # Handle different job types
+                    if any(job_type in item_class for job_type in ['WorkflowJob', 'FreeStyleProject', 'Pipeline']):
+                        # Regular job
+                        jobs.append({
+                            'name': item_name,
+                            'full_name': item.get('fullName', item_name),
+                            'url': item_url,
+                            'class': item_class
+                        })
+                        logger.debug(f"Added job: {item_name}")
+                        
+                    elif any(folder_type in item_class for folder_type in ['Folder', 'WorkflowMultiBranch', 'OrganizationFolder']):
+                        # Folder or similar container - recurse into it
+                        logger.debug(f"Recursing into folder: {item_name}")
+                        sub_jobs = self._get_all_jobs_recursive(f"{item_url}api/json")
+                        jobs.extend(sub_jobs)
+                        
+                except Exception as e:
+                    error_msg = f"Error processing job {item_name}: {str(e)}"
+                    logger.error(error_msg)
+                    self.errors.append(error_msg)
+                    continue
+
+            return jobs
+
+        except Exception as e:
+            error_msg = f"Failed to get jobs from {url}: {str(e)}"
+            logger.error(error_msg)
+            self.errors.append(error_msg)
+            return []
+
     def get_jobs(self, job_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """Get all Jenkins jobs and their parameters."""
         jobs_info = {}
@@ -239,6 +292,12 @@ class JenkinsJobParser:
             # Get all jobs recursively
             logger.info("Starting Jenkins job discovery...")
             all_jobs = self._get_all_jobs_recursive()
+            
+            if not all_jobs:
+                logger.warning("No jobs found in Jenkins")
+                self.warnings.append("No jobs were found in Jenkins server")
+                return {}, self.warnings, self.errors
+
             logger.info(f"Found {len(all_jobs)} total jobs")
             
             # Filter jobs if needed
@@ -247,19 +306,18 @@ class JenkinsJobParser:
                 if not job_filter or job['full_name'] in job_filter
             ]
             
-            logger.info(f"Processing {len(jobs_to_process)} jobs after filtering")
-
-            if not jobs_to_process:
-                self.warnings.append("No matching jobs found")
+            if job_filter and not jobs_to_process:
+                warning_msg = f"No jobs matched the filter: {job_filter}"
+                logger.warning(warning_msg)
+                self.warnings.append(warning_msg)
                 return {}, self.warnings, self.errors
+
+            logger.info(f"Processing {len(jobs_to_process)} jobs after filtering")
 
             # Process jobs in parallel
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_job = {
-                    executor.submit(
-                        self._process_single_job,
-                        job['full_name']
-                    ): job
+                    executor.submit(self._process_single_job, job['full_name']): job
                     for job in jobs_to_process
                 }
 
@@ -279,6 +337,9 @@ class JenkinsJobParser:
             error_msg = f"Failed to get jobs: {str(e)}"
             logger.error(error_msg)
             self.errors.append(error_msg)
+
+        if not jobs_info and not self.errors:
+            self.errors.append("No jobs were found or all jobs failed to process")
 
         logger.info(f"Completed job discovery. Found {len(jobs_info)} valid jobs")
         return jobs_info, self.warnings, self.errors
