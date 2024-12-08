@@ -15,8 +15,8 @@ def discover():
     logger.info("Starting Jenkins Operations tool discovery...")
     
     try:
-        from .tools.initializer import initialize_tools
-        from .tools.config import DEFAULT_JENKINS_CONFIG
+        from jenkins_ops.tools.initializer import initialize_tools
+        from jenkins_ops.tools.config import DEFAULT_JENKINS_CONFIG
         
         def setup_default_environment():
             if not os.environ.get('JENKINS_URL'):
