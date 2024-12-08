@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Dict, Any
-from .tools import initialize_tools
+from .tools import initialize_tools, tools
 from .tools.config import DEFAULT_JENKINS_CONFIG
 
 # Configure logging
@@ -43,7 +43,10 @@ def discover():
     except Exception as e:
         error_msg = f"Failed to initialize Jenkins tools: {str(e)}"
         logger.error(error_msg)
-        raise JenkinsOpsError(error_msg) from e
+        raise JenkinsOpsError(error_msg)
+
+# Export the tools
+__all__ = ['tools', 'discover']
 
 # Run discovery when the package is imported
 if __name__ == "__main__":

@@ -1,5 +1,71 @@
-from .initializer import initialize_tools
+import logging
+from kubiya_sdk.tools.registry import tool_registry
 from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
+from .config import DEFAULT_JENKINS_CONFIG
 
-__all__ = ['initialize_tools', 'JenkinsJobTool', 'JenkinsJobParser']
+logger = logging.getLogger(__name__)
+
+# Initialize tools dictionary at module level
+tools = {}
+
+def initialize_tools():
+    """Initialize and register Jenkins tools."""
+    try:
+        logger.info("Initializing Jenkins tools...")
+        
+        # Load configuration and create parser
+        parser = JenkinsJobParser(
+            jenkins_url=DEFAULT_JENKINS_CONFIG['jenkins_url'],
+            username=DEFAULT_JENKINS_CONFIG['auth']['username'],
+            api_token="${JENKINS_API_TOKEN}"
+        )
+
+        # Get jobs from Jenkins server
+        jobs_info, warnings, errors = parser.get_jobs()
+        
+        if errors:
+            logger.error(f"Errors during job discovery: {errors}")
+        
+        if warnings:
+            logger.warning(f"Warnings during job discovery: {warnings}")
+
+        # Create and register tools for each job
+        for job_name, job_info in jobs_info.items():
+            try:
+                tool_config = {
+                    "name": f"jenkins_job_{job_name}",
+                    "description": f"Execute Jenkins job: {job_name}\n{job_info.get('description', '')}",
+                    "job_config": {
+                        "name": job_name,
+                        "parameters": job_info.get('parameters', {}),
+                        "auth": DEFAULT_JENKINS_CONFIG['auth']
+                    },
+                    "long_running": True,
+                    "stream_logs": True,
+                    "poll_interval": 30
+                }
+
+                # Create tool
+                tool = JenkinsJobTool(**tool_config)
+                tool.prepare()
+                
+                # Register tool
+                tool_registry.register("jenkins", tool)
+                tools[tool.name] = tool
+                
+                logger.info(f"Registered tool for job: {job_name}")
+                
+            except Exception as e:
+                logger.error(f"Failed to create tool for job {job_name}: {str(e)}")
+                continue
+
+        logger.info(f"Successfully initialized {len(tools)} Jenkins tools")
+        return list(tools.values())
+
+    except Exception as e:
+        logger.error(f"Failed to initialize Jenkins tools: {str(e)}")
+        return []
+
+# Export the necessary components
+__all__ = ['initialize_tools', 'JenkinsJobTool', 'tools']
