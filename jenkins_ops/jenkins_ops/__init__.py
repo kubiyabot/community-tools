@@ -46,6 +46,7 @@ def discover():
         raise JenkinsOpsError(error_msg) from e
 
 # Run discovery when the package is imported
-tools = discover()
-for tool in tools:
-    print(tool)
+if __name__ == "__main__":
+    tools = discover()
+    for tool in tools:
+        print(tool)
