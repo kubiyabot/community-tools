@@ -109,6 +109,23 @@ class JenkinsJobParser:
             logger.error(f"Failed to get config for job {job_name}: {str(e)}")
             return None
 
+    def _extract_default_value(self, param: Dict[str, Any]) -> Optional[Any]:
+        """Extract the actual default value from parameter definition."""
+        # Try different locations and formats for default value
+        if 'defaultValue' in param:
+            return param['defaultValue']
+        
+        default_param = param.get('defaultParameterValue', {})
+        if isinstance(default_param, dict):
+            # If it's a parameter value object, get the actual value
+            if 'value' in default_param:
+                return default_param['value']
+            # Some Jenkins versions store it differently
+            if 'defaultValue' in default_param:
+                return default_param['defaultValue']
+        
+        return None
+
     def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
         try:
@@ -169,17 +186,9 @@ class JenkinsJobParser:
                     'file': 'str',
                 }
 
-                # Get default value from all possible locations
-                default_value = None
-                for default_location in [
-                    ('defaultValue', param),
-                    ('defaultParameterValue', param),
-                    ('value', param.get('defaultParameterValue', {}))
-                ]:
-                    key, obj = default_location
-                    if key in obj and obj[key] is not None:
-                        default_value = obj[key]
-                        break
+                # Get default value
+                default_value = self._extract_default_value(param)
+                logger.debug(f"Extracted default value for {param_name}: {default_value}")
 
                 # Build description
                 description_parts = []
@@ -219,10 +228,10 @@ class JenkinsJobParser:
 
                 param_config = {
                     "name": self._sanitize_name(param_name),
-                    "original_name": param_name,  # Store original name for unsanitization
+                    "original_name": param_name,
                     "type": type_mapping.get(param_type, 'str'),
                     "description": description,
-                    "required": default_value is None,  # Required only if no default value
+                    "required": default_value is None,
                 }
 
                 # Add default value to parameter config
