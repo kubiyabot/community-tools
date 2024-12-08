@@ -67,12 +67,16 @@ class JenkinsJobParser:
             parameters = {}
             for prop in job_info.get('property', []):
                 if 'parameterDefinitions' in prop:
+                    logger.debug(f"Found parameters for job {job_name}: {prop['parameterDefinitions']}")
                     for param in prop['parameterDefinitions']:
                         param_type = param.get('_class', '').split('.')[-1]
                         param_name = param.get('name')
                         
-                        if not param_name:  # Skip parameters without names
+                        if not param_name:
+                            logger.warning(f"Found parameter without name in job {job_name}")
                             continue
+                        
+                        logger.debug(f"Processing parameter: {param_name} of type {param_type}")
                         
                         # Map Jenkins parameter types to Kubiya types
                         type_mapping = {
@@ -94,7 +98,7 @@ class JenkinsJobParser:
                             "name": param_name,
                             "type": type_mapping.get(param_type, 'str'),
                             "description": description,
-                            "required": not bool(param.get('defaultValue'))  # Required if no default value
+                            "required": not bool(param.get('defaultValue'))
                         }
 
                         # Handle default values based on type
@@ -109,6 +113,7 @@ class JenkinsJobParser:
                             param_config['choices'] = param['choices']
                         
                         parameters[param_name] = param_config
+                        logger.debug(f"Added parameter config: {param_config}")
 
             # Add job URL to description
             job_description = job_info.get('description', '')
@@ -117,15 +122,21 @@ class JenkinsJobParser:
             else:
                 job_description = f"Jenkins Job URL: {self.jenkins_url}/job/{job_name}"
 
-            return {
+            result = {
                 "name": job_name,
                 "description": job_description,
                 "parameters": parameters,
                 "url": job_info.get('url', ''),
                 "buildable": job_info.get('buildable', True),
                 "type": self._determine_job_type(job_info),
-                "health": self._get_job_health(job_info)
+                "health": self._get_job_health(job_info),
+                "auth": {
+                    "username": self.username
+                }
             }
+            
+            logger.debug(f"Processed job {job_name} with parameters: {parameters}")
+            return result
             
         except Exception as e:
             logger.error(f"Failed to process job {job_name}: {str(e)}")

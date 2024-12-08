@@ -81,14 +81,22 @@ python3 /opt/scripts/jenkins_job_runner.py
     def prepare(self) -> None:
         """Prepare the tool for execution."""
         try:
+            logger.debug(f"Preparing tool with config: {self.job_config}")
+            
             # Convert job parameters to Kubiya args
             self.args = []
             
             # Get parameters from job config
-            for param_name, param_config in self.job_config.get('parameters', {}).items():
-                if not param_name:  # Skip parameters without names
+            parameters = self.job_config.get('parameters', {})
+            logger.debug(f"Processing parameters: {parameters}")
+            
+            for param_name, param_config in parameters.items():
+                if not param_name:
+                    logger.warning("Found parameter without name, skipping")
                     continue
                     
+                logger.debug(f"Processing parameter {param_name}: {param_config}")
+                
                 # Create argument
                 arg = Arg(
                     name=param_name,
@@ -107,7 +115,10 @@ python3 /opt/scripts/jenkins_job_runner.py
                     else:
                         arg.default = str(default_value)
                 
+                logger.debug(f"Created argument: {arg}")
                 self.args.append(arg)
+
+            logger.debug(f"Created {len(self.args)} arguments")
 
             # Set up script content
             self.content = self._generate_script_content()
@@ -127,14 +138,17 @@ python3 /opt/scripts/jenkins_job_runner.py
                         'poll_interval': self.poll_interval,
                         'parameters': {
                             name: {
-                                'type': self.job_config['parameters'][name].get('type', 'str'),
+                                'type': parameters[name].get('type', 'str'),
                                 'name': name
                             }
-                            for name in self.job_config['parameters']
+                            for name in parameters
                         }
                     })
                 )
             ]
+            
+            logger.debug("Tool preparation completed successfully")
+            
         except Exception as e:
             logger.error(f"Failed to prepare tool: {str(e)}")
             raise
