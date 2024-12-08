@@ -83,8 +83,10 @@ class JenkinsJobParser:
                         
                         param_config = {
                             "type": type_mapping.get(param_type, 'str'),
+                            "name": param_name,
                             "description": param.get('description', ''),
-                            "required": True,  # Jenkins parameters are typically required
+                            # required depends if we have a default value
+                            "required": True if param.get('defaultValue') else False
                         }
 
                         # Handle default values based on type
@@ -101,9 +103,15 @@ class JenkinsJobParser:
                         
                         parameters[param_name] = param_config
 
+            job_description = job_info.get('description', '')
+            if job_description:
+                job_description += f"\n\nThis tool was synced from Jenkins job at: {self.jenkins_url}/job/{job_name}"
+            else:
+                job_description = f"This tool was synced from Jenkins job at: {self.jenkins_url}/job/{job_name}"
+
             return {
                 "name": job_name,
-                "description": job_info.get('description', ''),
+                "description": job_description,
                 "parameters": parameters,
                 "url": job_info.get('url', ''),
                 "buildable": job_info.get('buildable', True),
@@ -131,6 +139,7 @@ class JenkinsJobParser:
                     
                     param_config = {
                         "type": "str",  # All parameters are strings in Kubiya
+                        "name": param_name,
                         "description": self._enhance_parameter_description(
                             param.get('description', ''),
                             param_type,
@@ -217,7 +226,7 @@ class JenkinsJobParser:
                 else:
                     default_str = str(default_value)
                 enhanced_desc += f"\nDefault: {default_str}"
-        
+
         return enhanced_desc
 
     def _determine_job_type(self, job_info: Dict[str, Any]) -> str:
