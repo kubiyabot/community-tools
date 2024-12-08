@@ -27,7 +27,7 @@ class JenkinsJobTool(Tool):
         
         # Set default icon
         if not self.icon_url:
-            self.icon_url = "https://dwglogo.com/wp-content/uploads/2017/11/1500px_Jenkins_logo.png"
+            self.icon_url = "https://e7.pngegg.com/pngimages/285/944/png-clipart-jenkins-software-build-continuous-integration-plug-in-software-testing-github-child-face-thumbnail.png"
             
         # Generate mermaid diagram for job flow
         self.mermaid = self._generate_mermaid_diagram()
