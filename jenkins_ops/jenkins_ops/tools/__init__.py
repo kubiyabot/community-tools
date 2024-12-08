@@ -8,28 +8,35 @@ from ..scripts.config_loader import get_jenkins_config
 
 logger = logging.getLogger(__name__)
 
+class ToolInitializationError(Exception):
+    """Exception raised for errors during tool initialization."""
+    pass
+
 def create_jenkins_job_tool(job_config: dict, long_running: bool = False) -> JenkinsJobTool:
     """Create a Jenkins job tool from configuration."""
-    
-    # Generate tool name with self_service prefix
-    base_name = job_config['name'].lower().replace(' ', '_')
-    tool_name = f"self_service_jenkins_{base_name}"
-    
-    # Create tool description
-    description = (
-        f"Execute Jenkins job: {job_config['name']}\n"
-        f"{job_config.get('description', '')}\n"
-        f"URL: {job_config['url']}"
-    )
+    try:
+        # Generate tool name with self_service prefix
+        base_name = job_config['name'].lower().replace(' ', '_')
+        tool_name = f"self_service_jenkins_{base_name}"
+        
+        # Create tool description
+        description = (
+            f"Execute Jenkins job: {job_config['name']}\n"
+            f"{job_config.get('description', '')}\n"
+            f"URL: {job_config['url']}"
+        )
 
-    return JenkinsJobTool(
-        name=tool_name,
-        description=description,
-        job_config=job_config,
-        long_running=long_running,
-        type="docker",
-        image="python:3.9-alpine"
-    )
+        logger.debug(f"Creating tool: {tool_name}")
+        return JenkinsJobTool(
+            name=tool_name,
+            description=description,
+            job_config=job_config,
+            long_running=long_running,
+            type="docker",
+            image="python:3.9-alpine"
+        )
+    except Exception as e:
+        raise ToolInitializationError(f"Failed to create tool for job {job_config.get('name', 'unknown')}: {str(e)}")
 
 def initialize_tools() -> List[JenkinsJobTool]:
     """Initialize all Jenkins job tools."""
@@ -39,20 +46,20 @@ def initialize_tools() -> List[JenkinsJobTool]:
         # Load Jenkins configuration
         config = get_jenkins_config()
         if not config:
-            logger.error("Failed to load Jenkins configuration")
-            return tools
+            raise ToolInitializationError("Failed to load Jenkins configuration")
 
         # Get Jenkins credentials
         jenkins_token = os.environ.get(config['auth']['password_env'])
         if not jenkins_token:
-            logger.error(f"Environment variable {config['auth']['password_env']} not set")
-            return tools
+            raise ToolInitializationError(f"Environment variable {config['auth']['password_env']} not set")
 
+        logger.info(f"Connecting to Jenkins at {config['jenkins_url']}")
+        
         # Initialize parser
         parser = JenkinsJobParser(
             jenkins_url=config['jenkins_url'],
             username=config['auth']['username'],
-            password=jenkins_token
+            api_token=jenkins_token
         )
 
         # Get job filter based on configuration
@@ -62,8 +69,10 @@ def initialize_tools() -> List[JenkinsJobTool]:
             exclude_jobs = set(config.get('jobs', {}).get('exclude', []))
             if include_jobs:
                 job_filter = list(include_jobs - exclude_jobs)
+                logger.info(f"Using job filter: {job_filter}")
 
         # Get jobs from Jenkins
+        logger.info("Fetching jobs from Jenkins...")
         jobs_info, warnings, errors = parser.get_jobs(job_filter)
 
         # Log any warnings or errors
@@ -71,6 +80,12 @@ def initialize_tools() -> List[JenkinsJobTool]:
             logger.warning(warning)
         for error in errors:
             logger.error(error)
+
+        if errors:
+            raise ToolInitializationError(f"Errors occurred during job discovery: {'; '.join(errors)}")
+
+        if not jobs_info:
+            raise ToolInitializationError("No jobs were discovered from Jenkins")
 
         # Create tools for each job
         for job_name, job_info in jobs_info.items():
@@ -95,12 +110,17 @@ def initialize_tools() -> List[JenkinsJobTool]:
                     logger.info(f"Created long-running tool for job: {job_name}")
 
             except Exception as e:
-                logger.error(f"Failed to create tool for job {job_name}: {str(e)}")
-                continue
+                raise ToolInitializationError(f"Failed to create tool for job {job_name}: {str(e)}")
+
+        if not tools:
+            raise ToolInitializationError("No tools were created from discovered jobs")
+
+        logger.info(f"Successfully created {len(tools)} tools")
+        return tools
 
     except Exception as e:
-        logger.error(f"Failed to initialize tools: {str(e)}")
-
-    return tools
+        error_msg = f"Failed to initialize tools: {str(e)}"
+        logger.error(error_msg)
+        raise ToolInitializationError(error_msg) from e
 
 __all__ = ['initialize_tools', 'create_jenkins_job_tool', 'JenkinsJobTool'] 
