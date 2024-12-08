@@ -3,7 +3,6 @@ from kubiya_sdk.tools.registry import tool_registry
 from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
 from .config import DEFAULT_JENKINS_CONFIG
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -79,4 +78,3 @@ def initialize_tools():
     except Exception as e:
         logger.error(f"Failed to initialize Jenkins tools: {str(e)}")
         return []
-
