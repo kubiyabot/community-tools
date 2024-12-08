@@ -33,7 +33,15 @@ def discover():
         discovered_tools = initialize_tools()
         
         if not discovered_tools:
-            error_msg = "No Jenkins tools were discovered. Check Jenkins connection and configuration."
+            error_msg = (
+                "No Jenkins tools were discovered.\n"
+                "This could be due to:\n"
+                f"1. Jenkins server not accessible at {os.environ.get('JENKINS_URL')}\n"
+                "2. Invalid authentication credentials\n"
+                "3. No jobs available or accessible\n"
+                "4. Errors during tool creation\n\n"
+                "Please check the logs above for specific error messages."
+            )
             logger.error(error_msg)
             raise JenkinsOpsError(error_msg)
         
