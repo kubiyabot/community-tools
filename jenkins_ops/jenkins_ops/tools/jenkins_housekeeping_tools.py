@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, ClassVar
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.models import FileSpec
 from .config import DEFAULT_JENKINS_CONFIG
@@ -22,8 +22,8 @@ class JenkinsHousekeepingTool(Tool):
 
 class DeleteOldBuildsTool(JenkinsHousekeepingTool):
     """Tool to delete old builds from Jenkins jobs."""
-    name = "delete_old_builds"
-    description = "Delete builds older than a specified number of days from Jenkins jobs."
+    name: ClassVar[str] = "delete_old_builds"
+    description: ClassVar[str] = "Delete builds older than a specified number of days from Jenkins jobs."
     args = [
         Arg(
             name="job_name",
@@ -51,8 +51,8 @@ class DeleteOldBuildsTool(JenkinsHousekeepingTool):
 
 class ManagePluginsTool(JenkinsHousekeepingTool):
     """Tool to list and optionally update Jenkins plugins."""
-    name = "manage_plugins"
-    description = "List installed Jenkins plugins and optionally update them."
+    name: ClassVar[str] = "manage_plugins"
+    description: ClassVar[str] = "List installed Jenkins plugins and optionally update them."
     args = [
         Arg(
             name="action",
@@ -81,15 +81,14 @@ class ManagePluginsTool(JenkinsHousekeepingTool):
 
 class ManageNodesTool(JenkinsHousekeepingTool):
     """Tool to manage Jenkins nodes/agents."""
-    name = "manage_nodes"
-    description = "List and manage Jenkins nodes/agents."
+    name: ClassVar[str] = "manage_nodes"
+    description: ClassVar[str] = "List and manage Jenkins nodes/agents."
     args = [
         Arg(
             name="action",
             type="str",
             description="Action to perform: 'list' or 'toggle'.",
             required=True,
-            choices=["list", "toggle"]
         ),
         Arg(
             name="node_name",
@@ -102,7 +101,6 @@ class ManageNodesTool(JenkinsHousekeepingTool):
             type="str",
             description="Desired node state: 'online' or 'offline' (required for toggle action).",
             required=False,
-            choices=["online", "offline"]
         ),
     ]
 
@@ -118,15 +116,14 @@ class ManageNodesTool(JenkinsHousekeepingTool):
 
 class SystemInfoTool(JenkinsHousekeepingTool):
     """Tool to get Jenkins system information and metrics."""
-    name = "system_info"
-    description = "Get Jenkins system information and metrics."
+    name: ClassVar[str] = "system_info"
+    description: ClassVar[str] = "Get Jenkins system information and metrics."
     args = [
         Arg(
             name="action",
             type="str",
             description="Type of information to retrieve: 'info' or 'metrics'.",
             required=True,
-            choices=["info", "metrics"]
         ),
     ]
 
@@ -142,15 +139,14 @@ class SystemInfoTool(JenkinsHousekeepingTool):
 
 class JobStatisticsTool(JenkinsHousekeepingTool):
     """Tool to analyze Jenkins job statistics."""
-    name = "job_statistics"
-    description = "Get statistics and analysis of Jenkins jobs."
+    name: ClassVar[str] = "job_statistics"
+    description: ClassVar[str] = "Get statistics and analysis of Jenkins jobs."
     args = [
         Arg(
             name="action",
             type="str",
             description="Type of statistics to retrieve: 'summary' or 'job_stats'.",
             required=True,
-            choices=["summary", "job_stats"]
         ),
         Arg(
             name="job_name",
@@ -175,4 +171,5 @@ class JobStatisticsTool(JenkinsHousekeepingTool):
                 destination="/opt/scripts/job_statistics.py",
                 source=str(Path(__file__).parent.parent / 'scripts' / 'housekeeping' / 'job_statistics.py')
             )
-        ] 
+        ]
+        
