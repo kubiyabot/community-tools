@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
+from jenkins_ops import DEFAULT_JENKINS_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -70,12 +71,14 @@ def get_jenkins_config() -> Optional[Dict[str, Any]]:
     try:
         config_path = Path(__file__).parent / 'configs' / 'jenkins_config.json'
         
-        if not config_path.exists():
-            logger.error(f"Configuration file not found: {config_path}")
-            return None
-
-        with open(config_path) as f:
-            config = json.load(f)
+        # If config file exists, load it
+        if config_path.exists():
+            with open(config_path) as f:
+                config = json.load(f)
+        else:
+            # Use default config
+            logger.info("No configuration file found, using default in-cluster settings")
+            config = DEFAULT_JENKINS_CONFIG.copy()
 
         # Validate configuration
         validate_config(config)

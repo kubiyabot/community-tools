@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-import jenkins
+try:
+    import jenkins
+except ImportError:
+    print("WARN: jenkins module not found,this could be OK if you are just syncing (discovering) jobs against the Jenkins server")
+    pass
 import time
 import json
 import os
