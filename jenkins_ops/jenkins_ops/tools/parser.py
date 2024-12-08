@@ -206,57 +206,81 @@ class JenkinsJobParser:
                     'file': 'str',
                 }
 
+                # Build description parts list
+                description_parts = []
+                
+                # Add main description first, if available
+                if param.get('description'):
+                    description_parts.append(str(param.get('description')))
+
                 # Get default value
                 default_value = self._extract_default_value(param)
                 logger.debug(f"Extracted default value for {param_name}: {default_value}")
 
-                # Build description
-                description_parts = []
-                
-                # Add main description if available
-                if param.get('description'):
-                    description_parts.append(param.get('description'))
-                
-                # Add type information
+                # Add type and default information
                 type_info = {
-                    'boolean': 'Boolean value (true/false)',
-                    'string': 'Text value',
-                    'text': 'Multi-line text',
-                    'choice': 'Selection from predefined values',
-                    'password': 'Secure text value',
-                    'file': 'File content'
+                    'boolean': {
+                        'display': 'Boolean value (true/false)',
+                        'default': 'false'
+                    },
+                    'string': {
+                        'display': 'Text value',
+                        'default': ''
+                    },
+                    'text': {
+                        'display': 'Multi-line text',
+                        'default': ''
+                    },
+                    'choice': {
+                        'display': 'Selection from predefined values',
+                        'default': None
+                    },
+                    'password': {
+                        'display': 'Secure text value',
+                        'default': ''
+                    },
+                    'file': {
+                        'display': 'File content',
+                        'default': None
+                    }
                 }
-                description_parts.append(f"Type: {type_info.get(param_type, 'Text value')}")
+
+                # Add type information
+                param_type_info = type_info.get(param_type, {'display': 'Text value', 'default': ''})
+                description_parts.append(f"Type: {param_type_info['display']}")
 
                 # Add choices if available
                 if 'choices' in param:
                     choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
                     description_parts.append(f"Allowed values: [{choices_str}]")
 
-                # Add default value to description if available
-                if default_value is not None:
+                # Set default value if none provided
+                if default_value is None:
+                    default_value = param_type_info['default']
+
+                # Add default value to description
+                if default_value is not None and str(default_value).strip():
                     if param_type == 'boolean':
                         default_str = 'true' if str(default_value).lower() == 'true' else 'false'
                     elif isinstance(default_value, (dict, list)):
                         default_str = json.dumps(default_value)
                     else:
                         default_str = str(default_value)
-                    if default_str:  # Only add if there's an actual value
-                        description_parts.append(f"Default: {default_str}")
+                    description_parts.append(f"Default: {default_str}")
 
-                # Join all description parts
-                description = '\n'.join(description_parts)
+                # Join description parts with newlines
+                description = '\n'.join(part.strip() for part in description_parts if part.strip())
 
                 param_config = {
                     "name": self._sanitize_name(param_name),
                     "original_name": param_name,
                     "type": type_mapping.get(param_type, 'str'),
                     "description": description,
-                    "required": default_value is None,
+                    "required": default_value is None or not str(default_value).strip(),
                 }
 
                 # Add default value to parameter config
-                if default_value is not None:
+                if default_value is not None and str(default_value).strip():
                     if param_type == 'boolean':
                         param_config['default'] = str(default_value).lower() == 'true'
                     elif isinstance(default_value, (dict, list)):
