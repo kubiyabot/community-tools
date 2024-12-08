@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
-from jenkins_ops.config import DEFAULT_JENKINS_CONFIG
+from ..tools.initializer import DEFAULT_JENKINS_CONFIG
 
 logger = logging.getLogger(__name__)
 
