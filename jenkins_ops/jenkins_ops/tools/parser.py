@@ -97,7 +97,7 @@ class JenkinsJobParser:
         """Process a single Jenkins job."""
         try:
             # Get job info with parameters using JSON API
-            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[*],lastBuild[*],lastSuccessfulBuild[*],healthReport[*]'
+            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[*],lastBuild[*],lastSuccessfulBuild[*],healthReport[*],actions[parameterDefinitions]'
             job_info = self._make_request(info_endpoint)
             
             if not job_info:
@@ -105,71 +105,94 @@ class JenkinsJobParser:
 
             # Extract parameters from job properties
             parameters = {}
-            for prop in job_info.get('property', []):
-                if 'parameterDefinitions' in prop:
-                    logger.debug(f"Found parameters for job {job_name}: {prop['parameterDefinitions']}")
-                    for param in prop['parameterDefinitions']:
-                        # Log the raw parameter data for debugging
-                        logger.debug(f"Raw parameter data: {param}")
-                        
-                        param_type = param.get('_class', '').split('.')[-1]
-                        # Try different possible name fields
-                        raw_name = (
-                            param.get('name') or 
-                            param.get('parameterName') or 
-                            param.get('id') or 
-                            param.get('displayName')
-                        )
-                        
-                        if not raw_name:
-                            logger.warning(f"Found parameter without name in job {job_name}. Raw data: {param}")
-                            continue
+            
+            # Try different paths to find parameters
+            param_sources = [
+                # Standard property path
+                job_info.get('property', []),
+                # Actions path (sometimes parameters are here)
+                job_info.get('actions', []),
+                # Direct parameterDefinitions (older Jenkins versions)
+                [{'parameterDefinitions': job_info.get('parameterDefinitions', [])}]
+            ]
 
-                        # Sanitize and normalize the parameter name
-                        param_name = self._sanitize_name(raw_name)
-                        if param_name != raw_name:
-                            logger.debug(f"Sanitized parameter name from '{raw_name}' to '{param_name}'")
-                        
-                        logger.debug(f"Processing parameter: {param_name} of type {param_type}")
-                        
-                        # Map Jenkins parameter types to Kubiya types
-                        type_mapping = {
-                            'BooleanParameterDefinition': 'bool',
-                            'StringParameterDefinition': 'str',
-                            'TextParameterDefinition': 'str',
-                            'ChoiceParameterDefinition': 'str',
-                            'PasswordParameterDefinition': 'str',
-                            'FileParameterDefinition': 'str',
-                        }
-                        
-                        # Build parameter description
-                        description = param.get('description', 'No description provided')
-                        if raw_name != param_name:
-                            description = f"Original name: {raw_name}\n{description}"
-                        if 'choices' in param:
-                            choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
-                            description += f"\nAllowed values: [{choices_str}]"
-                        
-                        param_config = {
-                            "name": param_name,
-                            "type": type_mapping.get(param_type, 'str'),
-                            "description": description,
-                            "required": not bool(param.get('defaultValue'))
-                        }
+            for source in param_sources:
+                for prop in source:
+                    if 'parameterDefinitions' in prop:
+                        logger.debug(f"Found parameters for job {job_name}: {json.dumps(prop['parameterDefinitions'], indent=2)}")
+                        for param in prop['parameterDefinitions']:
+                            # Log the raw parameter data for debugging
+                            logger.debug(f"Raw parameter data: {json.dumps(param, indent=2)}")
+                            
+                            # Try to get parameter name from different possible locations
+                            param_name = (
+                                param.get('name') or 
+                                param.get('parameterName') or 
+                                param.get('id') or 
+                                param.get('displayName') or
+                                # Try to extract from defaultParameterValue if exists
+                                (param.get('defaultParameterValue', {}) or {}).get('name')
+                            )
+                            
+                            if not param_name:
+                                # Try to generate a name based on type if no name found
+                                param_type = param.get('_class', '').split('.')[-1]
+                                param_count = len(parameters) + 1
+                                param_name = f"param_{param_type.lower()}_{param_count}"
+                                logger.warning(
+                                    f"Generated name '{param_name}' for unnamed parameter in job {job_name}.\n"
+                                    f"Parameter type: {param_type}\n"
+                                    f"Raw data: {json.dumps(param, indent=2)}"
+                                )
 
-                        # Handle default values based on type
-                        if 'defaultValue' in param:
-                            if param_type == 'BooleanParameterDefinition':
-                                param_config['default'] = str(param['defaultValue']).lower() == 'true'
-                            else:
-                                param_config['default'] = param['defaultValue']
+                            param_type = param.get('_class', '').split('.')[-1]
+                            logger.debug(f"Processing parameter: {param_name} of type {param_type}")
+                            
+                            # Map Jenkins parameter types to Kubiya types
+                            type_mapping = {
+                                'BooleanParameterDefinition': 'bool',
+                                'StringParameterDefinition': 'str',
+                                'TextParameterDefinition': 'str',
+                                'ChoiceParameterDefinition': 'str',
+                                'PasswordParameterDefinition': 'str',
+                                'FileParameterDefinition': 'str',
+                            }
+                            
+                            # Build parameter description
+                            description = param.get('description', 'No description provided')
+                            if 'choices' in param:
+                                choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
+                                description += f"\nAllowed values: [{choices_str}]"
+                            
+                            param_config = {
+                                "name": param_name,
+                                "original_name": param_name,  # Store original name for unsanitization
+                                "type": type_mapping.get(param_type, 'str'),
+                                "description": description,
+                                "required": not bool(param.get('defaultValue'))
+                            }
 
-                        # Add choices if available
-                        if 'choices' in param:
-                            param_config['choices'] = param['choices']
-                        
-                        parameters[param_name] = param_config
-                        logger.debug(f"Added parameter config: {param_config}")
+                            # Handle default values based on type
+                            if 'defaultValue' in param:
+                                if param_type == 'BooleanParameterDefinition':
+                                    param_config['default'] = str(param['defaultValue']).lower() == 'true'
+                                else:
+                                    param_config['default'] = param['defaultValue']
+                            # Also check defaultParameterValue (alternative location)
+                            elif 'defaultParameterValue' in param:
+                                default_value = param['defaultParameterValue'].get('value')
+                                if default_value is not None:
+                                    if param_type == 'BooleanParameterDefinition':
+                                        param_config['default'] = str(default_value).lower() == 'true'
+                                    else:
+                                        param_config['default'] = default_value
+
+                            # Add choices if available
+                            if 'choices' in param:
+                                param_config['choices'] = param['choices']
+                            
+                            parameters[param_name] = param_config
+                            logger.debug(f"Added parameter config: {param_config}")
 
             # Add job URL to description
             job_description = job_info.get('description', '')
