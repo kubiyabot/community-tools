@@ -69,7 +69,10 @@ class JenkinsJobParser:
                 if 'parameterDefinitions' in prop:
                     for param in prop['parameterDefinitions']:
                         param_type = param.get('_class', '').split('.')[-1]
-                        param_name = param.get('name', '')
+                        param_name = param.get('name')
+                        
+                        if not param_name:  # Skip parameters without names
+                            continue
                         
                         # Map Jenkins parameter types to Kubiya types
                         type_mapping = {
@@ -81,18 +84,22 @@ class JenkinsJobParser:
                             'FileParameterDefinition': 'str',
                         }
                         
+                        # Build parameter description
+                        description = param.get('description', 'No description provided')
+                        if 'choices' in param:
+                            choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
+                            description += f"\nAllowed values: [{choices_str}]"
+                        
                         param_config = {
-                            "type": type_mapping.get(param_type, 'str'),
                             "name": param_name,
-                            "description": param.get('description', ''),
-                            # required depends if we have a default value
-                            "required": True if param.get('defaultValue') else False
+                            "type": type_mapping.get(param_type, 'str'),
+                            "description": description,
+                            "required": not bool(param.get('defaultValue'))  # Required if no default value
                         }
 
                         # Handle default values based on type
                         if 'defaultValue' in param:
                             if param_type == 'BooleanParameterDefinition':
-                                # Convert string 'true'/'false' to actual boolean
                                 param_config['default'] = str(param['defaultValue']).lower() == 'true'
                             else:
                                 param_config['default'] = param['defaultValue']
@@ -103,11 +110,12 @@ class JenkinsJobParser:
                         
                         parameters[param_name] = param_config
 
+            # Add job URL to description
             job_description = job_info.get('description', '')
             if job_description:
-                job_description += f"\n\nThis tool was synced from Jenkins job at: {self.jenkins_url}/job/{job_name}"
+                job_description += f"\n\nJenkins Job URL: {self.jenkins_url}/job/{job_name}"
             else:
-                job_description = f"This tool was synced from Jenkins job at: {self.jenkins_url}/job/{job_name}"
+                job_description = f"Jenkins Job URL: {self.jenkins_url}/job/{job_name}"
 
             return {
                 "name": job_name,
@@ -116,10 +124,7 @@ class JenkinsJobParser:
                 "url": job_info.get('url', ''),
                 "buildable": job_info.get('buildable', True),
                 "type": self._determine_job_type(job_info),
-                "health": self._get_job_health(job_info),
-                "auth": {
-                    "username": self.username
-                }
+                "health": self._get_job_health(job_info)
             }
             
         except Exception as e:
