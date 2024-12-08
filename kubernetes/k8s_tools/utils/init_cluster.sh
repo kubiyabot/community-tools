@@ -15,6 +15,14 @@ check_command() {
     log "✅ $2"
 }
 
+# Helper function to check if k8s resource exists
+resource_exists() {
+    local namespace=$1
+    local resource_type=$2
+    local resource_name=$3
+    kubectl get -n "$namespace" "$resource_type" "$resource_name" &> /dev/null
+}
+
 log "🚀 Initializing Kubernetes tools..."
 
 # Ensure curl is installed
@@ -38,15 +46,6 @@ if ! command -v kubectl &> /dev/null; then
     check_command "kubectl installation failed" "kubectl installed successfully"
 else
     log "✅ kubectl is already installed"
-fi
-
-# Install helm if not present
-if ! command -v helm &> /dev/null; then
-    log "Installing helm..."
-    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | HELM_INSTALL_DIR="$TOOLS_DIR" bash
-    check_command "helm installation failed" "helm installed successfully"
-else
-    log "✅ helm is already installed"
 fi
 
 # Test kubectl connection
@@ -74,120 +73,216 @@ if [ ! -f "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-kubectl apply -n kubiya -f - <<EOT
+# Create ConfigMap
+log "Creating ConfigMap..."
+if ! resource_exists "kubiya" "configmap" "kubiya-kubewatch-config"; then
+    kubectl apply -n kubiya -f - <<EOT
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kubiya-kubewatch-config
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
 data:
   .kubewatch.yaml: |
 $(cat "$CONFIG_PATH" | sed 's/^/    /')
 EOT
-
-
-# Create values file for helm
-HELM_VALUES=$(cat <<EOF
-configmap:
-  create: false # do not create config map from helm
-  name: kubiya-kubewatch-config
-  data:
-    .kubewatch.yaml: |
-$(sed 's/^/      /' "$CONFIG_PATH")
-
-rbac:
-  create: true
-
-resources:
-  limits:
-    cpu: 100m
-    memory: 128Mi
-  requests:
-    cpu: 50m
-    memory: 64Mi
-
-command: ["kubewatch"]
-args: ["run", "--config", "/opt/bitnami/kubewatch/conf/.kubewatch.yaml"]
-
-extraVolumeMounts:
-  - name: config-volume
-    mountPath: /opt/bitnami/kubewatch/conf
-    readOnly: true
-
-extraVolumes:
-  - name: config-volume
-    configMap:
-      name: kubiya-kubewatch-config
-EOF
-)
-
-# Save values to temporary file
-VALUES_FILE=$(mktemp)
-echo "$HELM_VALUES" > "$VALUES_FILE"
-
-# Add helm repo if needed
-helm repo add robusta https://robusta-charts.storage.googleapis.com || true
-helm repo update
-check_command "helm repo setup failed" "Helm repository configured"
-
-# Check current helm release status
-HELM_STATUS=$(helm status kubiya-kubewatch -n kubiya 2>/dev/null || echo "not_found")
-
-if echo "$HELM_STATUS" | grep -q "pending-install\|failed"; then
-    log "Found failed or pending installation, cleaning up..."
-    helm uninstall kubiya-kubewatch -n kubiya || true
-    # Wait for resources to be cleaned up
-    sleep 5
-fi
-
-# Check if kubiya-kubewatch is already deployed
-if ! helm list -n kubiya | grep -q "kubiya-kubewatch"; then
-    # Only install if not already present
-    log "kubiya-kubewatch not found, installing..."
-    
-    helm install kubiya-kubewatch robusta/kubewatch \
-        --namespace kubiya \
-        --create-namespace \
-        --set rbac.create=true \
-        --set image.repository=ghcr.io/kubiyabot/kubewatch \
-        --set image.tag=main \
-        -f "$VALUES_FILE"
-    check_command "kubiya-kubewatch installation failed" "Initiated kubiya-kubewatch installation"
+    check_command "ConfigMap creation failed" "Created ConfigMap"
 else
-    # Update existing installation with new config
-    log "Updating existing kubiya-kubewatch installation..."
-    helm upgrade kubiya-kubewatch robusta/kubewatch \
-        --namespace kubiya \
-        --reuse-values \
-        --set image.repository=ghcr.io/kubiyabot/kubewatch \
-        --set image.tag=main \
-        -f "$VALUES_FILE"
-    check_command "kubiya-kubewatch upgrade failed" "Updated kubiya-kubewatch configuration"
+    log "✅ ConfigMap already exists"
 fi
 
-# Load kubewatch config
-CONFIG_PATH="$(dirname "$0")/../config/kubewatch.yaml"
-if [ ! -f "$CONFIG_PATH" ]; then
-    log "❌ Error: Kubewatch config not found at $CONFIG_PATH"
-    exit 1
-fi
-
-kubectl apply -n kubiya -f - <<EOT
+# Create ServiceAccount
+log "Creating ServiceAccount..."
+if ! resource_exists "kubiya" "serviceaccount" "kubiya-kubewatch"; then
+    kubectl apply -n kubiya -f - <<EOT
 apiVersion: v1
-kind: ConfigMap
+kind: ServiceAccount
 metadata:
-  name: kubiya-kubewatch-config
-data:
-  .kubewatch.yaml: |
-$(cat "$CONFIG_PATH" | sed 's/^/    /')
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+automountServiceAccountToken: true
 EOT
+    check_command "ServiceAccount creation failed" "Created ServiceAccount"
+else
+    log "✅ ServiceAccount already exists"
+fi
 
-# Clean up temporary file
-rm -f "$VALUES_FILE"
+# Create Deployment
+log "Creating Deployment..."
+if ! resource_exists "kubiya" "deployment" "kubiya-kubewatch"; then
+    kubectl apply -n kubiya -f - <<EOT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubewatch
+      app.kubernetes.io/part-of: kubiya
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubewatch
+        app.kubernetes.io/part-of: kubiya
+    spec:
+      serviceAccountName: kubiya-kubewatch
+      containers:
+        - name: kubewatch
+          command: ["kubewatch"]
+          args: ["run", "--config", "/opt/bitnami/kubewatch/conf/.kubewatch.yaml"]
+          image: ghcr.io/kubiyabot/kubewatch:main
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 50m
+              memory: 64Mi
+          volumeMounts:
+            - name: config-volume
+              mountPath: /opt/bitnami/kubewatch/conf
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: kubiya-kubewatch-config
+EOT
+    check_command "Deployment creation failed" "Created Deployment"
+else
+    log "✅ Deployment already exists"
+fi
 
 # Restart the deployment to pick up new config
 log "Triggering kubiya-kubewatch restart..."
 kubectl rollout restart deployment/kubiya-kubewatch -n kubiya
 check_command "restart trigger failed" "Triggered kubiya-kubewatch restart"
 
+# Create ClusterRole
+log "Creating ClusterRole..."
+if ! resource_exists "" "clusterrole" "kubiya-kubewatch"; then
+    kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - daemonsets
+      - deployments
+      - events
+      - namespaces
+      - nodes
+      - persistentvolumes
+      - pods
+      - replicasets
+      - replicationcontrollers
+      - secrets
+      - services
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/scale
+      - replicasets
+      - replicasets/scale
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling 
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/scale
+      - ingresses
+      - replicasets
+      - replicasets/scale
+      - replicationcontrollers/scale
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - list
+      - watch
+      - get
+EOT
+    check_command "ClusterRole creation failed" "Created ClusterRole"
+else
+    log "✅ ClusterRole already exists"
+fi
+
+# Create ClusterRoleBinding
+log "Creating ClusterRoleBinding..."
+if ! resource_exists "" "clusterrolebinding" "kubiya-kubewatch"; then
+    kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubiya-kubewatch
+subjects:
+- kind: ServiceAccount
+  name: kubiya-kubewatch
+  namespace: kubiya
+EOT
+    check_command "ClusterRoleBinding creation failed" "Created ClusterRoleBinding"
+else
+    log "✅ ClusterRoleBinding already exists"
+fi
+
 log "🎉 Initialization completed successfully"
-log "Note: Deployment updates are in progress and may take a few minutes to complete" 
+log "Note: Deployment updates are in progress and may take a few minutes to complete"
