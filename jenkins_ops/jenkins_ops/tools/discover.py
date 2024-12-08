@@ -1,8 +1,8 @@
 import logging
 import os
 from typing import Dict, Any
-from .tools import initialize_tools, tools
-from .tools.config import DEFAULT_JENKINS_CONFIG
+from . import initialize_tools, tools
+from . import DEFAULT_JENKINS_CONFIG
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
