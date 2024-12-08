@@ -31,9 +31,11 @@ filter:
         Count: {{.Count}}
   namespaces:
     - default
+    - kubiya
+    - staging
     - kube-system
   settings:
-    dedup_interval: 1m
+    dedup_interval: 10m
     include_labels: true
 handler:
   webhook:
