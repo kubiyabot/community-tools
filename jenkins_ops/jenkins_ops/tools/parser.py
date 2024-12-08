@@ -221,52 +221,56 @@ class JenkinsJobParser:
                 type_info = {
                     'boolean': {
                         'display': 'Boolean value (true/false)',
-                        'default': 'false'
-                    },
-                    'string': {
-                        'display': 'Text value',
-                        'default': ''
-                    },
-                    'text': {
-                        'display': 'Multi-line text',
-                        'default': ''
+                        'default': 'false',
+                        'needs_type_info': True
                     },
                     'choice': {
                         'display': 'Selection from predefined values',
-                        'default': None
+                        'default': None,
+                        'needs_type_info': True
                     },
                     'password': {
                         'display': 'Secure text value',
-                        'default': ''
+                        'default': None,
+                        'needs_type_info': True
+                    },
+                    'text': {
+                        'display': 'Multi-line text',
+                        'default': '',
+                        'needs_type_info': True
+                    },
+                    'string': {
+                        'display': 'Text value',
+                        'default': '',
+                        'needs_type_info': False
                     },
                     'file': {
                         'display': 'File content',
-                        'default': None
+                        'default': None,
+                        'needs_type_info': True
                     }
                 }
 
-                # Add type information
-                param_type_info = type_info.get(param_type, {'display': 'Text value', 'default': ''})
-                description_parts.append(f"Type: {param_type_info['display']}")
+                # Only add type information for complex parameters
+                param_type_info = type_info.get(param_type, {'display': '', 'default': '', 'needs_type_info': False})
+                if param_type_info['needs_type_info']:
+                    description_parts.append(f"Type: {param_type_info['display']}")
 
                 # Add choices if available
                 if 'choices' in param:
                     choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
                     description_parts.append(f"Allowed values: [{choices_str}]")
 
-                # Set default value if none provided
-                if default_value is None:
-                    default_value = param_type_info['default']
-
-                # Add default value to description
+                # Add default value to description only if it's meaningful
                 if default_value is not None and str(default_value).strip():
                     if param_type == 'boolean':
                         default_str = 'true' if str(default_value).lower() == 'true' else 'false'
+                        description_parts.append(f"Default: {default_str}")
                     elif isinstance(default_value, (dict, list)):
                         default_str = json.dumps(default_value)
-                    else:
-                        default_str = str(default_value)
-                    description_parts.append(f"Default: {default_str}")
+                        description_parts.append(f"Default: {default_str}")
+                    elif param_type_info['needs_type_info']:
+                        description_parts.append(f"Default: {str(default_value)}")
 
                 # Join description parts with newlines
                 description = '\n'.join(part.strip() for part in description_parts if part.strip())

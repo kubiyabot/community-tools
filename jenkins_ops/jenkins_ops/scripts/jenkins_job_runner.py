@@ -71,6 +71,32 @@ class JenkinsJobRunner:
             logger.error(f"Failed to connect to Jenkins: {str(e)}")
             raise
 
+    def _prepare_parameters_for_jenkins(self, parameters: Dict[str, Any], param_types: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+        """Convert parameters to format expected by Jenkins."""
+        jenkins_params = {}
+        
+        for param_name, value in parameters.items():
+            # Get parameter info
+            param_info = param_types.get(param_name, {})
+            original_name = param_info.get('original_name', param_name)
+            param_type = param_info.get('type', 'str')
+            
+            # Convert value based on type
+            if param_type == 'bool':
+                # Jenkins expects boolean as true/false string
+                jenkins_params[original_name] = str(value).lower()
+            elif param_type == 'str':
+                if isinstance(value, (dict, list)):
+                    # For complex types, convert back to string as Jenkins expects
+                    jenkins_params[original_name] = json.dumps(value)
+                else:
+                    jenkins_params[original_name] = str(value)
+            else:
+                # For other types, pass as string
+                jenkins_params[original_name] = str(value)
+        
+        return jenkins_params
+
     def trigger_build(self, parameters: Dict[str, Any]) -> int:
         """Trigger Jenkins build with parameters."""
         try:
@@ -81,13 +107,13 @@ class JenkinsJobRunner:
             # Get parameter types from config
             param_types = config.get('parameters', {})
             
-            # Unsanitize parameters before sending to Jenkins
-            jenkins_params = self._unsanitize_parameters(parameters, param_types)
+            # Convert parameters to Jenkins format
+            jenkins_params = self._prepare_parameters_for_jenkins(parameters, param_types)
             
             logger.debug(f"Original parameters: {parameters}")
-            logger.debug(f"Unsanitized parameters for Jenkins: {jenkins_params}")
+            logger.debug(f"Parameters for Jenkins: {jenkins_params}")
             
-            # Queue the build with unsanitized parameters
+            # Queue the build with prepared parameters
             queue_id = self.server.build_job(self.job_name, parameters=jenkins_params)
             
             # Get build number from queue
