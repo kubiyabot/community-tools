@@ -1,6 +1,5 @@
 import logging
 import json
-import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
@@ -10,7 +9,7 @@ import base64
 logger = logging.getLogger(__name__)
 
 class JenkinsJobParser:
-    """Parser for Jenkins jobs using direct HTTP requests."""
+    """Parser for Jenkins jobs using direct HTTP requests and JSON API."""
     
     def __init__(
         self,
@@ -52,130 +51,15 @@ class JenkinsJobParser:
             logger.error(f"Request failed for {url}: {str(e)}")
             raise
 
-    def _get_crumb(self) -> Optional[Dict[str, str]]:
-        """Get Jenkins CSRF crumb."""
-        try:
-            response = self._make_request('crumbIssuer/api/json')
-            return {
-                response.get('crumbRequestField', 'Jenkins-Crumb'): 
-                response.get('crumb')
-            }
-        except Exception:
-            return None
-
-    def get_jobs(self, job_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Get all Jenkins jobs and their parameters."""
-        jobs_info = {}
-        
-        try:
-            # Get all jobs recursively
-            all_jobs = self._get_all_jobs_recursive()
-            
-            # Filter jobs if needed
-            jobs_to_process = [
-                job for job in all_jobs
-                if not job_filter or job['full_name'] in job_filter
-            ]
-
-            if not jobs_to_process:
-                self.warnings.append("No matching jobs found")
-                return {}, self.warnings, self.errors
-
-            # Process jobs in parallel
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                future_to_job = {
-                    executor.submit(
-                        self._process_single_job,
-                        job['full_name']
-                    ): job
-                    for job in jobs_to_process
-                }
-
-                for future in as_completed(future_to_job):
-                    job = future_to_job[future]
-                    try:
-                        job_info = future.result()
-                        if job_info:
-                            jobs_info[job['full_name']] = job_info
-                    except Exception as e:
-                        self.errors.append(f"Failed to process job {job['full_name']}: {str(e)}")
-
-        except Exception as e:
-            self.errors.append(f"Failed to get jobs: {str(e)}")
-
-        return jobs_info, self.warnings, self.errors
-
-    def _get_all_jobs_recursive(self, folder_path: str = '') -> List[Dict[str, Any]]:
-        """Recursively get all jobs from Jenkins."""
-        all_jobs = []
-        
-        try:
-            # Get items at current level
-            if folder_path:
-                endpoint = f'job/{folder_path}/api/json'
-                items = self._make_request(endpoint)['jobs']
-            else:
-                items = self._make_request('api/json')['jobs']
-
-            for item in items:
-                item_class = item.get('_class', '')
-                
-                # Handle different item types
-                if 'WorkflowJob' in item_class:  # Pipeline job
-                    all_jobs.append({
-                        'name': item['name'],
-                        'full_name': f"{folder_path}/{item['name']}" if folder_path else item['name'],
-                        'type': 'pipeline',
-                        'url': item['url']
-                    })
-                elif 'FreeStyleProject' in item_class:  # Freestyle job
-                    all_jobs.append({
-                        'name': item['name'],
-                        'full_name': f"{folder_path}/{item['name']}" if folder_path else item['name'],
-                        'type': 'freestyle',
-                        'url': item['url']
-                    })
-                elif any(folder_type in item_class for folder_type in ['Folder', 'WorkflowMultiBranchProject']):
-                    # Recursively process folders and multibranch pipelines
-                    new_path = f"{folder_path}/{item['name']}" if folder_path else item['name']
-                    folder_jobs = self._get_all_jobs_recursive(new_path)
-                    all_jobs.extend(folder_jobs)
-                    
-                    # For multibranch pipelines, also get branch jobs
-                    if 'WorkflowMultiBranchProject' in item_class:
-                        try:
-                            endpoint = f'job/{new_path}/api/json'
-                            branches = self._make_request(endpoint)['jobs']
-                            for branch in branches:
-                                all_jobs.append({
-                                    'name': f"{item['name']}/{branch['name']}",
-                                    'full_name': f"{new_path}/{branch['name']}",
-                                    'type': 'multibranch-pipeline',
-                                    'url': branch['url']
-                                })
-                        except Exception as e:
-                            self.warnings.append(f"Failed to get branches for {new_path}: {str(e)}")
-
-        except Exception as e:
-            self.warnings.append(f"Failed to get jobs from {folder_path}: {str(e)}")
-
-        return all_jobs
-
     def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
         try:
-            # Get job configuration (XML)
-            config_endpoint = f'job/{job_name}/config.xml'
-            config_response = self.session.get(urljoin(self.jenkins_url, config_endpoint))
-            config_response.raise_for_status()
-            job_config = config_response.text
-            
-            # Parse parameters from config
-            parameters = self._parse_job_parameters(job_name, job_config)
-            
-            # Get job info
-            info_endpoint = f'job/{job_name}/api/json'
+            # Get job info with parameters using JSON API
+            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[*],lastBuild[*],lastSuccessfulBuild[*],healthReport[*]'
             job_info = self._make_request(info_endpoint)
+            
+            # Extract parameters from job properties
+            parameters = self._extract_parameters_from_properties(job_info.get('property', []))
             
             # Get additional job information
             last_build = job_info.get('lastBuild', {})
@@ -217,65 +101,32 @@ class JenkinsJobParser:
             logger.error(f"Failed to process job {job_name}: {str(e)}")
             return None
 
-    def _parse_job_parameters(self, job_name: str, job_config: str) -> Dict[str, Any]:
-        """Parse parameters from Jenkins job XML configuration."""
-        try:
-            root = ET.fromstring(job_config)
-            parameters = {}
-            
-            # Find all parameter definitions
-            param_paths = [
-                ".//hudson.model.ParameterDefinition",  # Standard parameters
-                ".//com.cloudbees.plugins.credentials.CredentialsParameterDefinition",  # Credentials
-                ".//net.uaznia.lukanus.hudson.plugins.gitparameter.GitParameterDefinition",  # Git parameters
-                ".//org.biouno.unochoice.ChoiceParameter",  # Dynamic choice parameters
-                # Add more parameter types as needed
-            ]
-            
-            for path in param_paths:
-                for param in root.findall(path):
-                    param_type = param.tag.split(".")[-1]
-                    param_name = param.find("name").text
-                    param_desc = param.find("description")
-                    param_default = param.find("defaultValue")
-                    
-                    description = param_desc.text if param_desc is not None else ""
-                    default_value = param_default.text if param_default is not None else None
+    def _extract_parameters_from_properties(self, properties: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract parameters from job properties using JSON API."""
+        parameters = {}
+        
+        for prop in properties:
+            # Handle ParametersDefinitionProperty
+            if 'parameterDefinitions' in prop:
+                for param in prop['parameterDefinitions']:
+                    param_type = param.get('_class', '').split('.')[-1]
+                    param_name = param.get('name', '')
                     
                     param_config = {
-                        "type": self._map_jenkins_type_to_kubiya(param_type),
+                        "type": "str",  # All parameters are strings in Kubiya
                         "description": self._enhance_parameter_description(
-                            description, param_type, default_value
+                            param.get('description', ''),
+                            param_type,
+                            param.get('defaultValue'),
+                            param.get('choices', []) if 'choices' in param else None
                         ),
                         "required": True,  # Jenkins parameters are typically required
-                        "default": default_value
+                        "default": param.get('defaultValue')
                     }
                     
-                    # Handle choices for choice parameters
-                    choices = None
-                    if param_type == "ChoiceParameterDefinition":
-                        choices_elem = param.find("choices")
-                        if choices_elem is not None:
-                            choices = [choice.text for choice in choices_elem.findall(".//string")]
-                            # Include choices in description instead of separate field
-                            param_config["description"] = self._enhance_parameter_description(
-                                description, param_type, default_value, choices
-                            )
-                    else:
-                        param_config["description"] = self._enhance_parameter_description(
-                            description, param_type, default_value
-                        )
-                    
                     parameters[param_name] = param_config
-            
-            return parameters
-            
-        except ET.ParseError as e:
-            logger.error(f"Failed to parse XML for job {job_name}: {str(e)}")
-            return {}
-        except Exception as e:
-            logger.error(f"Error processing parameters for job {job_name}: {str(e)}")
-            return {}
+        
+        return parameters
 
     def _enhance_parameter_description(
         self, description: str, param_type: str, default_value: Any, choices: Optional[List[str]] = None
@@ -351,11 +202,6 @@ class JenkinsJobParser:
                 enhanced_desc += f"\nDefault: {default_str}"
         
         return enhanced_desc
-
-    def _map_jenkins_type_to_kubiya(self, jenkins_type: str) -> str:
-        """Map Jenkins parameter types to Kubiya types."""
-        # All types are mapped to str since we handle conversion in the runner
-        return "str"
 
     def _determine_job_type(self, job_info: Dict[str, Any]) -> str:
         """Determine the type of Jenkins job."""
