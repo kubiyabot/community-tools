@@ -2,9 +2,6 @@ import logging
 import os
 from typing import Dict, Any
 
-from jenkins_ops.tools import initialize_tools
-from jenkins_ops.config import DEFAULT_JENKINS_CONFIG
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -13,27 +10,27 @@ class JenkinsOpsError(Exception):
     """Base exception for Jenkins Operations module."""
     pass
 
-def setup_default_environment():
-    """Setup default environment variables if not present."""
+def discover():
+    """Entry point for tool discovery."""
+    logger.info("Starting Jenkins Operations tool discovery...")
+    
     try:
-        if not os.environ.get('JENKINS_URL'):
-            os.environ['JENKINS_URL'] = DEFAULT_JENKINS_CONFIG['jenkins_url']
-            logger.info(f"Using default Jenkins URL: {DEFAULT_JENKINS_CONFIG['jenkins_url']}")
+        from jenkins_ops.tools import initialize_tools
+        from jenkins_ops.config import DEFAULT_JENKINS_CONFIG
         
-        if not os.environ.get('JENKINS_API_TOKEN'):
-            os.environ['JENKINS_API_TOKEN'] = "KYlJppNVnJQP5K1r"
-            logger.info("Using default Jenkins API token")
-    except Exception as e:
-        raise JenkinsOpsError(f"Failed to setup environment: {str(e)}")
+        def setup_default_environment():
+            if not os.environ.get('JENKINS_URL'):
+                os.environ['JENKINS_URL'] = DEFAULT_JENKINS_CONFIG['jenkins_url']
+                logger.info(f"Using default Jenkins URL: {DEFAULT_JENKINS_CONFIG['jenkins_url']}")
+            
+            if not os.environ.get('JENKINS_API_TOKEN'):
+                os.environ['JENKINS_API_TOKEN'] = "KYlJppNVnJQP5K1r"
+                logger.info("Using default Jenkins API token")
 
-def initialize_module():
-    """Initialize the module with default or configured settings."""
-    try:
-        # Setup default environment
+        # Setup environment
         setup_default_environment()
         
         # Initialize tools
-        logger.info("Starting Jenkins tools discovery...")
         discovered_tools = initialize_tools()
         
         if not discovered_tools:
@@ -49,12 +46,8 @@ def initialize_module():
         logger.error(error_msg)
         raise JenkinsOpsError(error_msg) from e
 
-try:
-    # Initialize tools when module is imported
-    tools = initialize_module()
-except Exception as e:
-    logger.critical(f"Critical error during module initialization: {str(e)}")
-    raise  # Re-raise the exception to prevent silent failures
+# Run discovery when the package is imported
+tools = discover()
 
 # Export the tools and initialization functions
-__all__ = ['tools', 'initialize_module', 'DEFAULT_JENKINS_CONFIG', 'JenkinsOpsError'] 
+__all__ = ['tools', 'discover', 'JenkinsOpsError'] 

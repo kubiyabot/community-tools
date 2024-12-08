@@ -13,5 +13,10 @@ setup(
         "requests>=2.25.0",
         "pyyaml>=5.4.1"
     ],
+    entry_points={
+        'kubiya.tools': [
+            'jenkins_ops=jenkins_ops:discover'
+        ]
+    },
     python_requires=">=3.8",
 ) 

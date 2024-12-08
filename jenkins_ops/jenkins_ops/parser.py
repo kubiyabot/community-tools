@@ -228,3 +228,55 @@ class JenkinsJobParser:
             return None
         except Exception:
             return None
+
+    def get_jobs(self, job_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Get all Jenkins jobs and their parameters."""
+        jobs_info = {}
+        
+        try:
+            # Get all jobs recursively
+            logger.info("Starting Jenkins job discovery...")
+            all_jobs = self._get_all_jobs_recursive()
+            logger.info(f"Found {len(all_jobs)} total jobs")
+            
+            # Filter jobs if needed
+            jobs_to_process = [
+                job for job in all_jobs
+                if not job_filter or job['full_name'] in job_filter
+            ]
+            
+            logger.info(f"Processing {len(jobs_to_process)} jobs after filtering")
+
+            if not jobs_to_process:
+                self.warnings.append("No matching jobs found")
+                return {}, self.warnings, self.errors
+
+            # Process jobs in parallel
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                future_to_job = {
+                    executor.submit(
+                        self._process_single_job,
+                        job['full_name']
+                    ): job
+                    for job in jobs_to_process
+                }
+
+                for future in as_completed(future_to_job):
+                    job = future_to_job[future]
+                    try:
+                        job_info = future.result()
+                        if job_info:
+                            jobs_info[job['full_name']] = job_info
+                            logger.info(f"Successfully processed job: {job['full_name']}")
+                    except Exception as e:
+                        error_msg = f"Failed to process job {job['full_name']}: {str(e)}"
+                        logger.error(error_msg)
+                        self.errors.append(error_msg)
+
+        except Exception as e:
+            error_msg = f"Failed to get jobs: {str(e)}"
+            logger.error(error_msg)
+            self.errors.append(error_msg)
+
+        logger.info(f"Completed job discovery. Found {len(jobs_info)} valid jobs")
+        return jobs_info, self.warnings, self.errors
