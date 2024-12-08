@@ -90,7 +90,7 @@ python3 /opt/scripts/jenkins_job_runner.py
             # Build description including choices if available
             description = param_config.get('description', '')
             if 'choices' in param_config:
-                choices_str = ', '.join(f'"{choice}"' for choice in param_config['choices'])
+                choices_str = ', '.join(f'"{str(choice)}"' for choice in param_config['choices'])
                 description += f"\nAllowed values: [{choices_str}]"
             
             arg = Arg(
@@ -100,7 +100,7 @@ python3 /opt/scripts/jenkins_job_runner.py
                 required=param_config.get('required', True)
             )
             
-            # Handle default values
+            # Handle default values - ensure they're strings
             if 'default' in param_config:
                 if isinstance(param_config['default'], (dict, list)):
                     arg.default = json.dumps(param_config['default'])
