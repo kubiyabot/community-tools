@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 class JenkinsHousekeepingTool(Tool):
     """Base class for Jenkins housekeeping tools."""
+    name: ClassVar[str]
+    description: ClassVar[str]
+    args: ClassVar[List[Arg]]
+
     def __init__(self, **data):
         super().__init__(**data)
         self.jenkins_url = DEFAULT_JENKINS_CONFIG['jenkins_url']
@@ -24,7 +28,7 @@ class DeleteOldBuildsTool(JenkinsHousekeepingTool):
     """Tool to delete old builds from Jenkins jobs."""
     name: ClassVar[str] = "delete_old_builds"
     description: ClassVar[str] = "Delete builds older than a specified number of days from Jenkins jobs."
-    args = [
+    args: ClassVar[List[Arg]] = [
         Arg(
             name="job_name",
             type="str",
@@ -39,7 +43,7 @@ class DeleteOldBuildsTool(JenkinsHousekeepingTool):
         ),
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Prepare the tool for execution."""
         self.content = "#!/bin/sh\npython3 /opt/scripts/delete_old_builds.py"
         self.with_files = [
@@ -53,7 +57,7 @@ class ManagePluginsTool(JenkinsHousekeepingTool):
     """Tool to list and optionally update Jenkins plugins."""
     name: ClassVar[str] = "manage_plugins"
     description: ClassVar[str] = "List installed Jenkins plugins and optionally update them."
-    args = [
+    args: ClassVar[List[Arg]] = [
         Arg(
             name="action",
             type="str",
@@ -69,7 +73,7 @@ class ManagePluginsTool(JenkinsHousekeepingTool):
         ),
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Prepare the tool for execution."""
         self.content = "#!/bin/sh\npython3 /opt/scripts/manage_plugins.py"
         self.with_files = [
@@ -83,7 +87,7 @@ class ManageNodesTool(JenkinsHousekeepingTool):
     """Tool to manage Jenkins nodes/agents."""
     name: ClassVar[str] = "manage_nodes"
     description: ClassVar[str] = "List and manage Jenkins nodes/agents."
-    args = [
+    args: ClassVar[List[Arg]] = [
         Arg(
             name="action",
             type="str",
@@ -104,7 +108,7 @@ class ManageNodesTool(JenkinsHousekeepingTool):
         ),
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Prepare the tool for execution."""
         self.content = "#!/bin/sh\npython3 /opt/scripts/manage_nodes.py"
         self.with_files = [
@@ -118,7 +122,7 @@ class SystemInfoTool(JenkinsHousekeepingTool):
     """Tool to get Jenkins system information and metrics."""
     name: ClassVar[str] = "system_info"
     description: ClassVar[str] = "Get Jenkins system information and metrics."
-    args = [
+    args: ClassVar[List[Arg]] = [
         Arg(
             name="action",
             type="str",
@@ -127,7 +131,7 @@ class SystemInfoTool(JenkinsHousekeepingTool):
         ),
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Prepare the tool for execution."""
         self.content = "#!/bin/sh\npython3 /opt/scripts/system_info.py"
         self.with_files = [
@@ -141,7 +145,7 @@ class JobStatisticsTool(JenkinsHousekeepingTool):
     """Tool to analyze Jenkins job statistics."""
     name: ClassVar[str] = "job_statistics"
     description: ClassVar[str] = "Get statistics and analysis of Jenkins jobs."
-    args = [
+    args: ClassVar[List[Arg]] = [
         Arg(
             name="action",
             type="str",
@@ -163,7 +167,7 @@ class JobStatisticsTool(JenkinsHousekeepingTool):
         ),
     ]
 
-    def prepare(self):
+    def prepare(self) -> None:
         """Prepare the tool for execution."""
         self.content = "#!/bin/sh\npython3 /opt/scripts/job_statistics.py"
         self.with_files = [
