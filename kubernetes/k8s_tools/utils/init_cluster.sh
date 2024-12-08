@@ -139,6 +139,8 @@ spec:
       serviceAccountName: kubiya-kubewatch
       containers:
         - name: kubewatch
+          command: ["kubewatch"]
+          args: ["run", "--config", "/opt/bitnami/kubewatch/conf/.kubewatch.yaml"]
           image: ghcr.io/kubiyabot/kubewatch:main
           imagePullPolicy: IfNotPresent
           resources:
