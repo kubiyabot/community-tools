@@ -93,57 +93,27 @@ class JenkinsJobParser:
         
         return sanitized
 
-    def _get_job_config_xml(self, job_name: str) -> Optional[str]:
-        """Get job configuration XML from Jenkins."""
+    def _get_job_config(self, job_name: str) -> Optional[Dict[str, Any]]:
+        """Get job configuration from Jenkins API."""
         try:
-            config_endpoint = f'job/{job_name}/config.xml'
-            response = self.session.get(urljoin(self.jenkins_url, config_endpoint))
-            response.raise_for_status()
-            return response.text
-        except Exception as e:
-            logger.error(f"Failed to get config XML for job {job_name}: {str(e)}")
-            return None
-
-    def _extract_parameters_from_xml(self, xml_content: str) -> List[Dict[str, Any]]:
-        """Extract parameter information from job config XML."""
-        try:
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(xml_content)
+            # Use the JSON API to get job config
+            config_endpoint = f'job/{job_name}/config'
+            response = self._make_request(config_endpoint)
             
-            # Find parameters section
-            params = []
-            for properties in root.findall('.//properties'):
-                for param_defs in properties.findall('.//parameterDefinitions'):
-                    for param in param_defs:
-                        param_info = {
-                            'name': param.find('name').text if param.find('name') is not None else None,
-                            '_class': param.tag,
-                            'description': param.find('description').text if param.find('description') is not None else '',
-                            'defaultValue': param.find('defaultValue').text if param.find('defaultValue') is not None else None
-                        }
-                        params.append(param_info)
-            return params
+            if not response:
+                logger.warning(f"No config found for job {job_name}")
+                return None
+            
+            return response
         except Exception as e:
-            logger.error(f"Failed to parse config XML: {str(e)}")
-            return []
+            logger.error(f"Failed to get config for job {job_name}: {str(e)}")
+            return None
 
     def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
         try:
-            # First try to get parameters from XML config
-            xml_content = self._get_job_config_xml(job_name)
-            xml_params = self._extract_parameters_from_xml(xml_content) if xml_content else []
-            
-            # Create a mapping of parameter types to their proper names from XML
-            param_name_mapping = {}
-            for idx, param in enumerate(xml_params):
-                param_type = param['_class'].replace('ParameterDefinition', '').lower()
-                auto_name = f"param_{param_type}_{idx + 1}"
-                if param.get('name'):
-                    param_name_mapping[auto_name] = param['name']
-
             # Get job info from API
-            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[*],lastBuild[*],lastSuccessfulBuild[*],healthReport[*],actions[parameterDefinitions]'
+            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[parameterDefinitions[*]],actions[parameterDefinitions[*]]'
             job_info = self._make_request(info_endpoint)
             
             if not job_info:
@@ -160,15 +130,33 @@ class JenkinsJobParser:
                 'file': 0
             }
 
+            # Look for parameters in both properties and actions
+            param_sources = []
+            
+            # Check properties
+            for prop in job_info.get('property', []):
+                if 'parameterDefinitions' in prop:
+                    param_sources.extend(prop['parameterDefinitions'])
+                    
+            # Check actions
+            for action in job_info.get('actions', []):
+                if 'parameterDefinitions' in action:
+                    param_sources.extend(action['parameterDefinitions'])
+
             # Process parameters
-            for param in xml_params:
-                param_type = param['_class'].replace('ParameterDefinition', '').lower()
+            for param in param_sources:
+                param_class = param.get('_class', '')
+                param_type = param_class.split('.')[-1].replace('ParameterDefinition', '').lower()
                 param_count[param_type] = param_count.get(param_type, 0) + 1
                 
-                param_name = param.get('name')
-                if not param_name:
-                    # If no name in XML, use the auto-generated name
-                    param_name = f"param_{param_type}_{param_count[param_type]}"
+                # Get parameter name
+                param_name = (
+                    param.get('name') or 
+                    param.get('defaultParameterValue', {}).get('name') or
+                    f"param_{param_type}_{param_count[param_type]}"
+                )
+                
+                if param_name.startswith('param_'):
                     logger.warning(f"Using generated name {param_name} for parameter in job {job_name}")
 
                 # Map Jenkins parameter types to Kubiya types
@@ -181,20 +169,34 @@ class JenkinsJobParser:
                     'file': 'str',
                 }
 
+                # Build description
+                description = param.get('description', 'No description provided')
+                if 'choices' in param:
+                    choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
+                    description += f"\nAllowed values: [{choices_str}]"
+
                 param_config = {
                     "name": self._sanitize_name(param_name),
                     "original_name": param_name,  # Store original name for unsanitization
                     "type": type_mapping.get(param_type, 'str'),
-                    "description": param.get('description', 'No description provided'),
+                    "description": description,
                     "required": not bool(param.get('defaultValue')),
                 }
 
                 # Handle default values
-                if param.get('defaultValue') is not None:
+                default_value = (
+                    param.get('defaultValue') or
+                    param.get('defaultParameterValue', {}).get('value')
+                )
+                if default_value is not None:
                     if param_type == 'boolean':
-                        param_config['default'] = str(param['defaultValue']).lower() == 'true'
+                        param_config['default'] = str(default_value).lower() == 'true'
                     else:
-                        param_config['default'] = param['defaultValue']
+                        param_config['default'] = default_value
+
+                # Add choices if available
+                if 'choices' in param:
+                    param_config['choices'] = param['choices']
 
                 parameters[param_config['name']] = param_config
                 logger.debug(f"Added parameter config: {param_config}")
