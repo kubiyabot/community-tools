@@ -167,5 +167,120 @@ log "Triggering kubiya-kubewatch restart..."
 kubectl rollout restart deployment/kubiya-kubewatch -n kubiya
 check_command "restart trigger failed" "Triggered kubiya-kubewatch restart"
 
+# Create ClusterRole
+log "Creating ClusterRole..."
+if ! resource_exists "" "clusterrole" "kubiya-kubewatch"; then
+    kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - daemonsets
+      - deployments
+      - events
+      - namespaces
+      - nodes
+      - persistentvolumes
+      - pods
+      - replicasets
+      - replicationcontrollers
+      - secrets
+      - services
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/scale
+      - replicasets
+      - replicasets/scale
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - autoscaling 
+    resources:
+      - horizontalpodautoscalers
+    verbs:
+      - list
+      - watch
+      - get
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/scale
+      - ingresses
+      - replicasets
+      - replicasets/scale
+      - replicationcontrollers/scale
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+      - jobs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - list
+      - watch
+      - get
+EOT
+    check_command "ClusterRole creation failed" "Created ClusterRole"
+else
+    log "✅ ClusterRole already exists"
+fi
+
+# Create ClusterRoleBinding
+log "Creating ClusterRoleBinding..."
+if ! resource_exists "" "clusterrolebinding" "kubiya-kubewatch"; then
+    kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubiya-kubewatch
+subjects:
+- kind: ServiceAccount
+  name: kubiya-kubewatch
+  namespace: kubiya
+EOT
+    check_command "ClusterRoleBinding creation failed" "Created ClusterRoleBinding"
+else
+    log "✅ ClusterRoleBinding already exists"
+fi
+
 log "🎉 Initialization completed successfully"
 log "Note: Deployment updates are in progress and may take a few minutes to complete"
