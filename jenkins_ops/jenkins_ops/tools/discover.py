@@ -48,8 +48,4 @@ def discover():
 # Export the tools
 __all__ = ['tools', 'discover']
 
-# Run discovery when the package is imported
-if __name__ == "__main__":
-    tools = discover()
-    for tool in tools:
-        print(tool)
+discover()
