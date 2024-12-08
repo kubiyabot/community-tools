@@ -3,27 +3,11 @@ import os
 from typing import Dict, Any
 
 from jenkins_ops.tools import initialize_tools
+from jenkins_ops.config import DEFAULT_JENKINS_CONFIG
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Default Jenkins settings for in-cluster access
-DEFAULT_JENKINS_CONFIG: Dict[str, Any] = {
-    "jenkins_url": "http://jenkins.jenkins.svc.cluster.local:8080",
-    "auth": {
-        "username": "admin",
-        "password_env": "JENKINS_API_TOKEN"
-    },
-    "jobs": {
-        "sync_all": True  # By default, sync all jobs
-    },
-    "defaults": {
-        "stream_logs": True,
-        "poll_interval": 30,
-        "long_running_threshold": 300
-    }
-}
 
 def setup_default_environment():
     """Setup default environment variables if not present."""
