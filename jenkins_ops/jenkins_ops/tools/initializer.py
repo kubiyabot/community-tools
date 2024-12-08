@@ -5,7 +5,6 @@ import logging
 import json
 from pathlib import Path
 from typing import List, Optional
-from .jenkins_job_tool import JenkinsJobTool
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +66,14 @@ def validate_jobs_config(config: dict) -> Optional[str]:
         )
     return None
 
-def initialize_tools() -> List[JenkinsJobTool]:
+def initialize_tools() -> List:
     """Initialize and register Jenkins tools with Kubiya."""
     try:
+        # Move imports inside the function to avoid circular imports
+        from .jenkins_job_tool import JenkinsJobTool
+        from .parser import JenkinsJobParser
+
         # Load and validate Jenkins configuration
-        logger.info("Loading Jenkins configuration...")
         jenkins_config = load_jenkins_config()
 
         # Check jobs configuration
@@ -81,8 +83,6 @@ def initialize_tools() -> List[JenkinsJobTool]:
 
         # Initialize parser to get jobs from server
         logger.info("Initializing Jenkins parser...")
-        from .parser import JenkinsJobParser
-        
         parser = JenkinsJobParser(
             jenkins_url=jenkins_config['jenkins_url'],
             username=jenkins_config['auth']['username'],
