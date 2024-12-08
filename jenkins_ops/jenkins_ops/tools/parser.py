@@ -111,20 +111,40 @@ class JenkinsJobParser:
 
     def _extract_default_value(self, param: Dict[str, Any]) -> Optional[Any]:
         """Extract the actual default value from parameter definition."""
-        # Try different locations and formats for default value
-        if 'defaultValue' in param:
-            return param['defaultValue']
-        
-        default_param = param.get('defaultParameterValue', {})
-        if isinstance(default_param, dict):
-            # If it's a parameter value object, get the actual value
-            if 'value' in default_param:
-                return default_param['value']
-            # Some Jenkins versions store it differently
-            if 'defaultValue' in default_param:
-                return default_param['defaultValue']
-        
-        return None
+        try:
+            # First try direct defaultValue
+            if 'defaultValue' in param:
+                if isinstance(param['defaultValue'], dict) and '_class' in param['defaultValue']:
+                    # If it's a parameter value object, try to get the actual value
+                    return param['defaultValue'].get('value')
+                return param['defaultValue']
+            
+            # Then try defaultParameterValue
+            default_param = param.get('defaultParameterValue', {})
+            if isinstance(default_param, dict):
+                # If it's a parameter value object, get the actual value
+                if 'value' in default_param:
+                    return default_param['value']
+                # Some Jenkins versions store it differently
+                if 'defaultValue' in default_param:
+                    return default_param['defaultValue']
+                # If it's just a class wrapper, try to get the name
+                if '_class' in default_param:
+                    param_type = default_param['_class'].lower()
+                    if 'booleanparametervalue' in param_type:
+                        return 'false'  # Default to false for boolean parameters
+                    return ''  # Default to empty string for other types
+            
+            # For boolean parameters, default to false if no default value is specified
+            param_type = param.get('_class', '').lower()
+            if 'booleanparameterdefinition' in param_type:
+                return 'false'
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error extracting default value: {str(e)}")
+            return None
 
     def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
@@ -216,12 +236,13 @@ class JenkinsJobParser:
                 # Add default value to description if available
                 if default_value is not None:
                     if param_type == 'boolean':
-                        default_str = str(default_value).lower()
+                        default_str = 'true' if str(default_value).lower() == 'true' else 'false'
                     elif isinstance(default_value, (dict, list)):
                         default_str = json.dumps(default_value)
                     else:
                         default_str = str(default_value)
-                    description_parts.append(f"Default: {default_str}")
+                    if default_str:  # Only add if there's an actual value
+                        description_parts.append(f"Default: {default_str}")
 
                 # Join all description parts
                 description = '\n'.join(description_parts)
