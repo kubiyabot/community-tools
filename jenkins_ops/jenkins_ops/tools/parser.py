@@ -169,30 +169,70 @@ class JenkinsJobParser:
                     'file': 'str',
                 }
 
+                # Get default value from all possible locations
+                default_value = None
+                for default_location in [
+                    ('defaultValue', param),
+                    ('defaultParameterValue', param),
+                    ('value', param.get('defaultParameterValue', {}))
+                ]:
+                    key, obj = default_location
+                    if key in obj and obj[key] is not None:
+                        default_value = obj[key]
+                        break
+
                 # Build description
-                description = param.get('description', 'No description provided')
+                description_parts = []
+                
+                # Add main description if available
+                if param.get('description'):
+                    description_parts.append(param.get('description'))
+                
+                # Add type information
+                type_info = {
+                    'boolean': 'Boolean value (true/false)',
+                    'string': 'Text value',
+                    'text': 'Multi-line text',
+                    'choice': 'Selection from predefined values',
+                    'password': 'Secure text value',
+                    'file': 'File content'
+                }
+                description_parts.append(f"Type: {type_info.get(param_type, 'Text value')}")
+
+                # Add choices if available
                 if 'choices' in param:
                     choices_str = ', '.join(f'"{choice}"' for choice in param['choices'])
-                    description += f"\nAllowed values: [{choices_str}]"
+                    description_parts.append(f"Allowed values: [{choices_str}]")
+
+                # Add default value to description if available
+                if default_value is not None:
+                    if param_type == 'boolean':
+                        default_str = str(default_value).lower()
+                    elif isinstance(default_value, (dict, list)):
+                        default_str = json.dumps(default_value)
+                    else:
+                        default_str = str(default_value)
+                    description_parts.append(f"Default: {default_str}")
+
+                # Join all description parts
+                description = '\n'.join(description_parts)
 
                 param_config = {
                     "name": self._sanitize_name(param_name),
                     "original_name": param_name,  # Store original name for unsanitization
                     "type": type_mapping.get(param_type, 'str'),
                     "description": description,
-                    "required": not bool(param.get('defaultValue')),
+                    "required": default_value is None,  # Required only if no default value
                 }
 
-                # Handle default values
-                default_value = (
-                    param.get('defaultValue') or
-                    param.get('defaultParameterValue', {}).get('value')
-                )
+                # Add default value to parameter config
                 if default_value is not None:
                     if param_type == 'boolean':
                         param_config['default'] = str(default_value).lower() == 'true'
+                    elif isinstance(default_value, (dict, list)):
+                        param_config['default'] = json.dumps(default_value)
                     else:
-                        param_config['default'] = default_value
+                        param_config['default'] = str(default_value)
 
                 # Add choices if available
                 if 'choices' in param:
