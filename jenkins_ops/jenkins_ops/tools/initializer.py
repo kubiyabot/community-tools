@@ -14,6 +14,7 @@ class JenkinsConfigError(Exception):
 def load_jenkins_config() -> dict:
     """Load Jenkins configuration from config file."""
     try:
+        logger.info("Loading Jenkins configuration...")
         config_path = Path(__file__).parent.parent / 'scripts' / 'configs' / 'jenkins_config.json'
         if not config_path.exists():
             raise JenkinsConfigError(
@@ -167,6 +168,7 @@ def initialize_tools() -> List[JenkinsJobTool]:
         logger.info(summary)
 
         if not registered_tools:
+            logger.error("No Jenkins tools were registered.")
             raise JenkinsConfigError(
                 "No Jenkins tools were registered.\n"
                 "Please verify:\n"
