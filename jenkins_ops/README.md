@@ -46,18 +46,18 @@ graph TD
     style Jenkins fill:#FDEDEC,stroke:#E74C3C,stroke-width:2px
 
     subgraph Jenkins_Ops[💡 Jenkins Operations Module]
-        A[🔍 Job Parser] -- Parses --> B[🔧 Tool Generator]
-        B -- Generates --> C[🛠️ Kubiya Tool Wrappers]
+        A[🔍 Job Parser] --> B[🔧 Tool Generator]
+        B --> C[🛠️ Kubiya Tool Wrappers]
     end
     subgraph Kubiya[🚀 Kubiya Platform]
-        D[👤 User Request] -- Invokes --> E[🛠��� Tool Wrapper]
+        D[👤 User Request] --> E[🛠️ Tool Wrapper]
     end
     subgraph Jenkins[🏗️ Jenkins Server]
-        E -- Triggers --> F[⚙️ Jenkins Job]
-        F -- Streams Status --> E
+        E --> F[⚙️ Jenkins Job]
+        F --> E
     end
-    C -- Available In --> E
-    E -- Updates --> D
+    C -.-> E
+    E --> D
 ```
 
 ## Installation
@@ -125,6 +125,7 @@ sequenceDiagram
     participant P as 🔍 Parser
     participant J as 🏗️ Jenkins Server
     participant T as 🔧 Tool Generator
+
     K->>P: Initialize Parser
     P->>J: Connect to Jenkins
     P->>J: Fetch Jobs & Parameters
@@ -146,9 +147,11 @@ sequenceDiagram
     participant K as Kubiya Platform
     participant T as 🛠️ Tool Wrapper
     participant J as 🏗️ Jenkins Server
+
     U->>K: Request Job Execution
     K->>T: Invoke Tool
     T->>J: Trigger Jenkins Job
+
     alt ⏳ Long Running Job
         loop Until Completion
             J-->>T: 🔄 Job Status Update
@@ -160,6 +163,7 @@ sequenceDiagram
         J-->>T: Job Result
         T-->>K: Return Result
     end
+
     K-->>U: Display Final Result 🏁
 ```
 
@@ -180,8 +184,10 @@ sequenceDiagram
     participant A as 🛡️ JIT Access Control
     participant T as 🛠️ Tool Wrapper
     participant J as 🏗️ Jenkins Server
+
     U->>K: Request Job Execution
     K->>A: Check Access Permissions
+
     alt ✅ Access Granted
         A-->>K: Permission Granted
         K->>T: Invoke Tool
