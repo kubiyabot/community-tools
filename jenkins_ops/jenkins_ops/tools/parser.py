@@ -60,19 +60,47 @@ class JenkinsJobParser:
             info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[*],lastBuild[*],lastSuccessfulBuild[*],healthReport[*]'
             job_info = self._make_request(info_endpoint)
             
+            if not job_info:
+                raise Exception("Failed to get job information")
+
             # Extract parameters from job properties
-            parameters = self._extract_parameters_from_properties(job_info.get('property', []))
-            
-            # Get additional job information
-            last_build = job_info.get('lastBuild', {})
-            last_successful_build = job_info.get('lastSuccessfulBuild', {})
-            
-            # Get detailed build information if available
-            if last_build:
-                last_build = self._make_request(f"{last_build['url']}api/json")
-            if last_successful_build:
-                last_successful_build = self._make_request(f"{last_successful_build['url']}api/json")
-            
+            parameters = {}
+            for prop in job_info.get('property', []):
+                if 'parameterDefinitions' in prop:
+                    for param in prop['parameterDefinitions']:
+                        param_type = param.get('_class', '').split('.')[-1]
+                        param_name = param.get('name', '')
+                        
+                        # Map Jenkins parameter types to Kubiya types
+                        type_mapping = {
+                            'BooleanParameterDefinition': 'bool',
+                            'StringParameterDefinition': 'str',
+                            'TextParameterDefinition': 'str',
+                            'ChoiceParameterDefinition': 'str',
+                            'PasswordParameterDefinition': 'str',
+                            'FileParameterDefinition': 'str',
+                        }
+                        
+                        param_config = {
+                            "type": type_mapping.get(param_type, 'str'),
+                            "description": param.get('description', ''),
+                            "required": True,  # Jenkins parameters are typically required
+                        }
+
+                        # Handle default values based on type
+                        if 'defaultValue' in param:
+                            if param_type == 'BooleanParameterDefinition':
+                                # Convert string 'true'/'false' to actual boolean
+                                param_config['default'] = str(param['defaultValue']).lower() == 'true'
+                            else:
+                                param_config['default'] = param['defaultValue']
+
+                        # Add choices if available
+                        if 'choices' in param:
+                            param_config['choices'] = param['choices']
+                        
+                        parameters[param_name] = param_config
+
             return {
                 "name": job_name,
                 "description": job_info.get('description', ''),
@@ -80,19 +108,6 @@ class JenkinsJobParser:
                 "url": job_info.get('url', ''),
                 "buildable": job_info.get('buildable', True),
                 "type": self._determine_job_type(job_info),
-                "last_build": {
-                    "number": last_build.get('number'),
-                    "url": last_build.get('url'),
-                    "timestamp": last_build.get('timestamp'),
-                    "duration": last_build.get('duration'),
-                    "result": last_build.get('result')
-                } if last_build else None,
-                "last_successful_build": {
-                    "number": last_successful_build.get('number'),
-                    "url": last_successful_build.get('url'),
-                    "timestamp": last_successful_build.get('timestamp'),
-                    "duration": last_successful_build.get('duration')
-                } if last_successful_build else None,
                 "health": self._get_job_health(job_info),
                 "auth": {
                     "username": self.username

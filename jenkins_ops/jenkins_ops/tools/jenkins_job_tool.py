@@ -84,7 +84,7 @@ python3 /opt/scripts/jenkins_job_runner.py
         self.args = []
         parameter_names = []
         
-        for param_name, param_config in self.job_config['parameters'].items():
+        for param_name, param_config in self.job_config.get('parameters', {}).items():
             parameter_names.append(param_name)
             
             # Build description including choices if available
@@ -93,19 +93,28 @@ python3 /opt/scripts/jenkins_job_runner.py
                 choices_str = ', '.join(f'"{str(choice)}"' for choice in param_config['choices'])
                 description += f"\nAllowed values: [{choices_str}]"
             
+            # Get parameter type, defaulting to string
+            param_type = param_config.get('type', 'str')
+            
             arg = Arg(
                 name=param_name,
-                type="str",  # All parameters are strings
+                type=param_type,  # Use the type from Jenkins
                 description=description,
                 required=param_config.get('required', True)
             )
             
-            # Handle default values - ensure they're strings
+            # Handle default values based on type
             if 'default' in param_config:
-                if isinstance(param_config['default'], (dict, list)):
-                    arg.default = json.dumps(param_config['default'])
+                default_value = param_config['default']
+                if param_type == 'bool':
+                    # For boolean parameters, ensure the default is a string 'true' or 'false'
+                    arg.default = str(default_value).lower()
+                elif isinstance(default_value, (dict, list)):
+                    # For complex types, convert to JSON string
+                    arg.default = json.dumps(default_value)
                 else:
-                    arg.default = str(param_config['default'])
+                    # For all other types, convert to string
+                    arg.default = str(default_value)
             
             self.args.append(arg)
 
@@ -127,7 +136,10 @@ python3 /opt/scripts/jenkins_job_runner.py
                     'job_name': self.job_config['name'],
                     'stream_logs': self.stream_logs,
                     'poll_interval': self.poll_interval,
-                    'parameters': parameter_names  # Add parameter names to config
+                    'parameters': {
+                        name: {'type': self.job_config['parameters'][name].get('type', 'str')}
+                        for name in parameter_names
+                    }
                 })
             )
         ] 
