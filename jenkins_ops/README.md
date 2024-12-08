@@ -157,7 +157,6 @@ sequenceDiagram
             J-->>T: 🔄 Job Status Update
             T-->>K: Update Status
             K-->>U: Display Status 📡
-            Note over U,K,J: Users can check status at any time
         end
     else ✅ Quick Job
         J-->>T: Job Result
