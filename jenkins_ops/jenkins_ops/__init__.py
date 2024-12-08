@@ -48,6 +48,5 @@ def discover():
 
 # Run discovery when the package is imported
 tools = discover()
-
-# Export the tools and initialization functions
-__all__ = ['tools', 'discover', 'JenkinsOpsError'] 
+for tool in tools:
+    print(tool)
