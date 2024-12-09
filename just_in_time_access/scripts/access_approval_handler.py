@@ -254,7 +254,7 @@ def notify_user(request_id, status, user_email, approver_email):
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": "🚀 Execute Tool Now",
+                            "text": "🚀 Use your new access",
                             "emoji": True
                         },
                         "style": "primary",
