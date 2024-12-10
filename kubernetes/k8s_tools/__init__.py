@@ -1,10 +1,10 @@
 # k8s_tools/__init__.py
-from .initialization import initialize
 
-# Run initialization when module is imported
-initialize()
-
-# Import tools after initialization
+# Import tools first
 from .tools import *
+
+# Then run initialization
+from .initialization import initialize
+initialize()
 
 __all__ = ['initialize']

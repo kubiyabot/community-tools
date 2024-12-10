@@ -1,5 +1,4 @@
 from kubiya_sdk.tools import Arg
-from ..initialization import initialize
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
@@ -36,9 +35,8 @@ kubectl_tool = KubernetesTool(
     """,
     args=[
         Arg(name="command", type="str", description="The kubectl command to execute", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace or 'all' for all namespaces", required=True),  # Required
+        Arg(name="namespace", type="str", description="Kubernetes namespace or 'all' for all namespaces", required=True),
     ],
 )
-
 
 tool_registry.register("kubernetes", kubectl_tool)
