@@ -47,3 +47,5 @@ def initialize():
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)
         sys.exit(1)
+
+__all__ = ['initialize']

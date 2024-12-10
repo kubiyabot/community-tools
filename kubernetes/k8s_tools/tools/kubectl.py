@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Arg
+from ..kubewatch import initialize
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
