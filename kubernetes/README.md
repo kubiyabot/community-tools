@@ -1,133 +1,129 @@
 # Kubernetes Tools Module for Kubiya SDK
 
-This module provides a set of tools for interacting with Kubernetes clusters using the Kubiya SDK. These tools are designed to be stateless and easily discoverable by the Kubiya engine, allowing for dynamic execution in various environments with different cluster configurations.
+## Dynamic Configuration
 
-## Tools Overview
+The Kubernetes Tools module supports dynamic configuration through the Kubiya SDK's dynamic configuration system. Here are the available configuration options:
 
-1. **kubectl**: General-purpose tool for executing kubectl commands
-2. **deployment**: Manages Kubernetes deployments (create, update, delete, get)
-3. **service**: Manages Kubernetes services (create, delete, get)
-4. **pod**: Manages Kubernetes pods (get, delete, logs)
+### Required Settings
+- `webhook_url`: Webhook URL for KubeWatch notifications (optional - if not provided, notifications will not be sent)
 
-## Architecture and Execution Flow
+### Namespace Configuration
+- `namespaces`: Comma-separated list of namespaces to monitor (default: "default,kube-system")
 
-The following Mermaid diagram illustrates the architecture, tool discovery, and execution flow for the Kubernetes Tools Module:
+### Watch Settings
+- `watch_event`: Monitor Kubernetes events (default: true)
+- `watch_node`: Monitor node status (default: true)
+- `watch_pod`: Monitor pod status (default: true)
+- `watch_deployment`: Monitor deployments (default: true)
+- `watch_service`: Monitor services (default: false)
+- `watch_ingress`: Monitor ingress resources (default: false)
+- `watch_configmap`: Monitor configmaps (default: false)
+- `watch_secret`: Monitor secrets (default: false)
+- `watch_job`: Monitor jobs and cronjobs (default: true)
 
-```mermaid
-graph TD
-    A[Kubernetes Tools Module] -->|Declares| B(kubectl)
-    A -->|Declares| C(deployment)
-    A -->|Declares| D(service)
-    A -->|Declares| E(pod)
-    F[Teammate Environment] -->|Adds as Source| A
-    F -->|Discovers Tools| B
-    F -->|Discovers Tools| C
-    F -->|Discovers Tools| D
-    F -->|Discovers Tools| E
-    F -->|Executes Tools| G[Kubiya Engine]
-    H[Kubernetes Integration] -->|Provides Config| G
-    G -->|Interacts| I[Kubernetes Cluster]
-    
-    classDef module fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef tool fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef env fill:#bfb,stroke:#333,stroke-width:2px;
-    classDef engine fill:#fbb,stroke:#333,stroke-width:2px;
-    
-    class A module;
-    class B,C,D,E tool;
-    class F,H env;
-    class G engine;
+### Performance Settings
+- `batch_size`: Number of events to batch before sending (default: 5)
+- `max_wait_time`: Maximum time to wait before sending batch (default: "30s")
+- `min_wait_time`: Minimum time between batches (default: "5s")
+- `dedup_window`: Time window for deduplication (default: "15m")
+- `max_log_lines`: Maximum number of log lines to include (default: 50)
+- `max_events`: Maximum number of events to include (default: 10)
+
+### Advanced Settings
+- `include_logs`: Include container logs in notifications (default: true)
+- `include_events`: Include related events in notifications (default: true)
+- `include_metrics`: Include resource metrics in notifications (default: true)
+- `namespace_isolation`: Isolate events by namespace (default: false)
+- `min_severity`: Minimum severity level to report (default: "Warning")
+- `group_events`: Group related events together (default: true)
+
+### Example Configurations
+
+1. With Webhook (Full Monitoring):
+```yaml
+dynamic_config:
+  webhook_url: "https://webhooksource-kubiya.hooks.kubiya.ai:8443/webhook"
+  namespaces: "default,kube-system,production"
+  watch_pod: true
+  watch_node: true
+  watch_deployment: true
 ```
 
-This architecture emphasizes the following key points:
+2. Without Webhook (Monitoring Only):
+```yaml
+dynamic_config:
+  namespaces: "default,kube-system"
+  watch_pod: true
+  watch_node: true
+  include_logs: true
+```
 
-1. The Kubernetes Tools Module declares stateless tools using the Kubiya SDK.
-2. The Teammate Environment adds the module as a source, enabling tool discovery.
-3. Tools are discovered and executed within the Teammate Environment.
-4. The Kubiya Engine handles the actual execution of the tools.
-5. Cluster configuration and settings are inherited from the Kubernetes Integration, allowing for flexible execution across different environments.
+### Behavior
+- If webhook_url is provided: Full monitoring with notifications
+- If webhook_url is not provided: 
+  - Configuration will be generated but not applied
+  - No notifications will be sent
+  - Monitoring can still be used for local inspection
 
-## Usage
+### KubeWatch Integration
 
-### Adding the Module as a Source
+The module automatically configures KubeWatch based on your dynamic configuration settings. It will:
 
-To use these tools in your Kubiya SDK workflows, you first need to add this module as a source in your Teammate Environment. This allows the environment to discover and use the tools defined in the module.
+1. Generate appropriate KubeWatch configuration
+2. Apply the configuration to your cluster
+3. Monitor specified resources and namespaces
+4. Send notifications via webhook for important events
 
-1. In your Kubiya platform, navigate to the Teammate Environment settings.
-2. Add a new source with the following details:
-   - Source Type: Git Repository (or appropriate type for your setup)
-   - Repository URL: `https://github.com/your-org/kubernetes-tools-module.git`
-   - Branch: `main` (or the appropriate branch)
-   - Path: `/` (root of the repository)
+### Notification Format
 
-Once added, the Teammate Environment will be able to discover and use the tools defined in this module.
+Events are formatted with rich context and emojis for better readability:
 
-### Using the Tools in Workflows
+```
+🚨 Critical Pod Issue Detected
+═══════════════════════════
+Pod: example-pod
+Namespace: default
+Status: Failed
+Issue: CrashLoopBackOff
 
-After adding the module as a source, you can use the tools in your workflows like this:
+Details:
+• State: Waiting
+• Restarts: 5
+• Exit Code: 1
+• Message: "Container failed to start"
+
+Context:
+• Owner: Deployment/example-app
+• Related Events: 3
+```
+
+## Usage Examples
 
 ```python
-# Use kubectl tool
-result = await kubectl.execute({"command": "get pods"})
+# Example: Configure monitoring for specific namespaces
+tool_registry.dynamic_config = {
+    'webhook_url': 'https://your-webhook-url',
+    'namespaces': 'production,staging',
+    'watch_pod': True,
+    'watch_deployment': True,
+    'include_logs': True,
+    'max_log_lines': 100
+}
 
-# Use deployment tool
-result = await deployment.execute({
-    "action": "create",
-    "name": "my-deployment",
-    "image": "nginx:latest",
-    "replicas": 3
-})
-
-# Use service tool
-result = await service.execute({
-    "action": "create",
-    "name": "my-service",
-    "type": "ClusterIP",
-    "port": 80
-})
-
-# Use pod tool
-result = await pod.execute({
-    "action": "get",
-    "name": "my-pod"
-})
+# The module will automatically configure KubeWatch with these settings
 ```
 
-## Dynamic Execution Environment
+## Error Handling
 
-By adding this module as a source to the Teammate Environment, you enable a dynamic and flexible execution model:
+The module performs validation of all configuration settings and will raise clear error messages if:
+- Required settings are missing
+- Values are invalid
+- Configuration cannot be applied
 
-1. **Tool Discovery**: The Teammate Environment automatically discovers the tools defined in this module.
-2. **Flexibility**: The same tools can be used across different Kubernetes clusters without modification.
-3. **Security**: Cluster credentials and configurations are managed by the Kubiya Engine, not hardcoded in the tools.
-4. **Scalability**: As new clusters or environments are added to the Kubiya platform, these tools can immediately be used with them.
-5. **Version Control**: Updates to the tools can be managed through version control of the module's repository.
+## Best Practices
 
-## Tool Definitions
-
-Each tool in this module is defined using the Kubiya SDK's Tool model. Here's a brief overview of each tool:
-
-1. **kubectl**: Executes arbitrary kubectl commands.
-2. **deployment**: Manages Kubernetes deployments with actions like create, update, delete, and get.
-3. **service**: Manages Kubernetes services with actions like create, delete, and get.
-4. **pod**: Manages Kubernetes pods with actions like get, delete, and logs.
-
-The tool definitions include necessary arguments, environment variables, and file mappings required for execution in a containerized environment.
-
-## Extending the Module
-
-To add new Kubernetes-related tools to this module:
-
-1. Create a new Python file in the `kubernetes_tools` directory.
-2. Define your tool using the Kubiya SDK's Tool model.
-3. Import and expose your new tool in the `__init__.py` file.
-4. Update the module in the source repository.
-5. Refresh the source in the Teammate Environment to discover the new tool.
-
-## Contributing
-
-Contributions to this module are welcome! Please ensure that any new tools or modifications maintain the stateless nature of the tools and adhere to the existing pattern of tool definition.
-
-## License
-
-This project is licensed under the MIT License.
+1. Start with minimal monitoring (pods and deployments)
+2. Adjust batch settings based on event volume
+3. Use namespace isolation in large clusters
+4. Set appropriate severity levels for your environment
+5. Configure log line limits based on application verbosity
