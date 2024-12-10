@@ -96,7 +96,7 @@ def schedule_task(
     print("Task scheduled successfully.")
 
 
-def approve(request_id: str, ttl: str, enforcer_base_url: str):
+def approve(request_id: str, ttl: str, approve_email: str, enforcer_base_url: str):
     print(f"🚀 Approving request {request_id} with TTL {ttl}.")
     request_metadata = get_request_metadata(request_id, enforcer_base_url)
 
@@ -114,7 +114,7 @@ def approve(request_id: str, ttl: str, enforcer_base_url: str):
 
     response = requests.put(
         f"{enforcer_base_url}/requests/approve",
-        json={"id": request_id, "ttl": ttl},
+        json={"id": request_id, "ttl": ttl, "user_email": approve_email},
     )
     if response.status_code != 200:
         print(f"Failed to approve request: {response.text}")
@@ -133,7 +133,7 @@ def approve_access(request_id: str, approval_action: str, ttl: str | None = None
             print("Please provide a TTL for the approved request.")
             sys.exit(1)
 
-        approve(request_id, ttl, enforcer_base_url)
+        approve(request_id, ttl, approver_email, enforcer_base_url)
 
         # Notify requester in Slack
         notify_user(request_id, "approved", requester_email, approver_email)
