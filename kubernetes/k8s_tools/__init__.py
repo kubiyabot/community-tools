@@ -1,5 +1,5 @@
 # k8s_tools/__init__.py
-from .kubewatch import initialize
+from .initialization import initialize
 
 # Run initialization when module is imported
 initialize()
