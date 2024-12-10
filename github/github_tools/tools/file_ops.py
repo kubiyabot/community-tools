@@ -188,7 +188,6 @@ preview_changes() {
 # Function to modify files and commit changes
 modify_and_commit() {
     local modifications="$1"
-    local commit_message="$2"
     local create_branch="$3"
     local branch_name="$4"
     local dry_run="$5"
@@ -233,7 +232,7 @@ modify_and_commit() {
         git add .
         
         echo "💾 Committing changes..."
-        COMMIT_MSG="${{commit_message:-Auto-update: $(date)}}
+        COMMIT_MSG="${commit_message:-Auto-update: $(date)}
 
 $(add_disclaimer text)"
         
@@ -346,35 +345,15 @@ stateful_modify_and_commit = GitHubCliTool(
 {FILE_OPS_SCRIPT}
 
 setup_repo "${{repo}}" "${{branch}}"
-
-# ... rest of the setup code ...
-
-if [ -n "$(git status --porcelain)" ]; then
-    echo "📦 Staging changes..."
-    git add .
-    
-    echo "💾 Committing changes..."
-    COMMIT_MSG="${{commit_message:-Auto-update: $(date)}}
-
-$(add_disclaimer text)"
-    
-    git commit -m "$COMMIT_MSG"
-    
-    echo "🚀 Pushing changes..."
-    git push origin HEAD
-    
-    echo "✨ Changes pushed successfully"
-else
-    echo "ℹ️  No changes to commit"
-fi
+modify_and_commit "${{modifications}}" "${{commit_message}}" "${{create_branch}}" "${{branch_name}}" "${{dry_run}}"
 ''',
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="modifications", type="str", description='JSON array of modifications: [{"file": "path", "pattern": "old", "replacement": "new"}]', required=True),
+        Arg(name="commit_message", type="str", description="Custom commit message", required=False),
         Arg(name="branch", type="str", description="Base branch to start from", required=False),
         Arg(name="create_branch", type="bool", description="Create new branch for changes", required=False),
         Arg(name="branch_name", type="str", description="Name for new branch (if creating)", required=False),
-        Arg(name="commit_message", type="str", description="Custom commit message", required=False),
         Arg(name="dry_run", type="bool", description="Preview changes without committing", required=False),
     ],
     with_volumes=[GIT_VOLUME]
