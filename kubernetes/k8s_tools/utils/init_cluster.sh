@@ -196,17 +196,20 @@ metadata:
   name: kubiya-kubewatch
   namespace: kubiya
   labels:
+    app: kubewatch
     app.kubernetes.io/name: kubewatch
     app.kubernetes.io/part-of: kubiya
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: kubewatch
+      app: kubewatch
   template:
     metadata:
       labels:
+        app: kubewatch
         app.kubernetes.io/name: kubewatch
+        app.kubernetes.io/part-of: kubiya
     spec:
       serviceAccountName: kubiya-kubewatch
       containers:
