@@ -3,17 +3,61 @@ set -e
 
 echo "🚀 Initializing Kubernetes Tools..."
 
+# Function to handle errors
+handle_error() {
+    local exit_code=$?
+    local line_no=$1
+    echo "❌ Error on line $line_no: Command failed with exit code $exit_code"
+    case $exit_code in
+        127) echo "  • Command not found - Missing required dependencies" ;;
+        1) echo "  • General error occurred" ;;
+        *) echo "  • Unexpected error occurred" ;;
+    esac
+    exit $exit_code
+}
+
+# Set error handler
+trap 'handle_error $LINENO' ERR
+
+# Function to download file with fallback methods
+download_file() {
+    local url=$1
+    local output=$2
+    local downloaded=false
+
+    # Try curl first
+    if command -v curl &> /dev/null; then
+        echo "📥 Downloading using curl..."
+        if curl -fsSL "$url" -o "$output"; then
+            downloaded=true
+        fi
+    fi
+
+    # Fallback to wget if curl failed or doesn't exist
+    if [ "$downloaded" = false ] && command -v wget &> /dev/null; then
+        echo "📥 Downloading using wget..."
+        if wget -q "$url" -O "$output"; then
+            downloaded=true
+        fi
+    fi
+
+    # If both methods failed
+    if [ "$downloaded" = false ]; then
+        echo "❌ Failed to download file: Neither curl nor wget is available"
+        echo "Please install curl or wget and try again"
+        exit 1
+    fi
+}
+
 # Install yq if not available
 if ! command -v yq &> /dev/null; then
     echo "🔧 Installing yq..."
     YQ_VERSION="v4.35.1"
     YQ_BINARY="yq_linux_amd64"
+    YQ_URL="https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY"
     
-    # Use curl instead of wget
-    if ! curl -sSL "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY" -o /usr/local/bin/yq; then
-        echo "❌ Failed to download yq binary"
-        exit 1
-    fi
+    # Download yq
+    download_file "$YQ_URL" "/usr/local/bin/yq"
     chmod +x /usr/local/bin/yq || {
         echo "❌ Failed to make yq executable"
         exit 1
@@ -23,19 +67,23 @@ fi
 # Install kubectl if not available
 if ! command -v kubectl &> /dev/null; then
     echo "🔧 Installing kubectl..."
-    if ! curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"; then
-        echo "❌ Failed to download kubectl"
-        exit 1
-    fi
-    chmod +x kubectl || {
+    KUBECTL_URL="https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+    
+    # Download kubectl
+    download_file "$KUBECTL_URL" "/usr/local/bin/kubectl"
+    chmod +x /usr/local/bin/kubectl || {
         echo "❌ Failed to make kubectl executable"
         exit 1
     }
-    mv kubectl /usr/local/bin/ || {
-        echo "❌ Failed to move kubectl to /usr/local/bin/"
-        exit 1
-    }
 fi
+
+# Check for required commands
+for cmd in curl chmod mkdir; do
+    if ! command -v $cmd &> /dev/null; then
+        echo "❌ Required command not found: $cmd"
+        exit 1
+    fi
+done
 
 # Generate KubeWatch configuration if webhook URL is provided
 if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
@@ -43,10 +91,17 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Create config directory if it doesn't exist
     CONFIG_DIR="$(dirname "$0")/../config"
-    mkdir -p "$CONFIG_DIR"
+    mkdir -p "$CONFIG_DIR" || {
+        echo "❌ Failed to create config directory"
+        exit 1
+    }
     
     # Generate base KubeWatch configuration
-    cat > "$CONFIG_DIR/kubewatch.yaml" << EOF
+    echo "📝 Generating KubeWatch configuration..."
+    cat > "$CONFIG_DIR/kubewatch.yaml" << EOF || {
+        echo "❌ Failed to write KubeWatch configuration"
+        exit 1
+    }
 version: "1"
 filter:
   watch_for: []
@@ -93,15 +148,24 @@ EOF
 
     # Add watch configurations using yq
     if [ "${WATCH_POD:-true}" = "true" ]; then
-        yq -i '.filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$CONFIG_DIR/kubewatch.yaml"
+        yq -i '.filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$CONFIG_DIR/kubewatch.yaml" || {
+            echo "❌ Failed to add Pod watch configuration"
+            exit 1
+        }
     fi
 
     if [ "${WATCH_NODE:-true}" = "true" ]; then
-        yq -i '.filter.watch_for += {"kind": "Node", "reasons": ["*NotReady*", "*DiskPressure*", "*MemoryPressure*", "*NetworkUnavailable*"], "severity": "critical"}' "$CONFIG_DIR/kubewatch.yaml"
+        yq -i '.filter.watch_for += {"kind": "Node", "reasons": ["*NotReady*", "*DiskPressure*", "*MemoryPressure*", "*NetworkUnavailable*"], "severity": "critical"}' "$CONFIG_DIR/kubewatch.yaml" || {
+            echo "❌ Failed to add Node watch configuration"
+            exit 1
+        }
     fi
 
     echo "🔄 Applying KubeWatch configuration..."
-    kubectl apply -f "$CONFIG_DIR/kubewatch.yaml"
+    kubectl apply -f "$CONFIG_DIR/kubewatch.yaml" || {
+        echo "❌ Failed to apply KubeWatch configuration"
+        exit 1
+    }
     echo "✅ KubeWatch configuration applied successfully"
 else
     echo "ℹ️ No webhook URL provided - skipping KubeWatch configuration"
