@@ -88,6 +88,6 @@ enrichment:
         
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        raise
 
 __all__ = ['initialize']

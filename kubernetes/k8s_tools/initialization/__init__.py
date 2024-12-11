@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 from kubiya_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script
 from ..kubewatch.builder import KubeWatchConfigBuilder
@@ -11,58 +12,70 @@ def initialize():
         config = tool_registry.dynamic_config
         settings = KubeWatchConfigBuilder.parse_config(config)
         
-        # Generate base configuration
-        config_content = f"""
-version: "1"
-filter:
-  watch_for: []
-  settings:
-    dedup_interval: {settings.numeric_settings['dedup_window']}
-    include_labels: true
-    namespace_isolation: {str(settings.advanced_settings['namespace_isolation']).lower()}
-    group_by:
-      - owner
-      - app_label
-    log_tail: {settings.numeric_settings['max_log_lines']}
-handler:
-  webhook:
-    url: "{settings.webhook_url}"
-    batchSize: {settings.numeric_settings['batch_size']}
-    maxWaitTime: "{settings.numeric_settings['max_wait_time']}"
-    minWaitTime: "{settings.numeric_settings['min_wait_time']}"
-    groupEvents: {str(settings.advanced_settings['group_events']).lower()}
-    groupBy:
-      - kind
-      - namespace
-      - reason
-      - owner
-    filtering:
-      includeRoutineEvents: false
-      minSeverity: "{settings.advanced_settings['min_severity']}"
-      deduplication:
-        enabled: true
-        window: "{settings.numeric_settings['dedup_window']}"
-resource:
-  pod: {str(settings.watch_settings['watch_pod']).lower()}
-  node: {str(settings.watch_settings['watch_node']).lower()}
-  deployment: {str(settings.watch_settings['watch_deployment']).lower()}
-  service: {str(settings.watch_settings['watch_service']).lower()}
-  ingress: {str(settings.watch_settings['watch_ingress']).lower()}
-  event: {str(settings.watch_settings['watch_event']).lower()}
-enrichment:
-  include_logs: {str(settings.advanced_settings['include_logs']).lower()}
-  include_events: {str(settings.advanced_settings['include_events']).lower()}
-  include_metrics: {str(settings.advanced_settings['include_metrics']).lower()}
-  max_log_lines: {settings.numeric_settings['max_log_lines']}
-  max_events: {settings.numeric_settings['max_events']}
-"""
+        # Generate KubeWatch configuration as a dictionary
+        kubewatch_config = {
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": "kubewatch-config",
+                "namespace": "default"
+            },
+            "data": {
+                ".kubewatch.yaml": {
+                    "version": "1",
+                    "filter": {
+                        "watch_for": [],
+                        "settings": {
+                            "dedup_interval": settings.numeric_settings['dedup_window'],
+                            "include_labels": True,
+                            "namespace_isolation": settings.advanced_settings['namespace_isolation'],
+                            "group_by": ["owner", "app_label"],
+                            "log_tail": settings.numeric_settings['max_log_lines']
+                        }
+                    },
+                    "handler": {
+                        "webhook": {
+                            "url": settings.webhook_url,
+                            "batchSize": settings.numeric_settings['batch_size'],
+                            "maxWaitTime": settings.numeric_settings['max_wait_time'],
+                            "minWaitTime": settings.numeric_settings['min_wait_time'],
+                            "groupEvents": settings.advanced_settings['group_events'],
+                            "groupBy": ["kind", "namespace", "reason", "owner"],
+                            "filtering": {
+                                "includeRoutineEvents": False,
+                                "minSeverity": settings.advanced_settings['min_severity'],
+                                "deduplication": {
+                                    "enabled": True,
+                                    "window": settings.numeric_settings['dedup_window']
+                                }
+                            }
+                        }
+                    },
+                    "resource": {
+                        "pod": settings.watch_settings['watch_pod'],
+                        "node": settings.watch_settings['watch_node'],
+                        "deployment": settings.watch_settings['watch_deployment'],
+                        "service": settings.watch_settings['watch_service'],
+                        "ingress": settings.watch_settings['watch_ingress'],
+                        "event": settings.watch_settings['watch_event']
+                    },
+                    "enrichment": {
+                        "include_logs": settings.advanced_settings['include_logs'],
+                        "include_events": settings.advanced_settings['include_events'],
+                        "include_metrics": settings.advanced_settings['include_metrics'],
+                        "max_log_lines": settings.numeric_settings['max_log_lines'],
+                        "max_events": settings.numeric_settings['max_events']
+                    }
+                }
+            }
+        }
         
-        # Write configuration
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'kubewatch.yaml')
+        # Write configuration as JSON
+        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'kubewatch.json')
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
         
         with open(config_path, 'w') as f:
-            f.write(config_content)
+            json.dump(kubewatch_config, f, indent=2)
         
         # Handle webhook URL and apply configuration
         if settings.webhook_url:
@@ -71,7 +84,7 @@ enrichment:
             
             # Apply configuration using init_cluster.sh
             init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
-            run_script(f"bash {init_script}")
+            run_script(init_script)
         else:
             print("⚠️  No webhook URL provided - notifications will not be sent")
             if 'KUBIYA_KUBEWATCH_WEBHOOK_URL' in os.environ:
