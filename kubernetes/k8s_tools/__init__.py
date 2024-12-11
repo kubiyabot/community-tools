@@ -5,7 +5,7 @@ from .utils.script_runner import run_script
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     init_script = os.path.join(os.path.dirname(__file__), 'utils', 'init_cluster.sh')
-    run_script(f"bash {init_script}")
+    run_script(init_script)
 
 # Run initialization when module is imported
 initialize()

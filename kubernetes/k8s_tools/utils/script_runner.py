@@ -30,12 +30,21 @@ def run_script(script_path: str, env_vars: Optional[Dict[str, str]] = None) -> s
         PermissionError: If script isn't executable
     """
     try:
+        # Convert to absolute path
+        script_path = os.path.abspath(script_path)
+        
         # Verify script exists and is executable
         if not os.path.exists(script_path):
             raise FileNotFoundError(f"Script not found: {script_path}")
         
         if not os.access(script_path, os.X_OK):
-            os.chmod(script_path, 0o755)  # Make executable if not already
+            try:
+                os.chmod(script_path, 0o755)  # Make executable if not already
+            except Exception as e:
+                raise PermissionError(f"Cannot make script executable: {str(e)}")
+        
+        print(f"🔄 Executing script: {os.path.basename(script_path)}")
+        print(f"📂 Script path: {script_path}")
         
         # Get dynamic configuration
         config = tool_registry.dynamic_config or {}
