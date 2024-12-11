@@ -32,11 +32,36 @@ find_resource_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="resource_type", type="str", description="Type of resource to find (e.g., pods, services, deployments)", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=False),
-        Arg(name="label_selector", type="str", description="Label selector for filtering resources", required=False),
-        Arg(name="field_selector", type="str", description="Field selector for filtering resources", required=False),
-        Arg(name="search_term", type="str", description="Search term to filter results", required=False),
+        Arg(
+            name="resource_type",
+            type="str",
+            description="Type of resource to find (e.g., pods, services, deployments)",
+            required=True,
+        ),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace",
+            required=False,
+        ),
+        Arg(
+            name="label_selector",
+            type="str",
+            description="Label selector for filtering resources",
+            required=False,
+        ),
+        Arg(
+            name="field_selector",
+            type="str",
+            description="Field selector for filtering resources",
+            required=False,
+        ),
+        Arg(
+            name="search_term",
+            type="str",
+            description="Search term to filter results",
+            required=False,
+        ),
     ],
 )
 
@@ -65,10 +90,27 @@ change_replicas_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="resource_type", type="str", description="Type of resource (e.g., deployment, statefulset)", required=True),
-        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
-        Arg(name="replicas", type="int", description="Number of replicas", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(
+            name="resource_type",
+            type="str",
+            description="Type of resource (e.g., deployment, statefulset)",
+            required=True,
+        ),
+        Arg(
+            name="resource_name",
+            type="str",
+            description="Name of the resource",
+            required=True,
+        ),
+        Arg(
+            name="replicas", type="int", description="Number of replicas", required=True
+        ),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace",
+            required=True,
+        ),
     ],
 )
 
@@ -103,24 +145,33 @@ get_resource_events_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="resource_type", type="str", description="Type of resource (e.g., pod, deployment)", required=True),
-        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),  # Marked as required
+        Arg(
+            name="resource_type",
+            type="str",
+            description="Type of resource (e.g., pod, deployment)",
+            required=True,
+        ),
+        Arg(
+            name="resource_name",
+            type="str",
+            description="Name of the resource",
+            required=True,
+        ),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace",
+            required=True,
+        ),  # Marked as required
     ],
 )
 
-get_pod_logs_tool= KubernetesTool(
+get_pod_logs_tool = KubernetesTool(
     name="get_pod_logs",
-    description="Fetches the last N lines of logs for a Kubernetes pod, with optional time window",
+    description="Fetches logs for a Kubernetes pod with automatic fallback to previous logs if pod not found",
     content="""
     #!/bin/bash
     set -e
-
-    # Default to last 100 lines if lines not specified
-    lines=${lines:-100}
-    
-    # Default to last hour if time_window not specified
-    time_window=${time_window:-"1h"}
 
     # Validate required inputs
     if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
@@ -128,26 +179,37 @@ get_pod_logs_tool= KubernetesTool(
         exit 1
     fi
 
-    # Fetch logs with pagination
-    logs=$(kubectl logs -n "$namespace" "$pod_name" \
-           --tail="$lines" \
-           --since="$time_window" 2>&1 || echo "Error: $?")
+    # First attempt: Get current logs
+    logs=$(kubectl logs -n "$namespace" "$pod_name" 2>&1 || echo "Error: $?")
 
-    # Check for common error patterns
-    if echo "$logs" | grep -q "Error from server (NotFound)"; then
-        echo "❗Pod '$pod_name' not found in namespace '$namespace'"
-    elif echo "$logs" | grep -q "Error"; then
-        echo "❗Error getting logs: $logs"
+    # Check for errors and try fallback if needed
+    if echo "$logs" | grep -q "Error from server (NotFound)" || echo "$logs" | grep -q "Error"; then
+        echo "⚠️ Could not fetch current logs, attempting to fetch previous logs..."
+        
+        # Second attempt: Try with --previous flag
+        previous_logs=$(kubectl logs -n "$namespace" "$pod_name" --previous 2>&1 || echo "Error: $?")
+        
+        if echo "$previous_logs" | grep -q "Error from server (NotFound)"; then
+            echo "❗Pod '$pod_name' not found in namespace '$namespace' (both current and previous)"
+        elif echo "$previous_logs" | grep -q "Error"; then
+            echo "❗Error getting logs (both current and previous): $previous_logs"
+        else
+            echo "📜 Previous logs for $pod_name in $namespace:"
+            echo "$previous_logs" | sed 's/^/  /'
+        fi
     else
-        echo "📜 Last $lines lines of logs for $pod_name in $namespace (from last $time_window):"
+        echo "📜 Current logs for $pod_name in $namespace:"
         echo "$logs" | sed 's/^/  /'
     fi
     """,
     args=[
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace",
+            required=True,
+        ),
         Arg(name="pod_name", type="str", description="Name of the pod", required=True),
-        Arg(name="lines", type="int", description="Number of log lines to show (default: 100)", required=False),
-        Arg(name="time_window", type="str", description="Time window for logs (e.g. 1h, 2h, 1d) (default: 1h)", required=False),
     ],
 )
 
@@ -216,7 +278,12 @@ find_suspicious_errors_tool = KubernetesTool(
     }'
     """,
     args=[
-        Arg(name="namespace", type="str", description="Kubernetes namespace to search for errors. Use 'all' to search in all namespaces.", required=True),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace to search for errors. Use 'all' to search in all namespaces.",
+            required=True,
+        ),
     ],
 )
 
@@ -316,7 +383,12 @@ pod_disruption_budget_checker_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="namespace", type="str", description="Kubernetes namespace to filter results. If omitted, checks all namespaces.", required=False),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace to filter results. If omitted, checks all namespaces.",
+            required=False,
+        ),
     ],
 )
 
@@ -346,9 +418,24 @@ check_replicas_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="resource_type", type="str", description="Type of resource (e.g., deployment, statefulset)", required=True),
-        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(
+            name="resource_type",
+            type="str",
+            description="Type of resource (e.g., deployment, statefulset)",
+            required=True,
+        ),
+        Arg(
+            name="resource_name",
+            type="str",
+            description="Name of the resource",
+            required=True,
+        ),
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace",
+            required=True,
+        ),
     ],
 )
 
