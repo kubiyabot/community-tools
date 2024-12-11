@@ -214,12 +214,12 @@ spec:
         image: ghcr.io/kubiyabot/kubewatch:main
         imagePullPolicy: Always
         args: ["run", "--config", "/config/.kubewatch.yaml"]
+        env:
+        - name: KUBIYA_KUBEWATCH_WEBHOOK_URL
+          value: "${KUBIYA_KUBEWATCH_WEBHOOK_URL}"
         volumeMounts:
         - name: config
           mountPath: /config
-      env:
-      - name: KUBIYA_KUBEWATCH_WEBHOOK_URL
-        value: ${KUBIYA_KUBEWATCH_WEBHOOK_URL}
       volumes:
       - name: config
         configMap:
