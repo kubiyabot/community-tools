@@ -38,13 +38,20 @@ def run_script(script_path: str, env_vars: Optional[Dict[str, str]] = None) -> s
         ScriptExecutionError: If script execution fails with detailed error info
     """
     try:
+        print(f"\n=== Script Execution Start ===")
+        print(f"Script: {script_path}")
+        print(f"Environment variables:")
+        for key, value in (env_vars or {}).items():
+            print(f"  {key}={value}")
+        
         # Convert to absolute path
         script_path = os.path.abspath(script_path)
+        print(f"Absolute path: {script_path}")
         
         # Verify script exists
         if not os.path.exists(script_path):
             raise ScriptExecutionError(
-                message="Script not found",
+                message=f"Script not found: {script_path}",
                 script_path=script_path,
                 exit_code=1,
                 output="",

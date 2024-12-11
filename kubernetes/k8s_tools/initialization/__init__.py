@@ -8,15 +8,29 @@ from ..kubewatch.builder import KubeWatchConfigBuilder
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     try:
+        print("\n=== Starting KubeWatch Initialization ===")
+        
         # Get dynamic configuration
         config = tool_registry.dynamic_config
         print(f"📝 Received dynamic configuration: {config}")
         
+        if not config:
+            print("⚠️  No dynamic configuration provided")
+            return
+        
         # Parse configuration using builder
         settings = KubeWatchConfigBuilder.parse_config(config)
-        print(f"✅ Parsed configuration settings")
+        print(f"✅ Parsed configuration settings: {settings.__dict__}")
+        
+        # Handle webhook URL first
+        if not settings.webhook_url:
+            print("⚠️  No webhook URL provided - notifications will not be sent")
+            if 'KUBIYA_KUBEWATCH_WEBHOOK_URL' in os.environ:
+                del os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL']
+            return
         
         # Generate KubeWatch configuration with actual values
+        print("Generating KubeWatch configuration...")
         kubewatch_yaml = {
             "version": "1",
             "filter": {
@@ -85,38 +99,44 @@ def initialize():
         json_path = "/tmp/kubewatch.json"
         print(f"📝 Writing KubeWatch configuration to: {json_path}")
         
-        with open(json_path, 'w') as f:
-            json.dump(kubewatch_config, f, indent=2)
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(kubewatch_config, f, indent=2)
+            print(f"✅ Successfully wrote configuration to {json_path}")
+        except Exception as e:
+            print(f"❌ Failed to write configuration: {str(e)}")
+            raise
         
         print(f"✅ Generated JSON configuration:")
-        with open(json_path, 'r') as f:
-            print(f.read())
+        try:
+            with open(json_path, 'r') as f:
+                print(f.read())
+        except Exception as e:
+            print(f"❌ Failed to read back configuration: {str(e)}")
+            raise
         
-        # Handle webhook URL and apply configuration
-        if settings.webhook_url:
-            os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
-            os.environ['KUBEWATCH_CONFIG_PATH'] = json_path
-            print(f"🔗 Found webhook URL, will configure notifications")
-            
-            # Apply configuration using init_cluster.sh
-            init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
-            print(f"🔄 Running initialization script: {init_script}")
-            
-            try:
-                output = run_script(init_script)
-                print(f"✅ Initialization script completed successfully")
-            except ScriptExecutionError as e:
-                print(f"❌ Initialization script failed:")
-                print(f"Error: {e.message}")
-                print(f"Output: {e.output}")
-                print(f"Error Output: {e.error_output}")
-                raise
-        else:
-            print("⚠️  No webhook URL provided - notifications will not be sent")
-            if 'KUBIYA_KUBEWATCH_WEBHOOK_URL' in os.environ:
-                del os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL']
+        # Set environment variables for the script
+        os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
+        os.environ['KUBEWATCH_CONFIG_PATH'] = json_path
+        print(f"🔗 Found webhook URL, will configure notifications")
+        print(f"📁 Configuration path: {json_path}")
         
-        print("✅ Kubernetes tools initialized successfully")
+        # Apply configuration using init_cluster.sh
+        init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
+        print(f"🔄 Running initialization script: {init_script}")
+        
+        try:
+            output = run_script(init_script)
+            print(f"✅ Initialization script completed successfully")
+            print(f"Script output:\n{output}")
+        except ScriptExecutionError as e:
+            print(f"❌ Initialization script failed:")
+            print(f"Error: {e.message}")
+            print(f"Output: {e.output}")
+            print(f"Error Output: {e.error_output}")
+            raise
+        
+        print("=== KubeWatch Initialization Completed ===\n")
         
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)

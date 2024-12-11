@@ -4,26 +4,20 @@ from .utils.script_runner import run_script, ScriptExecutionError
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
-    init_script = os.path.join(os.path.dirname(__file__), 'utils', 'init_cluster.sh')
     try:
-        print(f"Attempting to initialize Kubernetes tools...")
-        run_script(init_script)
-    except ScriptExecutionError as e:
-        # Format a user-friendly error message
-        error_msg = (
-            f"Failed to initialize Kubernetes tools\n\n"
-            f"Unable to install dependencies on the cluster:\n"
-            f"{e.error_output}\n\n"
-            f"Standard output:\n{e.output}"
-        )
-        raise Exception(error_msg)
+        print("Starting Kubernetes tools initialization...")
+        from .initialization import initialize as init_kubewatch
+        init_kubewatch()
+        print("Kubernetes tools initialization completed")
     except Exception as e:
-        raise Exception(f"Unexpected error during initialization: {str(e)}")
+        print(f"Failed to initialize Kubernetes tools: {str(e)}")
+        raise
 
 # Run initialization when module is imported
+print("Loading Kubernetes tools module...")
 initialize()
 
 # Import tools after initialization
 from .tools import *
 
-__all__ = ['initialize', 'ScriptExecutionError']
+__all__ = ['initialize']
