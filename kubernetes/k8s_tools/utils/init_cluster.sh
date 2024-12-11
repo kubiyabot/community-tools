@@ -149,6 +149,10 @@ enrichment:
   max_events: ${MAX_EVENTS:-10}
 EOF
 
+    CONFIG_FILE="$CONFIG_DIR/kubewatch.yaml"
+    
+    echo "Successfully generated KubeWatch configuration, reference:\n\n$(cat "$CONFIG_FILE")\n\n"
+
     # Add watch configurations using yq
     if [ "${WATCH_POD:-true}" = "true" ]; then
         yq -i '.filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$CONFIG_DIR/kubewatch.yaml" || {
@@ -166,12 +170,12 @@ EOF
 
     echo "🔄 Applying KubeWatch configuration..."
     kubectl apply -f "$CONFIG_DIR/kubewatch.yaml" || {
-        echo "❌ Failed to apply KubeWatch configuration"
+        echo "❌ Failed to apply KubeWatch configuration, refer to the generated configuration for reference"
         exit 1
     }
-    echo "✅ KubeWatch configuration applied successfully"
+    echo "✅ KubeWatch configuration applied successfully - events will be sent to the configured webhook"
 else
-    echo "ℹ️ No webhook URL provided - skipping KubeWatch configuration"
+    echo "ℹ️ No webhook URL provided - skipping KubeWatch configuration (will not be able to watch for events)"
 fi
 
 echo "✅ Kubernetes Tools initialized successfully!"
