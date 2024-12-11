@@ -125,9 +125,9 @@ check_network_policies_tool = KubernetesTool(
     echo "=============================="
 
     echo "\n📡 Namespaces without network policies:"
-    if [ -n "$namespace" ]; then
+    if [ "$check_all_namespaces" = false ]; then
         # Check only the specified namespace
-        if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
+        if [ $(kubectl get netpol $namespace_flag -o json | jq '.items | length') -eq 0 ]; then
             echo "  ⚠️  $namespace"
         fi
     else
@@ -140,7 +140,7 @@ check_network_policies_tool = KubernetesTool(
             ) |
             .metadata.name' | 
         while read ns; do
-            if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
+            if [ $(kubectl get netpol -n "$ns" -o json | jq '.items | length') -eq 0 ]; then
                 echo "  ⚠️  $ns"
             fi
         done
