@@ -1,146 +1,221 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Initializing Kubernetes Tools..."
-
-# Function to handle errors
-handle_error() {
-    local exit_code=$?
-    local line_no=$1
-    echo "❌ Error on line $line_no: Command failed with exit code $exit_code"
-    case $exit_code in
-        127) echo "  • Command not found - Missing required dependencies" ;;
-        1) echo "  • General error occurred" ;;
-        *) echo "  • Unexpected error occurred" ;;
-    esac
-    exit $exit_code
+# Helper function for logging
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
-# Set error handler
-trap 'handle_error $LINENO' ERR
-
-# Function to download file with fallback methods
-download_file() {
-    local url=$1
-    local output=$2
-    local downloaded=false
-
-    # Install curl if not available
-    if ! command -v curl &> /dev/null; then
-        echo "🔧 Installing curl..."
-        apt-get update && apt-get install -y curl
-    fi
-
-    # Try curl first
-    if command -v curl &> /dev/null; then
-        echo "📥 Downloading using curl..."
-        if curl -fsSL "$url" -o "$output"; then
-            downloaded=true
-        fi
-    fi
-
-    # Fallback to wget if curl failed or doesn't exist
-    if [ "$downloaded" = false ] && command -v wget &> /dev/null; then
-        echo "📥 Downloading using wget..."
-        if wget -q "$url" -O "$output"; then
-            downloaded=true
-        fi
-    fi
-
-    # If both methods failed
-    if [ "$downloaded" = false ]; then
-        echo "❌ Failed to download file: Neither curl nor wget is available"
-        echo "Please install curl or wget and try again"
+# Helper function to check command result
+check_command() {
+    if [ $? -ne 0 ]; then
+        log "❌ Error: $1"
         exit 1
     fi
+    log "✅ $2"
 }
 
-# Install yq if not available
-if ! command -v yq &> /dev/null; then
-    echo "🔧 Installing yq..."
-    YQ_VERSION="v4.35.1"
-    YQ_BINARY="yq_linux_amd64"
-    YQ_URL="https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY"
-    
-    # Download yq
-    download_file "$YQ_URL" "/usr/local/bin/yq"
-    chmod +x /usr/local/bin/yq || {
-        echo "❌ Failed to make yq executable"
-        exit 1
-    }
-fi
+# Helper function to check if k8s resource exists
+resource_exists() {
+    local namespace=$1
+    local resource_type=$2
+    local resource_name=$3
+    kubectl get -n "$namespace" "$resource_type" "$resource_name" &> /dev/null
+}
 
-# Install kubectl if not available
-if ! command -v kubectl &> /dev/null; then
-    echo "🔧 Installing kubectl..."
-    KUBECTL_URL="https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    
-    # Download kubectl
-    download_file "$KUBECTL_URL" "/usr/local/bin/kubectl"
-    chmod +x /usr/local/bin/kubectl || {
-        echo "❌ Failed to make kubectl executable"
-        exit 1
-    }
-fi
+log "🚀 Initializing Kubernetes tools..."
 
-# Check for required commands
-for cmd in curl chmod mkdir envsubst; do
+# Install required tools
+for cmd in curl yq kubectl; do
     if ! command -v $cmd &> /dev/null; then
-        echo "🔧 Installing required command: $cmd"
-        apt-get update && apt-get install -y gettext-base
+        log "Installing $cmd..."
+        case $cmd in
+            curl)
+                apt-get update && apt-get install -y curl
+                ;;
+            yq)
+                YQ_VERSION="v4.35.1"
+                YQ_BINARY="yq_linux_amd64"
+                curl -sSL "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY" -o "/usr/local/bin/yq"
+                chmod +x "/usr/local/bin/yq"
+                ;;
+            kubectl)
+                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+                chmod +x kubectl
+                mv kubectl /usr/local/bin/
+                ;;
+        esac
+        check_command "$cmd installation failed" "$cmd installed successfully"
+    else
+        log "✅ $cmd is already installed"
     fi
 done
 
-# Generate KubeWatch configuration if webhook URL is provided
+# Test kubectl connection
+log "Testing kubectl connection..."
+if ! kubectl cluster-info &> /dev/null; then
+    log "❌ Error: Cannot connect to Kubernetes cluster"
+    exit 1
+fi
+check_command "cluster connection failed" "Connected to Kubernetes cluster"
+
+# Process KubeWatch configuration if webhook URL is provided
 if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
-    echo "🔄 Configuring KubeWatch..."
+    log "🔄 Configuring KubeWatch..."
     
     # Use /tmp for all files
     JSON_FILE="${KUBEWATCH_CONFIG_PATH:-/tmp/kubewatch.json}"
     YAML_FILE="/tmp/kubewatch.yaml"
     
     # Convert JSON to YAML using yq
-    echo "📝 Converting configuration to YAML..."
+    log "📝 Converting configuration to YAML..."
     if [ ! -f "$JSON_FILE" ]; then
-        echo "❌ JSON configuration file not found at: $JSON_FILE"
+        log "❌ JSON configuration file not found at: $JSON_FILE"
         exit 1
     fi
     
     # Use yq to read JSON and output as YAML
     yq eval -P "$JSON_FILE" > "$YAML_FILE" || {
-        echo "❌ Failed to convert JSON to YAML"
-        echo "JSON content:"
+        log "❌ Failed to convert JSON to YAML"
+        log "JSON content:"
         cat "$JSON_FILE"
         exit 1
     }
     
-    echo "Successfully generated KubeWatch configuration, reference:\n\n$(cat "$YAML_FILE")\n\n"
-
-    # Add watch configurations
-    if [ "${WATCH_POD:-true}" = "true" ]; then
-        yq eval -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$YAML_FILE" || {
-            echo "❌ Failed to add Pod watch configuration"
-            exit 1
-        }
+    # Create namespace if it doesn't exist
+    log "Setting up kubiya namespace..."
+    if ! kubectl get namespace kubiya &> /dev/null; then
+        kubectl create namespace kubiya
+        check_command "namespace creation failed" "Created kubiya namespace"
+    else
+        log "✅ Kubiya namespace already exists"
     fi
 
-    if [ "${WATCH_NODE:-true}" = "true" ]; then
-        yq eval -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Node", "reasons": ["*NotReady*", "*DiskPressure*", "*MemoryPressure*", "*NetworkUnavailable*"], "severity": "critical"}' "$YAML_FILE" || {
-            echo "❌ Failed to add Node watch configuration"
-            exit 1
-        }
+    # Create ServiceAccount
+    log "Creating ServiceAccount..."
+    if ! resource_exists "kubiya" "serviceaccount" "kubiya-kubewatch"; then
+        kubectl apply -n kubiya -f - <<EOT
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+automountServiceAccountToken: true
+EOT
+        check_command "ServiceAccount creation failed" "Created ServiceAccount"
+    else
+        log "✅ ServiceAccount already exists"
     fi
 
-    echo "🔄 Applying KubeWatch configuration..."
-    if ! kubectl apply -f "$YAML_FILE"; then
-        echo "❌ Failed to apply KubeWatch configuration"
-        echo "Configuration content:"
+    # Create ClusterRole
+    log "Creating ClusterRole..."
+    if ! resource_exists "" "clusterrole" "kubiya-kubewatch"; then
+        kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "services", "deployments", "events", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+EOT
+        check_command "ClusterRole creation failed" "Created ClusterRole"
+    else
+        log "✅ ClusterRole already exists"
+    fi
+
+    # Create ClusterRoleBinding
+    log "Creating ClusterRoleBinding..."
+    if ! resource_exists "" "clusterrolebinding" "kubiya-kubewatch"; then
+        kubectl apply -f - <<EOT
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubiya-kubewatch
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubiya-kubewatch
+subjects:
+- kind: ServiceAccount
+  name: kubiya-kubewatch
+  namespace: kubiya
+EOT
+        check_command "ClusterRoleBinding creation failed" "Created ClusterRoleBinding"
+    else
+        log "✅ ClusterRoleBinding already exists"
+    fi
+
+    # Apply ConfigMap
+    log "Applying KubeWatch ConfigMap..."
+    kubectl apply -f "$YAML_FILE" || {
+        log "❌ Failed to apply KubeWatch configuration"
+        log "Configuration content:"
         cat "$YAML_FILE"
         exit 1
-    fi
-    echo "✅ KubeWatch configuration applied successfully - events will be sent to the configured webhook"
+    }
+    check_command "ConfigMap creation failed" "Created ConfigMap"
+
+    # Create/Update Deployment
+    log "Creating/Updating KubeWatch Deployment..."
+    kubectl apply -n kubiya -f - <<EOT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubiya-kubewatch
+  namespace: kubiya
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubewatch
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubewatch
+    spec:
+      serviceAccountName: kubiya-kubewatch
+      containers:
+      - name: kubewatch
+        image: ghcr.io/kubiyabot/kubewatch:main
+        imagePullPolicy: Always
+        args: ["run", "--config", "/config/.kubewatch.yaml"]
+        volumeMounts:
+        - name: config
+          mountPath: /config
+      volumes:
+      - name: config
+        configMap:
+          name: kubewatch-config
+EOT
+    check_command "Deployment creation/update failed" "Created/Updated Deployment"
+
+    # Wait for deployment to be ready
+    log "Waiting for KubeWatch deployment to be ready..."
+    kubectl rollout status deployment/kubiya-kubewatch -n kubiya
+    check_command "Deployment rollout failed" "KubeWatch deployment is ready"
+
+    log "✅ KubeWatch configuration applied successfully - events will be sent to the configured webhook"
 else
-    echo "ℹ️ No webhook URL provided - skipping KubeWatch configuration (will not be able to watch for events)"
+    log "ℹ️ No webhook URL provided - skipping KubeWatch configuration"
 fi
 
-echo "✅ Kubernetes Tools initialized successfully!"
+log "✅ Kubernetes Tools initialized successfully!"

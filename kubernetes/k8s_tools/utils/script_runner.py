@@ -99,8 +99,7 @@ def run_script(script_path: str, env_vars: Optional[Dict[str, str]] = None) -> s
         if env_vars:
             env.update(env_vars)
         
-        print(f"🔄 Executing script: {os.path.basename(script_path)}")
-        print(f"📂 Script path: {script_path}")
+        print(f"🔄 Executing Kubiya K8s Crew provisioning script: {os.path.basename(script_path)}")
         
         # Run the script
         process = subprocess.Popen(
