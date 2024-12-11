@@ -26,4 +26,4 @@ initialize()
 # Import tools after initialization
 from .tools import *
 
-__all__ = ['initialize']
+__all__ = ['initialize', 'ScriptExecutionError']
