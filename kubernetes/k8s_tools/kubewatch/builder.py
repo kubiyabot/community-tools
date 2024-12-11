@@ -40,6 +40,9 @@ class KubeWatchConfigBuilder:
         """Parse and validate configuration"""
         if not config:
             raise ValueError("No dynamic configuration provided")
+        
+        # print the config
+        print(f"Starting to parse config: {config}")
 
         # Parse namespaces
         namespaces = config.get('namespaces', 'default,kube-system')

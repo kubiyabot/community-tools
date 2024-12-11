@@ -67,7 +67,7 @@ enrichment:
         # Handle webhook URL and apply configuration
         if settings.webhook_url:
             os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
-            print("🔗 Webhook URL configured")
+            print("🔗 Found webhook URL in the configuration, notifications will be sent to the webhook")
             
             # Apply configuration using init_cluster.sh
             init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
