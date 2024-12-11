@@ -25,6 +25,12 @@ download_file() {
     local output=$2
     local downloaded=false
 
+    # Install curl if not available
+    if ! command -v curl &> /dev/null; then
+        echo "🔧 Installing curl..."
+        apt-get update && apt-get install -y curl
+    fi
+
     # Try curl first
     if command -v curl &> /dev/null; then
         echo "📥 Downloading using curl..."
