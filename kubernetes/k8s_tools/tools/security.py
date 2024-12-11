@@ -9,8 +9,11 @@ check_privileged_pods_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "🔍 Scanning for security risks in pods..."
     echo "========================================="
@@ -54,8 +57,11 @@ check_resource_limits_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "📊 Scanning for missing resource limits..."
     echo "========================================"
@@ -100,8 +106,11 @@ check_network_policies_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "🌐 Scanning network policies..."
     echo "=============================="
@@ -151,8 +160,11 @@ check_exposed_services_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "🌍 Scanning for exposed services..."
     echo "================================="
@@ -187,8 +199,11 @@ check_pod_security_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "🛡️ Running comprehensive pod security scan..."
     echo "=========================================="
@@ -247,8 +262,11 @@ full_security_scan_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, using parameter expansion with default empty string
+    namespace_flag="${namespace:+"-n $namespace"}"
+    if [ -z "$namespace_flag" ]; then
+        namespace_flag="--all-namespaces"
+    fi
 
     echo "🔒 Starting comprehensive security scan..."
     echo "========================================"
