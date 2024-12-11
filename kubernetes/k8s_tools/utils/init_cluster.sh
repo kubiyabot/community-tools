@@ -189,7 +189,9 @@ EOT
 
     # Create/Update Deployment
     log "Creating/Updating KubeWatch Deployment..."
-    kubectl apply -n kubiya -f - <<EOT
+    
+    # Try to apply the deployment first
+    if ! kubectl apply -n kubiya -f - <<EOT
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -228,7 +230,56 @@ spec:
         configMap:
           name: kubewatch-config
 EOT
-    check_command "Deployment creation/update failed" "Created/Updated Deployment"
+    then
+        log "⚠️ Failed to update deployment, attempting recreation..."
+        # Delete existing deployment if update failed
+        kubectl delete deployment kubiya-kubewatch -n kubiya
+        check_command "Failed to delete existing deployment" "Removed existing deployment"
+        
+        # Retry creating the deployment
+        kubectl apply -n kubiya -f - <<EOT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubiya-kubewatch
+  namespace: kubiya
+  labels:
+    app: kubewatch
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubewatch
+  template:
+    metadata:
+      labels:
+        app: kubewatch
+        app.kubernetes.io/name: kubewatch
+        app.kubernetes.io/part-of: kubiya
+    spec:
+      serviceAccountName: kubiya-kubewatch
+      containers:
+      - name: kubewatch
+        image: ghcr.io/kubiyabot/kubewatch:main
+        imagePullPolicy: Always
+        args: ["run", "--config", "/config/.kubewatch.yaml"]
+        env:
+        - name: KUBIYA_KUBEWATCH_WEBHOOK_URL
+          value: "${KUBIYA_KUBEWATCH_WEBHOOK_URL}"
+        volumeMounts:
+        - name: config
+          mountPath: /config
+      volumes:
+      - name: config
+        configMap:
+          name: kubewatch-config
+EOT
+        check_command "Deployment recreation failed" "Recreated deployment successfully"
+    else
+        log "✅ Deployment updated successfully"
+    fi
 
     # Wait for deployment to be ready
     log "Waiting for KubeWatch deployment to be ready..."
