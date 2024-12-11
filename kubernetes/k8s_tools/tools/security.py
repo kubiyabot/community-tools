@@ -107,18 +107,26 @@ check_network_policies_tool = KubernetesTool(
     echo "=============================="
 
     echo "\n📡 Namespaces without network policies:"
-    kubectl get ns -o json | jq -r '
-        .items[] | 
-        select(
-            .metadata.name as $ns | 
-            ($ns != "kube-system" and $ns != "kube-public" and $ns != "kube-node-lease")
-        ) |
-        .metadata.name' | 
-    while read ns; do
-        if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
-            echo "  ⚠️  $ns"
+    if [ -n "$namespace" ]; then
+        # Check only the specified namespace
+        if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
+            echo "  ⚠️  $namespace"
         fi
-    done
+    else
+        # Check all namespaces
+        kubectl get ns -o json | jq -r '
+            .items[] | 
+            select(
+                .metadata.name as $ns | 
+                ($ns != "kube-system" and $ns != "kube-public" and $ns != "kube-node-lease")
+            ) |
+            .metadata.name' | 
+        while read ns; do
+            if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
+                echo "  ⚠️  $ns"
+            fi
+        done
+    fi
 
     echo "\n🔍 Pods potentially exposed (no matching network policies):"
     kubectl get pods $namespace_flag -o json | jq -r '
@@ -153,7 +161,7 @@ check_exposed_services_tool = KubernetesTool(
     kubectl get services $namespace_flag -o json | jq -r '
         .items[] | 
         select(.spec.type == "LoadBalancer" or .spec.type == "NodePort") |
-        "  ⚠️  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
+        "  ⚠��  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
             [.spec.ports[] | 
             "\(if .nodePort then "NodePort: \(.nodePort)" else "" end) → \(.port)"] | 
             join(", ")
