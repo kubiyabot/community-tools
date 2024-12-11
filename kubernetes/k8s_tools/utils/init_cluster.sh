@@ -65,34 +65,36 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Use /tmp for all files
     JSON_FILE="${KUBEWATCH_CONFIG_PATH:-/tmp/kubewatch.json}"
+    INNER_JSON="${KUBEWATCH_INNER_CONFIG_PATH:-/tmp/kubewatch_inner.json}"
     YAML_FILE="/tmp/kubewatch.yaml"
     KUBEWATCH_CONFIG="/tmp/kubewatch_final.yaml"
     
-    # Convert JSON to YAML using yq
-    log "📝 Converting configuration to YAML..."
-    if [ ! -f "$JSON_FILE" ]; then
-        log "❌ JSON configuration file not found at: $JSON_FILE"
+    # Verify files exist
+    if [ ! -f "$JSON_FILE" ] || [ ! -f "$INNER_JSON" ]; then
+        log "❌ Configuration files not found:"
+        [ ! -f "$JSON_FILE" ] && log "  • Missing outer config: $JSON_FILE"
+        [ ! -f "$INNER_JSON" ] && log "  • Missing inner config: $INNER_JSON"
         exit 1
     fi
     
-    # Extract and convert the .kubewatch.yaml content to string
-    yq eval '.data[".kubewatch.yaml"] | to_yaml' "$JSON_FILE" > "$YAML_FILE"
+    # Convert inner JSON to YAML
+    log "📝 Converting inner configuration to YAML..."
+    yq eval -P "$INNER_JSON" > "$YAML_FILE" || {
+        log "❌ Failed to convert inner configuration to YAML"
+        log "Inner JSON content:"
+        cat "$INNER_JSON"
+        exit 1
+    }
     
-    # Create the final ConfigMap with proper YAML content
-    cat > "$KUBEWATCH_CONFIG" << EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: kubewatch-config
-  namespace: kubiya
-  labels:
-    app.kubernetes.io/name: kubewatch
-    app.kubernetes.io/part-of: kubiya
-data:
-  .kubewatch.yaml: |
-$(cat "$YAML_FILE" | sed 's/^/    /')
-EOF
-
+    # Create the final ConfigMap
+    log "📝 Creating final ConfigMap..."
+    yq eval ".data[\".kubewatch.yaml\"] = \"$(cat $YAML_FILE | sed 's/"/\\"/g')\"" "$JSON_FILE" > "$KUBEWATCH_CONFIG" || {
+        log "❌ Failed to create final ConfigMap"
+        log "YAML content:"
+        cat "$YAML_FILE"
+        exit 1
+    }
+    
     log "Generated KubeWatch configuration:"
     cat "$KUBEWATCH_CONFIG"
     
@@ -232,7 +234,7 @@ EOT
 
     log "✅ KubeWatch configuration applied successfully - events will be sent to the configured webhook"
 else
-    log "ℹ️ No webhook URL provided - skipping KubeWatch configuration"
+    log "ℹ️ No webhook URL provided - skipping KubeWatch configuration (will not be able to watch for events)"
 fi
 
 log "✅ Kubernetes Tools initialized successfully!"

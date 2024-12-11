@@ -29,74 +29,60 @@ def initialize():
                 del os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL']
             return
         
-        # Generate KubeWatch configuration with actual values
-        print("Generating KubeWatch configuration...")
-        kubewatch_config = {
-            "apiVersion": "v1",
-            "kind": "ConfigMap",
-            "metadata": {
-                "name": "kubewatch-config",
-                "namespace": "kubiya",
-                "labels": {
-                    "app.kubernetes.io/name": "kubewatch",
-                    "app.kubernetes.io/part-of": "kubiya"
+        # Generate inner KubeWatch configuration first
+        kubewatch_inner_config = {
+            "version": "1",
+            "filter": {
+                "watch_for": [],
+                "settings": {
+                    "dedup_interval": settings.numeric_settings.get('dedup_window', '15m'),
+                    "include_labels": True,
+                    "namespace_isolation": settings.advanced_settings.get('namespace_isolation', False),
+                    "group_by": ["owner", "app_label"],
+                    "log_tail": settings.numeric_settings.get('max_log_lines', 50)
                 }
             },
-            "data": {
-                ".kubewatch.yaml": {  # This will be processed by yq in the shell script
-                    "version": "1",
-                    "filter": {
-                        "watch_for": [],
-                        "settings": {
-                            "dedup_interval": settings.numeric_settings.get('dedup_window', '15m'),
-                            "include_labels": True,
-                            "namespace_isolation": settings.advanced_settings.get('namespace_isolation', False),
-                            "group_by": ["owner", "app_label"],
-                            "log_tail": settings.numeric_settings.get('max_log_lines', 50)
+            "handler": {
+                "webhook": {
+                    "url": settings.webhook_url,
+                    "batchSize": settings.numeric_settings.get('batch_size', 5),
+                    "maxWaitTime": settings.numeric_settings.get('max_wait_time', '30s'),
+                    "minWaitTime": settings.numeric_settings.get('min_wait_time', '5s'),
+                    "groupEvents": settings.advanced_settings.get('group_events', True),
+                    "groupBy": ["kind", "namespace", "reason", "owner"],
+                    "filtering": {
+                        "includeRoutineEvents": False,
+                        "minSeverity": settings.advanced_settings.get('min_severity', 'Warning'),
+                        "deduplication": {
+                            "enabled": True,
+                            "window": settings.numeric_settings.get('dedup_window', '15m')
                         }
-                    },
-                    "handler": {
-                        "webhook": {
-                            "url": settings.webhook_url,
-                            "batchSize": settings.numeric_settings.get('batch_size', 5),
-                            "maxWaitTime": settings.numeric_settings.get('max_wait_time', '30s'),
-                            "minWaitTime": settings.numeric_settings.get('min_wait_time', '5s'),
-                            "groupEvents": settings.advanced_settings.get('group_events', True),
-                            "groupBy": ["kind", "namespace", "reason", "owner"],
-                            "filtering": {
-                                "includeRoutineEvents": False,
-                                "minSeverity": settings.advanced_settings.get('min_severity', 'Warning'),
-                                "deduplication": {
-                                    "enabled": True,
-                                    "window": settings.numeric_settings.get('dedup_window', '15m')
-                                }
-                            }
-                        }
-                    },
-                    "resource": {
-                        "pod": settings.watch_settings.get('watch_pod', True),
-                        "node": settings.watch_settings.get('watch_node', True),
-                        "deployment": settings.watch_settings.get('watch_deployment', True),
-                        "service": settings.watch_settings.get('watch_service', False),
-                        "ingress": settings.watch_settings.get('watch_ingress', False),
-                        "event": settings.watch_settings.get('watch_event', True)
-                    },
-                    "enrichment": {
-                        "include_logs": settings.advanced_settings.get('include_logs', True),
-                        "include_events": settings.advanced_settings.get('include_events', True),
-                        "include_metrics": settings.advanced_settings.get('include_metrics', True),
-                        "max_log_lines": settings.numeric_settings.get('max_log_lines', 50),
-                        "max_events": settings.numeric_settings.get('max_events', 10)
                     }
                 }
+            },
+            "resource": {
+                "pod": settings.watch_settings.get('watch_pod', True),
+                "node": settings.watch_settings.get('watch_node', True),
+                "deployment": settings.watch_settings.get('watch_deployment', True),
+                "service": settings.watch_settings.get('watch_service', False),
+                "ingress": settings.watch_settings.get('watch_ingress', False),
+                "event": settings.watch_settings.get('watch_event', True)
+            },
+            "enrichment": {
+                "include_logs": settings.advanced_settings.get('include_logs', True),
+                "include_events": settings.advanced_settings.get('include_events', True),
+                "include_metrics": settings.advanced_settings.get('include_metrics', True),
+                "max_log_lines": settings.numeric_settings.get('max_log_lines', 50),
+                "max_events": settings.numeric_settings.get('max_events', 10)
             }
         }
 
-        # Convert kubewatch_config to YAML string
-        import yaml
-        kubewatch_config_str = yaml.dump(kubewatch_config, default_flow_style=False)
+        # Write inner config as JSON to /tmp
+        inner_json_path = "/tmp/kubewatch_inner.json"
+        with open(inner_json_path, 'w') as f:
+            json.dump(kubewatch_inner_config, f, indent=2)
 
-        # Create the ConfigMap structure
+        # Create outer ConfigMap structure
         kubewatch_config = {
             "apiVersion": "v1",
             "kind": "ConfigMap",
@@ -109,11 +95,11 @@ def initialize():
                 }
             },
             "data": {
-                ".kubewatch.yaml": kubewatch_config_str  # Use the YAML string here
+                ".kubewatch.yaml": inner_json_path  # This will be processed by yq in the shell script
             }
         }
         
-        # Write configuration as JSON to /tmp
+        # Write outer config as JSON to /tmp
         json_path = "/tmp/kubewatch.json"
         print(f"📝 Writing KubeWatch configuration to: {json_path}")
         
@@ -125,19 +111,14 @@ def initialize():
             print(f"❌ Failed to write configuration: {str(e)}")
             raise
         
-        print(f"✅ Generated JSON configuration:")
-        try:
-            with open(json_path, 'r') as f:
-                print(f.read())
-        except Exception as e:
-            print(f"❌ Failed to read back configuration: {str(e)}")
-            raise
-        
         # Set environment variables for the script
         os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
         os.environ['KUBEWATCH_CONFIG_PATH'] = json_path
+        os.environ['KUBEWATCH_INNER_CONFIG_PATH'] = inner_json_path
         print(f"🔗 Found webhook URL, will configure notifications")
-        print(f"📁 Configuration path: {json_path}")
+        print(f"📁 Configuration paths:")
+        print(f"  • Outer config: {json_path}")
+        print(f"  • Inner config: {inner_json_path}")
         
         # Apply configuration using init_cluster.sh
         init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
