@@ -8,16 +8,33 @@ if ! command -v yq &> /dev/null; then
     echo "🔧 Installing yq..."
     YQ_VERSION="v4.35.1"
     YQ_BINARY="yq_linux_amd64"
-    wget -q https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY -O /usr/local/bin/yq
-    chmod +x /usr/local/bin/yq
+    
+    # Use curl instead of wget
+    if ! curl -sSL "https://github.com/mikefarah/yq/releases/download/$YQ_VERSION/$YQ_BINARY" -o /usr/local/bin/yq; then
+        echo "❌ Failed to download yq binary"
+        exit 1
+    fi
+    chmod +x /usr/local/bin/yq || {
+        echo "❌ Failed to make yq executable"
+        exit 1
+    }
 fi
 
 # Install kubectl if not available
 if ! command -v kubectl &> /dev/null; then
     echo "🔧 Installing kubectl..."
-    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-    chmod +x kubectl
-    mv kubectl /usr/local/bin/
+    if ! curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"; then
+        echo "❌ Failed to download kubectl"
+        exit 1
+    fi
+    chmod +x kubectl || {
+        echo "❌ Failed to make kubectl executable"
+        exit 1
+    }
+    mv kubectl /usr/local/bin/ || {
+        echo "❌ Failed to move kubectl to /usr/local/bin/"
+        exit 1
+    }
 fi
 
 # Generate KubeWatch configuration if webhook URL is provided
