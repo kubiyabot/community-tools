@@ -99,6 +99,9 @@ def run_script(script_path: str, env_vars: Optional[Dict[str, str]] = None) -> s
         if env_vars:
             env.update(env_vars)
         
+        print(f"🔄 Executing script: {os.path.basename(script_path)}")
+        print(f"📂 Script path: {script_path}")
+        
         # Run the script
         process = subprocess.Popen(
             ['bash', script_path],
@@ -171,3 +174,5 @@ def run_script(script_path: str, env_vars: Optional[Dict[str, str]] = None) -> s
             output="",
             error_output=str(e)
         ) from e
+
+__all__ = ['run_script', 'ScriptExecutionError']
