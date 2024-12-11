@@ -111,7 +111,7 @@ check_network_policies_tool = KubernetesTool(
         .items[] | 
         select(
             .metadata.name as $ns | 
-            not(any(["kube-system", "kube-public", "kube-node-lease"]; . == $ns))
+            ($ns != "kube-system" and $ns != "kube-public" and $ns != "kube-node-lease")
         ) |
         .metadata.name' | 
     while read ns; do
@@ -198,11 +198,15 @@ check_pod_security_tool = KubernetesTool(
     kubectl get pods $namespace_flag -o json | jq -r '
         .items[] | 
         select(
-            .spec.containers[].securityContext.capabilities.add[] |
-            select(. == "ALL" or . == "SYS_ADMIN" or . == "NET_ADMIN")
+            .spec.containers[] | 
+            select(.securityContext?.capabilities?.add? // [] | 
+                any(. == "ALL" or . == "SYS_ADMIN" or . == "NET_ADMIN")
+            )
         ) |
         "  ⚠️  Namespace: \(.metadata.namespace)\n     Pod: \(.metadata.name)\n     Capabilities: \(
-            [.spec.containers[].securityContext.capabilities.add[]] | join(", ")
+            [.spec.containers[] | 
+             .securityContext?.capabilities?.add? // [] | 
+             select(. == "ALL" or . == "SYS_ADMIN" or . == "NET_ADMIN")] | join(", ")
         )"
     '
 
