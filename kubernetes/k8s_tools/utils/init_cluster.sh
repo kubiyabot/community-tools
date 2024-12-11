@@ -104,10 +104,7 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Generate base KubeWatch configuration
     echo "📝 Generating KubeWatch configuration..."
-    cat > "$CONFIG_DIR/kubewatch.yaml" << EOF || {
-        echo "❌ Failed to write KubeWatch configuration"
-        exit 1
-    }
+    cat > "$CONFIG_DIR/kubewatch.yaml" <<'EOF'
 version: "1"
 filter:
   watch_for: []
