@@ -70,16 +70,18 @@ def initialize():
             }
         }
         
-        # Write configuration as JSON
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'kubewatch.json')
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
+        # Write configuration as JSON to /tmp
+        json_path = "/tmp/kubewatch.json"
         
-        with open(config_path, 'w') as f:
+        with open(json_path, 'w') as f:
             json.dump(kubewatch_config, f, indent=2)
+        
+        print(f"📝 Generated JSON configuration at: {json_path}")
         
         # Handle webhook URL and apply configuration
         if settings.webhook_url:
             os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
+            os.environ['KUBEWATCH_CONFIG_PATH'] = json_path  # Pass the path to the script
             print("🔗 Found webhook URL in the configuration, notifications will be sent to the webhook")
             
             # Apply configuration using init_cluster.sh
@@ -92,7 +94,7 @@ def initialize():
         
         # Print status
         print("✅ Kubernetes tools initialized successfully")
-        print(f"📝 KubeWatch configuration written to: {config_path}")
+        print(f"📝 KubeWatch configuration written to: {json_path}")
         print(f"🔍 Monitoring namespaces: {', '.join(settings.namespaces)}")
         print("🎯 Watching for:")
         if settings.watch_settings['watch_pod']: print("  • Pod issues")
@@ -101,6 +103,6 @@ def initialize():
         
     except Exception as e:
         print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        raise
 
 __all__ = ['initialize'] 

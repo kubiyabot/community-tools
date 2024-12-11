@@ -95,9 +95,9 @@ done
 if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     echo "🔄 Configuring KubeWatch..."
     
-    CONFIG_DIR="$(dirname "$0")/../config"
-    JSON_FILE="$CONFIG_DIR/kubewatch.json"
-    YAML_FILE="$CONFIG_DIR/kubewatch.yaml"
+    # Use /tmp for all files
+    JSON_FILE="${KUBEWATCH_CONFIG_PATH:-/tmp/kubewatch.json}"
+    YAML_FILE="/tmp/kubewatch.yaml"
     
     # Convert JSON to YAML using yq
     echo "📝 Converting configuration to YAML..."
