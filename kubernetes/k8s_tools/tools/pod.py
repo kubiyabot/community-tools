@@ -3,8 +3,8 @@ from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
 pod_management_tool = KubernetesTool(
-    name="pod_management",
-    description="Manages Kubernetes pods, including retrieving logs, getting information, or deleting a pod.",
+    name="single_pod_operations",
+    description="Performs operations on a single Kubernetes pod - retrieves logs, gets detailed information, or deletes a specific pod. For listing multiple pods, use a different tool.",
     content="""
     #!/bin/bash
     set -e
@@ -27,10 +27,10 @@ pod_management_tool = KubernetesTool(
     fi
     """,
     args=[
-        Arg(name="action", type="str", description="Action to perform (get, delete, logs)", required=True),
-        Arg(name="name", type="str", description="Name of the pod", required=True),
-        Arg(name="namespace", type="str", description="Kubernetes namespace (required for managing a specific pod)", required=True),
-        Arg(name="container", type="str", description="Container name (for logs action)", required=False),
+        Arg(name="action", type="str", description="Action to perform on a single pod (get, delete, logs)", required=True),
+        Arg(name="name", type="str", description="Name of the specific pod to operate on", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace where the pod is located", required=True),
+        Arg(name="container", type="str", description="Container name (only used for logs action)", required=False),
     ],
 )
 
