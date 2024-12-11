@@ -88,13 +88,20 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Create the final ConfigMap
     log "📝 Creating final ConfigMap..."
-    yq eval ".data[\".kubewatch.yaml\"] = \"$(cat $YAML_FILE | sed 's/"/\\"/g')\"" "$JSON_FILE" > "$KUBEWATCH_CONFIG" || {
-        log "❌ Failed to create final ConfigMap"
-        log "YAML content:"
-        cat "$YAML_FILE"
-        exit 1
-    }
-    
+    cat > "$KUBEWATCH_CONFIG" <<EOT
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubewatch-config
+  namespace: kubiya
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+data:
+  .kubewatch.yaml: |
+$(cat "$YAML_FILE" | sed 's/^/    /')
+EOT
+
     log "Generated KubeWatch configuration:"
     cat "$KUBEWATCH_CONFIG"
     
