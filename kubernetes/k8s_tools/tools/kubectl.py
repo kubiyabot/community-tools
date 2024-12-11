@@ -1,6 +1,7 @@
 from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
+from ..utils.script_runner import ScriptExecutionError
 
 kubectl_tool = KubernetesTool(
     name="kubectl",
@@ -26,12 +27,12 @@ kubectl_tool = KubernetesTool(
     echo "🔧 Executing: $full_command"
 
     # Run the kubectl command
-    if eval "$full_command"; then
-        echo "✅ Command executed successfully"
-    else
+    if ! $full_command; then
         echo "❌ Command failed: $full_command"
         exit 1
     fi
+
+    echo "✅ Command executed successfully"
     """,
     args=[
         Arg(name="command", type="str", description="The kubectl command to execute", required=True),
@@ -39,4 +40,8 @@ kubectl_tool = KubernetesTool(
     ],
 )
 
-tool_registry.register("kubernetes", kubectl_tool)
+try:
+    tool_registry.register("kubernetes", kubectl_tool)
+except Exception as e:
+    print(f"❌ Failed to register kubectl tool: {str(e)}", file=sys.stderr)
+    raise
