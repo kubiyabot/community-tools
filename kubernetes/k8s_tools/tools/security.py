@@ -275,19 +275,27 @@ full_security_scan_tool = KubernetesTool(
 
     # Check network policies
     echo "\n3️⃣ Checking network policies..."
-    kubectl get ns -o json | jq -r '
-        .items[] | 
-        select(
-            .metadata.name != "kube-system" and
-            .metadata.name != "kube-public" and
-            .metadata.name != "kube-node-lease"
-        ) |
-        .metadata.name' | 
-    while read ns; do
-        if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
-            echo "  ⚠️  Namespace without network policies: $ns"
+    if [ -n "$namespace" ]; then
+        # Check only the specified namespace
+        if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
+            echo "  ⚠️  Namespace without network policies: $namespace"
         fi
-    done
+    else
+        # Check all namespaces
+        kubectl get ns -o json | jq -r '
+            .items[] | 
+            select(
+                .metadata.name != "kube-system" and
+                .metadata.name != "kube-public" and
+                .metadata.name != "kube-node-lease"
+            ) |
+            .metadata.name' | 
+        while read ns; do
+            if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
+                echo "  ⚠️  Namespace without network policies: $ns"
+            fi
+        done
+    fi
 
     # Check exposed services
     echo "\n4️⃣ Checking exposed services..."
