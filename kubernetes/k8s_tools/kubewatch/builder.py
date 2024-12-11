@@ -18,7 +18,8 @@ class KubeWatchConfigBuilder:
     }
 
     DEFAULT_NUMERIC_SETTINGS = {
-        'batch_size': 5,
+        'batch_size': 1,
+        'batch_interval': '5m',
         'max_wait_time': '10m',
         'min_wait_time': '1m',
         'dedup_window': '15m',
@@ -94,6 +95,7 @@ class KubeWatchConfigBuilder:
                 'webhook': {
                     'url': settings.webhook_url,
                     'batchSize': settings.numeric_settings['batch_size'],
+                    'batchInterval': settings.numeric_settings['batch_interval'],
                     'maxWaitTime': settings.numeric_settings['max_wait_time'],
                     'minWaitTime': settings.numeric_settings['min_wait_time'],
                     'groupEvents': settings.advanced_settings['group_events'],
