@@ -79,7 +79,7 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Convert inner JSON to YAML
     log "📝 Converting inner configuration to YAML..."
-    yq eval -P "$INNER_JSON" > "$YAML_FILE" || {
+    yq eval -P -o=yaml "$INNER_JSON" > "$YAML_FILE" || {
         log "❌ Failed to convert inner configuration to YAML"
         log "Inner JSON content:"
         cat "$INNER_JSON"

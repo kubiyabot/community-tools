@@ -32,37 +32,65 @@ def initialize():
         # Generate inner KubeWatch configuration first
         kubewatch_inner_config = {
             "version": "1",
+            "logging": {
+                "level": "debug",
+                "format": "text",
+                "fields": {
+                    "component": "kubiya-kubernetes-watcher"
+                }
+            },
             "filter": {
-                "watch_for": [],
+                "watch_for": [
+                    {
+                        "kind": "Pod",
+                        "reasons": [
+                            "*CrashLoopBackOff*",
+                            "*OOMKilled*",
+                            "*ImagePullBackOff*",
+                            "*RunContainerError*",
+                            "*Failed*"
+                        ],
+                        "severity": "critical"
+                    },
+                    {
+                        "kind": "Node",
+                        "reasons": [
+                            "*NotReady*",
+                            "*DiskPressure*",
+                            "*MemoryPressure*",
+                            "*NetworkUnavailable*"
+                        ],
+                        "severity": "critical"
+                    }
+                ],
                 "settings": {
                     "dedup_interval": settings.numeric_settings.get('dedup_window', '15m'),
                     "include_labels": True,
                     "namespace_isolation": settings.advanced_settings.get('namespace_isolation', False),
-                    "group_by": ["owner", "app_label"],
-                    "log_tail": settings.numeric_settings.get('max_log_lines', 50)
+                    "group_by": ["owner", "app_label"]
+                },
+                "correlation": {
+                    "ttl": "15m",
+                    "max_events": 50,
+                    "patterns": [
+                        {
+                            "resources": ["Deployment", "ReplicaSet", "Pod"],
+                            "reasons": ["*Failed*", "CrashLoopBackOff"]
+                        }
+                    ]
                 }
             },
             "handler": {
                 "webhook": {
                     "url": settings.webhook_url,
                     "batchSize": settings.numeric_settings.get('batch_size', 5),
-                    "maxWaitTime": settings.numeric_settings.get('max_wait_time', '30s'),
-                    "minWaitTime": settings.numeric_settings.get('min_wait_time', '5s'),
-                    "groupEvents": settings.advanced_settings.get('group_events', True),
-                    "groupBy": ["kind", "namespace", "reason", "owner"],
+                    "min_wait": settings.numeric_settings.get('min_wait_time', '1m'),
+                    "max_wait": settings.numeric_settings.get('max_wait_time', '2m'),
                     "filtering": {
-                        "includeRoutineEvents": False,
                         "minSeverity": settings.advanced_settings.get('min_severity', 'Warning'),
                         "deduplication": {
                             "enabled": True,
                             "window": settings.numeric_settings.get('dedup_window', '15m')
-                        }
-                    },
-                    "templates": {
-                        "Pod": {
-                            "status": "{{ if .Status }}Pod Status: {{ .Status.Phase }}{{ if .Status.Message }} - {{ .Status.Message }}{{ end }}{{ if .Status.Reason }} ({{ .Status.Reason }}){{ end }}{{ end }}",
-                            "containers": "{{ range .Status.ContainerStatuses }}{{ .Name }}: {{ if .State.Waiting }}Waiting ({{ .State.Waiting.Reason }}){{ else if .State.Running }}Running{{ else if .State.Terminated }}Terminated ({{ .State.Terminated.Reason }}){{ end }}{{ end }}",
-                            "events": "{{ range .Events }}[{{ .Type }}] {{ .Reason }}: {{ .Message }}{{ end }}"
                         }
                     }
                 }
@@ -71,14 +99,11 @@ def initialize():
                 "pod": settings.watch_settings.get('watch_pod', True),
                 "node": settings.watch_settings.get('watch_node', True),
                 "deployment": settings.watch_settings.get('watch_deployment', True),
-                "service": settings.watch_settings.get('watch_service', False),
-                "ingress": settings.watch_settings.get('watch_ingress', False),
                 "event": settings.watch_settings.get('watch_event', True)
             },
             "enrichment": {
                 "include_logs": settings.advanced_settings.get('include_logs', True),
                 "include_events": settings.advanced_settings.get('include_events', True),
-                "include_metrics": settings.advanced_settings.get('include_metrics', True),
                 "max_log_lines": settings.numeric_settings.get('max_log_lines', 50),
                 "max_events": settings.numeric_settings.get('max_events', 10)
             }

@@ -19,8 +19,8 @@ class KubeWatchConfigBuilder:
 
     DEFAULT_NUMERIC_SETTINGS = {
         'batch_size': 5,
-        'max_wait_time': '30s',
-        'min_wait_time': '5s',
+        'max_wait_time': '10m',
+        'min_wait_time': '1m',
         'dedup_window': '15m',
         'max_log_lines': 50,
         'max_events': 10,
@@ -48,6 +48,7 @@ class KubeWatchConfigBuilder:
         namespaces = config.get('namespaces', 'default,kube-system')
         namespace_list = [ns.strip() for ns in namespaces.split(',') if ns.strip()]
         if not namespace_list:
+            print("No namespaces provided, using default namespaces (default, kube-system)")
             namespace_list = ['default', 'kube-system']
 
         # Parse settings
