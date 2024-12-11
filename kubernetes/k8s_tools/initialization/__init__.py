@@ -57,6 +57,13 @@ def initialize():
                             "enabled": True,
                             "window": settings.numeric_settings.get('dedup_window', '15m')
                         }
+                    },
+                    "templates": {
+                        "Pod": {
+                            "status": "{{ if .Status }}Pod Status: {{ .Status.Phase }}{{ if .Status.Message }} - {{ .Status.Message }}{{ end }}{{ if .Status.Reason }} ({{ .Status.Reason }}){{ end }}{{ end }}",
+                            "containers": "{{ range .Status.ContainerStatuses }}{{ .Name }}: {{ if .State.Waiting }}Waiting ({{ .State.Waiting.Reason }}){{ else if .State.Running }}Running{{ else if .State.Terminated }}Terminated ({{ .State.Terminated.Reason }}){{ end }}{{ end }}",
+                            "events": "{{ range .Events }}[{{ .Type }}] {{ .Reason }}: {{ .Message }}{{ end }}"
+                        }
                     }
                 }
             },

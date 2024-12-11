@@ -138,7 +138,7 @@ metadata:
     app.kubernetes.io/part-of: kubiya
 rules:
   - apiGroups: [""]
-    resources: ["pods", "nodes", "services", "deployments", "events", "configmaps"]
+    resources: ["pods", "pods/status", "pods/log", "nodes", "services", "deployments", "events", "configmaps"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets", "statefulsets", "replicasets"]
