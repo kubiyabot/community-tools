@@ -83,7 +83,7 @@ def initialize():
             "handler": {
                 "webhook": {
                     "url": settings.webhook_url,
-                    "batchSize": settings.numeric_settings.get('batch_size', 5),
+                    "batchSize": settings.numeric_settings.get('batch_size', 1),
                     "min_wait": settings.numeric_settings.get('min_wait_time', '1m'),
                     "max_wait": settings.numeric_settings.get('max_wait_time', '2m'),
                     "filtering": {
