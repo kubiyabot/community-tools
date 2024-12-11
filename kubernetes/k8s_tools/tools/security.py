@@ -161,7 +161,7 @@ check_exposed_services_tool = KubernetesTool(
     kubectl get services $namespace_flag -o json | jq -r '
         .items[] | 
         select(.spec.type == "LoadBalancer" or .spec.type == "NodePort") |
-        "  ⚠��  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
+        "  ⚠️  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
             [.spec.ports[] | 
             "\(if .nodePort then "NodePort: \(.nodePort)" else "" end) → \(.port)"] | 
             join(", ")
@@ -277,8 +277,10 @@ full_security_scan_tool = KubernetesTool(
     echo "\n3️⃣ Checking network policies..."
     kubectl get ns -o json | jq -r '
         .items[] | 
-        select(.metadata.name as $ns | 
-            not(any(["kube-system", "kube-public", "kube-node-lease"]; . == $ns))
+        select(
+            .metadata.name != "kube-system" and
+            .metadata.name != "kube-public" and
+            .metadata.name != "kube-node-lease"
         ) |
         .metadata.name' | 
     while read ns; do
@@ -300,7 +302,7 @@ full_security_scan_tool = KubernetesTool(
     kubectl get pods $namespace_flag -o json | jq -r '
         .items[] | 
         select(
-            .spec.containers[].securityContext.capabilities.add != null or
+            (.spec.containers[].securityContext.capabilities.add != null) or
             .spec.hostNetwork == true or
             .spec.hostPID == true or
             .spec.hostIPC == true
