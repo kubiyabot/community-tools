@@ -101,24 +101,43 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     
     # Convert JSON to YAML using yq
     echo "📝 Converting configuration to YAML..."
-    yq -P "$JSON_FILE" > "$YAML_FILE"
+    if [ ! -f "$JSON_FILE" ]; then
+        echo "❌ JSON configuration file not found at: $JSON_FILE"
+        exit 1
+    fi
+    
+    # Use yq to read JSON and output as YAML
+    yq eval -P "$JSON_FILE" > "$YAML_FILE" || {
+        echo "❌ Failed to convert JSON to YAML"
+        echo "JSON content:"
+        cat "$JSON_FILE"
+        exit 1
+    }
     
     echo "Successfully generated KubeWatch configuration, reference:\n\n$(cat "$YAML_FILE")\n\n"
 
     # Add watch configurations
     if [ "${WATCH_POD:-true}" = "true" ]; then
-        yq -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$YAML_FILE"
+        yq eval -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Pod", "reasons": ["*CrashLoopBackOff*", "*OOMKilled*", "*ImagePullBackOff*", "*RunContainerError*", "*Failed*"], "severity": "critical"}' "$YAML_FILE" || {
+            echo "❌ Failed to add Pod watch configuration"
+            exit 1
+        }
     fi
 
     if [ "${WATCH_NODE:-true}" = "true" ]; then
-        yq -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Node", "reasons": ["*NotReady*", "*DiskPressure*", "*MemoryPressure*", "*NetworkUnavailable*"], "severity": "critical"}' "$YAML_FILE"
+        yq eval -i '.data[".kubewatch.yaml"].filter.watch_for += {"kind": "Node", "reasons": ["*NotReady*", "*DiskPressure*", "*MemoryPressure*", "*NetworkUnavailable*"], "severity": "critical"}' "$YAML_FILE" || {
+            echo "❌ Failed to add Node watch configuration"
+            exit 1
+        }
     fi
 
     echo "🔄 Applying KubeWatch configuration..."
-    kubectl apply -f "$YAML_FILE" || {
-        echo "❌ Failed to apply KubeWatch configuration, refer to the generated configuration for reference"
+    if ! kubectl apply -f "$YAML_FILE"; then
+        echo "❌ Failed to apply KubeWatch configuration"
+        echo "Configuration content:"
+        cat "$YAML_FILE"
         exit 1
-    }
+    fi
     echo "✅ KubeWatch configuration applied successfully - events will be sent to the configured webhook"
 else
     echo "ℹ️ No webhook URL provided - skipping KubeWatch configuration (will not be able to watch for events)"
