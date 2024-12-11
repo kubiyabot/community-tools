@@ -109,6 +109,13 @@ def initialize():
             }
         }
 
+        # Add namespaces to filter if specified
+        if settings.namespaces and settings.namespaces != ['*']:
+            kubewatch_inner_config["filter"]["namespaces"] = settings.namespaces
+            print(f"🔍 Watching specific namespaces: {', '.join(settings.namespaces)}")
+        else:
+            print("🔍 Watching all namespaces")
+
         # Write inner config as JSON to /tmp
         inner_json_path = "/tmp/kubewatch_inner.json"
         with open(inner_json_path, 'w') as f:
