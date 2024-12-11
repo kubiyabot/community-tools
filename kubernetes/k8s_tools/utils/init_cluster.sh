@@ -66,6 +66,7 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
     # Use /tmp for all files
     JSON_FILE="${KUBEWATCH_CONFIG_PATH:-/tmp/kubewatch.json}"
     YAML_FILE="/tmp/kubewatch.yaml"
+    KUBEWATCH_CONFIG="/tmp/kubewatch_final.yaml"
     
     # Convert JSON to YAML using yq
     log "📝 Converting configuration to YAML..."
@@ -74,13 +75,26 @@ if [ -n "${KUBIYA_KUBEWATCH_WEBHOOK_URL}" ]; then
         exit 1
     fi
     
-    # Use yq to read JSON and output as YAML
-    yq eval -P "$JSON_FILE" > "$YAML_FILE" || {
-        log "❌ Failed to convert JSON to YAML"
-        log "JSON content:"
-        cat "$JSON_FILE"
-        exit 1
-    }
+    # Extract and convert the .kubewatch.yaml content to string
+    yq eval '.data[".kubewatch.yaml"] | to_yaml' "$JSON_FILE" > "$YAML_FILE"
+    
+    # Create the final ConfigMap with proper YAML content
+    cat > "$KUBEWATCH_CONFIG" << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubewatch-config
+  namespace: kubiya
+  labels:
+    app.kubernetes.io/name: kubewatch
+    app.kubernetes.io/part-of: kubiya
+data:
+  .kubewatch.yaml: |
+$(cat "$YAML_FILE" | sed 's/^/    /')
+EOF
+
+    log "Generated KubeWatch configuration:"
+    cat "$KUBEWATCH_CONFIG"
     
     # Create namespace if it doesn't exist
     log "Setting up kubiya namespace..."
@@ -163,10 +177,10 @@ EOT
 
     # Apply ConfigMap
     log "Applying KubeWatch ConfigMap..."
-    kubectl apply -f "$YAML_FILE" || {
+    kubectl apply -f "$KUBEWATCH_CONFIG" || {
         log "❌ Failed to apply KubeWatch configuration"
         log "Configuration content:"
-        cat "$YAML_FILE"
+        cat "$KUBEWATCH_CONFIG"
         exit 1
     }
     check_command "ConfigMap creation failed" "Created ConfigMap"
