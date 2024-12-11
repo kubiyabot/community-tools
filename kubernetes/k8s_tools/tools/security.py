@@ -262,9 +262,10 @@ full_security_scan_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input, using parameter expansion with default empty string
-    namespace_flag="${namespace:+"-n $namespace"}"
-    if [ -z "$namespace_flag" ]; then
+    # Set namespace flag based on input
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+    else
         namespace_flag="--all-namespaces"
     fi
 
@@ -293,13 +294,13 @@ full_security_scan_tool = KubernetesTool(
 
     # Check network policies
     echo "\n3️⃣ Checking network policies..."
-    if [ -n "$namespace" ]; then
+    if [ -n "${namespace:-}" ]; then
         # Check only the specified namespace
         if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
             echo "  ⚠️  Namespace without network policies: $namespace"
         fi
     else
-        # Check all namespaces
+        # Check all namespaces except system ones
         kubectl get ns -o json | jq -r '
             .items[] | 
             select(
@@ -308,8 +309,8 @@ full_security_scan_tool = KubernetesTool(
                 .metadata.name != "kube-node-lease"
             ) |
             .metadata.name' | 
-        while read ns; do
-            if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
+        while read -r ns; do
+            if [ $(kubectl get netpol -n "$ns" -o json | jq '.items | length') -eq 0 ]; then
                 echo "  ⚠️  Namespace without network policies: $ns"
             fi
         done
