@@ -21,7 +21,7 @@ def get_dir_tree(start_path, indent=0):
     return tree
 
 # Specify the directory you want to start with
-start_directory = "/tmp"
+start_directory = "/tmp/kubiya_shared_tools"
 dir_tree = get_dir_tree(start_directory)
 
 raise Exception(f"{dir_tree}")
