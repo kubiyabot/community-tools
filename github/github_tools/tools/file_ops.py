@@ -353,7 +353,6 @@ echo "✨ File listing complete!"
 tools = [
     get_file,
     remote_search,
-    preview_modifications,
     list_files
 ]
 
@@ -363,7 +362,6 @@ for tool in tools:
 __all__ = [
     'get_file',
     'remote_search',
-    'preview_modifications',
     'stateful_create_pr',
     'list_files'
 ]
