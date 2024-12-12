@@ -391,26 +391,32 @@ API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")
 
 # Fetch repository tree
 echo "🔍 Fetching repository structure..."
-TREE=$(gh api "$API_PATH" --jq '.tree[]')
+TREE=$(gh api "$API_PATH")
 
-# Process and display the tree structure
-echo "$TREE" | jq -r '[
-    .type as $type |
-    .path as $path |
-    .size as $size |
-    {
-        type: $type,
-        path: $path,
-        size: $size,
-        depth: ($path | split("/") | length),
-        dir: ($path | split("/")[:-1] | join("/"))
-    }
-] | sort_by(.path)' | while IFS= read -r item; do
-    type=$(echo "$item" | jq -r '.type')
-    path=$(echo "$item" | jq -r '.path')
+# First, get all directories and create them
+echo "$TREE" | jq -r '
+    .tree | 
+    map(select(.type == "tree")) |
+    map(.path) |
+    .[] |
+    @sh' | while read -r dir; do
+    dir=$(echo "$dir" | tr -d "'")
+    echo "📁 $dir/"
+done
+
+# Then list all files with proper indentation based on their path
+echo "$TREE" | jq -r '
+    .tree | 
+    map(select(.type == "blob")) |
+    sort_by(.path) |
+    .[] |
+    {path: .path, size: .size} |
+    @json' | while read -r file_info; do
+    path=$(echo "$file_info" | jq -r '.path')
+    size=$(echo "$file_info" | jq -r '.size')
     
     # Apply path filter if specified
-    if [ -n "$path" ] && [[ ! "$path" == "$path"* ]]; then
+    if [ -n "$path_filter" ] && [[ ! "$path" == "$path_filter"* ]]; then
         continue
     fi
     
@@ -418,26 +424,25 @@ echo "$TREE" | jq -r '[
     if [ -n "$filter" ] && [[ ! "$path" =~ $filter ]]; then
         continue
     fi
+
+    # Calculate indentation based on path depth
+    depth=$(echo "$path" | tr -cd '/' | wc -c)
+    indent=$(printf '%*s' "$((depth * 2))" '')
     
-    # Display item based on type
-    if [ "$type" = "tree" ]; then
-        echo "📁 $path/"
-    elif [ "$type" = "blob" ]; then
-        echo "  📄 $path"
+    # Display file with proper indentation
+    echo "${indent}📄 $path"
+    
+    if [ "$show_details" = "true" ]; then
+        FILE_INFO=$(gh api "repos/$repo/contents/$path" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
+            size: .size,
+            type: .type,
+            sha: .sha,
+            url: .html_url
+        }')
         
-        if [ "$show_details" = "true" ]; then
-            # Fetch additional file details using the API
-            FILE_INFO=$(gh api "repos/$repo/contents/$path" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
-                size: .size,
-                type: .type,
-                sha: .sha,
-                url: .html_url
-            }')
-            
-            echo "     📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
-            echo "     🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
-            echo "     🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
-        fi
+        echo "${indent}   📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
+        echo "${indent}   🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
+        echo "${indent}   🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
     fi
 done
 
