@@ -402,8 +402,18 @@ FILE_EDIT_SCRIPT = '''
 #!/bin/bash
 set -euo pipefail
 
+# Function to check if changes were made
+check_changes() {
+    if ! git diff --quiet "${file}"; then
+        return 0  # Changes found
+    else
+        return 1  # No changes
+    fi
+}
+
 # Clone repo and setup
 echo "🔄 Cloning repository..."
+rm -rf ./* ./.git
 git clone "https://${GH_TOKEN}@github.com/${repo}.git" .
 
 # Configure git
@@ -413,9 +423,17 @@ git config --global user.email "bot@kubiya.ai"
 # Switch to or create branch
 if [ -n "${branch_name}" ]; then
     echo "🌱 Creating branch: ${branch_name}"
+    git fetch origin "${base_branch}"
     git checkout -b "${branch_name}" "origin/${base_branch}"
 else
+    echo "🔄 Checking out ${base_branch}"
     git checkout "${base_branch}"
+fi
+
+# Verify file exists
+if [ ! -f "${file}" ]; then
+    echo "❌ Error: File '${file}' not found!"
+    exit 1
 fi
 
 # Edit file using sed
@@ -426,16 +444,37 @@ else
     sed -i "${sed_statement}" "${file}"
 fi
 
+# Check if changes were made
+if ! check_changes; then
+    echo "⚠️  No changes were made to the file. The sed command might not have matched anything."
+    exit 1
+fi
+
 # Show what changed
 echo "📊 Changes made:"
 git diff "${file}"
 
 # Commit and push
+echo "💾 Committing changes..."
 git add "${file}"
+git status --short
 git commit -m "${commit_message}"
-git push origin HEAD
 
-echo "✨ Changes pushed successfully!"
+echo "🚀 Pushing changes..."
+if [ -n "${branch_name}" ]; then
+    git push -u origin "${branch_name}"
+else
+    git push origin "${base_branch}"
+fi
+
+# Verify push was successful
+if git ls-remote --heads origin "${branch_name:-${base_branch}}" | grep -q "${branch_name:-${base_branch}}"; then
+    echo "✨ Changes pushed successfully to ${branch_name:-${base_branch}}!"
+    echo "🔗 Branch URL: https://github.com/${repo}/tree/${branch_name:-${base_branch}}"
+else
+    echo "❌ Failed to push changes!"
+    exit 1
+fi
 '''
 
 # Simplified edit file tool
