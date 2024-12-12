@@ -313,69 +313,6 @@ preview_changes "${{modifications}}" "${{create_branch}}" "${{branch_name}}"
     with_volumes=[GIT_VOLUME]
 )
 
-stateful_modify_and_commit = GitHubCliTool(
-    name="github_modify_and_commit",
-    description="Modify files and commit changes.",
-    content=f'''
-{FILE_OPS_SCRIPT}
-
-setup_repo "${{repo}}" "${{branch}}"
-modify_and_commit "${{modifications}}" "${{commit_message}}" "${{create_branch}}" "${{branch_name}}" "${{dry_run}}"
-''',
-    args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="modifications", type="str", description='JSON array of modifications: [{"file": "path", "pattern": "old", "replacement": "new"}]', required=True),
-        Arg(name="commit_message", type="str", description="Custom commit message", required=False),
-        Arg(name="branch", type="str", description="Base branch to start from", required=False),
-        Arg(name="create_branch", type="bool", description="Create new branch for changes", required=False),
-        Arg(name="branch_name", type="str", description="Name for new branch (if creating)", required=False),
-        Arg(name="dry_run", type="bool", description="Preview changes without committing", required=False),
-    ],
-    with_volumes=[GIT_VOLUME]
-)
-
-stateful_create_pr = GitHubCliTool(
-    name="github_create_pr",
-    description="""Create pull request from changes.
-    
-WHEN TO USE:
-- After modifying files
-- Need to create PR
-- Want to add reviewers""",
-    content=f'''
-{FILE_OPS_SCRIPT}
-
-setup_repo "${{repo}}" "${{branch}}"
-
-echo "📋 Creating pull request..."
-
-# Add disclaimer to PR body
-PR_BODY="${{body}}
-
-$(add_disclaimer markdown)"
-
-PR_URL=$(gh pr create \
-    --title "${{title}}" \
-    --body "$PR_BODY" \
-    --base "${{target_branch}}" \
-    $([[ -n "${{reviewers}}" ]] && echo "--reviewer ${{reviewers}}") \
-    $([[ -n "${{labels}}" ]] && echo "--label ${{labels}}"))
-
-echo "✨ Pull request created successfully"
-echo "🔗 URL: $PR_URL"
-''',
-    args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="branch", type="str", description="Source branch with changes", required=True),
-        Arg(name="target_branch", type="str", description="Target branch for PR", required=True),
-        Arg(name="title", type="str", description="PR title", required=True),
-        Arg(name="body", type="str", description="PR description", required=True),
-        Arg(name="reviewers", type="str", description="Comma-separated list of reviewers", required=False),
-        Arg(name="labels", type="str", description="Comma-separated list of labels", required=False),
-    ],
-    with_volumes=[GIT_VOLUME]
-)
-
 list_files = GitHubCliTool(
     name="github_list_files",
     description="List files in a GitHub repository with optional filtering using GitHub API",
@@ -446,8 +383,6 @@ tools = [
     get_file,
     remote_search,
     preview_modifications,
-    stateful_modify_and_commit,
-    stateful_create_pr,
     list_files
 ]
 
@@ -458,7 +393,6 @@ __all__ = [
     'get_file',
     'remote_search',
     'preview_modifications',
-    'stateful_modify_and_commit',
     'stateful_create_pr',
     'list_files'
 ]
