@@ -3,33 +3,47 @@ from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Common disclaimer for automated actions
-KUBIYA_DISCLAIMER = """
+KUBIYA_DISCLAIMER = '''
 
 ---
-> **Note**: This action was performed on behalf of @${GITHUB_ACTOR} using an automated AI workflow powered by [Kubiya.ai](https://kubiya.ai)
-"""
+> **Note**: This action was performed by Kubiya.ai on behalf of @${GITHUB_ACTOR}
+> 
+> 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
+'''
 
 pr_create = GitHubCliTool(
     name="github_pr_create",
-    description="Create a new pull request in a GitHub repository.",
+    description="Create a new pull request in a GitHub repository. DO NOT USE THIS BEFORE YOU HAVE CREATED OR KNOWN THE BRANCH YOU WANT TO OPEN THE PR FROM.",
     content="""
+#!/bin/bash
+set -euo pipefail
+
 echo "🚀 Creating new pull request in $repo..."
 echo "📝 Title: $title"
 echo "📄 Base branch: $base"
 echo "🔀 Head branch: $head"
 
-# Append disclaimer to PR body
+# Get current user and create disclaimer
 GITHUB_ACTOR=$(gh api user --jq '.login')
-FULL_BODY="$body
+DISCLAIMER=$(echo "${KUBIYA_DISCLAIMER}" | envsubst)
 
-${KUBIYA_DISCLAIMER}"
+# Create full PR body with disclaimer
+FULL_BODY="${body}
 
-RESULT=$(gh pr create --repo $repo --title "$title" --body "$FULL_BODY" --base $base --head $head $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$reviewer" ]] && echo "--reviewer $reviewer"))
+${DISCLAIMER}"
 
-PR_URL=$(echo "$RESULT" | grep -o 'https://github.com/[^[:space:]]*')
+# Create PR with full body
+PR_URL=$(gh pr create \
+    --repo "$repo" \
+    --title "$title" \
+    --body "$FULL_BODY" \
+    --base "$base" \
+    --head "$head" \
+    $([[ -n "$assignee" ]] && echo "--assignee $assignee") \
+    $([[ -n "$reviewer" ]] && echo "--reviewer $reviewer"))
+
 echo "✨ Pull request created successfully!"
 echo "📋 Details: $PR_URL"
-echo "$RESULT"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
