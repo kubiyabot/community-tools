@@ -49,11 +49,11 @@ PR_CMD="gh pr create \
     --head \"$head\""
 
 # Add optional args if provided
-if [ -n "$assignee" ]; then
+if [ -n "${{assignee:-}}" ]; then
     PR_CMD="$PR_CMD --assignee \"$assignee\""
 fi
 
-if [ -n "$reviewer" ]; then
+if [ -n "${{reviewer:-}}" ]; then
     PR_CMD="$PR_CMD --reviewer \"$reviewer\"" 
 fi
 
