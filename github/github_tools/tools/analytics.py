@@ -60,9 +60,9 @@ fi
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="workflow", type="str", description="Workflow name/ID to analyze", required=False),
-        Arg(name="days", type="int", description="Analysis period in days", required=False, default=30),
+        Arg(name="days", type="str", description="Analysis period in days", required=False, default="30"),
         Arg(name="format", type="str", description="Output format (json/text)", required=False, default="text"),
-        Arg(name="limit", type="int", description="Maximum runs to analyze", required=False, default=1000),
+        Arg(name="limit", type="str", description="Maximum runs to analyze", required=False, default="1000"),
     ],
 )
 

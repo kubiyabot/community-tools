@@ -39,7 +39,7 @@ echo "🔗 View results on web: https://github.com/search?q=${query}&type=${type
         ),
         Arg(
             name="limit",
-            type="int",
+            type="str",
             description="Maximum number of results to return. Example: 100 (default: 30)",
             required=False
         ),
@@ -85,7 +85,7 @@ fi
         ),
         Arg(
             name="limit",
-            type="int",
+            type="str",
             description="Maximum number of results. Example: 50 (default: 100)",
             required=False
         ),
@@ -229,7 +229,7 @@ echo "✨ Search Complete! ✨"
         Arg(name="in_file", type="bool", description="Search in file contents", required=False),
         Arg(name="in_path", type="bool", description="Search in file paths", required=False),
         Arg(name="format", type="str", description="Output format (text/json/markdown)", required=False, default="text"),
-        Arg(name="limit", type="int", description="Maximum results to return", required=False, default=100),
+        Arg(name="limit", type="str", description="Maximum results to return", required=False, default="100"),
     ],
 )
 
