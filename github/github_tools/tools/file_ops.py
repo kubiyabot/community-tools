@@ -406,6 +406,10 @@ set -euo pipefail
 echo "🔄 Cloning repository..."
 git clone "https://${GH_TOKEN}@github.com/${repo}.git" .
 
+# Configure git
+git config --global user.name "Kubiya Bot"
+git config --global user.email "bot@kubiya.ai"
+
 # Switch to or create branch
 if [ -n "${branch_name}" ]; then
     echo "🌱 Creating branch: ${branch_name}"
