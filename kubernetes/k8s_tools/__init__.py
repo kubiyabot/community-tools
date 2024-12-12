@@ -1,10 +1,11 @@
 # k8s_tools/__init__.py
+from .initialization import initialize as init_kubewatch
+
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     try:
         print("Starting Kubernetes tools initialization...")
-        from .initialization import initialize as init_kubewatch
         init_kubewatch()
         print("Kubernetes tools initialization completed")
     except Exception as e:
