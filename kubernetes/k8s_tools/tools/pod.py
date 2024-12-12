@@ -2,9 +2,9 @@ from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
-pod_management_tool = KubernetesTool(
+single_pod_operations_tool = KubernetesTool(
     name="single_pod_operations",
-    description="Performs operations on a single Kubernetes pod - retrieves logs, gets detailed information, or deletes a specific pod. For listing multiple pods, use a different tool.",
+    description="Performs operations on a single Kubernetes pod - retrieves logs, gets detailed information, or deletes a specific pod.",
     content="""
     #!/bin/bash
     set -e
@@ -34,6 +34,45 @@ pod_management_tool = KubernetesTool(
     ],
 )
 
+bulk_pod_operations_tool = KubernetesTool(
+    name="bulk_pod_operations",
+    description="Performs operations on multiple Kubernetes pods - list, delete, or filter pods across namespaces",
+    content="""
+    #!/bin/bash
+    set -e
+
+    # Set namespace flag based on input
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
+    
+    # Set selector flag if provided
+    selector_flag=$( [ -n "$selector" ] && echo "-l $selector" || echo "" )
+    
+    # Set field selector if provided
+    field_selector_flag=$( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" || echo "" )
+
+    if [ "$action" = "get" ]; then
+        kubectl get pods $namespace_flag $selector_flag $field_selector_flag
+    elif [ "$action" = "delete" ]; then
+        if [ -z "$selector" ] && [ -z "$field_selector" ]; then
+            echo "❌ Error: Either label selector or field selector is required for bulk delete operations for safety"
+            exit 1
+        fi
+        kubectl delete pods $namespace_flag $selector_flag $field_selector_flag
+    fi
+    """,
+    args=[
+        Arg(name="action", type="str", description="Action to perform (get, delete)", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace to filter results. If omitted, shows all namespaces", required=False),
+        Arg(name="selector", type="str", description="Label selector to filter pods (e.g. 'app=myapp')", required=False),
+        Arg(name="field_selector", type="str", description="Field selector to filter pods (e.g. 'status.phase=Failed')", required=False),
+    ],
+)
 
 check_pod_restarts_tool = KubernetesTool(
     name="check_pod_restarts",
@@ -70,7 +109,8 @@ check_pod_restarts_tool = KubernetesTool(
 
 # Register all tools
 for tool in [
-    pod_management_tool,
+    single_pod_operations_tool,
+    bulk_pod_operations_tool,
     check_pod_restarts_tool,
 ]:
     tool_registry.register("kubernetes", tool)
