@@ -1,6 +1,6 @@
 # k8s_tools/tools/base.py
 from ..utils.script_runner import ScriptExecutionError, run_script
-from kubiya_sdk.tools import Tool
+from kubiya_sdk.tools import Tool, Arg, FileSpec
 
 KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 
@@ -62,4 +62,4 @@ kubectl_cli = KubernetesTool(
     ]
 )
 
-__all__ = ['KubernetesTool', 'ScriptExecutionError', 'run_script']
+__all__ = ['KubernetesTool', 'ScriptExecutionError', 'run_script', 'Arg', 'FileSpec']

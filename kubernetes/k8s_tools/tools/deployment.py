@@ -1,5 +1,4 @@
-from .base import KubernetesTool, ScriptExecutionError
-from kubiya_sdk.tools import Arg
+from .base import KubernetesTool, ScriptExecutionError, Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 
 deployment_management_tool = KubernetesTool(
