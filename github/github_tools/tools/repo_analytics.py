@@ -193,62 +193,60 @@ set -euo pipefail
 echo "📊 Analyzing GitHub Actions for: $repo"
 DAYS="${days:-7}"  # Default to last 7 days
 LIMIT="${limit:-50}"  # Default to 50 runs
-WORKFLOW="${workflow:-}"  # Optional specific workflow
 
-# Get workflow runs
+# Get workflow runs with correct fields
 echo "🔍 Fetching workflow runs..."
-QUERY="repos/$repo/actions/runs?per_page=$LIMIT"
-if [ -n "$workflow" ]; then
-    WORKFLOW_ID=$(gh api "repos/$repo/actions/workflows" --jq ".workflows[] | select(.name == \\"$workflow\\" or .path == \\"$workflow\\") | .id")
-    if [ -n "$WORKFLOW_ID" ]; then
-        QUERY="repos/$repo/actions/workflows/$WORKFLOW_ID/runs?per_page=$LIMIT"
-    fi
-fi
-
-RUNS=$(gh api "$QUERY" --jq "{
-    total_count: .total_count,
-    runs: [
-        .workflow_runs[] | 
-        select(.created_at >= (now - ($DAYS | tonumber * 86400) | todate))
-    ]
-}")
+RUNS=$(gh run list \
+    --repo "$repo" \
+    --limit "$LIMIT" \
+    --json "conclusion,createdAt,event,headBranch,name,startedAt,status,updatedAt,url" \
+    --jq '[
+        .[] |
+        select(.createdAt >= (now - ($DAYS | tonumber * 86400) | todate)) |
+        . + {
+            duration: (
+                if (.startedAt != null and .updatedAt != null) then
+                    ((.updatedAt | fromdateiso8601) - (.startedAt | fromdateiso8601))
+                else 0 end
+            )
+        }
+    ]')
 
 # Analyze the runs
 echo "📈 Analyzing workflow performance..."
 ANALYSIS=$(echo "$RUNS" | jq '{
     summary: {
-        total_runs: (.runs | length),
-        success_rate: (([.runs[] | select(.conclusion == "success")] | length) as $s | 
-                      ([.runs[] | select(.conclusion != null)] | length) as $t |
-                      if $t > 0 then ($s * 100.0 / $t) else 0 end),
-        avg_duration: ([.runs[] | select(.conclusion != null) | .run_started_at | fromdateiso8601] as $starts |
-                      [.runs[] | select(.conclusion != null) | .updated_at | fromdateiso8601] as $ends |
-                      if ($starts | length) > 0 then
-                        ([$starts, $ends] | transpose | map(.[1] - .[0]) | add / length / 60)
-                      else 0 end)
-    },
-    by_status: (.runs | group_by(.conclusion) | map({
-        status: .[0].conclusion,
-        count: length,
-        percentage: (length * 100.0 / ($runs | length))
-    })),
-    recent_failures: [
-        .runs[] | 
-        select(.conclusion == "failure") |
-        {
-            workflow: .name,
-            branch: .head_branch,
-            started_at: .run_started_at,
-            url: .html_url
-        }
-    ] | sort_by(.started_at) | reverse | .[0:5],
-    by_workflow: (.runs | group_by(.name) | map({
-        name: .[0].name,
         total_runs: length,
         success_rate: (([.[] | select(.conclusion == "success")] | length) as $s |
                       ([.[] | select(.conclusion != null)] | length) as $t |
-                      if $t > 0 then ($s * 100.0 / $t) else 0 end)
-    }) | sort_by(-.total_runs))
+                      if $t > 0 then ($s * 100.0 / $t) else 0 end),
+        avg_duration_minutes: ([.[] | select(.duration > 0) | .duration] | if length > 0 then (add / length / 60) else 0 end)
+    },
+    status_breakdown: (group_by(.conclusion) | map({
+        status: (.[0].conclusion // "pending"),
+        count: length,
+        percentage: (length * 100.0 / ($RUNS | length))
+    })),
+    by_branch: (group_by(.headBranch) | map({
+        branch: .[0].headBranch,
+        runs: length,
+        success_rate: (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
+    }) | sort_by(-.runs)),
+    by_trigger: (group_by(.event) | map({
+        trigger: .[0].event,
+        count: length,
+        success_rate: (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
+    }) | sort_by(-.count)),
+    recent_failures: [
+        .[] | 
+        select(.conclusion == "failure") |
+        {
+            workflow: .name,
+            branch: .headBranch,
+            started: .startedAt,
+            url: .url
+        }
+    ] | sort_by(.started) | reverse | .[0:5]
 }')
 
 # Format output
@@ -260,33 +258,38 @@ else
         .summary |
         "📊 Total Runs: \(.total_runs)",
         "✨ Success Rate: \(.success_rate | round)%",
-        "⏱️  Average Duration: \(.avg_duration | round)min"
+        "⏱️  Average Duration: \(.avg_duration_minutes | round)min"
     '
     
     echo -e "\\n=== Status Breakdown ==="
     echo "$ANALYSIS" | jq -r '
-        .by_status[] |
+        .status_breakdown[] |
         "[\(.status // "pending")] \(.count) runs (\(.percentage | round)%)"
+    '
+    
+    echo -e "\\n=== By Branch ==="
+    echo "$ANALYSIS" | jq -r '
+        .by_branch[] |
+        "🌿 \(.branch):\\n   Runs: \(.runs), Success Rate: \(.success_rate | round)%"
+    '
+    
+    echo -e "\\n=== By Trigger ==="
+    echo "$ANALYSIS" | jq -r '
+        .by_trigger[] |
+        "🔄 \(.trigger):\\n   Count: \(.count), Success Rate: \(.success_rate | round)%"
     '
     
     if [ -n "$(echo "$ANALYSIS" | jq -r '.recent_failures | length')" ]; then
         echo -e "\\n=== Recent Failures ==="
         echo "$ANALYSIS" | jq -r '
             .recent_failures[] |
-            "❌ \(.workflow) (\(.branch))\\n   At: \(.started_at)\\n   URL: \(.url)"
+            "❌ \(.workflow) (\(.branch))\\n   At: \(.started)\\n   URL: \(.url)"
         '
     fi
-    
-    echo -e "\\n=== By Workflow ==="
-    echo "$ANALYSIS" | jq -r '
-        .by_workflow[] |
-        "🔄 \(.name):\\n   Runs: \(.total_runs), Success Rate: \(.success_rate | round)%"
-    '
 fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="workflow", type="str", description="Specific workflow name or file path (optional)", required=False),
         Arg(name="days", type="str", description="Days of history to analyze (default: 7)", required=False, default="7"),
         Arg(name="limit", type="str", description="Maximum number of runs to analyze (default: 50)", required=False, default="50"),
         Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
