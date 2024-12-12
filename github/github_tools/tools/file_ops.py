@@ -438,7 +438,6 @@ echo "✨ File listing complete!"
 # Update the tools list
 tools = [
     get_file,
-    stateful_search_files,
     remote_search,
     preview_modifications,
     stateful_modify_and_commit,
@@ -451,7 +450,6 @@ for tool in tools:
 
 __all__ = [
     'get_file',
-    'stateful_search_files',
     'remote_search',
     'preview_modifications',
     'stateful_modify_and_commit',
