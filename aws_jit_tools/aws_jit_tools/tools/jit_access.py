@@ -5,10 +5,9 @@ from .base import AWSJITTool
 from ..scripts.config_loader import get_access_configs, get_s3_configs
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
-from dateutil.parser import parse
-from dateutil.relativedelta import relativedelta
+import re
 
 # Get access handler code
 HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
@@ -26,6 +25,34 @@ class S3JITAccess(AWSJITTool):
         self.iam_client = self.session.client('iam')
         self.logger = logging.getLogger(__name__)
         
+    def _parse_iso8601_duration(self, duration_str):
+        """Parse ISO8601 duration string to timedelta"""
+        pattern = re.compile(r'P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
+        match = pattern.match(duration_str)
+        if not match:
+            raise ValueError(f"Invalid ISO8601 duration format: {duration_str}")
+        
+        days, hours, minutes, seconds = match.groups()
+        return timedelta(
+            days=int(days or 0),
+            hours=int(hours or 0),
+            minutes=int(minutes or 0),
+            seconds=int(seconds or 0)
+        )
+
+    def _validate_duration(self, requested_duration, max_duration):
+        """Validate the requested duration against maximum allowed"""
+        try:
+            requested = self._parse_iso8601_duration(requested_duration)
+            maximum = self._parse_iso8601_duration(max_duration)
+            
+            if requested > maximum:
+                raise ValueError(f"Requested duration exceeds maximum allowed ({max_duration})")
+            
+            return requested_duration
+        except ValueError as e:
+            raise ValueError(f"Invalid duration format: {e}")
+
     def _create_permission_set(self, instance_arn, name, description, session_duration, policy_doc):
         """Create a new permission set with inline policy"""
         try:
@@ -68,19 +95,6 @@ class S3JITAccess(AWSJITTool):
         if config_name not in configs:
             raise ValueError(f"Configuration '{config_name}' not found")
         return configs[config_name]
-
-    def _validate_duration(self, requested_duration, max_duration):
-        """Validate the requested duration against maximum allowed"""
-        try:
-            requested = parse(requested_duration)
-            maximum = parse(max_duration)
-            
-            if requested > maximum:
-                raise ValueError(f"Requested duration exceeds maximum allowed ({max_duration})")
-            
-            return requested_duration
-        except ValueError as e:
-            raise ValueError(f"Invalid duration format: {e}")
 
     def grant_access(self, config_name, requester_id, duration=None):
         """Grant S3 access by creating and assigning permission set"""
