@@ -230,7 +230,8 @@ class S3JITAccess(AWSJITTool):
         # Replace bucket name placeholders for each bucket
         resources = []
         for bucket in config['buckets']:
-            bucket_arn = f"arn:aws:s3:::{bucket['name']}"
+            bucket_name = bucket['name']  # Extract the name from the bucket dict
+            bucket_arn = f"arn:aws:s3:::{bucket_name}"
             resources.extend([bucket_arn, f"{bucket_arn}/*"])
             
         policy['Statement'][0]['Resource'] = resources
@@ -340,7 +341,7 @@ def create_s3_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
-    buckets_list = ", ".join(config['buckets'])
+    buckets_list = ", ".join(bucket['name'] for bucket in config['buckets'])
     tool_name = f"s3_{action}_{config['name'].lower().replace(' ', '_')}"
 
     mermaid_diagram = f"""
