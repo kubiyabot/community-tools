@@ -268,31 +268,6 @@ get_file_contents "${{repo}}" "${{file_path}}" "${{ref}}"
     ]
 )
 
-stateful_search_files = GitHubCliTool(
-    name="github_stateful_search_files",
-    description="""Search for patterns in repository files.
-    
-WHEN TO USE:
-- Need to find text patterns
-- Want to search specific file types
-- Need context around matches""",
-    content=f'''
-{FILE_OPS_SCRIPT}
-
-setup_repo "${{repo}}" "${{branch}}"
-search_files "${{pattern}}" "${{file_pattern}}" "${{case_sensitive}}" "${{show_content}}"
-''',
-    args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="pattern", type="str", description="Pattern to search for", required=True),
-        Arg(name="file_pattern", type="str", description="File pattern (e.g., '*.py')", required=False),
-        Arg(name="case_sensitive", type="bool", description="Case sensitive search", required=False),
-        Arg(name="show_content", type="bool", description="Show matching content", required=False),
-        Arg(name="branch", type="str", description="Branch to search in", required=False),
-    ],
-    with_volumes=[GIT_VOLUME]
-)
-
 remote_search = GitHubCliTool(
     name="github_remote_search",
     description="""Search repository content via GitHub API.
@@ -401,6 +376,65 @@ echo "🔗 URL: $PR_URL"
     with_volumes=[GIT_VOLUME]
 )
 
+list_files = GitHubCliTool(
+    name="github_list_files",
+    description="List files in a GitHub repository with optional filtering using GitHub API",
+    content="""
+echo "📂 Listing files in repository: $repo"
+[[ -n "$path" ]] && echo "📁 Path: $path"
+[[ -n "$filter" ]] && echo "🔍 Filter: $filter"
+[[ -n "$ref" ]] && echo "🔖 Ref: $ref"
+
+# Build the API query
+API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")"
+[[ "$recursive" == "true" ]] && API_PATH="$API_PATH?recursive=1"
+
+# Fetch repository tree
+echo "🔍 Fetching repository structure..."
+TREE=$(gh api "$API_PATH" --jq '.tree[]')
+
+# Process and filter the results
+echo "$TREE" | jq -r '. | select(.type == "blob") | .path' | while read -r file; do
+    # Apply path filter if specified
+    if [ -n "$path" ] && [[ ! "$file" == "$path"* ]]; then
+        continue
+    fi
+    
+    # Apply name filter if specified
+    if [ -n "$filter" ] && [[ ! "$file" =~ $filter ]]; then
+        continue
+    fi
+    
+    # Display file info
+    echo "  📄 $file"
+    
+    if [ "$show_details" = "true" ]; then
+        # Fetch additional file details using the API
+        FILE_INFO=$(gh api "repos/$repo/contents/$file" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
+            size: .size,
+            type: .type,
+            sha: .sha,
+            url: .html_url
+        }')
+        
+        echo "     📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
+        echo "     🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
+        echo "     🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
+    fi
+done
+
+echo "✨ File listing complete!"
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
+        Arg(name="filter", type="str", description="Optional filter pattern for file names. Example: '.py' or 'test'", required=False),
+        Arg(name="path", type="str", description="Optional path to list files from. Example: 'src' or 'docs'", required=False),
+        Arg(name="ref", type="str", description="Optional git reference (branch, tag, or commit SHA). Example: 'main' or 'v1.0.0'", required=False),
+        Arg(name="recursive", type="bool", description="List files recursively in subdirectories", required=False, default="true"),
+        Arg(name="show_details", type="bool", description="Show additional file details", required=False, default="false"),
+    ],
+)
+
 # Update the tools list
 tools = [
     get_file,
@@ -408,7 +442,8 @@ tools = [
     remote_search,
     preview_modifications,
     stateful_modify_and_commit,
-    stateful_create_pr
+    stateful_create_pr,
+    list_files
 ]
 
 for tool in tools:
@@ -420,5 +455,6 @@ __all__ = [
     'remote_search',
     'preview_modifications',
     'stateful_modify_and_commit',
-    'stateful_create_pr'
+    'stateful_create_pr',
+    'list_files'
 ]
