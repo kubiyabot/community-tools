@@ -72,7 +72,7 @@ echo "✨ Successfully retrieved workflow list!"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="limit", type="int", description="Maximum workflows to list", required=False),
+        Arg(name="limit", type="str", description="Maximum workflows to list", required=False),
     ],
 )
 
