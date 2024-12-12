@@ -3,6 +3,11 @@ from kubiya_sdk.tools.models import FileSpec, Arg
 from pathlib import Path
 from .base import AWSJITTool
 from ..scripts.config_loader import get_access_configs, get_s3_configs
+import json
+import uuid
+from datetime import datetime, timedelta
+import logging
+import re
 
 # Get access handler code
 HANDLER_PATH = Path(__file__).parent.parent / 'scripts' / 'access_handler.py'
@@ -12,6 +17,225 @@ with open(HANDLER_PATH) as f:
 # Initialize tools dictionary at module level
 tools = {}
 s3_tools = {}
+
+class S3JITAccess(AWSJITTool):
+    def __init__(self, role_arn):
+        super().__init__(role_arn)
+        self.sso_client = self.session.client('sso-admin')
+        self.iam_client = self.session.client('iam')
+        self.logger = logging.getLogger(__name__)
+        
+    def _parse_iso8601_duration(self, duration_str):
+        """Parse ISO8601 duration string to timedelta"""
+        pattern = re.compile(r'P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?')
+        match = pattern.match(duration_str)
+        if not match:
+            raise ValueError(f"Invalid ISO8601 duration format: {duration_str}")
+        
+        days, hours, minutes, seconds = match.groups()
+        return timedelta(
+            days=int(days or 0),
+            hours=int(hours or 0),
+            minutes=int(minutes or 0),
+            seconds=int(seconds or 0)
+        )
+
+    def _validate_duration(self, requested_duration, max_duration):
+        """Validate the requested duration against maximum allowed"""
+        try:
+            requested = self._parse_iso8601_duration(requested_duration)
+            maximum = self._parse_iso8601_duration(max_duration)
+            
+            if requested > maximum:
+                raise ValueError(f"Requested duration exceeds maximum allowed ({max_duration})")
+            
+            return requested_duration
+        except ValueError as e:
+            raise ValueError(f"Invalid duration format: {e}")
+
+    def _create_permission_set(self, instance_arn, name, description, session_duration, policy_doc):
+        """Create a new permission set with inline policy"""
+        try:
+            # Create permission set
+            response = self.sso_client.create_permission_set(
+                InstanceArn=instance_arn,
+                Name=f"kubiya-{name}-{uuid.uuid4().hex[:8]}",
+                Description=description,
+                SessionDuration=session_duration,
+                Tags=[
+                    {
+                        'Key': 'ManagedBy',
+                        'Value': 'Kubiya'
+                    },
+                    {
+                        'Key': 'CreatedAt',
+                        'Value': datetime.utcnow().isoformat()
+                    }
+                ]
+            )
+            
+            permission_set_arn = response['PermissionSet']['PermissionSetArn']
+            
+            # Put inline policy
+            self.sso_client.put_inline_policy_to_permission_set(
+                InstanceArn=instance_arn,
+                PermissionSetArn=permission_set_arn,
+                InlinePolicy=json.dumps(policy_doc)
+            )
+            
+            return permission_set_arn
+            
+        except Exception as e:
+            print(f"Error creating permission set: {e}")
+            raise
+
+    def _load_config(self, config_name):
+        """Load and validate S3 access configuration"""
+        configs = get_s3_configs()
+        if config_name not in configs:
+            raise ValueError(f"Configuration '{config_name}' not found")
+        return configs[config_name]
+
+    def grant_access(self, config_name, requester_id, duration=None):
+        """Grant S3 access by creating and assigning permission set"""
+        try:
+            # Load and validate configuration
+            config = self._load_config(config_name)
+            
+            # Validate duration
+            duration = self._validate_duration(
+                duration or config['session_duration'],
+                config['session_duration']
+            )
+
+            # Get SSO instance
+            instances = self.sso_client.list_instances()
+            if not instances['Instances']:
+                raise Exception("No SSO instance found")
+            
+            instance_arn = instances['Instances'][0]['InstanceArn']
+            
+            # Generate policy document
+            policy_doc = self._generate_policy(config)
+            
+            # Create permission set with tags
+            permission_set_arn = self._create_permission_set(
+                instance_arn,
+                config['name'],
+                config['description'],
+                duration,
+                policy_doc
+            )
+            
+            self.logger.info(f"Created permission set: {permission_set_arn}")
+            
+            # Create account assignments
+            created_assignments = []
+            try:
+                accounts = set(bucket['account_id'] for bucket in config['buckets'])
+                for account_id in accounts:
+                    response = self.sso_client.create_account_assignment(
+                        InstanceArn=instance_arn,
+                        TargetId=account_id,
+                        TargetType='AWS_ACCOUNT',
+                        PermissionSetArn=permission_set_arn,
+                        PrincipalType='USER',
+                        PrincipalId=requester_id
+                    )
+                    created_assignments.append({
+                        'account_id': account_id,
+                        'request_id': response['RequestId']
+                    })
+                    self.logger.info(f"Created assignment for account {account_id}")
+            except Exception as e:
+                # Cleanup partial assignments if something fails
+                self.logger.error(f"Error creating assignments: {e}")
+                self._cleanup_failed_grant(instance_arn, permission_set_arn, created_assignments, requester_id)
+                raise
+            
+            return {
+                'status': 'success',
+                'permission_set_arn': permission_set_arn,
+                'instance_arn': instance_arn,
+                'assignments': created_assignments
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error granting access: {e}")
+            raise
+
+    def _cleanup_failed_grant(self, instance_arn, permission_set_arn, assignments, requester_id):
+        """Clean up resources after failed grant attempt"""
+        for assignment in assignments:
+            try:
+                self.sso_client.delete_account_assignment(
+                    InstanceArn=instance_arn,
+                    TargetId=assignment['account_id'],
+                    TargetType='AWS_ACCOUNT',
+                    PermissionSetArn=permission_set_arn,
+                    PrincipalType='USER',
+                    PrincipalId=requester_id
+                )
+            except Exception as e:
+                self.logger.error(f"Error cleaning up assignment: {e}")
+
+        try:
+            self.sso_client.delete_permission_set(
+                InstanceArn=instance_arn,
+                PermissionSetArn=permission_set_arn
+            )
+        except Exception as e:
+            self.logger.error(f"Error cleaning up permission set: {e}")
+
+    def revoke_access(self, permission_set_arn, instance_arn, requester_id):
+        """Revoke access by removing assignments and permission set"""
+        try:
+            # List account assignments
+            assignments = self.sso_client.list_account_assignments(
+                InstanceArn=instance_arn,
+                PermissionSetArn=permission_set_arn
+            )
+            
+            # Delete account assignments
+            for assignment in assignments['AccountAssignments']:
+                if assignment['PrincipalId'] == requester_id:
+                    self.sso_client.delete_account_assignment(
+                        InstanceArn=instance_arn,
+                        TargetId=assignment['AccountId'],
+                        TargetType='AWS_ACCOUNT',
+                        PermissionSetArn=permission_set_arn,
+                        PrincipalType='USER',
+                        PrincipalId=requester_id
+                    )
+            
+            # Delete permission set
+            self.sso_client.delete_permission_set(
+                InstanceArn=instance_arn,
+                PermissionSetArn=permission_set_arn
+            )
+            
+            return {
+                'status': 'success',
+                'message': 'Access revoked successfully'
+            }
+            
+        except Exception as e:
+            print(f"Error revoking access: {e}")
+            raise
+
+    def _generate_policy(self, config):
+        """Generate S3 bucket policy from template"""
+        policy = config['policy_template']
+        
+        # Replace bucket name placeholders for each bucket
+        resources = []
+        for bucket in config['buckets']:
+            bucket_name = bucket['name']  # Extract the name from the bucket dict
+            bucket_arn = f"arn:aws:s3:::{bucket_name}"
+            resources.extend([bucket_arn, f"{bucket_arn}/*"])
+            
+        policy['Statement'][0]['Resource'] = resources
+        return policy
 
 def create_jit_tool(config, action):
     """Create a JIT tool from configuration."""
@@ -117,7 +341,10 @@ def create_s3_jit_tool(config, action):
         FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
-    buckets_list = ", ".join(config['buckets'])
+    # Get list of bucket names for display and script
+    bucket_names = [bucket['name'] for bucket in config['buckets']]
+    buckets_list = ", ".join(bucket_names)
+
     tool_name = f"s3_{action}_{config['name'].lower().replace(' ', '_')}"
 
     mermaid_diagram = f"""
@@ -154,15 +381,15 @@ echo ">> Processing request... ⏳"
 pip install -q boto3 requests jinja2 jsonschema argparse
 
 # Export bucket names and policy template from config
-export BUCKETS="{','.join(config['buckets'])}"
-export POLICY_TEMPLATE="{config['policy_template']}"
+export BUCKETS="{','.join(bucket_names)}"
+export POLICY_TEMPLATE='{json.dumps(config['policy_template'])}'
 export MAX_DURATION="{config['session_duration']}"
 
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
 
 # Run access handler for each bucket in the configuration
-for bucket in {' '.join(config['buckets'])}; do
+for bucket in {' '.join(bucket_names)}; do
     echo "Processing bucket: $bucket"
     python /opt/scripts/access_handler.py {action} --user-email {"$KUBIYA_USER_EMAIL" if action == "grant" else "{{.user_email}}"} --bucket-name "$bucket" {"--duration {{.duration}}" if action == "grant" else ""}
 done
