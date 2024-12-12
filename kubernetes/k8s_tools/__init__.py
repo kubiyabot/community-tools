@@ -4,25 +4,34 @@ import sys
 import logging
 import sentry_sdk
 from .utils.sentry_client import initialize_sentry
-from .initialization import initialize as init_kubewatch
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+
+# Initialize Sentry immediately
+logger.info("Initializing Sentry...")
+if not initialize_sentry(force=True):
+    logger.error("Failed to initialize Sentry")
+else:
+    logger.info("Sentry initialized successfully")
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     try:
         logger.info("Starting Kubernetes tools initialization...")
         
-        # Ensure Sentry is initialized
-        initialize_sentry()
-        
-        sentry_sdk.add_breadcrumb(
-            category='initialization',
-            message='Starting Kubernetes tools initialization',
+        # Ensure Sentry is working
+        sentry_sdk.capture_message(
+            "Starting Kubernetes tools initialization",
             level='info'
         )
+        
+        # Import initialization after Sentry is ready
+        from .initialization import initialize as init_kubewatch
         
         # Set release version if available
         version = os.getenv('KUBIYA_VERSION', 'development')
@@ -41,11 +50,9 @@ def initialize():
         sentry_sdk.capture_exception(e)
         raise
 
-# Initialize Sentry immediately when module is imported
-initialize_sentry()
-
 # Run initialization when module is imported
 logger.info("Loading Kubernetes tools module...")
 initialize()
 
+# Import tools after initialization
 from .tools import *
