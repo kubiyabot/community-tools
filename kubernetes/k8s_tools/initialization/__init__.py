@@ -1,15 +1,23 @@
 import os
 import sys
 import json
+import logging
 import sentry_sdk
 from kubiya_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script, ScriptExecutionError
 from ..utils.kubewatch_config import KubeWatchConfig
+from ..utils.sentry_client import initialize_sentry
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     try:
-        print("\n=== Starting KubeWatch Initialization ===")
+        logger.info("=== Starting KubeWatch Initialization ===")
+        
+        # Ensure Sentry is initialized
+        initialize_sentry()
         
         # Get dynamic configuration
         config = tool_registry.dynamic_config
@@ -19,7 +27,7 @@ def initialize():
             data={'config': config},
             level='info'
         )
-        print(f"📝 Received dynamic configuration: {config}")
+        logger.info(f"📝 Received dynamic configuration: {config}")
         
         if not config:
             sentry_sdk.capture_message("No dynamic configuration provided", level='warning')
@@ -230,8 +238,11 @@ def initialize():
         print("=== KubeWatch Initialization Completed ===\n")
         
     except Exception as e:
+        logger.error(f"❌ Initialization failed: {str(e)}")
         sentry_sdk.capture_exception(e)
-        print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)
         raise
+
+# Initialize Sentry when module is imported
+initialize_sentry()
 
 __all__ = ['initialize'] 
