@@ -380,9 +380,15 @@ check_changes() {
     fi
 }
 
+# Setup workspace
+WORKSPACE="/opt/gh_files/${KUBIYA_USER_EMAIL}/${repo}"
+echo "🔧 Setting up workspace: ${WORKSPACE}"
+rm -rf "${WORKSPACE}"
+mkdir -p "${WORKSPACE}"
+cd "${WORKSPACE}"
+
 # Clone repo and setup
 echo "🔄 Cloning repository..."
-rm -rf ./* ./.git
 git clone "https://${GH_TOKEN}@github.com/${repo}.git" .
 
 # Configure git
@@ -447,7 +453,7 @@ else
 fi
 
 # Cleanup
-rm "${file}.bak"
+rm -rf "${WORKSPACE}"
 '''
 
 # Simplified edit file tool with direct content replacement
