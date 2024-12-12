@@ -4,10 +4,8 @@ from pathlib import Path
 from .base import AWSJITTool
 from ..scripts.config_loader import get_access_configs, get_s3_configs
 import json
-import boto3
 import uuid
 from datetime import datetime
-from botocore.exceptions import ClientError
 import logging
 from dateutil.parser import parse
 from dateutil.relativedelta import relativedelta
@@ -60,7 +58,7 @@ class S3JITAccess(AWSJITTool):
             
             return permission_set_arn
             
-        except ClientError as e:
+        except Exception as e:
             print(f"Error creating permission set: {e}")
             raise
 
