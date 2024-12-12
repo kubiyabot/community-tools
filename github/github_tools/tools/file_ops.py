@@ -463,158 +463,82 @@ __all__ = [
     'list_files'
 ]
 
-# First, let's add the improved script with size handling
+# Simple script for file editing with sed
 FILE_EDIT_SCRIPT = '''
 #!/bin/bash
 set -euo pipefail
 
-# Size thresholds in bytes (1MB and 10KB for diff)
-MAX_FULL_DISPLAY=1048576    # 1MB
-MAX_DIFF_DISPLAY=10240      # 10KB
-
-show_file_changes() {
-    local file=$1
-    local file_size=$(wc -c < "$file")
-    local diff_size=$(diff "${file}.bak" "$file" | wc -c)
-    
-    echo "File size: $(numfmt --to=iec-i --suffix=B $file_size)"
-    
-    if [ $file_size -gt $MAX_FULL_DISPLAY ]; then
-        echo "File is large. Showing only changed lines:"
-        if [ $diff_size -gt $MAX_DIFF_DISPLAY ]; then
-            echo "Large number of changes detected. Showing summary and sample:"
-            diff --stat "${file}.bak" "$file" || true
-            echo "Sample of changes (first 10 changed lines):"
-            diff "${file}.bak" "$file" | head -n 10 || true
-        else
-            diff "${file}.bak" "$file" || true
-        fi
-    else
-        echo "Complete diff:"
-        diff "${file}.bak" "$file" || true
-    fi
+# Configure git to use token authentication
+setup_git_auth() {
+    git config --global url."https://oauth2:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 }
 
-# Create or checkout branch
-create_branch() {
-    local branch_name=$1
-    local base_branch=${2:-main}
-    
-    echo "🌱 Creating branch: $branch_name from $base_branch"
-    git fetch origin
-    git checkout "$base_branch"
-    git pull origin "$base_branch"
-    git checkout -b "$branch_name"
-}
-
-# Edit file with size handling
+# Edit file using sed
 edit_file() {
     local file=$1
-    local edit_mode=$2
-    local edit_input=$3
+    local sed_statement=$2
     
     echo "📝 Editing file: $file"
     
-    # Backup original
+    # Create backup
     cp "$file" "${file}.bak"
     
-    # Apply changes based on mode
-    if [ "$edit_mode" = "content" ]; then
-        echo "$edit_input" > "$file"
-    elif [ "$edit_mode" = "sed" ]; then
-        if [ "$(uname)" = "Darwin" ]; then
-            sed -i '' "$edit_input" "$file"
-        else
-            sed -i "$edit_input" "$file"
-        fi
+    # Apply sed command
+    if [ "$(uname)" = "Darwin" ]; then
+        sed -i '' "$sed_statement" "$file"
     else
-        echo "❌ Invalid edit mode. Use 'content' or 'sed'"
-        git checkout -- "$file"
-        rm "${file}.bak"
-        exit 1
+        sed -i "$sed_statement" "$file"
     fi
     
-    # Show changes
-    show_file_changes "$file"
+    # Show diff
+    echo "📊 Changes made:"
+    diff "${file}.bak" "$file" || true
     rm "${file}.bak"
-}
-
-# Commit changes
-commit_changes() {
-    local message=$1
-    local files="${2:-*}"
-    
-    echo "💾 Committing changes"
-    git add $files
-    git status --short
-    git commit -m "$message"
-}
-
-# Push branch
-push_branch() {
-    local branch_name=$1
-    echo "🚀 Pushing branch: $branch_name"
-    git push origin "$branch_name"
 }
 '''
 
-# Tool to create a new branch
-create_branch = GitHubCliTool(
-    name="github_create_branch",
-    description="Create a new branch in a GitHub repository",
-    content=f'''
-{FILE_EDIT_SCRIPT}
-
-echo "🔄 Cloning/updating repository: $repo"
-gh repo clone "$repo" . || (cd . && git fetch)
-
-create_branch "${{branch_name}}" "${{base_branch}}"
-push_branch "${{branch_name}}"
-
-echo "✨ Branch created and pushed successfully!"
-''',
-    args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="branch_name", type="str", description="Name for the new branch", required=True),
-        Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-    ],
-    with_volumes=[GIT_VOLUME]
-)
-
-# Tool to edit a file
+# Simplified edit file tool
 edit_file = GitHubCliTool(
     name="github_edit_file",
-    description="Edit a file in a GitHub repository with size-aware handling",
+    description="Edit a file in a GitHub repository using sed",
     content=f'''
 {FILE_EDIT_SCRIPT}
 
-echo "🔄 Cloning/updating repository: $repo"
+echo "🔄 Setting up repository: $repo"
+setup_git_auth
 gh repo clone "$repo" . || (cd . && git fetch)
 
+# Create new branch if specified
 if [ -n "$branch_name" ]; then
-    create_branch "$branch_name" "$base_branch"
+    echo "🌱 Creating branch: $branch_name"
+    git checkout -b "$branch_name" origin/$base_branch
 else
     git checkout "$base_branch"
 fi
 
-edit_file "$file" "$edit_mode" "$edit_input"
-commit_changes "$commit_message" "$file"
-push_branch "${{branch_name:-$base_branch}}"
+# Edit the file
+edit_file "$file" "$sed_statement"
+
+# Commit and push changes
+git add "$file"
+git commit -m "$commit_message"
+git push origin HEAD
 
 echo "✨ Changes pushed successfully!"
-if [ -n "$create_pr" ] && [ "$create_pr" = "true" ]; then
+
+# Create PR if requested
+if [ "$create_pr" = "true" ]; then
     echo "📝 Creating pull request..."
     PR_URL=$(gh pr create --title "$pr_title" --body "$pr_body" --base "$base_branch")
     echo "🔗 Pull request created: $PR_URL"
 fi
 ''',
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="file", type="str", description="Path to file to edit", required=True),
-        Arg(name="edit_mode", type="str", description="Edit mode: 'content' for full content or 'sed' for sed command", required=True),
-        Arg(name="edit_input", type="str", description="New content or sed command", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
+        Arg(name="file", type="str", description="Path to file to edit. Example: 'README.md'", required=True),
+        Arg(name="sed_statement", type="str", description="Sed command to apply. Example: 's/old/new/g'", required=True),
         Arg(name="base_branch", type="str", description="Base branch to work from", required=False, default="main"),
-        Arg(name="branch_name", type="str", description="Create and use new branch (optional)", required=False),
+        Arg(name="branch_name", type="str", description="Optional new branch name", required=False),
         Arg(name="commit_message", type="str", description="Commit message", required=False, default="Update file"),
         Arg(name="create_pr", type="bool", description="Create PR after push", required=False, default="false"),
         Arg(name="pr_title", type="str", description="PR title (if creating PR)", required=False),
@@ -623,10 +547,7 @@ fi
     with_volumes=[GIT_VOLUME]
 )
 
-# Add to existing tools list
-tools.extend([create_branch, edit_file])
-for tool in [create_branch, edit_file]:
-    tool_registry.register("github", tool)
-
-# Update __all__
-__all__.extend(['create_branch', 'edit_file'])
+# Update tools list and registry
+tools.append(edit_file)
+tool_registry.register("github", edit_file)
+__all__.append('edit_file')
