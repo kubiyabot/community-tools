@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import sentry_sdk
 from kubiya_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script, ScriptExecutionError
 from ..utils.kubewatch_config import KubeWatchConfig
@@ -12,18 +13,35 @@ def initialize():
         
         # Get dynamic configuration
         config = tool_registry.dynamic_config
+        sentry_sdk.add_breadcrumb(
+            category='configuration',
+            message='Received dynamic configuration',
+            data={'config': config},
+            level='info'
+        )
         print(f"📝 Received dynamic configuration: {config}")
         
         if not config:
+            sentry_sdk.capture_message("No dynamic configuration provided", level='warning')
             print("⚠️  No dynamic configuration provided")
             return
         
         # Parse configuration using KubeWatchConfig
         settings = KubeWatchConfig.parse_config(config)
+        sentry_sdk.add_breadcrumb(
+            category='configuration',
+            message='Parsed configuration settings',
+            data={'settings': settings.__dict__},
+            level='info'
+        )
         print(f"✅ Parsed configuration settings: {settings.__dict__}")
         
         # Handle webhook URL first
         if not settings.webhook_url:
+            sentry_sdk.capture_message(
+                "No webhook URL provided - notifications will not be sent",
+                level='warning'
+            )
             print("⚠️  No webhook URL provided - notifications will not be sent")
             if 'KUBIYA_KUBEWATCH_WEBHOOK_URL' in os.environ:
                 del os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL']
@@ -109,74 +127,110 @@ def initialize():
             }
         }
 
+        sentry_sdk.add_breadcrumb(
+            category='configuration',
+            message='Generated KubeWatch inner configuration',
+            data={'inner_config': kubewatch_inner_config},
+            level='info'
+        )
+
         # Add namespaces to filter if specified
         if settings.namespaces and settings.namespaces != ['*']:
             kubewatch_inner_config["filter"]["namespaces"] = settings.namespaces
+            sentry_sdk.add_breadcrumb(
+                category='configuration',
+                message='Watching specific namespaces',
+                data={'namespaces': settings.namespaces},
+                level='info'
+            )
             print(f"🔍 Watching specific namespaces: {', '.join(settings.namespaces)}")
         else:
+            sentry_sdk.add_breadcrumb(
+                category='configuration',
+                message='Watching all namespaces',
+                level='info'
+            )
             print("🔍 Watching all namespaces")
 
-        # Write inner config as JSON to /tmp
-        inner_json_path = "/tmp/kubewatch_inner.json"
-        with open(inner_json_path, 'w') as f:
-            json.dump(kubewatch_inner_config, f, indent=2)
-
-        # Create outer ConfigMap structure
-        kubewatch_config = {
-            "apiVersion": "v1",
-            "kind": "ConfigMap",
-            "metadata": {
-                "name": "kubewatch-config",
-                "namespace": "kubiya",
-                "labels": {
-                    "app.kubernetes.io/name": "kubewatch",
-                    "app.kubernetes.io/part-of": "kubiya"
-                }
-            },
-            "data": {
-                ".kubewatch.yaml": inner_json_path  # This will be processed by yq in the shell script
-            }
-        }
-        
-        # Write outer config as JSON to /tmp
-        json_path = "/tmp/kubewatch.json"
-        print(f"📝 Writing KubeWatch configuration to: {json_path}")
-        
+        # Write configurations
         try:
+            inner_json_path = "/tmp/kubewatch_inner.json"
+            with open(inner_json_path, 'w') as f:
+                json.dump(kubewatch_inner_config, f, indent=2)
+            
+            kubewatch_config = {
+                "apiVersion": "v1",
+                "kind": "ConfigMap",
+                "metadata": {
+                    "name": "kubewatch-config",
+                    "namespace": "kubiya",
+                    "labels": {
+                        "app.kubernetes.io/name": "kubewatch",
+                        "app.kubernetes.io/part-of": "kubiya"
+                    }
+                },
+                "data": {
+                    ".kubewatch.yaml": inner_json_path
+                }
+            }
+            
+            json_path = "/tmp/kubewatch.json"
             with open(json_path, 'w') as f:
                 json.dump(kubewatch_config, f, indent=2)
-            print(f"✅ Successfully wrote configuration to {json_path}")
+            
+            sentry_sdk.add_breadcrumb(
+                category='configuration',
+                message='Wrote configuration files',
+                data={
+                    'inner_path': inner_json_path,
+                    'config_path': json_path
+                },
+                level='info'
+            )
+            
         except Exception as e:
-            print(f"❌ Failed to write configuration: {str(e)}")
+            sentry_sdk.capture_exception(e)
             raise
         
-        # Set environment variables for the script
-        os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
-        os.environ['KUBEWATCH_CONFIG_PATH'] = json_path
-        os.environ['KUBEWATCH_INNER_CONFIG_PATH'] = inner_json_path
-        print(f"🔗 Found webhook URL, will configure notifications")
-        print(f"📁 Configuration paths:")
-        print(f"  • Outer config: {json_path}")
-        print(f"  • Inner config: {inner_json_path}")
-        
-        # Apply configuration using init_cluster.sh
-        init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
-        print(f"🔄 Running initialization script: {init_script}")
-        
+        # Set environment variables and run initialization script
         try:
+            os.environ['KUBIYA_KUBEWATCH_WEBHOOK_URL'] = settings.webhook_url
+            os.environ['KUBEWATCH_CONFIG_PATH'] = json_path
+            os.environ['KUBEWATCH_INNER_CONFIG_PATH'] = inner_json_path
+            
+            init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_cluster.sh')
             output = run_script(init_script)
-            print(f"✅ Initialization script completed successfully")
-            print(f"Script output:\n{output}")
+            
+            sentry_sdk.add_breadcrumb(
+                category='initialization',
+                message='Initialization script completed',
+                data={'output': output},
+                level='info'
+            )
+            
+            sentry_sdk.capture_message(
+                "KubeWatch initialization completed successfully",
+                level='info'
+            )
+            
         except ScriptExecutionError as e:
-            print(f"❌ Initialization script failed:")
-            print(f"Error: {e.message}")
-            print(f"Output: {e.output}")
-            print(f"Error Output: {e.error_output}")
+            sentry_sdk.capture_exception(e)
+            sentry_sdk.add_breadcrumb(
+                category='initialization',
+                message='Initialization script failed',
+                data={
+                    'error': e.message,
+                    'output': e.output,
+                    'error_output': e.error_output
+                },
+                level='error'
+            )
             raise
         
         print("=== KubeWatch Initialization Completed ===\n")
         
     except Exception as e:
+        sentry_sdk.capture_exception(e)
         print(f"❌ Initialization failed: {str(e)}", file=sys.stderr)
         raise
 
