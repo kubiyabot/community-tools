@@ -20,8 +20,7 @@ set -euo pipefail
 
 # Install gettext for envsubst if not present
 if ! command -v envsubst >/dev/null 2>&1; then
-    echo "📦 Installing required tools..."
-    apk add gettext
+    apk add --quiet gettext > /dev/null 2>&1
 fi
 
 echo "🚀 Creating new pull request in $repo..."
@@ -33,11 +32,8 @@ echo "🔀 Head branch: $head"
 GITHUB_ACTOR=$(gh api user --jq '.login')
 
 # Create disclaimer with proper variable expansion
-DISCLAIMER='{KUBIYA_DISCLAIMER}'
-EXPANDED_DISCLAIMER=$(echo "$DISCLAIMER" | envsubst)
-
 # Create full PR body with disclaimer
-FULL_BODY="${{body}}
+FULL_BODY="$body
 
 $EXPANDED_DISCLAIMER"
 
