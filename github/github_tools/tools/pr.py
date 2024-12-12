@@ -13,33 +13,42 @@ KUBIYA_DISCLAIMER = '''
 
 pr_create = GitHubCliTool(
     name="github_pr_create",
-    description="Create a new pull request in a GitHub repository. DO NOT USE THIS BEFORE YOU HAVE CREATED OR KNOWN THE BRANCH YOU WANT TO OPEN THE PR FROM.",
-    content="""
+    description="Create a new pull request in a GitHub repository",
+    content=f"""
 #!/bin/bash
 set -euo pipefail
+
+# Install gettext for envsubst if not present
+if ! command -v envsubst >/dev/null 2>&1; then
+    echo "📦 Installing required tools..."
+    apk add gettext
+fi
 
 echo "🚀 Creating new pull request in $repo..."
 echo "📝 Title: $title"
 echo "📄 Base branch: $base"
 echo "🔀 Head branch: $head"
 
-# Get current user and create disclaimer
+# Get current user
 GITHUB_ACTOR=$(gh api user --jq '.login')
-DISCLAIMER=$(echo "${KUBIYA_DISCLAIMER}" | envsubst)
+
+# Create disclaimer with proper variable expansion
+DISCLAIMER='{KUBIYA_DISCLAIMER}'
+EXPANDED_DISCLAIMER=$(echo "$DISCLAIMER" | envsubst)
 
 # Create full PR body with disclaimer
-FULL_BODY="${body}
+FULL_BODY="${{body}}
 
-${DISCLAIMER}"
+$EXPANDED_DISCLAIMER"
 
 # Create PR with full body
-PR_URL=$(gh pr create \
-    --repo "$repo" \
-    --title "$title" \
-    --body "$FULL_BODY" \
-    --base "$base" \
-    --head "$head" \
-    $([[ -n "$assignee" ]] && echo "--assignee $assignee") \
+PR_URL=$(gh pr create \\
+    --repo "$repo" \\
+    --title "$title" \\
+    --body "$FULL_BODY" \\
+    --base "$base" \\
+    --head "$head" \\
+    $([[ -n "$assignee" ]] && echo "--assignee $assignee") \\
     $([[ -n "$reviewer" ]] && echo "--reviewer $reviewer"))
 
 echo "✨ Pull request created successfully!"
@@ -48,11 +57,11 @@ echo "📋 Details: $PR_URL"
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
-        Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
+        Arg(name="body", type="str", description="Pull request description", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
         Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
-        Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
-        Arg(name="reviewer", type="str", description="The github user's login that should review this pr. Example: joe_doe.", required=False),
+        Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Use `@me` to self-assign", required=False),
+        Arg(name="reviewer", type="str", description="The github user's login that should review this pr", required=False),
     ],
 )
 
