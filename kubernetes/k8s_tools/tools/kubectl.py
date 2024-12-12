@@ -1,5 +1,7 @@
-from .base import KubernetesTool, ScriptExecutionError, Arg, FileSpec
+from kubiya_sdk.tools import Arg
+from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
+import sys
 
 kubectl_tool = KubernetesTool(
     name="kubectl",

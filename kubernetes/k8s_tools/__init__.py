@@ -1,6 +1,5 @@
 # k8s_tools/__init__.py
 import os
-from .utils.script_runner import run_script, ScriptExecutionError
 from .kubewatch.builder import KubeWatchConfigBuilder
 
 def initialize():
