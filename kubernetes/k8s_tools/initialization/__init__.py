@@ -3,6 +3,7 @@ import sys
 import json
 from kubiya_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script, ScriptExecutionError
+from ..utils.kubewatch_config import KubeWatchConfig
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
@@ -17,10 +18,8 @@ def initialize():
             print("⚠️  No dynamic configuration provided")
             return
         
-        from ..kubewatch.builder import KubeWatchConfigBuilder
-        
-        # Parse configuration using builder
-        settings = KubeWatchConfigBuilder.parse_config(config)
+        # Parse configuration using KubeWatchConfig
+        settings = KubeWatchConfig.parse_config(config)
         print(f"✅ Parsed configuration settings: {settings.__dict__}")
         
         # Handle webhook URL first

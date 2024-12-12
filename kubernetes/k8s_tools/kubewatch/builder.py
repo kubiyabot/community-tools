@@ -164,7 +164,4 @@ class KubeWatchConfigBuilder:
             ],
             'severity': 'critical',
             'prompt': KubeWatchTemplates.get_node_prompt()
-        } 
-
-# Explicitly export the class
-__all__ = ['KubeWatchConfigBuilder'] 
+        }

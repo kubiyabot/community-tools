@@ -1,7 +1,6 @@
 # k8s_tools/__init__.py
 from .initialization import initialize as init_kubewatch
 
-
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
     try:
