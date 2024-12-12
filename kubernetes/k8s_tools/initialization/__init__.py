@@ -3,7 +3,6 @@ import sys
 import json
 from kubiya_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script, ScriptExecutionError
-from ..kubewatch.builder import KubeWatchConfigBuilder
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
@@ -17,6 +16,8 @@ def initialize():
         if not config:
             print("⚠️  No dynamic configuration provided")
             return
+        
+        from ..kubewatch.builder import KubeWatchConfigBuilder
         
         # Parse configuration using builder
         settings = KubeWatchConfigBuilder.parse_config(config)
