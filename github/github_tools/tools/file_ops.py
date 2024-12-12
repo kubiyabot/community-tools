@@ -468,86 +468,54 @@ FILE_EDIT_SCRIPT = '''
 #!/bin/bash
 set -euo pipefail
 
-# Configure git to use token authentication
-setup_git_auth() {
-    git config --global url."https://oauth2:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-}
+# Clone repo and setup
+echo "🔄 Cloning repository..."
+git clone "https://${GH_TOKEN}@github.com/${repo}.git" .
+
+# Switch to or create branch
+if [ -n "${branch_name}" ]; then
+    echo "🌱 Creating branch: ${branch_name}"
+    git checkout -b "${branch_name}" "origin/${base_branch}"
+else
+    git checkout "${base_branch}"
+fi
 
 # Edit file using sed
-edit_file() {
-    local file=$1
-    local sed_statement=$2
-    
-    echo "📝 Editing file: $file"
-    
-    # Create backup
-    cp "$file" "${file}.bak"
-    
-    # Apply sed command
-    if [ "$(uname)" = "Darwin" ]; then
-        sed -i '' "$sed_statement" "$file"
-    else
-        sed -i "$sed_statement" "$file"
-    fi
-    
-    # Show diff
-    echo "📊 Changes made:"
-    diff "${file}.bak" "$file" || true
-    rm "${file}.bak"
-}
+echo "📝 Editing file: ${file}"
+if [ "$(uname)" = "Darwin" ]; then
+    sed -i '' "${sed_statement}" "${file}"
+else
+    sed -i "${sed_statement}" "${file}"
+fi
+
+# Show what changed
+echo "📊 Changes made:"
+git diff "${file}"
+
+# Commit and push
+git add "${file}"
+git commit -m "${commit_message}"
+git push origin HEAD
+
+echo "✨ Changes pushed successfully!"
 '''
 
 # Simplified edit file tool
 edit_file = GitHubCliTool(
     name="github_edit_file",
     description="Edit a file in a GitHub repository using sed",
-    content=f'''
-{FILE_EDIT_SCRIPT}
-
-echo "🔄 Setting up repository: $repo"
-setup_git_auth
-gh repo clone "$repo" . || (cd . && git fetch)
-
-# Create new branch if specified
-if [ -n "$branch_name" ]; then
-    echo "🌱 Creating branch: $branch_name"
-    git checkout -b "$branch_name" origin/$base_branch
-else
-    git checkout "$base_branch"
-fi
-
-# Edit the file
-edit_file "$file" "$sed_statement"
-
-# Commit and push changes
-git add "$file"
-git commit -m "$commit_message"
-git push origin HEAD
-
-echo "✨ Changes pushed successfully!"
-
-# Create PR if requested
-if [ "$create_pr" = "true" ]; then
-    echo "📝 Creating pull request..."
-    PR_URL=$(gh pr create --title "$pr_title" --body "$pr_body" --base "$base_branch")
-    echo "🔗 Pull request created: $PR_URL"
-fi
-''',
+    content=FILE_EDIT_SCRIPT,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
         Arg(name="file", type="str", description="Path to file to edit. Example: 'README.md'", required=True),
-        Arg(name="sed_statement", type="str", description="Sed command to apply. Example: 's/old/new/g'", required=True),
-        Arg(name="base_branch", type="str", description="Base branch to work from", required=False, default="main"),
-        Arg(name="branch_name", type="str", description="Optional new branch name", required=False),
+        Arg(name="sed_statement", type="str", description="Sed command. Example: 's/old/new/g'", required=True),
+        Arg(name="branch_name", type="str", description="New branch name (optional)", required=False),
+        Arg(name="base_branch", type="str", description="Base branch name", required=False, default="main"),
         Arg(name="commit_message", type="str", description="Commit message", required=False, default="Update file"),
-        Arg(name="create_pr", type="bool", description="Create PR after push", required=False, default="false"),
-        Arg(name="pr_title", type="str", description="PR title (if creating PR)", required=False),
-        Arg(name="pr_body", type="str", description="PR description (if creating PR)", required=False),
     ],
     with_volumes=[GIT_VOLUME]
 )
 
-# Update tools list and registry
-tools.append(edit_file)
+# Register tool
 tool_registry.register("github", edit_file)
 __all__.append('edit_file')
