@@ -385,65 +385,49 @@ echo "📂 Listing files in repository: $repo"
 [[ -n "$filter" ]] && echo "🔍 Filter: $filter"
 [[ -n "$ref" ]] && echo "🔖 Ref: $ref"
 
-# Build the API query
-API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")"
-[[ "$recursive" == "true" ]] && API_PATH="$API_PATH?recursive=1"
+# Build the API query - get full tree in one request
+API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")?recursive=1"
 
 # Fetch repository tree
 echo "🔍 Fetching repository structure..."
 TREE=$(gh api "$API_PATH")
 
-# First, get all directories and create them
+# Process and display the tree structure in a single jq command
 echo "$TREE" | jq -r '
-    .tree | 
-    map(select(.type == "tree")) |
-    map(.path) |
-    .[] |
-    @sh' | while read -r dir; do
-    dir=$(echo "$dir" | tr -d "'")
-    echo "📁 $dir/"
-done
-
-# Then list all files with proper indentation based on their path
-echo "$TREE" | jq -r '
-    .tree | 
-    map(select(.type == "blob")) |
+    .tree |
+    # First sort everything by path
     sort_by(.path) |
+    # Group by type and format output
     .[] |
-    {path: .path, size: .size} |
-    @json' | while read -r file_info; do
-    path=$(echo "$file_info" | jq -r '.path')
-    size=$(echo "$file_info" | jq -r '.size')
-    
-    # Apply path filter if specified
-    if [ -n "$path_filter" ] && [[ ! "$path" == "$path_filter"* ]]; then
+    # Calculate depth for indentation
+    . as $item |
+    ($item.path | split("/") | length - 1) as $depth |
+    # Create indentation string
+    ($depth * 2) as $indent |
+    # Format output based on type
+    if $item.type == "tree" then
+        ("📁 " + ($item.path | @sh | gsub("'\''"; ""))) + "/"
+    else
+        (
+            # Create indentation
+            (if $indent > 0 then (" " * $indent) else "" end) +
+            # Add file emoji and path
+            "📄 " + $item.path +
+            # Add size if show_details is true
+            if env.show_details == "true" then
+                "\n" + (" " * ($indent + 3)) + "📊 Size: " + ($item.size | tostring) + " bytes" +
+                "\n" + (" " * ($indent + 3)) + "🔒 SHA: " + $item.sha
+            else "" end
+        )
+    end' | while read -r line; do
+    # Apply filters if specified
+    if [ -n "$path" ] && [[ ! "$line" =~ "$path" ]]; then
         continue
     fi
-    
-    # Apply name filter if specified
-    if [ -n "$filter" ] && [[ ! "$path" =~ $filter ]]; then
+    if [ -n "$filter" ] && [[ ! "$line" =~ "$filter" ]]; then
         continue
     fi
-
-    # Calculate indentation based on path depth
-    depth=$(echo "$path" | tr -cd '/' | wc -c)
-    indent=$(printf '%*s' "$((depth * 2))" '')
-    
-    # Display file with proper indentation
-    echo "${indent}📄 $path"
-    
-    if [ "$show_details" = "true" ]; then
-        FILE_INFO=$(gh api "repos/$repo/contents/$path" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
-            size: .size,
-            type: .type,
-            sha: .sha,
-            url: .html_url
-        }')
-        
-        echo "${indent}   📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
-        echo "${indent}   🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
-        echo "${indent}   🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
-    fi
+    echo "$line"
 done
 
 echo "✨ File listing complete!"
@@ -453,8 +437,7 @@ echo "✨ File listing complete!"
         Arg(name="filter", type="str", description="Optional filter pattern for file names. Example: '.py' or 'test'", required=False),
         Arg(name="path", type="str", description="Optional path to list files from. Example: 'src' or 'docs'", required=False),
         Arg(name="ref", type="str", description="Optional git reference (branch, tag, or commit SHA). Example: 'main' or 'v1.0.0'", required=False),
-        Arg(name="recursive", type="bool", description="List files recursively in subdirectories", required=False, default="true"),
-        Arg(name="show_details", type="bool", description="Show additional file details", required=False, default="false"),
+        Arg(name="show_details", type="bool", description="Show file size and SHA", required=False, default="false"),
     ],
 )
 
