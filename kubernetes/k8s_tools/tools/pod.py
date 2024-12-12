@@ -51,10 +51,18 @@ bulk_pod_operations_tool = KubernetesTool(
     fi
     
     # Set selector flag if provided
-    selector_flag=$( [ -n "$selector" ] && echo "-l $selector" || echo "" )
+    selector="${selector:-}"
+    selector_flag=""
+    if [ -n "$selector" ]; then
+        selector_flag="-l $selector"
+    fi
     
     # Set field selector if provided
-    field_selector_flag=$( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" || echo "" )
+    field_selector="${field_selector:-}"
+    field_selector_flag=""
+    if [ -n "$field_selector" ]; then
+        field_selector_flag="--field-selector=$field_selector"
+    fi
 
     if [ "$action" = "get" ]; then
         kubectl get pods $namespace_flag $selector_flag $field_selector_flag
