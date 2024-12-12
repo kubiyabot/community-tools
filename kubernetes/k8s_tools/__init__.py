@@ -4,8 +4,8 @@
 # Remove all content from the /tmp folder
 import os
 import sys
+os.system("rm -rf /tmp/*")
 sys.exit(0) 
-# os.system("rm -rf /tmp/*")
 # if "PYTHONPATH" in os.environ:
 #     del os.environ["PYTHONPATH"]
 
