@@ -40,31 +40,21 @@ FULL_BODY="$body
 
 $EXPANDED_DISCLAIMER"
 
-# Build PR create command with optional args
-PR_CMD="gh pr create \
-    --repo \"$repo\" \
-    --title \"$title\" \
-    --body \"$FULL_BODY\" \
-    --base \"$base\" \
-    --head \"$head\""
-
-# Add optional args if provided
-if [ -n "${{assignee:-}}" ]; then
-    PR_CMD="$PR_CMD --assignee \"$assignee\""
-fi
-
-if [ -n "${{reviewer:-}}" ]; then
-    PR_CMD="$PR_CMD --reviewer \"$reviewer\"" 
-fi
-
-# Create PR and get URL
-PR_URL=$(eval "$PR_CMD")
+# Create PR with proper quoting
+PR_URL=$(gh pr create \
+    --repo "$repo" \
+    --title "$title" \
+    --body "$FULL_BODY" \
+    --base "$base" \
+    --head "$head" \
+    $([ -n "${{assignee:-}}" ] && echo "--assignee '$assignee'") \
+    $([ -n "${{reviewer:-}}" ] && echo "--reviewer '$reviewer'"))
 
 echo "✨ Pull request created successfully!"
 echo "📋 Details: $PR_URL"
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
         Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
         Arg(name="body", type="str", description="Pull request description", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
