@@ -28,12 +28,12 @@ echo "📝 Title: $title"
 echo "📄 Base branch: $base"
 echo "🔀 Head branch: $head"
 
+# Get current user
+GITHUB_ACTOR=$(gh api user --jq '.login')
+
 # Get the expanded disclaimer
 DISCLAIMER='{KUBIYA_DISCLAIMER}'
 EXPANDED_DISCLAIMER=$(echo "$DISCLAIMER" | envsubst)
-
-# Get current user
-GITHUB_ACTOR=$(gh api user --jq '.login')
 
 # Create full PR body with disclaimer
 FULL_BODY="$body
