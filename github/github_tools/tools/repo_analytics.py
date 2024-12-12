@@ -20,39 +20,53 @@ REPO_INFO=$(gh api "repos/$repo" --jq '{
     language: .language,
     updated_at: .updated_at,
     license: .license.name
-}')
+}' || echo '{}')
 
-# Get recent contributor stats (top 3)
+# Get recent contributor stats (top 3) with error handling
 echo "👥 Analyzing recent contributors..."
-CONTRIB_STATS=$(gh api "repos/$repo/stats/contributors" --jq 'map({
-    author: .author.login,
-    total_commits: .total,
-    recent_commits: ([.weeks[-4:][].c] | add)  # Last 4 weeks
-}) | sort_by(-.recent_commits) | .[0:3]')
+CONTRIB_STATS=$(gh api "repos/$repo/stats/contributors" --jq 'if . == null then 
+    []
+else
+    map({
+        author: .author.login,
+        total_commits: .total,
+        recent_commits: ([.weeks[-4:][].c] | add)
+    })
+    | sort_by(-.recent_commits)
+    | .[0:3]
+end' || echo '[]')
 
-# Format output
+# Format output with error handling
 if [ "$format" = "json" ]; then
     jq -n --argjson repo "$REPO_INFO" \
           --argjson contribs "$CONTRIB_STATS" \
         '{
             repository: $repo,
-            top_contributors: $contribs
+            top_contributors: ($contribs | if . == null then [] else . end)
         }'
 else
     echo "=== Repository Overview ==="
-    echo "$REPO_INFO" | jq -r '
-        "⭐ Stars: \(.stars)",
-        "🔱 Forks: \(.forks)",
-        "❗ Open Issues: \(.open_issues)",
-        "💻 Main Language: \(.language)",
-        "🔄 Last Updated: \(.updated_at | fromdate | strftime("%Y-%m-%d"))",
-        "📜 License: \(.license // "None")"
-    '
+    if [ "$REPO_INFO" != "{}" ]; then
+        echo "$REPO_INFO" | jq -r '
+            "⭐ Stars: \(.stars // 0)",
+            "🔱 Forks: \(.forks // 0)",
+            "❗ Open Issues: \(.open_issues // 0)",
+            "💻 Main Language: \(.language // "Unknown")",
+            "🔄 Last Updated: \(.updated_at | fromdate | strftime("%Y-%m-%d"))",
+            "📜 License: \(.license // "None")"
+        '
+    else
+        echo "❌ Could not fetch repository information"
+    fi
     
     echo -e "\\n=== Top Recent Contributors ==="
-    echo "$CONTRIB_STATS" | jq -r '.[] |
-        "👤 \(.author):\\n   Recent Commits: \(.recent_commits) (Total: \(.total_commits))"
-    '
+    if [ "$CONTRIB_STATS" != "[]" ]; then
+        echo "$CONTRIB_STATS" | jq -r '.[] |
+            "👤 \(.author):\\n   Recent Commits: \(.recent_commits // 0) (Total: \(.total_commits // 0))"
+        '
+    else
+        echo "ℹ️  No contributor data available"
+    fi
 fi
 """,
     args=[
@@ -199,14 +213,14 @@ echo "🔍 Fetching workflow runs..."
 RUNS=$(gh run list \
     --repo "$repo" \
     --limit "$LIMIT" \
-    --json "conclusion,createdAt,event,headBranch,name,startedAt,status,updatedAt,url" \
+    --json "conclusion,createdAt,event,headBranch,name,startedAt,status,updatedAt,url,displayTitle" \
     --jq '[
         .[] |
         select(.createdAt >= (now - ($DAYS | tonumber * 86400) | todate)) |
         . + {
-            duration: (
+            duration_minutes: (
                 if (.startedAt != null and .updatedAt != null) then
-                    ((.updatedAt | fromdateiso8601) - (.startedAt | fromdateiso8601))
+                    (((.updatedAt | fromdateiso8601) - (.startedAt | fromdateiso8601)) / 60)
                 else 0 end
             )
         }
@@ -220,33 +234,29 @@ ANALYSIS=$(echo "$RUNS" | jq '{
         success_rate: (([.[] | select(.conclusion == "success")] | length) as $s |
                       ([.[] | select(.conclusion != null)] | length) as $t |
                       if $t > 0 then ($s * 100.0 / $t) else 0 end),
-        avg_duration_minutes: ([.[] | select(.duration > 0) | .duration] | if length > 0 then (add / length / 60) else 0 end)
+        avg_duration_minutes: ([.[] | .duration_minutes] | if length > 0 then (add / length) else 0 end)
     },
     status_breakdown: (group_by(.conclusion) | map({
         status: (.[0].conclusion // "pending"),
         count: length,
         percentage: (length * 100.0 / ($RUNS | length))
     })),
-    by_branch: (group_by(.headBranch) | map({
-        branch: .[0].headBranch,
+    by_workflow: (group_by(.name) | map({
+        name: .[0].name,
         runs: length,
-        success_rate: (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
-    }) | sort_by(-.runs)),
-    by_trigger: (group_by(.event) | map({
-        trigger: .[0].event,
-        count: length,
-        success_rate: (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
-    }) | sort_by(-.count)),
+        success_rate: (([.[] | select(.conclusion == "success")] | length) * 100.0 / length),
+        avg_duration: ([.[] | .duration_minutes] | if length > 0 then (add / length) else 0 end)
+    }) | sort_by(-.runs) | .[0:5]),
     recent_failures: [
         .[] | 
         select(.conclusion == "failure") |
         {
-            workflow: .name,
+            workflow: .displayTitle,
             branch: .headBranch,
             started: .startedAt,
             url: .url
         }
-    ] | sort_by(.started) | reverse | .[0:5]
+    ] | sort_by(.started) | reverse | .[0:3]
 }')
 
 # Format output
@@ -267,23 +277,17 @@ else
         "[\(.status // "pending")] \(.count) runs (\(.percentage | round)%)"
     '
     
-    echo -e "\\n=== By Branch ==="
+    echo -e "\\n=== Top Workflows ==="
     echo "$ANALYSIS" | jq -r '
-        .by_branch[] |
-        "🌿 \(.branch):\\n   Runs: \(.runs), Success Rate: \(.success_rate | round)%"
-    '
-    
-    echo -e "\\n=== By Trigger ==="
-    echo "$ANALYSIS" | jq -r '
-        .by_trigger[] |
-        "🔄 \(.trigger):\\n   Count: \(.count), Success Rate: \(.success_rate | round)%"
+        .by_workflow[] |
+        "🔄 \(.name):\\n   Runs: \(.runs)\\n   Success Rate: \(.success_rate | round)%\\n   Avg Duration: \(.avg_duration | round)min"
     '
     
     if [ -n "$(echo "$ANALYSIS" | jq -r '.recent_failures | length')" ]; then
         echo -e "\\n=== Recent Failures ==="
         echo "$ANALYSIS" | jq -r '
             .recent_failures[] |
-            "❌ \(.workflow) (\(.branch))\\n   At: \(.started)\\n   URL: \(.url)"
+            "❌ \(.workflow)\\n   Branch: \(.branch)\\n   Started: \(.started)\\n   URL: \(.url)"
         '
     fi
 fi
