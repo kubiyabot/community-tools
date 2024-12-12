@@ -297,7 +297,6 @@ list_files = GitHubCliTool(
 set -euo pipefail
 
 echo "📂 Listing files in repository: $repo"
-[[ -n "$path" ]] && echo "📁 Path: $path"
 [[ -n "$filter" ]] && echo "🔍 Filter: $filter"
 [[ -n "$ref" ]] && echo "🔖 Ref: $ref"
 
@@ -329,21 +328,16 @@ echo "$TREE" | jq -r '
     end
 ' | while read -r line; do
     # Apply filters if specified
-    if [ -n "$path" ] && [[ ! "$line" =~ "$path" ]]; then
-        continue
-    fi
     if [ -n "$filter" ] && [[ ! "$line" =~ "$filter" ]]; then
         continue
     fi
     echo "$line"
 done
-
 echo "✨ File listing complete!"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
         Arg(name="filter", type="str", description="Optional filter pattern for file names. Example: '.py' or 'test'", required=False),
-        Arg(name="path", type="str", description="Optional path to list files from. Example: 'src' or 'docs'", required=False),
         Arg(name="ref", type="str", description="Optional git reference (branch, tag, or commit SHA). Example: 'main' or 'v1.0.0'", required=False),
         Arg(name="show_details", type="bool", description="Show file size", required=False, default="false"),
     ],
