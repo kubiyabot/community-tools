@@ -291,24 +291,67 @@ remote_search "${{repo}}" "${{pattern}}" "${{file}}"
 
 preview_modifications = GitHubCliTool(
     name="github_preview_modifications",
-    description="""Preview file modifications without committing.
-    
-WHEN TO USE:
-- Want to see changes before applying
-- Need to validate modifications
-- Want to check branch creation""",
-    content=f'''
-{FILE_OPS_SCRIPT}
+    description="Preview file modifications without committing",
+    content="""
+#!/bin/bash
+set -euo pipefail
 
-setup_repo "${{repo}}" "${{branch}}"
-preview_changes "${{modifications}}" "${{create_branch}}" "${{branch_name}}"
-''',
+# Clone repo and setup
+echo "🔄 Cloning repository..."
+rm -rf ./* ./.git
+git clone "https://${GH_TOKEN}@github.com/${repo}.git" .
+
+# Switch to base branch
+echo "🔄 Checking out base branch: ${base_branch}"
+git checkout "${base_branch}"
+
+# Create temporary copy of file
+echo "📝 Previewing changes to: ${file}"
+if [ ! -f "${file}" ]; then
+    echo "❌ Error: File '${file}' not found!"
+    exit 1
+fi
+
+# Create backup for comparison
+cp "${file}" "${file}.preview"
+
+# Apply sed command to preview file
+if [ "$(uname)" = "Darwin" ]; then
+    sed -i '' "${sed_statement}" "${file}.preview" || {
+        echo "❌ Error: Invalid sed command"
+        rm "${file}.preview"
+        exit 1
+    }
+else
+    sed -i "${sed_statement}" "${file}.preview" || {
+        echo "❌ Error: Invalid sed command"
+        rm "${file}.preview"
+        exit 1
+    }
+fi
+
+# Show preview of changes
+echo "📊 Preview of changes:"
+echo "-------------------"
+if ! diff --color "${file}" "${file}.preview"; then
+    echo "-------------------"
+    echo "✨ These changes would be made if applied"
+    if [ -n "${branch_name}" ]; then
+        echo "🌱 Would create new branch: ${branch_name}"
+    fi
+else
+    echo "⚠️  No changes would be made by this sed command"
+fi
+
+# Cleanup
+rm "${file}.preview"
+""",
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="modifications", type="str", description='JSON array of modifications: [{"file": "path", "pattern": "old", "replacement": "new"}]', required=True),
-        Arg(name="branch", type="str", description="Base branch to preview from", required=False),
-        Arg(name="create_branch", type="bool", description="Preview branch creation", required=False),
-        Arg(name="branch_name", type="str", description="Name for new branch", required=False),
+        Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
+        Arg(name="file", type="str", description="Path to file to modify. Example: 'README.md'", required=True),
+        Arg(name="sed_statement", type="str", description="Sed command to preview. Example: 's/old/new/g'", required=True),
+        Arg(name="base_branch", type="str", description="Base branch to preview from", required=False, default="main"),
+        Arg(name="branch_name", type="str", description="Name for new branch (optional)", required=False),
     ],
     with_volumes=[GIT_VOLUME]
 )
@@ -317,46 +360,41 @@ list_files = GitHubCliTool(
     name="github_list_files",
     description="List files in a GitHub repository with optional filtering using GitHub API",
     content="""
+#!/bin/bash
+set -euo pipefail
+
 echo "📂 Listing files in repository: $repo"
 [[ -n "$path" ]] && echo "📁 Path: $path"
 [[ -n "$filter" ]] && echo "🔍 Filter: $filter"
 [[ -n "$ref" ]] && echo "🔖 Ref: $ref"
 
-# Build the API query - get full tree in one request
+# Build the API query
 API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")?recursive=1"
 
 # Fetch repository tree
 echo "🔍 Fetching repository structure..."
 TREE=$(gh api "$API_PATH")
 
-# Process and display the tree structure in a single jq command
+# Process and display the tree structure
 echo "$TREE" | jq -r '
-    .tree |
-    # First sort everything by path
-    sort_by(.path) |
-    # Group by type and format output
-    .[] |
-    # Calculate depth for indentation
-    . as $item |
-    ($item.path | split("/") | length - 1) as $depth |
-    # Create indentation string
-    ($depth * 2) as $indent |
-    # Format output based on type
-    if $item.type == "tree" then
-        ("📁 " + ($item.path | @sh | gsub("'\''"; ""))) + "/"
+    .tree | 
+    sort_by(.path) | 
+    .[] | 
+    if .type == "tree" then
+        "📁 " + .path + "/"
     else
-        (
-            # Create indentation
-            (if $indent > 0 then (" " * $indent) else "" end) +
-            # Add file emoji and path
-            "📄 " + $item.path +
-            # Add size if show_details is true
+        if .type == "blob" then
+            "  📄 " + .path + 
             if env.show_details == "true" then
-                "\n" + (" " * ($indent + 3)) + "📊 Size: " + ($item.size | tostring) + " bytes" +
-                "\n" + (" " * ($indent + 3)) + "🔒 SHA: " + $item.sha
-            else "" end
-        )
-    end' | while read -r line; do
+                "\\n    📊 Size: " + (.size|tostring) + " bytes"
+            else 
+                ""
+            end
+        else 
+            empty 
+        end
+    end
+' | while read -r line; do
     # Apply filters if specified
     if [ -n "$path" ] && [[ ! "$line" =~ "$path" ]]; then
         continue
@@ -374,7 +412,7 @@ echo "✨ File listing complete!"
         Arg(name="filter", type="str", description="Optional filter pattern for file names. Example: '.py' or 'test'", required=False),
         Arg(name="path", type="str", description="Optional path to list files from. Example: 'src' or 'docs'", required=False),
         Arg(name="ref", type="str", description="Optional git reference (branch, tag, or commit SHA). Example: 'main' or 'v1.0.0'", required=False),
-        Arg(name="show_details", type="bool", description="Show file size and SHA", required=False, default="false"),
+        Arg(name="show_details", type="bool", description="Show file size", required=False, default="false"),
     ],
 )
 
@@ -397,7 +435,7 @@ __all__ = [
     'list_files'
 ]
 
-# Simple script for file editing with sed
+# Script for direct file content editing
 FILE_EDIT_SCRIPT = '''
 #!/bin/bash
 set -euo pipefail
@@ -430,23 +468,24 @@ else
     git checkout "${base_branch}"
 fi
 
-# Verify file exists
+# Verify file exists or create new one
 if [ ! -f "${file}" ]; then
-    echo "❌ Error: File '${file}' not found!"
-    exit 1
+    echo "📄 Creating new file: ${file}"
+    mkdir -p "$(dirname "${file}")"
+    touch "${file}"
 fi
 
-# Edit file using sed
-echo "📝 Editing file: ${file}"
-if [ "$(uname)" = "Darwin" ]; then
-    sed -i '' "${sed_statement}" "${file}"
-else
-    sed -i "${sed_statement}" "${file}"
-fi
+# Backup current content
+cp "${file}" "${file}.bak"
+
+# Write new content
+echo "📝 Writing new content to: ${file}"
+echo "${new_content}" > "${file}"
 
 # Check if changes were made
 if ! check_changes; then
-    echo "⚠️  No changes were made to the file. The sed command might not have matched anything."
+    echo "⚠️  No changes were made to the file. New content is identical to existing content."
+    rm "${file}.bak"
     exit 1
 fi
 
@@ -475,17 +514,20 @@ else
     echo "❌ Failed to push changes!"
     exit 1
 fi
+
+# Cleanup
+rm "${file}.bak"
 '''
 
-# Simplified edit file tool
+# Simplified edit file tool with direct content replacement
 edit_file = GitHubCliTool(
     name="github_edit_file",
-    description="Edit a file in a GitHub repository using sed",
+    description="Edit or create a file in a GitHub repository with new content",
     content=FILE_EDIT_SCRIPT,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
-        Arg(name="file", type="str", description="Path to file to edit. Example: 'README.md'", required=True),
-        Arg(name="sed_statement", type="str", description="Sed command. Example: 's/old/new/g'", required=True),
+        Arg(name="file", type="str", description="Path to file to edit or create. Example: 'docs/README.md'", required=True),
+        Arg(name="new_content", type="str", description="New content for the file", required=True),
         Arg(name="branch_name", type="str", description="New branch name (optional)", required=False),
         Arg(name="base_branch", type="str", description="Base branch name", required=False, default="main"),
         Arg(name="commit_message", type="str", description="Commit message", required=False, default="Update file"),
