@@ -1,6 +1,7 @@
 # k8s_tools/__init__.py
 import os
 from .utils.script_runner import run_script, ScriptExecutionError
+from .kubewatch.builder import KubeWatchConfigBuilder
 
 def initialize():
     """Initialize Kubernetes tools and KubeWatch configuration."""
@@ -20,4 +21,4 @@ initialize()
 # Import tools after initialization
 from .tools import *
 
-__all__ = ['initialize']
+__all__ = ['initialize', 'KubeWatchConfigBuilder']
