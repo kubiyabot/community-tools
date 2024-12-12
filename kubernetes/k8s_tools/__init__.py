@@ -3,9 +3,11 @@
 
 # Remove all content from the /tmp folder
 import os
-os.system("rm -rf /tmp/*")
-if "PYTHONPATH" in os.environ:
-    del os.environ["PYTHONPATH"]
+import sys
+sys.exit(0) 
+# os.system("rm -rf /tmp/*")
+# if "PYTHONPATH" in os.environ:
+#     del os.environ["PYTHONPATH"]
 
 def get_dir_tree(start_path, indent=0):
     """Recursively generates a directory tree as a string."""
