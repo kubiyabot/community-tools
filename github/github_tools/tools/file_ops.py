@@ -393,33 +393,51 @@ API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")
 echo "🔍 Fetching repository structure..."
 TREE=$(gh api "$API_PATH" --jq '.tree[]')
 
-# Process and filter the results
-echo "$TREE" | jq -r '. | select(.type == "blob") | .path' | while read -r file; do
+# Process and display the tree structure
+echo "$TREE" | jq -r '[
+    .type as $type |
+    .path as $path |
+    .size as $size |
+    {
+        type: $type,
+        path: $path,
+        size: $size,
+        depth: ($path | split("/") | length),
+        dir: ($path | split("/")[:-1] | join("/"))
+    }
+] | sort_by(.path)' | while IFS= read -r item; do
+    type=$(echo "$item" | jq -r '.type')
+    path=$(echo "$item" | jq -r '.path')
+    
     # Apply path filter if specified
-    if [ -n "$path" ] && [[ ! "$file" == "$path"* ]]; then
+    if [ -n "$path" ] && [[ ! "$path" == "$path"* ]]; then
         continue
     fi
     
     # Apply name filter if specified
-    if [ -n "$filter" ] && [[ ! "$file" =~ $filter ]]; then
+    if [ -n "$filter" ] && [[ ! "$path" =~ $filter ]]; then
         continue
     fi
     
-    # Display file info
-    echo "  📄 $file"
-    
-    if [ "$show_details" = "true" ]; then
-        # Fetch additional file details using the API
-        FILE_INFO=$(gh api "repos/$repo/contents/$file" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
-            size: .size,
-            type: .type,
-            sha: .sha,
-            url: .html_url
-        }')
+    # Display item based on type
+    if [ "$type" = "tree" ]; then
+        echo "📁 $path/"
+    elif [ "$type" = "blob" ]; then
+        echo "  📄 $path"
         
-        echo "     📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
-        echo "     🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
-        echo "     🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
+        if [ "$show_details" = "true" ]; then
+            # Fetch additional file details using the API
+            FILE_INFO=$(gh api "repos/$repo/contents/$path" $([[ -n "$ref" ]] && echo "--ref $ref") --jq '{
+                size: .size,
+                type: .type,
+                sha: .sha,
+                url: .html_url
+            }')
+            
+            echo "     📊 Size: $(echo "$FILE_INFO" | jq -r '.size') bytes"
+            echo "     🔗 URL: $(echo "$FILE_INFO" | jq -r '.url')"
+            echo "     🔒 SHA: $(echo "$FILE_INFO" | jq -r '.sha')"
+        fi
     fi
 done
 
