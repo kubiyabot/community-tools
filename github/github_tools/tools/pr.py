@@ -165,7 +165,11 @@ EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | s
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
     echo "🔄 Updating existing comment..."
-    UPDATED_COMMENT="### Current Comment\\n\\n$FULL_COMMENT\\n\\n---\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
+    # Count number of edits in the comment
+    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
+    EDIT_COUNT=$((EDIT_COUNT + 1))
+    
+    UPDATED_COMMENT="### Last Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
     gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
     echo "✅ Comment updated successfully!"
 else
