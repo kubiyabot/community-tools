@@ -4,7 +4,7 @@ from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
 workflow_analytics = GitHubCliTool(
-    name="github_workflow_analytics",
+    name="github_workflow_analytics", 
     description="Get comprehensive workflow analytics",
     content="""
 echo "📊 Analyzing workflow performance..."
@@ -13,7 +13,7 @@ echo "📈 Analysis period: ${days:-30} days"
 # Get workflow runs with detailed information
 RUNS=$(gh run list --repo "${repo}" \
     $([ -n "${workflow}" ] && echo "--workflow ${workflow}") \
-    --json startedAt,conclusion,durationInSeconds,event,headBranch,name,status \
+    --json startedAt,conclusion,event,headBranch,name,status,createdAt,updatedAt \
     --created ">=${days:-30} days ago" \
     --limit "${limit:-1000}")
 
@@ -23,14 +23,20 @@ if [ "${format}" = "json" ]; then
         summary: {
             total_runs: length,
             success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100,
-            avg_duration_minutes: ([.[] | .durationInSeconds] | add / length / 60),
-            total_time_hours: ([.[] | .durationInSeconds] | add / 3600)
+            avg_duration_minutes: ([.[] | (if .startedAt and .updatedAt then 
+                (fromdateiso8601(.updatedAt) - fromdateiso8601(.startedAt)) / 60 
+                else 0 end)] | add / length),
+            total_time_hours: ([.[] | (if .startedAt and .updatedAt then 
+                (fromdateiso8601(.updatedAt) - fromdateiso8601(.startedAt)) / 3600
+                else 0 end)] | add)
         },
         by_workflow: group_by(.name) | map({
             name: .[0].name,
             runs: length,
             success_rate: ([.[] | select(.conclusion == "success")] | length) / length * 100,
-            avg_duration_minutes: (map(.durationInSeconds) | add) / length / 60,
+            avg_duration_minutes: ([.[] | (if .startedAt and .updatedAt then
+                (fromdateiso8601(.updatedAt) - fromdateiso8601(.startedAt)) / 60
+                else 0 end)] | add / length),
             status_breakdown: group_by(.status) | map({key: .[0].status, count: length})
         }),
         by_trigger: group_by(.event) | map({
@@ -50,7 +56,9 @@ else
     echo "$RUNS" | jq -r '
         "Total Runs: \(length)",
         "Success Rate: \(([.[] | select(.conclusion == "success")] | length) / length * 100 | round)%",
-        "Average Duration: \(([.[] | .durationInSeconds] | add / length / 60 | round))m",
+        "Average Duration: \(([.[] | (if .startedAt and .updatedAt then
+            (fromdateiso8601(.updatedAt) - fromdateiso8601(.startedAt)) / 60
+            else 0 end)] | add / length | round))m",
         "\nTop Workflows by Usage:",
         (group_by(.name) | sort_by(-length) | .[0:5] | map(
             "  • \(.[0].name): \(length) runs, \(([.[] | select(.conclusion == "success")] | length) / length * 100 | round)% success"
