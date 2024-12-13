@@ -213,19 +213,19 @@ echo "🔍 Fetching workflow runs..."
 RUNS=$(gh run list \
     --repo "$repo" \
     --limit "$LIMIT" \
-    --json "conclusion,createdAt,startedAt,updatedAt,name,headBranch,status,url,displayTitle,event" || echo '[]')
+    --json "conclusion,createdAt,startedAt,updatedAt,displayTitle,event,headBranch,status,url,name,attempt" || echo '[]')
 
-# Analyze the runs with null checks
+# Analyze the runs with null checks and proper duration calculation
 echo "📈 Analyzing workflow performance..."
-ANALYSIS=$(echo "$RUNS" | jq '
-    def safe_duration(item):
-        if (item.startedAt != null and item.updatedAt != null) then
-            ((item.updatedAt | fromdateiso8601) - (item.startedAt | fromdateiso8601)) / 60
+ANALYSIS=$(echo "$RUNS" | jq --arg days "$DAYS" '
+    def calc_duration(start; end):
+        if (start != null and end != null) then
+            ((end | fromdateiso8601) - (start | fromdateiso8601)) / 60
         else 0 end;
 
-    def safe_date_check(date_str):
+    def is_recent(date_str):
         if (date_str != null) then
-            (now - (date_str | fromdateiso8601)) < ($ENV.DAYS | tonumber * 86400)
+            (now - (date_str | fromdateiso8601)) < ($days | tonumber * 86400)
         else false end;
 
     def safe_success_rate(arr):
@@ -233,52 +233,38 @@ ANALYSIS=$(echo "$RUNS" | jq '
             (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
         else 0 end;
 
-    def safe_avg(arr):
-        if (length > 0) then (add / length) else 0 end;
-
-    # Filter for date range and add duration
-    map(select(safe_date_check(.createdAt)) | . + {duration: safe_duration(.)}) as $filtered |
+    # Filter recent runs and add duration
+    map(select(is_recent(.createdAt)) | . + {
+        duration_minutes: calc_duration(.startedAt; .updatedAt)
+    }) as $recent_runs |
 
     {
         summary: {
-            total_runs: $filtered | length,
-            success_rate: ($filtered | safe_success_rate),
-            avg_duration_minutes: ($filtered | map(.duration) | safe_avg)
+            total_runs: ($recent_runs | length),
+            success_rate: ($recent_runs | safe_success_rate),
+            avg_duration: ($recent_runs | map(.duration_minutes) | add / length)
         },
-        status_breakdown: (
-            $filtered | group_by(.status // "unknown") | 
-            map({
-                status: .[0].status // "unknown",
-                count: length,
-                percentage: (length * 100.0 / ($filtered | length))
-            })
-        ),
-        by_workflow: (
-            $filtered | group_by(.name // "unknown") | 
-            map({
-                name: (.[0].name // "unknown"),
-                runs: length,
-                success_rate: safe_success_rate(.),
-                avg_duration: (map(.duration) | safe_avg)
-            }) | 
-            sort_by(-.runs) | 
-            .[0:5]
-        ),
-        recent_failures: (
-            $filtered | map(select(.conclusion == "failure")) |
-            map({
-                workflow: (.displayTitle // .name // "unknown"),
-                branch: (.headBranch // "unknown"),
-                started: .startedAt,
-                trigger: (.event // "unknown"),
-                url: .url
-            }) |
-            sort_by(.started) |
-            reverse |
-            .[0:3]
-        )
-    }
-')
+        by_status: ($recent_runs | group_by(.status) | map({
+            status: .[0].status,
+            count: length,
+            percentage: (length * 100.0 / ($recent_runs | length))
+        })),
+        by_workflow: ($recent_runs | group_by(.name) | map({
+            name: .[0].name,
+            runs: length,
+            success_rate: safe_success_rate(.),
+            avg_duration: (map(.duration_minutes) | add / length)
+        }) | sort_by(-.runs) | .[0:5]),
+        failures: ($recent_runs | map(select(.conclusion == "failure")) | map({
+            name: .displayTitle,
+            branch: .headBranch,
+            event: .event,
+            attempt: .attempt,
+            started: .startedAt,
+            url: .url
+        }) | sort_by(.started) | reverse | .[0:3])
+    }'
+)
 
 # Format output with error handling
 if [ "$format" = "json" ]; then
@@ -289,33 +275,38 @@ else
         .summary |
         "📊 Total Runs: \(.total_runs // 0)",
         "✨ Success Rate: \((.success_rate // 0) | round)%",
-        "⏱️  Average Duration: \((.avg_duration_minutes // 0) | round)min"
+        "⏱️  Average Duration: \((.avg_duration // 0) | round)min"
     '
     
-    if (echo "$ANALYSIS" | jq -e '.status_breakdown | length > 0' >/dev/null); then
-        echo -e "\\n=== Status Breakdown ==="
-        echo "$ANALYSIS" | jq -r '
-            .status_breakdown[] |
-            "[\(.status // "unknown")] \(.count // 0) runs (\((.percentage // 0) | round)%)"
-        '
-    fi
+    echo -e "\\n=== Status Breakdown ==="
+    echo "$ANALYSIS" | jq -r '
+        .by_status[] |
+        "[\(.status // "unknown")] \(.count // 0) runs (\((.percentage // 0) | round)%)"
+    '
     
-    if (echo "$ANALYSIS" | jq -e '.by_workflow | length > 0' >/dev/null); then
-        echo -e "\\n=== Top Workflows ==="
-        echo "$ANALYSIS" | jq -r '
-            .by_workflow[] |
-            "🔄 \(.name):\\n   Runs: \(.runs // 0)\\n   Success Rate: \((.success_rate // 0) | round)%\\n   Avg Duration: \((.avg_duration // 0) | round)min"
-        '
-    fi
+    echo -e "\\n=== Top Workflows ==="
+    echo "$ANALYSIS" | jq -r '
+        .by_workflow[] |
+        "🔄 \(.name // "unknown"):",
+        "   Runs: \(.runs // 0)",
+        "   Success Rate: \((.success_rate // 0) | round)%",
+        "   Avg Duration: \((.avg_duration // 0) | round)min"
+    '
     
-    if (echo "$ANALYSIS" | jq -e '.recent_failures | length > 0' >/dev/null); then
+    if (echo "$ANALYSIS" | jq -e '.failures | length > 0' >/dev/null); then
         echo -e "\\n=== Recent Failures ==="
         echo "$ANALYSIS" | jq -r '
-            .recent_failures[] |
-            "❌ \(.workflow // "unknown")\\n   Branch: \(.branch // "unknown")\\n   Trigger: \(.trigger)\\n   Started: \(.started // "unknown")\\n   URL: \(.url // "#")"
+            .failures[] |
+            "❌ \(.name // "unknown")",
+            "   Branch: \(.branch // "unknown")",
+            "   Trigger: \(.event // "unknown")",
+            "   Attempt: \(.attempt // 1)",
+            "   Started: \(.started // "unknown")",
+            "   URL: \(.url // "#")",
+            ""
         '
     else
-        echo -e "\\n✅ No recent failures found"
+        echo -e "\\n✅ No recent failures"
     fi
 fi
 """,
