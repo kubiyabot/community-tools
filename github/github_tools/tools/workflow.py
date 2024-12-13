@@ -179,10 +179,202 @@ echo "✨ Workflow disabled successfully!"
     ],
 )
 
+workflow_run_logs_failed = GitHubCliTool(
+    name="github_workflow_run_logs_failed",
+    description="Get logs from failed workflow runs with focus on error messages",
+    content=f'''
+#!/bin/sh
+set -e
+{LOG_PROCESSING_FUNCTIONS}
+
+echo "🔍 Finding failed workflow runs in: $repo"
+
+# Get recent failed runs
+FAILED_RUNS=$(gh run list --repo "$repo" --json databaseId,name,conclusion,createdAt,url \
+    --jq '[.[] | select(.conclusion == "failure")] | sort_by(.createdAt) | reverse | .[0:5]')
+
+if [ -z "$FAILED_RUNS" ] || [ "$FAILED_RUNS" = "[]" ]; then
+    echo "✅ No failed runs found in recent history"
+    exit 0
+fi
+
+# Process each failed run
+echo "$FAILED_RUNS" | jq -c '.[]' | while read -r run; do
+    run_id=$(echo "$run" | jq -r '.databaseId')
+    name=$(echo "$run" | jq -r '.name')
+    date=$(echo "$run" | jq -r '.createdAt')
+    url=$(echo "$run" | jq -r '.url')
+    
+    echo "\\n❌ Failed Run: $name"
+    echo "📅 Date: $date"
+    echo "🔗 URL: $url"
+    echo "🆔 Run ID: $run_id"
+    echo "\\n📝 Error Logs:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Get logs and filter for errors/failures
+    LOGS=$(gh run view --repo "$repo" "$run_id" --log || echo "No logs available")
+    
+    echo "$LOGS" | awk \'
+        BEGIN {{ lines_printed = 0; context_lines = 3; buffer[""] = ""; buffer_size = 0; }}
+        
+        # Store line in circular buffer for context
+        {{
+            buffer[buffer_size % context_lines] = $0
+            buffer_size++
+        }}
+        
+        # Print error context when found
+        /error|fail|exception|fatal/i {{
+            if (lines_printed < 50) {{  # Limit total output
+                print "\\n--- Error Context ---"
+                # Print previous lines for context
+                for (i = 1; i <= context_lines; i++) {{
+                    idx = ((buffer_size - i - 1) + context_lines) % context_lines
+                    if (buffer[idx] != "") print buffer[idx]
+                }}
+                print ">>> " $0  # Print the error line
+                lines_printed += context_lines + 1
+            }}
+        }}
+        
+        END {{
+            if (lines_printed == 0) print "No specific error messages found in logs"
+        }}
+    \'
+    echo "━━━━━━━━━━━━━━━━━━━━━━━"
+done
+
+echo "\\n✨ Log analysis complete!"
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+    ],
+)
+
+workflow_run_logs_failed_by_id = GitHubCliTool(
+    name="github_workflow_run_logs_failed_by_id",
+    description="Get error logs from a specific failed workflow run",
+    content=f'''
+#!/bin/sh
+set -e
+{LOG_PROCESSING_FUNCTIONS}
+
+echo "🔍 Checking workflow run #${{run_id}} in: ${{repo}}"
+
+# Get run details
+RUN_INFO=$(gh run view --repo "${{repo}}" "${{run_id}}" --json conclusion,name,createdAt,url,status || echo "{{}}") 
+
+if [ "$RUN_INFO" = "{{}}" ]; then
+    echo "❌ Run #${{run_id}} not found"
+    exit 1
+fi
+
+CONCLUSION=$(echo "$RUN_INFO" | jq -r '.conclusion')
+STATUS=$(echo "$RUN_INFO" | jq -r '.status')
+NAME=$(echo "$RUN_INFO" | jq -r '.name')
+DATE=$(echo "$RUN_INFO" | jq -r '.createdAt')
+URL=$(echo "$RUN_INFO" | jq -r '.url')
+
+echo "📋 Run Details:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔖 Name: $NAME"
+echo "📅 Date: $DATE"
+echo "📊 Status: $STATUS"
+echo "🏁 Conclusion: $CONCLUSION"
+echo "🔗 URL: $URL"
+
+if [ "$CONCLUSION" != "failure" ]; then
+    echo "\\n⚠️  This run did not fail (conclusion: $CONCLUSION)"
+    if [ "${{show_logs}}" != "true" ]; then
+        echo "Use --show-logs=true to see logs anyway"
+        exit 0
+    fi
+fi
+
+echo "\\n📝 Error Logs:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Get logs and filter for errors/failures
+LOGS=$(gh run view --repo "${{repo}}" "${{run_id}}" --log || echo "No logs available")
+
+if [ "$LOGS" = "No logs available" ]; then
+    echo "❌ No logs available for this run"
+    exit 1
+fi
+
+echo "$LOGS" | awk \'
+    BEGIN {{ 
+        lines_printed = 0
+        context_lines = 5  # Show more context for specific run
+        buffer[""] = ""
+        buffer_size = 0
+        in_error_block = 0
+        error_count = 0
+    }}
+    
+    # Store line in circular buffer for context
+    {{
+        buffer[buffer_size % context_lines] = $0
+        buffer_size++
+    }}
+    
+    # Print error context when found
+    /error|fail|exception|fatal|panic/i {{
+        if (lines_printed < 100) {{  # Allow more lines for specific run
+            if (!in_error_block) {{
+                error_count++
+                print "\\n🚫 Error Block #" error_count ":"
+                print "-------------------"
+                # Print previous lines for context
+                for (i = 1; i <= context_lines; i++) {{
+                    idx = ((buffer_size - i - 1) + context_lines) % context_lines
+                    if (buffer[idx] != "") print "  " buffer[idx]
+                }}
+            }}
+            print "❌ " $0
+            in_error_block = 5  # Keep printing next 5 lines after error
+            lines_printed++
+        }}
+    }}
+    
+    # Print following lines in error block
+    {{
+        if (in_error_block > 0 && lines_printed < 100) {{
+            if (!/error|fail|exception|fatal|panic/i) {{
+                print "  " $0
+                lines_printed++
+            }}
+            in_error_block--
+        }}
+    }}
+    
+    END {{
+        if (error_count == 0) {{
+            print "No specific error messages found in logs"
+        }} else {{
+            print "\\nFound " error_count " error blocks"
+            if (lines_printed >= 100) {{
+                print "Output truncated. Use workflow_logs for full log"
+            }}
+        }}
+    }}
+\'
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+echo "\\n✨ Log analysis complete!"
+''',
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="run_id", type="str", description="Workflow run ID", required=True),
+        Arg(name="show_logs", type="bool", description="Show logs even if run didn't fail", required=False, default="false"),
+    ],
+)
+
 # Register all tools
 WORKFLOW_TOOLS = [
     workflow_list, workflow_view, workflow_run, workflow_logs,
-    workflow_enable, workflow_disable
+    workflow_enable, workflow_disable, workflow_run_logs_failed,
+    workflow_run_logs_failed_by_id
 ]
 
 for tool in WORKFLOW_TOOLS:
