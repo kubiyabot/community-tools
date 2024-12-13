@@ -213,19 +213,19 @@ echo "🔍 Fetching workflow runs..."
 RUNS=$(gh run list \
     --repo "$repo" \
     --limit "$LIMIT" \
-    --json "conclusion,createdAt,startedAt,updatedAt,displayTitle,event,headBranch,status,url,name,attempt" || echo '[]')
+    --json "conclusion,createdAt,startedAt,updatedAt,displayTitle,event,headBranch,status,url,name,number,headSha,workflowName" || echo '[]')
 
 # Analyze the runs with null checks and proper duration calculation
 echo "📈 Analyzing workflow performance..."
 ANALYSIS=$(echo "$RUNS" | jq --arg days "$DAYS" '
-    def calc_duration(start; end):
-        if (start != null and end != null) then
-            ((end | fromdateiso8601) - (start | fromdateiso8601)) / 60
+    def calc_duration(item):
+        if (item.startedAt != null and item.updatedAt != null) then
+            ((item.updatedAt | fromdateiso8601) - (item.startedAt | fromdateiso8601)) / 60
         else 0 end;
 
-    def is_recent(date_str):
-        if (date_str != null) then
-            (now - (date_str | fromdateiso8601)) < ($days | tonumber * 86400)
+    def is_recent(item):
+        if (item.createdAt != null) then
+            (now - (item.createdAt | fromdateiso8601)) < ($days | tonumber * 86400)
         else false end;
 
     def safe_success_rate(arr):
@@ -234,8 +234,9 @@ ANALYSIS=$(echo "$RUNS" | jq --arg days "$DAYS" '
         else 0 end;
 
     # Filter recent runs and add duration
-    map(select(is_recent(.createdAt)) | . + {
-        duration_minutes: calc_duration(.startedAt; .updatedAt)
+    map(select(is_recent(.)) | . + {
+        duration_minutes: calc_duration(.),
+        workflow_name: (.workflowName // .name // "unknown")
     }) as $recent_runs |
 
     {
@@ -249,17 +250,19 @@ ANALYSIS=$(echo "$RUNS" | jq --arg days "$DAYS" '
             count: length,
             percentage: (length * 100.0 / ($recent_runs | length))
         })),
-        by_workflow: ($recent_runs | group_by(.name) | map({
-            name: .[0].name,
+        by_workflow: ($recent_runs | group_by(.workflow_name) | map({
+            name: .[0].workflow_name,
             runs: length,
             success_rate: safe_success_rate(.),
             avg_duration: (map(.duration_minutes) | add / length)
         }) | sort_by(-.runs) | .[0:5]),
         failures: ($recent_runs | map(select(.conclusion == "failure")) | map({
             name: .displayTitle,
+            workflow: .workflow_name,
             branch: .headBranch,
             event: .event,
-            attempt: .attempt,
+            commit: .headSha[0:7],
+            run_number: .number,
             started: .startedAt,
             url: .url
         }) | sort_by(.started) | reverse | .[0:3])
@@ -287,7 +290,7 @@ else
     echo -e "\\n=== Top Workflows ==="
     echo "$ANALYSIS" | jq -r '
         .by_workflow[] |
-        "🔄 \(.name // "unknown"):",
+        "🔄 \(.name):",
         "   Runs: \(.runs // 0)",
         "   Success Rate: \((.success_rate // 0) | round)%",
         "   Avg Duration: \((.avg_duration // 0) | round)min"
@@ -297,10 +300,12 @@ else
         echo -e "\\n=== Recent Failures ==="
         echo "$ANALYSIS" | jq -r '
             .failures[] |
-            "❌ \(.name // "unknown")",
+            "❌ \(.name // .workflow // "unknown")",
+            "   Workflow: \(.workflow // "unknown")",
             "   Branch: \(.branch // "unknown")",
             "   Trigger: \(.event // "unknown")",
-            "   Attempt: \(.attempt // 1)",
+            "   Commit: \(.commit // "unknown")",
+            "   Run #: \(.run_number // "?")",
             "   Started: \(.started // "unknown")",
             "   URL: \(.url // "#")",
             ""
