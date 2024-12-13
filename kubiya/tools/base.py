@@ -2,7 +2,8 @@ from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
 KUBIYA_ICON = "https://www.finsmes.com/wp-content/uploads/2022/10/Kubiya-logo-mark-color.png"
-CLI_IMAGE = "ghcr.io/kubiyabot/cli:latest"
+CLI_VERSION = "v0.0.6"
+CLI_URL = f"https://github.com/kubiyabot/cli/releases/download/{CLI_VERSION}/kubiya-cli-linux-amd64"
 
 class KubiyaCliBase(Tool):
     """Base class for all Kubiya CLI tools"""
@@ -12,6 +13,17 @@ class KubiyaCliBase(Tool):
         enhanced_command = f'''
 #!/bin/sh
 set -e
+
+# Install required packages if not already installed
+if ! command -v curl >/dev/null 2>&1; then
+    apk add curl
+fi
+
+# Download and install Kubiya CLI if not already installed
+if [ ! -f /usr/local/bin/kubiya ]; then
+    curl -L -o /usr/local/bin/kubiya {CLI_URL}
+    chmod +x /usr/local/bin/kubiya
+fi
 
 # Ensure KUBIYA_API_KEY is set
 if [ -z "$KUBIYA_API_KEY" ]; then
@@ -51,7 +63,7 @@ echo "✅ Operation completed successfully"
             description=description,
             icon_url=KUBIYA_ICON,
             type="docker",
-            image=CLI_IMAGE,
+            image="alpine:latest",
             content=enhanced_command,
             args=args or [],
             secrets=["KUBIYA_API_KEY"],
