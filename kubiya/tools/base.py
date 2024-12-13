@@ -14,12 +14,14 @@ class KubiyaCliBase(Tool):
 #!/bin/sh
 set -e
 
+apk add curl --silent > /dev/null 2>&1
+
 # Get CLI binary
-curl -L {CLI_URL} -o {CLI_PATH}
-chmod +x {CLI_PATH}
+curl -L {CLI_URL} -o /usr/local/bin/kubiya
+chmod +x /usr/local/bin/kubiya
 
 # Execute command with full path
-{cli_command.replace('kubiya ', f'{CLI_PATH} ')}
+/usr/local/bin/kubiya {cli_command}
 '''
 
         super().__init__(
