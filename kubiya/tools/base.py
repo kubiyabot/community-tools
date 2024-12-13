@@ -14,6 +14,11 @@ class KubiyaCliBase(Tool):
 #!/bin/sh
 set -e
 
+# Debug info
+echo "Starting setup..."
+uname -a
+ls -la /usr/local/bin || true
+
 # Install required packages if not already installed
 if ! command -v curl >/dev/null 2>&1; then
     apk add --no-cache curl
@@ -21,9 +26,38 @@ fi
 
 # Install Kubiya CLI if not already installed
 if [ ! -f {CLI_PATH} ]; then
+    echo "Installing Kubiya CLI..."
     mkdir -p /usr/local/bin
-    curl -L {CLI_URL} -o {CLI_PATH}
-    chmod +x {CLI_PATH}
+    curl -L {CLI_URL} -o {CLI_PATH}.tmp
+    
+    # Verify download
+    if [ ! -f {CLI_PATH}.tmp ]; then
+        echo "Download failed - file not found"
+        exit 1
+    fi
+    
+    echo "Download complete. File size:"
+    ls -lh {CLI_PATH}.tmp
+    
+    # Make executable
+    chmod +x {CLI_PATH}.tmp
+    
+    # Test binary
+    if ./{CLI_PATH}.tmp --help >/dev/null 2>&1; then
+        echo "Binary test successful"
+        mv {CLI_PATH}.tmp {CLI_PATH}
+    else
+        echo "Binary test failed"
+        file {CLI_PATH}.tmp
+        exit 1
+    fi
+fi
+
+# Verify CLI exists and is executable
+if [ ! -x {CLI_PATH} ]; then
+    echo "CLI not found or not executable at {CLI_PATH}"
+    ls -la {CLI_PATH} || true
+    exit 1
 fi
 
 # Ensure KUBIYA_API_KEY is set
@@ -53,6 +87,7 @@ if echo "{cli_command}" | grep -q "TEMP_DIR"; then
     }}
 fi
 
+echo "Running command..."
 # Execute command with full path
 {cli_command.replace('kubiya ', f'{CLI_PATH} ')}
 '''
