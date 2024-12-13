@@ -213,55 +213,64 @@ echo "🔍 Fetching workflow runs..."
 RUNS=$(gh run list \
     --repo "$repo" \
     --limit "$LIMIT" \
-    --json "conclusion,createdAt,event,headBranch,name,startedAt,status,updatedAt,url,displayTitle" || echo '[]')
+    --json "conclusion,createdAt,startedAt,updatedAt,name,headBranch,status,url,displayTitle,event" || echo '[]')
 
 # Analyze the runs with null checks
 echo "📈 Analyzing workflow performance..."
 ANALYSIS=$(echo "$RUNS" | jq '
-    def safe_date_diff(start; end):
-        if (start != null and end != null) then
-            ((end | fromdateiso8601) - (start | fromdateiso8601)) / 60
+    def safe_duration(item):
+        if (item.startedAt != null and item.updatedAt != null) then
+            ((item.updatedAt | fromdateiso8601) - (item.startedAt | fromdateiso8601)) / 60
         else 0 end;
+
+    def safe_date_check(date_str):
+        if (date_str != null) then
+            (now - (date_str | fromdateiso8601)) < ($ENV.DAYS | tonumber * 86400)
+        else false end;
 
     def safe_success_rate(arr):
         if (length > 0) then
-            (([arr[] | select(.conclusion == "success")] | length) * 100.0 / length)
+            (([.[] | select(.conclusion == "success")] | length) * 100.0 / length)
         else 0 end;
 
     def safe_avg(arr):
         if (length > 0) then (add / length) else 0 end;
 
+    # Filter for date range and add duration
+    map(select(safe_date_check(.createdAt)) | . + {duration: safe_duration(.)}) as $filtered |
+
     {
         summary: {
-            total_runs: length,
-            success_rate: safe_success_rate(.),
-            avg_duration_minutes: ([.[] | safe_date_diff(.startedAt; .updatedAt)] | safe_avg)
+            total_runs: $filtered | length,
+            success_rate: ($filtered | safe_success_rate),
+            avg_duration_minutes: ($filtered | map(.duration) | safe_avg)
         },
         status_breakdown: (
-            group_by(.conclusion // "pending") | 
+            $filtered | group_by(.status // "unknown") | 
             map({
-                status: .[0].conclusion // "pending",
+                status: .[0].status // "unknown",
                 count: length,
-                percentage: (length * 100.0 / ($RUNS | length))
+                percentage: (length * 100.0 / ($filtered | length))
             })
         ),
         by_workflow: (
-            group_by(.name // "unknown") | 
+            $filtered | group_by(.name // "unknown") | 
             map({
                 name: (.[0].name // "unknown"),
                 runs: length,
                 success_rate: safe_success_rate(.),
-                avg_duration: ([.[] | safe_date_diff(.startedAt; .updatedAt)] | safe_avg)
+                avg_duration: (map(.duration) | safe_avg)
             }) | 
             sort_by(-.runs) | 
             .[0:5]
         ),
         recent_failures: (
-            . | map(select(.conclusion == "failure")) |
+            $filtered | map(select(.conclusion == "failure")) |
             map({
                 workflow: (.displayTitle // .name // "unknown"),
                 branch: (.headBranch // "unknown"),
                 started: .startedAt,
+                trigger: (.event // "unknown"),
                 url: .url
             }) |
             sort_by(.started) |
@@ -303,7 +312,7 @@ else
         echo -e "\\n=== Recent Failures ==="
         echo "$ANALYSIS" | jq -r '
             .recent_failures[] |
-            "❌ \(.workflow // "unknown")\\n   Branch: \(.branch // "unknown")\\n   Started: \(.started // "unknown")\\n   URL: \(.url // "#")"
+            "❌ \(.workflow // "unknown")\\n   Branch: \(.branch // "unknown")\\n   Trigger: \(.trigger)\\n   Started: \(.started // "unknown")\\n   URL: \(.url // "#")"
         '
     else
         echo -e "\\n✅ No recent failures found"
@@ -618,6 +627,183 @@ fi
     ],
 )
 
+commit_search = GitHubCliTool(
+    name="github_commit_search",
+    description="Search for commits in a repository with various filters",
+    content="""
+#!/bin/bash
+set -euo pipefail
+
+echo "🔍 Searching commits in: $repo"
+
+# Build search query
+QUERY="repos/$repo/commits?"
+if [ -n "${author:-}" ]; then
+    QUERY="${QUERY}author=${author}&"
+fi
+if [ -n "${since:-}" ]; then
+    QUERY="${QUERY}since=${since}&"
+fi
+if [ -n "${path:-}" ]; then
+    QUERY="${QUERY}path=${path}&"
+fi
+if [ -n "${branch:-}" ]; then
+    QUERY="${QUERY}sha=${branch}&"
+fi
+
+# Get commits with detailed info
+echo "📥 Fetching commits..."
+COMMITS=$(gh api "$QUERY" --paginate --jq "[
+    .[] | {
+        sha: .sha[0:7],
+        full_sha: .sha,
+        author: {
+            name: .commit.author.name,
+            email: .commit.author.email,
+            username: (.author.login // null)
+        },
+        committer: {
+            name: .commit.committer.name,
+            email: .commit.committer.email,
+            username: (.committer.login // null)
+        },
+        message: .commit.message,
+        date: .commit.author.date,
+        url: .html_url,
+        git_url: .git_url,
+        stats: {
+            additions: .stats.additions,
+            deletions: .stats.deletions
+        },
+        files_changed: [.files[].filename]
+    }
+] | .[0:$ENV.limit | tonumber]")
+
+# Format output
+if [ "$format" = "json" ]; then
+    echo "$COMMITS"
+else
+    echo "$COMMITS" | jq -r '.[] | 
+        "🔨 Commit: \(.sha)\\n" +
+        "👤 Author: \(.author.name) <\(.author.email)>" + 
+        if .author.username then " (@\(.author.username))" else "" end + "\\n" +
+        "📅 Date: \(.date)\\n" +
+        "📝 Message:\\n\(.message | split("\\n") | map("   " + .) | join("\\n"))\\n" +
+        "📊 Changes: +\(.stats.additions // 0) -\(.stats.deletions // 0)\\n" +
+        if (.files_changed | length) > 0 then
+            "📄 Files Changed:\\n" + 
+            (.files_changed | map("   • " + .) | join("\\n")) + "\\n"
+        else "" end +
+        "🔗 URL: \(.url)\\n" +
+        "---"
+    '
+fi
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="author", type="str", description="Filter by author (username or email)", required=False),
+        Arg(name="since", type="str", description="Show commits after date (YYYY-MM-DD)", required=False),
+        Arg(name="path", type="str", description="Filter by file path", required=False),
+        Arg(name="branch", type="str", description="Filter by branch or commit SHA", required=False),
+        Arg(name="limit", type="str", description="Maximum number of commits to show", required=False, default="10"),
+        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+    ],
+)
+
+commit_details = GitHubCliTool(
+    name="github_commit_details",
+    description="Get detailed information about a specific commit",
+    content="""
+#!/bin/bash
+set -euo pipefail
+
+echo "🔍 Fetching commit details for: $commit in $repo"
+
+# Get detailed commit info
+COMMIT=$(gh api "repos/$repo/commits/$commit" --jq '{
+    sha: .sha,
+    author: {
+        name: .commit.author.name,
+        email: .commit.author.email,
+        username: (.author.login // null),
+        avatar: (.author.avatar_url // null)
+    },
+    committer: {
+        name: .commit.committer.name,
+        email: .commit.committer.email,
+        username: (.committer.login // null),
+        avatar: (.committer.avatar_url // null)
+    },
+    message: .commit.message,
+    date: .commit.author.date,
+    verification: {
+        verified: .commit.verification.verified,
+        reason: .commit.verification.reason,
+        signature: .commit.verification.signature
+    },
+    stats: {
+        additions: .stats.additions,
+        deletions: .stats.deletions,
+        total: .stats.total
+    },
+    files: [.files[] | {
+        name: .filename,
+        status: .status,
+        additions: .additions,
+        deletions: .deletions,
+        changes: .changes,
+        patch: .patch
+    }],
+    urls: {
+        html: .html_url,
+        git: .git_url,
+        api: .url
+    },
+    parents: [.parents[].sha[0:7]],
+    branch: .commit.tree.sha
+}')
+
+# Format output
+if [ "$format" = "json" ]; then
+    echo "$COMMIT"
+else
+    echo "$COMMIT" | jq -r '
+        "=== Commit Details ===\\n" +
+        "🔑 SHA: \(.sha)\\n" +
+        if (.parents | length) > 0 then
+            "👆 Parent(s): \(.parents | join(", "))\\n"
+        else "" end +
+        "\\n=== Author ===\\n" +
+        "👤 \(.author.name) <\(.author.email)>" +
+        if .author.username then " (@\(.author.username))" else "" end + "\\n" +
+        "📅 Date: \(.date)\\n" +
+        "\\n=== Message ===\\n" +
+        (.message | split("\\n") | map("   " + .) | join("\\n")) + "\\n" +
+        "\\n=== Verification ===\\n" +
+        "🔐 Status: \(.verification.verified | if . then "✅ Verified" else "⚠️ Not Verified" end)\\n" +
+        "   Reason: \(.verification.reason)\\n" +
+        "\\n=== Changes ===\\n" +
+        "📊 Stats: +\(.stats.additions) -\(.stats.deletions) (total: \(.stats.total))\\n" +
+        "\\n=== Files Changed ===\\n" +
+        (.files | map(
+            "📄 \(.name) [\(.status)]\\n" +
+            "   Changes: +\(.additions) -\(.deletions)\\n" +
+            if .patch then "   Patch:\\n\(.patch | split("\\n") | map("      " + .) | join("\\n"))\\n" else "" end
+        ) | join("\\n")) + "\\n" +
+        "\\n=== URLs ===\\n" +
+        "🌐 Web: \(.urls.html)\\n" +
+        "📦 Git: \(.urls.git)\\n" +
+        "🔗 API: \(.urls.api)"
+    '
+fi
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="commit", type="str", description="Commit SHA or reference", required=True),
+        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+    ],
+)
+
 # Register tools
 ANALYTICS_TOOLS = [
     repo_stats,
@@ -627,9 +813,11 @@ ANALYTICS_TOOLS = [
     workflow_job_analytics,
     repo_insights,
     dependency_insights,
+    commit_search,
+    commit_details,
 ]
 
 for tool in ANALYTICS_TOOLS:
     tool_registry.register("github", tool)
 
-__all__ = ['repo_stats', 'security_analysis', 'commit_history', 'workflow_analytics', 'workflow_job_analytics', 'repo_insights', 'dependency_insights'] 
+__all__ = ['repo_stats', 'security_analysis', 'commit_history', 'workflow_analytics', 'workflow_job_analytics', 'repo_insights', 'dependency_insights', 'commit_search', 'commit_details'] 
