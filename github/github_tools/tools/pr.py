@@ -152,14 +152,28 @@ echo "✅ Pull request closed successfully!"
 
 pr_comment = GitHubCliTool(
     name="github_pr_comment",
-    description="Add a comment to a pull request.",
+    description="Add a comment to a pull request or update existing comment.",
     content="""
-echo "💬 Adding comment to pull request #$number in $repo..."
+echo "💬 Processing comment for pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 GITHUB_ACTOR=$(gh api user --jq '.login')
 FULL_COMMENT="$body${KUBIYA_DISCLAIMER}"
-gh pr comment --repo $repo $number --body "$FULL_COMMENT"
-echo "✅ Comment added successfully!"
+
+# Get existing comments by the current user
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+
+if [ -n "$EXISTING_COMMENT_ID" ]; then
+    # Update existing comment
+    echo "🔄 Updating existing comment..."
+    UPDATED_COMMENT="### Current Comment\\n\\n$FULL_COMMENT\\n\\n---\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
+    gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
+    echo "✅ Comment updated successfully!"
+else
+    # Add new comment
+    echo "➕ Adding new comment..."
+    gh pr comment --repo $repo $number --body "$FULL_COMMENT"
+    echo "✅ Comment added successfully!"
+fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
