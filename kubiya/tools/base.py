@@ -16,14 +16,36 @@ set -e
 
 # Install required packages if not already installed
 if ! command -v curl >/dev/null 2>&1; then
-    apk add curl
+    apk add --no-cache curl
 fi
 
 # Download and install Kubiya CLI if not already installed
 if [ ! -f /usr/local/bin/kubiya ]; then
-    curl -L -o /usr/local/bin/kubiya {CLI_URL}
-    chmod +x /usr/local/bin/kubiya
+    # Create bin directory if it doesn't exist
+    mkdir -p /usr/local/bin
+
+    # Download CLI with progress
+    echo "Downloading Kubiya CLI {CLI_VERSION}..."
+    curl -L -o /usr/local/bin/kubiya {CLI_URL} || {{
+        echo "Failed to download Kubiya CLI"
+        exit 1
+    }}
+
+    # Make executable
+    chmod +x /usr/local/bin/kubiya || {{
+        echo "Failed to make Kubiya CLI executable"
+        exit 1
+    }}
+
+    # Verify installation
+    if ! /usr/local/bin/kubiya version >/dev/null 2>&1; then
+        echo "Failed to verify Kubiya CLI installation"
+        exit 1
+    fi
 fi
+
+# Add to PATH
+export PATH="/usr/local/bin:$PATH"
 
 # Ensure KUBIYA_API_KEY is set
 if [ -z "$KUBIYA_API_KEY" ]; then
@@ -50,6 +72,12 @@ if echo "{cli_command}" | grep -q "TEMP_DIR"; then
         echo "$content" > "$file"
         echo "$file"
     }}
+fi
+
+# Verify CLI is in PATH
+if ! command -v kubiya >/dev/null 2>&1; then
+    echo "❌ Error: Kubiya CLI not found in PATH"
+    exit 1
 fi
 
 # Execute command
