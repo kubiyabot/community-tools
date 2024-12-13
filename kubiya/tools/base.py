@@ -3,14 +3,13 @@ from kubiya_sdk.tools.registry import tool_registry
 
 KUBIYA_ICON = "https://www.finsmes.com/wp-content/uploads/2022/10/Kubiya-logo-mark-color.png"
 CLI_VERSION = "v0.0.6"
-CLI_URL = f"https://github.com/kubiyabot/cli/releases/download/{CLI_VERSION}/kubiya-cli-linux-amd64"
+CLI_URL = f"https://github.com/kubiyabot/cli/releases/download/{CLI_VERSION}/kubiya-linux-amd64"
 CLI_PATH = "/usr/local/bin/kubiya"
 
 class KubiyaCliBase(Tool):
     """Base class for all Kubiya CLI tools"""
     
     def __init__(self, name, description, cli_command, args=None, mermaid=None):
-        # Ensure non-interactive mode and JSON output by default
         enhanced_command = f'''
 #!/bin/sh
 set -e
@@ -20,17 +19,11 @@ if ! command -v curl >/dev/null 2>&1; then
     apk add --no-cache curl
 fi
 
-# Download and install Kubiya CLI if not already installed
+# Install Kubiya CLI if not already installed
 if [ ! -f {CLI_PATH} ]; then
     mkdir -p /usr/local/bin
-    curl -L -o {CLI_PATH} {CLI_URL} || {{
-        echo "Failed to download Kubiya CLI"
-        exit 1
-    }}
-    chmod +x {CLI_PATH} || {{
-        echo "Failed to make Kubiya CLI executable"
-        exit 1
-    }}
+    curl -L {CLI_URL} -o {CLI_PATH}
+    chmod +x {CLI_PATH}
 fi
 
 # Ensure KUBIYA_API_KEY is set
@@ -60,7 +53,7 @@ if echo "{cli_command}" | grep -q "TEMP_DIR"; then
     }}
 fi
 
-# Execute command (replace 'kubiya' with full path)
+# Execute command with full path
 {cli_command.replace('kubiya ', f'{CLI_PATH} ')}
 '''
 
