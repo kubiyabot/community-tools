@@ -219,7 +219,7 @@ check_and_set_org
 # Define stream_workflow_logs tool
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time.",
+    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
     content="""
 #!/bin/sh
 set -e
