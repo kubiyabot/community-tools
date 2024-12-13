@@ -4,6 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 KUBIYA_ICON = "https://www.finsmes.com/wp-content/uploads/2022/10/Kubiya-logo-mark-color.png"
 CLI_VERSION = "v0.0.6"
 CLI_URL = f"https://github.com/kubiyabot/cli/releases/download/{CLI_VERSION}/kubiya-cli-linux-amd64"
+CLI_PATH = "/usr/local/bin/kubiya"
 
 class KubiyaCliBase(Tool):
     """Base class for all Kubiya CLI tools"""
@@ -20,32 +21,17 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 # Download and install Kubiya CLI if not already installed
-if [ ! -f /usr/local/bin/kubiya ]; then
-    # Create bin directory if it doesn't exist
+if [ ! -f {CLI_PATH} ]; then
     mkdir -p /usr/local/bin
-
-    # Download CLI with progress
-    echo "Downloading Kubiya CLI {CLI_VERSION}..."
-    curl -L -o /usr/local/bin/kubiya {CLI_URL} || {{
+    curl -L -o {CLI_PATH} {CLI_URL} || {{
         echo "Failed to download Kubiya CLI"
         exit 1
     }}
-
-    # Make executable
-    chmod +x /usr/local/bin/kubiya || {{
+    chmod +x {CLI_PATH} || {{
         echo "Failed to make Kubiya CLI executable"
         exit 1
     }}
-
-    # Verify installation
-    if ! /usr/local/bin/kubiya version >/dev/null 2>&1; then
-        echo "Failed to verify Kubiya CLI installation"
-        exit 1
-    fi
 fi
-
-# Add to PATH
-export PATH="/usr/local/bin:$PATH"
 
 # Ensure KUBIYA_API_KEY is set
 if [ -z "$KUBIYA_API_KEY" ]; then
@@ -74,16 +60,8 @@ if echo "{cli_command}" | grep -q "TEMP_DIR"; then
     }}
 fi
 
-# Verify CLI is in PATH
-if ! command -v kubiya >/dev/null 2>&1; then
-    echo "❌ Error: Kubiya CLI not found in PATH"
-    exit 1
-fi
-
-# Execute command
-{cli_command}
-
-echo "✅ Operation completed successfully"
+# Execute command (replace 'kubiya' with full path)
+{cli_command.replace('kubiya ', f'{CLI_PATH} ')}
 '''
 
         super().__init__(
