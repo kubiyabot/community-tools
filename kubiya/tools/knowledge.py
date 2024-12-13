@@ -7,17 +7,9 @@ knowledge_list = create_tool(
     description="List all knowledge items in your Kubiya knowledge base",
     cli_command='''
 echo "📋 Fetching knowledge list..."
-kubiya knowledge list --output ${output_format}
+kubiya knowledge list
 ''',
-    args=[
-        Arg(
-            name="output_format",
-            type="str",
-            description="Output format (json|text)",
-            required=False,
-            default="text"
-        ),
-    ],
+    args=[],
 )
 
 # Knowledge Get Tool
