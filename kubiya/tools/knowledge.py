@@ -15,7 +15,7 @@ kubiya knowledge list --output ${output_format}
             type="str",
             description="Output format (json|text)",
             required=False,
-            default="json"
+            default="text"
         ),
     ],
 )
