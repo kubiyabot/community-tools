@@ -41,23 +41,51 @@ class ModuleSource:
         """Detect the type of module source."""
         source = self.original_source.lower()
         
-        if source.startswith(('http://', 'https://', 'git@')):
-            if 'github.com' in source:
-                return 'github'
+        # Handle GitHub variations
+        if any(pattern in source for pattern in [
+            'github.com', 
+            'git@github.com:', 
+            'git::https://github.com',
+            'github.com/tree'
+        ]):
+            return 'github'
+            
+        # Handle other Git sources
+        if any(pattern in source for pattern in [
+            'gitlab.com',
+            'bitbucket.org',
+            'git::', 
+            'git@',
+            '.git'
+        ]):
             return 'git'
             
-        if source.startswith(('aws://', 'azurerm://', 'google://')):
+        # Handle cloud sources
+        if source.startswith((
+            'aws://', 
+            'azurerm://', 
+            'google://',
+            'oci://',
+            'alicloud://'
+        )):
             return 'cloud'
             
+        # Handle registry sources
         if '/' in source and len(source.split('/')) >= 2:
-            # Check if it's a registry source
             if self.REGISTRY_DOMAIN in source:
                 return 'registry'
-            # Shorthand for registry modules
             if source.count('/') == 2:  # namespace/name/provider format
                 return 'registry'
                 
-        return 'local'
+        # Handle local paths and other formats
+        if (
+            source.startswith(('./', '../', '/')) or
+            ':' not in source or
+            source.startswith('file://')
+        ):
+            return 'local'
+            
+        return 'unknown'
     
     def _parse_source(self) -> Dict[str, Any]:
         """Parse the source string based on its type."""
@@ -73,13 +101,16 @@ class ModuleSource:
             return self._parse_local_source()
     
     def _parse_github_source(self) -> Dict[str, Any]:
-        """Parse GitHub repository source."""
+        """Parse GitHub repository source with all variations."""
         source = self.original_source
-        
-        # Handle tree references
         ref = self.version or 'master'
         path = None
         
+        # Remove git:: prefix if present
+        if source.startswith('git::'):
+            source = source[5:]
+            
+        # Handle tree references and subpaths
         if '/tree/' in source:
             base_url, tree_part = source.split('/tree/', 1)
             parts = tree_part.split('/', 1)
@@ -87,13 +118,27 @@ class ModuleSource:
             path = parts[1] if len(parts) > 1 else None
             source = base_url
             
-        # Clean up the URL
+        # Handle SSH format
         if source.startswith('git@github.com:'):
             source = f"https://github.com/{source[15:]}"
-        
-        # Remove .git suffix if present
-        source = source.rstrip('.git')
-        
+            
+        # Handle various URL formats
+        if '?ref=' in source:
+            source, ref_part = source.split('?ref=', 1)
+            ref = ref_part.split('&')[0]
+            
+        # Clean up the URL
+        source = source.rstrip('/')
+        if source.endswith('.git'):
+            source = source[:-4]
+            
+        # Ensure HTTPS format
+        if not source.startswith('http'):
+            if source.startswith('github.com/'):
+                source = f"https://{source}"
+            elif source.startswith('/'):
+                source = f"https://github.com{source}"
+                
         return {
             'url': source,
             'ref': ref,
@@ -105,24 +150,33 @@ class ModuleSource:
         """Parse Terraform registry source."""
         parts = self.original_source.split('/')
         
+        # Handle various registry formats
         if self.REGISTRY_DOMAIN in self.original_source:
-            # Handle full registry URLs
+            # Full registry URLs
             if len(parts) >= 5:  # registry.terraform.io/namespace/name/provider
                 namespace, name, provider = parts[-3:]
             else:
-                raise ValueError(f"Invalid registry source format: {self.original_source}")
+                raise ValueError(f"Invalid registry format: {self.original_source}")
         else:
-            # Handle shorthand format (namespace/name/provider)
+            # Short format (hashicorp/consul/aws)
             if len(parts) == 3:
                 namespace, name, provider = parts
             else:
-                raise ValueError(f"Invalid registry source format: {self.original_source}")
+                raise ValueError(f"Invalid registry format: {self.original_source}")
         
+        # Handle version constraints
+        version = self.version
+        if '//' in provider:  # Handle subpaths
+            provider, subpath = provider.split('//', 1)
+        else:
+            subpath = None
+            
         return {
             'namespace': namespace,
             'name': name,
             'provider': provider,
-            'version': self.version,
+            'version': version,
+            'subpath': subpath,
             'url': f"https://{self.REGISTRY_DOMAIN}/{namespace}/{name}/{provider}"
         }
     
@@ -130,16 +184,31 @@ class ModuleSource:
         """Parse generic Git repository source."""
         url = self.original_source
         ref = self.version or 'master'
+        path = None
         
-        # Convert SSH to HTTPS if needed
+        # Handle git:: prefix
+        if url.startswith('git::'):
+            url = url[5:]
+            
+        # Handle ref in URL
+        if '?ref=' in url:
+            url, ref_part = url.split('?ref=', 1)
+            ref = ref_part.split('&')[0]
+            
+        # Handle SSH format
         if url.startswith('git@'):
             domain = url[4:url.index(':')]
             path = url[url.index(':')+1:]
             url = f"https://{domain}/{path}"
-        
+            
+        # Handle subpaths
+        if '//' in url:
+            url, path = url.split('//', 1)
+            
         return {
             'url': url.rstrip('.git'),
             'ref': ref,
+            'path': path,
             'clone_url': url
         }
     
