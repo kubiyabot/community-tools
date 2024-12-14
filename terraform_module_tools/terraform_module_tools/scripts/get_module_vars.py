@@ -3,7 +3,7 @@ import os
 import json
 from pathlib import Path
 from typing import Dict, Any
-from terraform_tools.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+from terraform_module_tools.scripts.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
 
 def get_module_vars() -> Dict[str, Any]:
     """Get module variables from the module_variables.json file."""

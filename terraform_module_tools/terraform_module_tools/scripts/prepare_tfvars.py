@@ -4,7 +4,7 @@ import sys
 import json
 from pathlib import Path
 from typing import Dict, Any
-from terraform_tools.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+from terraform_module_tools.scripts.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""

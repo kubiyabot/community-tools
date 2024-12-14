@@ -5,7 +5,11 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     package_data={
-        'terraform_module_tools': ['scripts/configs/*.json'],
+        'terraform_module_tools': [
+            'scripts/configs/*.json',
+            'scripts/*.py',
+            'scripts/*.sh',
+        ],
     },
     include_package_data=True,
     install_requires=[
