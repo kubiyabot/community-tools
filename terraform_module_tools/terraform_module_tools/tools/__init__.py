@@ -71,7 +71,7 @@ def initialize_tools():
         module_urls = parse_module_urls(config.get('tf_modules_urls', ''))
         if not module_urls:
             logger.warning("No Terraform module URLs provided in configuration")
-            return tools
+            raise Exception("No Terraform module URLs provided in configuration - please provide tf_modules_urls")
 
         logger.info(f"Found {len(module_urls)} module URLs in configuration")
 
@@ -80,27 +80,36 @@ def initialize_tools():
             try:
                 logger.info(f"Creating tools for module: {module_url}")
                 
-                # Create plan tool
+                # Create and register tools
+                created_tools = []
+                
                 if plan_tool := create_terraform_module_tool(module_url, 'plan'):
-                    tools.append(plan_tool)
+                    created_tools.append(plan_tool)
                     tool_registry.register("terraform", plan_tool)
 
-                # Create plan with PR tool
                 if plan_pr_tool := create_terraform_module_tool(module_url, 'plan', with_pr=True):
-                    tools.append(plan_pr_tool)
+                    created_tools.append(plan_pr_tool)
                     tool_registry.register("terraform", plan_pr_tool)
 
-                # Create apply tool
                 if apply_tool := create_terraform_module_tool(module_url, 'apply'):
-                    tools.append(apply_tool)
+                    created_tools.append(apply_tool)
                     tool_registry.register("terraform", apply_tool)
-                
-                logger.info(f"Successfully created tools for module: {module_url}")
+
+                if created_tools:
+                    tools.extend(created_tools)
+                    logger.info(f"Successfully created {len(created_tools)} tools for module: {module_url}")
+                else:
+                    logger.warning(f"No tools were created for module: {module_url}")
                 
             except Exception as e:
                 logger.error(f"Failed to create tools for module {module_url}: {str(e)}")
                 continue
 
+        if not tools:
+            logger.warning("No tools were created from any modules")
+            return []
+
+        logger.info(f"Successfully created {len(tools)} tools total")
         return tools
         
     except Exception as e:
