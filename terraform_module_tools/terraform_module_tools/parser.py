@@ -11,6 +11,7 @@ import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from kubiya_sdk.tools.models import FileSpec
+from urllib.parse import urlparse, unquote
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,200 @@ def ensure_hcl2json():
             f.write(response.content)
         os.chmod(HCL2JSON_PATH, 0o755)
     return HCL2JSON_PATH
+
+class ModuleSource:
+    """Class to handle different types of module sources."""
+    
+    REGISTRY_DOMAIN = "registry.terraform.io"
+    
+    def __init__(self, source: str, version: Optional[str] = None):
+        self.original_source = source
+        self.version = version
+        self.source_type = self._detect_source_type()
+        self.parsed_source = self._parse_source()
+    
+    def _detect_source_type(self) -> str:
+        """Detect the type of module source."""
+        source = self.original_source.lower()
+        
+        if source.startswith(('http://', 'https://', 'git@')):
+            if 'github.com' in source:
+                return 'github'
+            return 'git'
+            
+        if source.startswith(('aws://', 'azurerm://', 'google://')):
+            return 'cloud'
+            
+        if '/' in source and len(source.split('/')) >= 2:
+            # Check if it's a registry source
+            if self.REGISTRY_DOMAIN in source:
+                return 'registry'
+            # Shorthand for registry modules
+            if source.count('/') == 2:  # namespace/name/provider format
+                return 'registry'
+                
+        return 'local'
+    
+    def _parse_source(self) -> Dict[str, Any]:
+        """Parse the source string based on its type."""
+        if self.source_type == 'github':
+            return self._parse_github_source()
+        elif self.source_type == 'registry':
+            return self._parse_registry_source()
+        elif self.source_type == 'git':
+            return self._parse_git_source()
+        elif self.source_type == 'cloud':
+            return self._parse_cloud_source()
+        else:
+            return self._parse_local_source()
+    
+    def _parse_github_source(self) -> Dict[str, Any]:
+        """Parse GitHub repository source."""
+        source = self.original_source
+        
+        # Handle tree references
+        ref = self.version or 'master'
+        path = None
+        
+        if '/tree/' in source:
+            base_url, tree_part = source.split('/tree/', 1)
+            parts = tree_part.split('/', 1)
+            ref = parts[0]
+            path = parts[1] if len(parts) > 1 else None
+            source = base_url
+            
+        # Clean up the URL
+        if source.startswith('git@github.com:'):
+            source = f"https://github.com/{source[15:]}"
+        
+        # Remove .git suffix if present
+        source = source.rstrip('.git')
+        
+        return {
+            'url': source,
+            'ref': ref,
+            'path': path,
+            'clone_url': f"{source}.git"
+        }
+    
+    def _parse_registry_source(self) -> Dict[str, Any]:
+        """Parse Terraform registry source."""
+        parts = self.original_source.split('/')
+        
+        if self.REGISTRY_DOMAIN in self.original_source:
+            # Handle full registry URLs
+            if len(parts) >= 5:  # registry.terraform.io/namespace/name/provider
+                namespace, name, provider = parts[-3:]
+            else:
+                raise ValueError(f"Invalid registry source format: {self.original_source}")
+        else:
+            # Handle shorthand format (namespace/name/provider)
+            if len(parts) == 3:
+                namespace, name, provider = parts
+            else:
+                raise ValueError(f"Invalid registry source format: {self.original_source}")
+        
+        return {
+            'namespace': namespace,
+            'name': name,
+            'provider': provider,
+            'version': self.version,
+            'url': f"https://{self.REGISTRY_DOMAIN}/{namespace}/{name}/{provider}"
+        }
+    
+    def _parse_git_source(self) -> Dict[str, Any]:
+        """Parse generic Git repository source."""
+        url = self.original_source
+        ref = self.version or 'master'
+        
+        # Convert SSH to HTTPS if needed
+        if url.startswith('git@'):
+            domain = url[4:url.index(':')]
+            path = url[url.index(':')+1:]
+            url = f"https://{domain}/{path}"
+        
+        return {
+            'url': url.rstrip('.git'),
+            'ref': ref,
+            'clone_url': url
+        }
+    
+    def _parse_cloud_source(self) -> Dict[str, Any]:
+        """Parse cloud-specific source."""
+        scheme, path = self.original_source.split('://', 1)
+        provider = scheme.lower()
+        
+        return {
+            'provider': provider,
+            'path': path,
+            'version': self.version
+        }
+    
+    def _parse_local_source(self) -> Dict[str, Any]:
+        """Parse local filesystem source."""
+        return {
+            'path': os.path.abspath(self.original_source),
+            'version': self.version
+        }
+    
+    def get_clone_url(self) -> str:
+        """Get the URL to clone the repository."""
+        if self.source_type == 'github':
+            return self.parsed_source['clone_url']
+        elif self.source_type == 'git':
+            return self.parsed_source['clone_url']
+        elif self.source_type == 'registry':
+            # For registry modules, we need to get the source from the registry
+            registry_client = TerraformRegistryClient()
+            module_source = registry_client.get_module_source(
+                self.parsed_source['namespace'],
+                self.parsed_source['name'],
+                self.parsed_source['provider'],
+                self.parsed_source['version']
+            )
+            return module_source
+        
+        raise ValueError(f"Source type {self.source_type} does not support cloning")
+    
+    def get_ref(self) -> Optional[str]:
+        """Get the reference (branch, tag, commit) to checkout."""
+        if self.source_type in ('github', 'git'):
+            return self.parsed_source['ref']
+        return None
+    
+    def get_path(self) -> Optional[str]:
+        """Get the path within the repository."""
+        if self.source_type == 'github':
+            return self.parsed_source.get('path')
+        return None
+
+class TerraformRegistryClient:
+    """Client for interacting with Terraform Registry API."""
+    
+    def __init__(self):
+        self.base_url = "https://registry.terraform.io/v1"
+        
+    def get_module_source(self, namespace: str, name: str, provider: str, version: Optional[str] = None) -> str:
+        """Get the source URL for a registry module."""
+        try:
+            # Get latest version if not specified
+            if not version:
+                versions_url = f"{self.base_url}/modules/{namespace}/{name}/{provider}/versions"
+                response = requests.get(versions_url)
+                response.raise_for_status()
+                versions = response.json()['modules'][0]['versions']
+                version = versions[0]['version']
+            
+            # Get download URL
+            download_url = f"{self.base_url}/modules/{namespace}/{name}/{provider}/{version}/download"
+            response = requests.get(download_url)
+            response.raise_for_status()
+            
+            # Registry returns a redirect to the actual source
+            return response.headers['X-Terraform-Get']
+            
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f"Failed to get module source from registry: {str(e)}")
 
 class TerraformModuleParser:
     PROVIDER_REQUIREMENTS = {
@@ -45,11 +240,10 @@ class TerraformModuleParser:
         source_url: str,
         ref: Optional[str] = None,
         path: Optional[str] = None,
-        max_workers: int = 4  # Number of parallel workers
+        max_workers: int = 4
     ):
-        self.source_url = source_url
-        self.ref = ref
-        self.path = path
+        self.source = ModuleSource(source_url, version=ref)
+        self.path = path or self.source.get_path()
         self.warnings = []
         self.errors = []
         self.readme_url = None
@@ -59,80 +253,80 @@ class TerraformModuleParser:
         self._clone_repository()
         ensure_hcl2json()
 
-    @lru_cache(maxsize=128)
-    def _get_github_url(self) -> str:
-        """Convert module source to GitHub URL with caching."""
-        if not self.source_url:
-            raise ValueError("Source URL is required")
-        
-        # Clean up GitHub URLs that include tree/branch references
-        if '/tree/' in self.source_url:
-            # Extract the repository URL and branch
-            repo_url, branch = self.source_url.split('/tree/')
-            self.ref = branch.split('/')[0]  # Set the ref to the branch
-            return repo_url
-        
-        if self.source_url.startswith(('http://', 'https://', 'git@')):
-            return self.source_url.rstrip('/')
-
-        if self.source_url.startswith('terraform-aws-modules/'):
-            parts = self.source_url.split('/')
-            if len(parts) != 3:
-                raise ValueError(f"Invalid module format: {self.source_url}")
-            _, provider, name = parts
-            return f"https://github.com/terraform-aws-modules/terraform-{provider}-{name}"
-
-        raise ValueError(f"Unsupported source format: {self.source_url}")
-
     def _clone_repository(self) -> None:
         """Clone the repository with optimized git operations."""
-        github_url = self._get_github_url()
         temp_dir = tempfile.mkdtemp()
 
         try:
-            logger.info(f"Cloning repository: {github_url}")
-            # Use shallow clone to speed up the process
-            clone_cmd = [
-                'git', 'clone', '--depth', '1', 
-                '--single-branch'
-            ]
+            logger.info(f"Cloning repository from {self.source.get_clone_url()}")
             
-            if self.ref:
-                clone_cmd.extend(['--branch', self.ref])
+            clone_cmd = ['git', 'clone', '--depth', '1', '--single-branch']
             
-            if "GH_TOKEN" in os.environ:
-                auth_url = github_url.replace(
-                    "https://github.com",
-                    f"https://{os.environ['GH_TOKEN']}@github.com"
-                )
-                clone_cmd.append(auth_url)
+            if ref := self.source.get_ref():
+                clone_cmd.extend(['--branch', ref])
+            
+            clone_url = self.source.get_clone_url()
+            
+            # Handle GitHub authentication tokens
+            if 'github.com' in clone_url:
+                # Try GH_TOKEN first, then TOOLS_GH_TOKEN
+                github_token = os.environ.get('GH_TOKEN') or os.environ.get('TOOLS_GH_TOKEN')
+                if github_token:
+                    logger.debug("Using GitHub token for authentication")
+                    auth_url = clone_url.replace(
+                        "https://github.com",
+                        f"https://{github_token}@github.com"
+                    )
+                    clone_cmd.append(auth_url)
+                else:
+                    logger.debug("No GitHub token found, using unauthenticated access")
+                    clone_cmd.append(clone_url)
             else:
-                clone_cmd.append(github_url)
+                clone_cmd.append(clone_url)
             
             clone_cmd.append(str(temp_dir))
             
-            subprocess.run(clone_cmd, check=True, capture_output=True)
+            # Run git clone command
+            try:
+                result = subprocess.run(
+                    clone_cmd, 
+                    check=True, 
+                    capture_output=True,
+                    text=True,
+                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '0'}  # Prevent git from prompting for credentials
+                )
+            except subprocess.CalledProcessError as e:
+                error_msg = f"Git clone failed: {e.stderr}"
+                if 'Authentication failed' in e.stderr:
+                    error_msg = "GitHub authentication failed. Please ensure either GH_TOKEN or TOOLS_GH_TOKEN is set with valid credentials."
+                logger.error(error_msg)
+                raise ValueError(error_msg)
             
             # Set the module directory
             self.module_dir = os.path.join(temp_dir, self.path or '')
             if self.path and not os.path.exists(self.module_dir):
                 raise ValueError(f"Specified path '{self.path}' does not exist")
 
-            # Set README URL if exists
-            readme_path = os.path.join(self.module_dir, 'README.md')
-            if os.path.exists(readme_path):
-                self.readme_url = os.path.join(
-                    github_url.replace('.git', ''),
-                    'blob',
-                    self.ref or 'master',
-                    self.path or '',
-                    'README.md'
-                )
+            # Set README URL for GitHub repositories
+            if self.source.source_type == 'github':
+                base_url = self.source.parsed_source['url']
+                ref = self.source.get_ref() or 'master'
+                path = self.source.get_path() or ''
+                self.readme_url = f"{base_url}/blob/{ref}/{path}/README.md".rstrip('/')
 
         except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to clone repository {github_url}: {e.stderr}"
+            error_msg = f"Failed to clone repository: {e.stderr}"
             logger.error(error_msg)
             raise ValueError(error_msg)
+        except Exception as e:
+            error_msg = f"Failed to clone repository: {str(e)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        finally:
+            # Ensure we don't leave the token in the error messages
+            if 'github_token' in locals():
+                for handler in logger.handlers:
+                    handler.formatter._fmt = handler.formatter._fmt.replace(github_token, '***')
 
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
         """Parse variables from a Terraform file with error handling."""
