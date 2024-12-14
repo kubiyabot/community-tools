@@ -62,8 +62,18 @@ class TerraformModuleParser:
     @lru_cache(maxsize=128)
     def _get_github_url(self) -> str:
         """Convert module source to GitHub URL with caching."""
+        if not self.source_url:
+            raise ValueError("Source URL is required")
+        
+        # Clean up GitHub URLs that include tree/branch references
+        if '/tree/' in self.source_url:
+            # Extract the repository URL and branch
+            repo_url, branch = self.source_url.split('/tree/')
+            self.ref = branch.split('/')[0]  # Set the ref to the branch
+            return repo_url
+        
         if self.source_url.startswith(('http://', 'https://', 'git@')):
-            return self.source_url
+            return self.source_url.rstrip('/')
 
         if self.source_url.startswith('terraform-aws-modules/'):
             parts = self.source_url.split('/')

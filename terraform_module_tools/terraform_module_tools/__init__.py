@@ -11,20 +11,23 @@ def initialize():
         logger.info("Starting Terraform module tools initialization...")
         initialized_tools = initialize_tools()
         if not initialized_tools:
-            logger.warning("No tools were initialized")
-            return []
+            error_msg = "No tools were initialized"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
             
         logger.info(f"Successfully initialized {len(initialized_tools)} Terraform tools")
         return initialized_tools
     except Exception as e:
-        logger.error(f"Failed to initialize Terraform tools: {str(e)}")
-        raise
+        error_msg = f"Failed to initialize Terraform tools: {str(e)}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
 # Initialize tools when module is imported and store them
-tools = initialize()
-
-if not tools:
-    logger.warning("No Terraform tools were initialized. Please check your configuration.")
+try:
+    tools = initialize()
+except Exception as e:
+    logger.error(f"Failed to initialize tools: {str(e)}")
+    tools = []
 
 # Export the tools and initialization function
 __all__ = ['tools', 'initialize']

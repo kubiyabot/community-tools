@@ -64,14 +64,16 @@ def initialize_tools():
         # Get dynamic configuration from tool registry
         config = tool_registry.dynamic_config
         if not config:
-            logger.warning("No dynamic configuration provided")
-            raise Exception("No dynamic configuration provided - please provide a comma separated list of Terraform module URLs to initialize the tools for")
+            error_msg = "No dynamic configuration provided - please provide a comma separated list of Terraform module URLs to initialize the tools for"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         # Get module URLs from configuration
         module_urls = parse_module_urls(config.get('tf_modules_urls', ''))
         if not module_urls:
-            logger.warning("No Terraform module URLs provided in configuration")
-            raise Exception("No Terraform module URLs provided in configuration - please provide tf_modules_urls")
+            error_msg = "No Terraform module URLs provided in configuration - please provide tf_modules_urls"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         logger.info(f"Found {len(module_urls)} module URLs in configuration")
 
@@ -83,31 +85,33 @@ def initialize_tools():
                 # Create and register tools
                 created_tools = []
                 
-                if plan_tool := create_terraform_module_tool(module_url, 'plan'):
-                    created_tools.append(plan_tool)
-                    tool_registry.register("terraform", plan_tool)
-
-                if plan_pr_tool := create_terraform_module_tool(module_url, 'plan', with_pr=True):
-                    created_tools.append(plan_pr_tool)
-                    tool_registry.register("terraform", plan_pr_tool)
-
-                if apply_tool := create_terraform_module_tool(module_url, 'apply'):
-                    created_tools.append(apply_tool)
-                    tool_registry.register("terraform", apply_tool)
+                for action in ['plan', 'plan_pr', 'apply']:
+                    with_pr = action == 'plan_pr'
+                    base_action = 'plan' if with_pr else action
+                    
+                    tool = create_terraform_module_tool(module_url, base_action, with_pr)
+                    if tool:
+                        created_tools.append(tool)
+                        tool_registry.register("terraform", tool)
+                        logger.info(f"Created {action} tool for {module_url}")
 
                 if created_tools:
                     tools.extend(created_tools)
                     logger.info(f"Successfully created {len(created_tools)} tools for module: {module_url}")
                 else:
-                    logger.warning(f"No tools were created for module: {module_url}")
+                    error_msg = f"Failed to create any tools for module: {module_url}"
+                    logger.error(error_msg)
+                    raise ValueError(error_msg)
                 
             except Exception as e:
-                logger.error(f"Failed to create tools for module {module_url}: {str(e)}")
-                continue
+                error_msg = f"Failed to create tools for module {module_url}: {str(e)}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
         if not tools:
-            logger.warning("No tools were created from any modules")
-            return []
+            error_msg = "No tools were created from any modules"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         logger.info(f"Successfully created {len(tools)} tools total")
         return tools
