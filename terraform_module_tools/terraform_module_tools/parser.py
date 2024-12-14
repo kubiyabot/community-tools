@@ -192,6 +192,34 @@ class ModuleSource:
             return self.parsed_source.get('path')
         return None
 
+    def get_module_name(self) -> str:
+        """Get a clean module name for tool creation."""
+        if self.source_type == 'github':
+            # Extract name from GitHub URL
+            name = self.parsed_source['url'].split('/')[-1]
+            if name.startswith('terraform-'):
+                # Handle terraform-provider-resource format
+                parts = name.split('-')
+                if len(parts) >= 3:
+                    provider = parts[1]
+                    resource = '_'.join(parts[2:])
+                    return f"{provider}_{resource}"
+            return name.replace('-', '_')
+            
+        elif self.source_type == 'registry':
+            # Use provider_name format for registry modules
+            return f"{self.parsed_source['provider']}_{self.parsed_source['name']}"
+            
+        elif self.source_type == 'git':
+            # Extract name from Git URL
+            name = self.parsed_source['url'].split('/')[-1].replace('.git', '')
+            return name.replace('-', '_')
+            
+        else:
+            # For other sources, use a sanitized version of the path
+            name = os.path.basename(self.original_source)
+            return re.sub(r'[^\w_]', '', name).lower()
+
 class TerraformRegistryClient:
     """Client for interacting with Terraform Registry API."""
     

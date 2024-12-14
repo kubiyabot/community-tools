@@ -3,6 +3,7 @@ from typing import List
 from kubiya_sdk.tools.registry import tool_registry
 from .terraform_module_tool import TerraformModuleTool
 from ..parser import TerraformModuleParser
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -26,24 +27,22 @@ def create_terraform_module_tool(module_url: str, action: str, with_pr: bool = F
         for warning in warnings:
             logger.warning(f"Warning for {module_url}: {warning}")
 
-        # Extract module name from URL
-        module_name = module_url.split('/')[-1].replace('.git', '')
+        # Extract clean module name from URL
+        module_name = _get_clean_module_name(module_url)
         
         # Create module configuration
         module_config = {
             'name': module_name,
-            'description': f"Terraform module from {module_url}",
+            'description': f"Terraform module for {module_name}",
             'source': {
                 'location': module_url,
-                'version': 'master'  # Default to master, can be made configurable
+                'version': parser.source.get_ref() or 'latest'
             }
         }
 
         # Generate tool name
-        action_suffix = f"_{action}"
-        if action == 'plan' and with_pr:
-            action_suffix = '_plan_pr'
-        tool_name = f"tf_{module_name.lower().replace('-', '_')}{action_suffix}"
+        action_suffix = '_plan_pr' if action == 'plan' and with_pr else f'_{action}'
+        tool_name = f"tf_{module_name}{action_suffix}"
 
         return TerraformModuleTool(
             name=tool_name,
@@ -56,6 +55,42 @@ def create_terraform_module_tool(module_url: str, action: str, with_pr: bool = F
     except Exception as e:
         logger.error(f"Failed to create tool for {module_url}: {str(e)}")
         return None
+
+def _get_clean_module_name(url: str) -> str:
+    """Extract a clean module name from the URL."""
+    # Remove any /tree/<branch> parts
+    if '/tree/' in url:
+        url = url.split('/tree/')[0]
+    
+    # Handle different URL formats
+    if url.startswith(('http://', 'https://', 'git@')):
+        # GitHub/GitLab URLs
+        if 'github.com' in url or 'gitlab.com' in url:
+            # Extract the repo name from the URL
+            parts = url.rstrip('/').rstrip('.git').split('/')
+            repo_name = parts[-1]
+            
+            # Handle terraform-provider-name format
+            if repo_name.startswith('terraform-'):
+                # Extract the actual resource name
+                name_parts = repo_name.split('-')
+                if len(name_parts) >= 3:
+                    # terraform-aws-vpc -> aws_vpc
+                    provider = name_parts[1]
+                    resource = '_'.join(name_parts[2:])
+                    return f"{provider}_{resource}"
+            
+            return repo_name.replace('-', '_')
+            
+    elif url.count('/') == 2:  # registry format (e.g., "hashicorp/consul/aws")
+        # Extract the module name from registry format
+        namespace, name, provider = url.split('/')
+        return f"{provider}_{name}"
+    
+    # Fallback: clean up whatever we have
+    name = url.split('/')[-1].replace('-', '_')
+    name = re.sub(r'[^\w_]', '', name)  # Remove any non-word chars except underscore
+    return name.lower()
 
 def initialize_tools():
     """Initialize all Terraform module tools from dynamic configuration."""
