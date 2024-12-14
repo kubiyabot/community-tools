@@ -1,79 +1,110 @@
 import logging
-from .terraform_module_tool import TerraformModuleTool
-from ..scripts.config_loader import get_module_configs
+from typing import List
 from kubiya_sdk.tools.registry import tool_registry
+from .terraform_module_tool import TerraformModuleTool
+from ..parser import TerraformModuleParser
 
 logger = logging.getLogger(__name__)
 
-def create_terraform_module_tool(config: dict, action: str, with_pr: bool = False):
-    """Create a Terraform module tool from configuration."""
-    
-    # Generate tool name
-    action_suffix = f"_{action}"
-    if action == 'plan' and with_pr:
-        action_suffix = '_plan_pr'
-    tool_name = f"tf_{config['name'].lower().replace(' ', '_')}{action_suffix}"
-    
-    # Create tool description
-    action_desc = {
-        'plan': 'Plan changes for',
-        'plan_pr': 'Plan changes and create PR for',
-        'apply': 'Apply changes to'
-    }
-    description = f"{action_desc.get(action, 'Manage')} {config['description']}"
+def parse_module_urls(urls_str: str) -> List[str]:
+    """Parse comma-separated module URLs string."""
+    if not urls_str:
+        return []
+    return [url.strip() for url in urls_str.split(',') if url.strip()]
 
-    # Create module configuration
-    module_config = {
-        'name': config['name'],
-        'description': config['description'],
-        'source': config['source'],  # Pass the entire source object
-        'pre_script': config.get('pre_script')
-    }
+def create_terraform_module_tool(module_url: str, action: str, with_pr: bool = False):
+    """Create a Terraform module tool from URL."""
+    try:
+        # Parse module information from URL
+        parser = TerraformModuleParser(source_url=module_url)
+        variables, warnings, errors = parser.get_variables()
+        
+        if errors:
+            logger.error(f"Failed to parse module {module_url}: {errors}")
+            return None
+            
+        for warning in warnings:
+            logger.warning(f"Warning for {module_url}: {warning}")
 
-    return TerraformModuleTool(
-        name=tool_name,
-        description=description,
-        module_config=module_config,
-        action=action,
-        with_pr=with_pr
-    )
+        # Extract module name from URL
+        module_name = module_url.split('/')[-1].replace('.git', '')
+        
+        # Create module configuration
+        module_config = {
+            'name': module_name,
+            'description': f"Terraform module from {module_url}",
+            'source': {
+                'location': module_url,
+                'version': 'master'  # Default to master, can be made configurable
+            }
+        }
+
+        # Generate tool name
+        action_suffix = f"_{action}"
+        if action == 'plan' and with_pr:
+            action_suffix = '_plan_pr'
+        tool_name = f"tf_{module_name.lower().replace('-', '_')}{action_suffix}"
+
+        return TerraformModuleTool(
+            name=tool_name,
+            description=f"Manage {module_name} infrastructure",
+            module_config=module_config,
+            action=action,
+            with_pr=with_pr
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to create tool for {module_url}: {str(e)}")
+        return None
 
 def initialize_tools():
-    """Initialize and register all Terraform module tools."""
-    tools = {}
+    """Initialize all Terraform module tools from dynamic configuration."""
+    tools = []
     try:
-        logger.info("Initializing Terraform module tools...")
-        module_configs = get_module_configs()
-        
-        for module_name, config in module_configs.items():
+        # Get dynamic configuration from tool registry
+        config = tool_registry.dynamic_config
+        if not config:
+            logger.warning("No dynamic configuration provided")
+            raise Exception("No dynamic configuration provided - please provide a comma separated list of Terraform module URLs to initialize the tools for")
+
+        # Get module URLs from configuration
+        module_urls = parse_module_urls(config.get('tf_modules_urls', ''))
+        if not module_urls:
+            logger.warning("No Terraform module URLs provided in configuration")
+            return tools
+
+        logger.info(f"Found {len(module_urls)} module URLs in configuration")
+
+        # Create tools for each module
+        for module_url in module_urls:
             try:
-                logger.info(f"Creating tools for module: {module_name}")
+                logger.info(f"Creating tools for module: {module_url}")
                 
                 # Create plan tool
-                plan_tool = create_terraform_module_tool(config, 'plan')
-                tools[plan_tool.name] = plan_tool
-                tool_registry.register("terraform", plan_tool)
+                if plan_tool := create_terraform_module_tool(module_url, 'plan'):
+                    tools.append(plan_tool)
+                    tool_registry.register("terraform", plan_tool)
 
                 # Create plan with PR tool
-                plan_pr_tool = create_terraform_module_tool(config, 'plan', with_pr=True)
-                tools[plan_pr_tool.name] = plan_pr_tool
-                tool_registry.register("terraform", plan_pr_tool)
+                if plan_pr_tool := create_terraform_module_tool(module_url, 'plan', with_pr=True):
+                    tools.append(plan_pr_tool)
+                    tool_registry.register("terraform", plan_pr_tool)
 
                 # Create apply tool
-                apply_tool = create_terraform_module_tool(config, 'apply')
-                tools[apply_tool.name] = apply_tool
-                tool_registry.register("terraform", apply_tool)
+                if apply_tool := create_terraform_module_tool(module_url, 'apply'):
+                    tools.append(apply_tool)
+                    tool_registry.register("terraform", apply_tool)
                 
-                logger.info(f"Successfully created tools for module: {module_name}")
+                logger.info(f"Successfully created tools for module: {module_url}")
                 
             except Exception as e:
-                logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+                logger.error(f"Failed to create tools for module {module_url}: {str(e)}")
                 continue
 
-        return list(tools.values())
+        return tools
         
     except Exception as e:
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
 
-__all__ = ['initialize_tools', 'create_terraform_module_tool', 'TerraformModuleTool']
+__all__ = ['initialize_tools', 'create_terraform_module_tool']
