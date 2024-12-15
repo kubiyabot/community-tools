@@ -129,6 +129,8 @@ IFS=","
 for dest in ${slack_destination}; do
     # Clean the destination string
     dest=$(echo "$dest" | tr -d '[:space:]')
+    dest=$(echo "$dest" | sed 's/^<//;s/>$//')   # Remove < from start and > from end
+
     [ -z "$dest" ] && continue
 
     # Skip if this is the original thread's channel
