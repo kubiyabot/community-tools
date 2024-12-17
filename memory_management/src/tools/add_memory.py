@@ -27,23 +27,28 @@ class AddMemoryTool(MemoryManagementTool):
             Arg(
                 name="memory_content",
                 type="str",
-                description="The content to store in memory",
+                description='Important point to remember from our conversation. '
+                          'Example: "Working on Kubernetes deployment issue in production"',
                 required=True
             ),
             Arg(
                 name="tags",
                 type="str",
-                description="""Tags to categorize the memory. Can be:
-                - JSON array: '["tag1", "tag2"]'
-                - Comma-separated: "tag1,tag2"
-                - Single tag: "tag1" """,
+                description='Tags to categorize this memory. '
+                          'Format: \'["tag1", "tag2"]\' or "tag1,tag2" or "tag1". '
+                          'Example: "kubernetes,production"',
                 required=True
             )
         ]
 
         super().__init__(
             name="add_memory",
-            description="Add content to memory with specified tags",
+            description="""Remember key points from our current conversation.
+
+WHEN TO USE:
+- To save important context for follow-up questions
+- When discussing multiple related topics
+- To track the main points of our discussion""",
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/add_memory.py << 'EOL'

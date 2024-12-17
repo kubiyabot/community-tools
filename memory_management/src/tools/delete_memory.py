@@ -18,14 +18,22 @@ class DeleteMemoryTool(MemoryManagementTool):
             Arg(
                 name="memory_id",
                 type="str",
-                description="The ID of the memory to delete",
+                description="""ID of the memory to remove (use list_memories to find IDs).
+                Example: "bf4d4092-cf91-4181-bfeb-b6fa2ed3061b""",
                 required=True
             )
         ]
 
         super().__init__(
             name="delete_memory",
-            description="Delete a memory by its ID",
+            description="""Remove outdated or irrelevant conversation points.
+
+WHEN TO USE:
+- When switching to a new topic
+- If incorrect information was saved
+- To remove resolved discussion points
+
+⚠️ Check list_memories first to get the correct ID""",
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/delete_memory.py << 'EOL'

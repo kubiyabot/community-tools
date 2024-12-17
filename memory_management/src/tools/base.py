@@ -112,21 +112,23 @@ class MemoryManagementTool(Tool):
         # Build enhanced content
         enhanced_content = f"""#!/bin/sh
 # Install only required system packages
-apk add py3-pip
+apk add py3-pip --quiet > /dev/null 2>&1
 
 # Configure LiteLLM
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
 # Install required packages
-echo "📦 Installing required packages for {settings.backend_type} backend..."
+echo "📦 Validating packages for {settings.backend_type} backend..."
 """
 
         # Add package installation commands
         for package in MemoryConfig.get_packages(settings):
             enhanced_content += f"""
-echo "📦 Installing {package}..."
-pip install --quiet {package} > /dev/null 2>&1
+if ! pip show {package} > /dev/null 2>&1; then
+    echo "📦 Installing {package}..."
+    pip install --quiet {package} > /dev/null 2>&1
+fi
 """
 
         # Add backend-specific configuration

@@ -18,14 +18,14 @@ class ListMemoriesTool(MemoryManagementTool):
             Arg(
                 name="page",
                 type="str",
-                description="Page number for pagination",
+                description="Page number for viewing recent conversation history (start with '1')",
                 required=False,
                 default="1"
             ),
             Arg(
                 name="page_size",
                 type="str",
-                description="Number of memories per page",
+                description="Number of memories per page (default: 50)",
                 required=False,
                 default="50"
             )
@@ -33,7 +33,12 @@ class ListMemoriesTool(MemoryManagementTool):
 
         super().__init__(
             name="list_memories",
-            description="List all memories for the current user",
+            description="""🎯 View what I remember from our current conversation.
+
+WHEN TO USE:
+- To check what I understood from our discussion
+- Before asking follow-up questions
+- To reference earlier points in the conversation""",
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/list_memories.py << 'EOL'
