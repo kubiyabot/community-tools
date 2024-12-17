@@ -71,20 +71,36 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENTS=$(gh api repos/$repo/issues/$number/comments | jq -r '.[] | select(.body | contains("Generated automatically by Kubiya AI")) | {id: .id, body: .body}')
+EXISTING_COMMENTS=$(gh api repos/$repo/issues/$number/comments | jq -r '.[] | select(.body | contains("Generated automatically by Kubiya AI"))')
 
 if [ -n "$EXISTING_COMMENTS" ]; then
     echo "Found existing Kubiya comment(s)"
-    # Get the most recent comment ID
+    # Get the most recent comment ID and body
     COMMENT_ID=$(echo "$EXISTING_COMMENTS" | jq -r '.id' | tail -n1)
-    # Get existing content
     EXISTING_BODY=$(echo "$EXISTING_COMMENTS" | jq -r '.body' | tail -n1)
     
-    # Extract the previous content (everything between the header and the disclaimer)
-    PREVIOUS_CONTENT=$(echo "$EXISTING_BODY" | awk '/### 💬 Comment Added via Kubiya AI/{p=1;next} /---/{p=0} p')
+    # Extract previous content more reliably
+    PREVIOUS_CONTENT=$(echo "$EXISTING_BODY" | awk '
+        BEGIN { print_lines = 0; previous_content = "" }
+        /### 💬 Comment Added via Kubiya AI/ { next }
+        /<details>/ { exit }
+        /---/ { exit }
+        NR > 1 { 
+            if (length($0) > 0) {
+                previous_content = previous_content $0 "\\n"
+            }
+        }
+        END { print previous_content }
+    ')
     
-    # Prepare the updated comment with collapsible previous content
-    FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+    # Clean up any trailing whitespace
+    PREVIOUS_CONTENT=$(echo "$PREVIOUS_CONTENT" | sed -e 's/[[:space:]]*$//')
+    
+    echo "📝 Preparing updated comment with previous content..."
+    
+    # Only include details section if we actually have previous content
+    if [ -n "$PREVIOUS_CONTENT" ]; then
+        FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
 
 $body
 
@@ -96,6 +112,14 @@ $PREVIOUS_CONTENT
 
 ---
 <sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
+    else
+        FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+
+$body
+
+---
+<sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
+    fi
 
     # Update the existing comment
     echo "📝 Updating existing comment..."
@@ -105,6 +129,7 @@ $PREVIOUS_CONTENT
         echo "Error: $UPDATE_RESULT"
         exit 1
     fi
+    echo "✅ Successfully updated existing comment"
     COMMENT_URL="https://github.com/$repo/pull/$number#issuecomment-$COMMENT_ID"
 else
     # Create new comment if no existing Kubiya comment found
@@ -137,6 +162,11 @@ if [ $? -eq 0 ]; then
     ACTUAL_BODY=$(echo "$COMMENT_CHECK" | jq -r .body)
     if [[ "$ACTUAL_BODY" == *"$body"* ]] && [[ "$ACTUAL_BODY" == *"$TIMESTAMP"* ]]; then
         echo "✅ Comment content verified"
+        
+        # Additional verification for previous content
+        if [ -n "$PREVIOUS_CONTENT" ] && [[ "$ACTUAL_BODY" != *"$PREVIOUS_CONTENT"* ]]; then
+            echo "⚠️ Warning: Previous content may not have been preserved correctly"
+        fi
     else
         echo "⚠️ Warning: Comment content may not match expected format"
     fi
