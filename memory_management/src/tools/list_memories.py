@@ -17,17 +17,17 @@ class ListMemoriesTool(MemoryManagementTool):
         memory_args = [
             Arg(
                 name="page",
-                type="int",
+                type="str",
                 description="Page number for pagination",
                 required=False,
-                default=1
+                default="1"
             ),
             Arg(
                 name="page_size",
-                type="int",
+                type="str",
                 description="Number of memories per page",
                 required=False,
-                default=50
+                default="50"
             )
         ]
 
@@ -52,8 +52,8 @@ try:
     # Get memories with pagination
     memories = client.get_all(
         user_id=user_id,
-        page=page,
-        page_size=page_size,
+        page=int(page),
+        page_size=int(page_size),
         output_format="v1.1"
     )
     
