@@ -75,12 +75,18 @@ def list_memories(filter_text, limit):
             page_size=limit
         )
         
-        if not memories.get('memories'):
+        # Handle both list and dict response formats
+        if isinstance(memories, dict):
+            memories_list = memories.get('memories', [])
+        else:
+            memories_list = memories if isinstance(memories, list) else []
+        
+        if not memories_list:
             print("📭 No relevant context found")
             sys.exit(0)
             
-        print(f"🧠 Found {len(memories['memories'])} relevant items:")
-        for memory in memories['memories']:
+        print(f"🧠 Found {len(memories_list)} relevant items:")
+        for memory in memories_list:
             tags = memory.get('metadata', {}).get('tags', [])
             tags_str = f"[{', '.join(tags)}]" if tags else ""
             print(f"💡 {memory.get('content', '')}")
