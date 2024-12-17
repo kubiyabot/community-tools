@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_sdk.tools import Tool, Arg
 
 MEMORY_ICON_URL = "https://www.onlygfx.com/wp-content/uploads/2022/04/brain-icon-3.png"
 
@@ -17,6 +17,34 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
+        # Add default memory arguments including required tags
+        memory_args = [
+            Arg(
+                name="memory_content",
+                type="str",
+                description="The content to store in memory",
+                required=True
+            ),
+            Arg(
+                name="tags",
+                type="str",
+                description="""Tags to categorize the memory. Can be:
+                - JSON array: '["tag1", "tag2"]'
+                - Comma-separated: "tag1,tag2"
+                - Single tag: "tag1" """,
+                required=True
+            ),
+            Arg(
+                name="custom_prompt",
+                type="str",
+                description="Optional custom prompt for entity extraction",
+                required=False
+            ),
+        ]
+
+        # Combine memory args with any additional args
+        combined_args = memory_args + args
+
         # Add both LiteLLM and Mem0 configuration
         enhanced_content = """
 # Create and activate virtual environment
@@ -46,7 +74,7 @@ export NEO4J_PASSWORD=$NEO4J_PASSWORD
             type="docker",
             image=image,
             content=enhanced_content,
-            args=args,
+            args=combined_args,
             env=env + ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "NEO4J_URI", "NEO4J_USER"],
             secrets=secrets + ["LLM_API_KEY", "MEM0_API_KEY", "NEO4J_PASSWORD"],
             long_running=long_running,

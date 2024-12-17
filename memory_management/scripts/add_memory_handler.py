@@ -6,17 +6,23 @@ from typing import Optional, List, Union
 
 def validate_tags(tags_str: Optional[str]) -> Optional[List[str]]:
     """Validate and parse tags JSON string."""
-    if not tags_str:
+    if not tags_str or tags_str.lower() == "none":
         return None
+        
     try:
-        tags = json.loads(tags_str)
-        if not isinstance(tags, list):
-            raise ValueError("Tags must be a JSON array")
+        # Handle string list format (e.g., '["tag1", "tag2"]')
+        if tags_str.startswith('[') and tags_str.endswith(']'):
+            tags = json.loads(tags_str)
+        # Handle comma-separated format (e.g., "tag1,tag2")
+        else:
+            tags = [tag.strip() for tag in tags_str.split(',')]
+            
         if not all(isinstance(tag, str) for tag in tags):
             raise ValueError("All tags must be strings")
         return tags
     except json.JSONDecodeError:
-        raise ValueError("Invalid JSON format for tags")
+        # If JSON parsing fails, try treating it as a single tag
+        return [tags_str]
 
 def get_memory_client():
     """Get appropriate memory client based on environment."""
@@ -88,9 +94,11 @@ if __name__ == "__main__":
             sys.exit(1)
 
         memory_content = sys.argv[1]
+        # Only try to parse tags if explicitly provided
         tags_str = sys.argv[2] if len(sys.argv) > 2 else None
         custom_prompt = sys.argv[3] if len(sys.argv) > 3 else None
         
+        # Only validate tags if they were provided
         tags = validate_tags(tags_str) if tags_str else None
         add_memory(memory_content, tags, custom_prompt)
 
