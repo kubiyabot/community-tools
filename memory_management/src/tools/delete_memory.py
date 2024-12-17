@@ -11,55 +11,57 @@ if project_root not in sys.path:
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
-from ..utils import get_script_files
 
 class DeleteMemoryTool(MemoryManagementTool):
     def __init__(self):
-        try:
-            import mem0
-            description = "Delete memories with specified tags"
-        except ImportError:
-            description = "Delete memories with specified tags (mem0 package will be installed at runtime)"
-
-        # Get memory configuration
-        memory_config = tool_registry.get_tool_config("memory")
-        backend_type = memory_config.get('backend', 'hosted') if memory_config else 'hosted'
-
-        # Define base environment variables and secrets
-        env = ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
-        secrets = []
-
-        # Add mode-specific requirements
-        if backend_type == 'hosted':
-            secrets.append("MEM0_API_KEY")
-        elif backend_type == 'neo4j':
-            env.extend(["NEO4J_URI", "NEO4J_USER"])
-            secrets.append("NEO4J_PASSWORD")
+        memory_args = [
+            Arg(
+                name="memory_id",
+                type="str",
+                description="The ID of the memory to delete",
+                required=True
+            )
+        ]
 
         super().__init__(
             name="delete_memory",
-            description=description,
-            content="""
+            description="Delete a memory by its ID",
+            content="""#!/bin/sh
+# Create Python script
+cat > /tmp/delete_memory.py << 'EOL'
+import os
+import sys
+from mem0 import MemoryClient
+
 try:
-    import mem0
-    from mem0.memory import Memory
+    # Initialize client
+    client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
     
-    # Initialize memory
-    memory = Memory()
+    # Get user ID
+    user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
     
-    # Delete memories with tags
-    memory.delete(tags)
-    print("✅ Successfully deleted memories with specified tags")
+    # Delete memory
+    success = client.delete(memory_id)
     
+    if success:
+        print("✅ Memory deleted successfully")
+    else:
+        print("⚠️ Memory not found or you don't have permission to delete it")
+        sys.exit(1)
+
 except Exception as e:
     print(f"❌ Error: {str(e)}")
-    exit(1)
+    sys.exit(1)
+EOL
+
+# Execute the Python script
+python3 /tmp/delete_memory.py
 """,
-            env=env,
-            secrets=secrets
+            args=memory_args
         )
 
-# Register the tool
-tool_registry.register("memory_management", DeleteMemoryTool())
+# Create and register the tool
+delete_memory_tool = DeleteMemoryTool()
+tool_registry.register("memory_management", delete_memory_tool)
 
-__all__ = ["DeleteMemoryTool"] 
+__all__ = ["delete_memory_tool", "DeleteMemoryTool"] 

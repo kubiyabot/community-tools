@@ -8,50 +8,81 @@ project_root = str(Path(__file__).resolve().parents[2])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from kubiya_sdk.tools import Arg, FileSpec
+from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
-from ..utils import get_script_files
 
-list_memories_tool = MemoryManagementTool(
-    name="list_memories",
-    description=(
-        "🎯 [Recommended First Step] View your stored preferences and settings!\n\n"
-        "This tool shows all your stored preferences and settings, helping me understand your "
-        "previous choices and preferences. Running this at the start of our conversation helps "
-        "me provide more personalized assistance.\n\n"
-        "You can optionally filter the results by providing search terms that match either the "
-        "content or tags of your stored preferences."
-    ),
-    content="""
-# Run the list memories handler script
-python /opt/scripts/list_memories_handler.py {{ if .search_filter }}"{{ .search_filter }}"{{ end }} || exit 1
-""",
-    args=[
-        Arg(
-            name="search_filter",
-            description=(
-                "Optional search terms to filter your preferences. Matches against both content and tags.\n"
-                "**Example**: \"notifications email\" will show preferences related to email notifications"
+class ListMemoriesTool(MemoryManagementTool):
+    def __init__(self):
+        memory_args = [
+            Arg(
+                name="page",
+                type="int",
+                description="Page number for pagination",
+                required=False,
+                default=1
             ),
-            required=False,
-            default=None,
-        ),
-    ],
-    env=[
-        "KUBIYA_USER_EMAIL",
-        "KUBIYA_USER_ORG",
-    ],
-    secrets=[
-        "MEM0_API_KEY",
-    ],
-    with_files=[
-        FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in get_script_files().items()
-    ],
-)
+            Arg(
+                name="page_size",
+                type="int",
+                description="Number of memories per page",
+                required=False,
+                default=50
+            )
+        ]
 
-# Register the tool
+        super().__init__(
+            name="list_memories",
+            description="List all memories for the current user",
+            content="""#!/bin/sh
+# Create Python script
+cat > /tmp/list_memories.py << 'EOL'
+import os
+import sys
+import json
+from mem0 import MemoryClient
+
+try:
+    # Initialize client
+    client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
+    
+    # Get user ID
+    user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
+    
+    # Get memories with pagination
+    memories = client.get_all(
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+        output_format="v1.1"
+    )
+    
+    if not memories.get('memories'):
+        print("📭 No memories found")
+        sys.exit(0)
+        
+    print(f"🧠 Found {len(memories['memories'])} memories:")
+    for memory in memories['memories']:
+        tags = memory.get('metadata', {}).get('tags', [])
+        tags_str = f"[{', '.join(tags)}]" if tags else "[]"
+        print(f"📌 ID: {memory.get('id', 'unknown')}")
+        print(f"   Content: {memory.get('content', '')}")
+        print(f"   Tags: {tags_str}")
+        print(f"   Added: {memory.get('created_at', 'unknown')}\n")
+
+except Exception as e:
+    print(f"❌ Error: {str(e)}")
+    sys.exit(1)
+EOL
+
+# Execute the Python script
+python3 /tmp/list_memories.py
+""",
+            args=memory_args
+        )
+
+# Create and register the tool
+list_memories_tool = ListMemoriesTool()
 tool_registry.register("memory_management", list_memories_tool)
 
-__all__ = ["list_memories_tool"] 
+__all__ = ["list_memories_tool", "ListMemoriesTool"] 

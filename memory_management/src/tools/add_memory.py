@@ -54,20 +54,38 @@ class AddMemoryTool(MemoryManagementTool):
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/add_memory.py << 'EOL'
+import os
+import sys
+import json
+from mem0 import MemoryClient
+
 try:
-    import mem0
-    from mem0.memory import Memory
+    # Initialize client
+    client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
     
-    # Initialize memory
-    memory = Memory()
+    # Get user ID
+    user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
     
-    # Add content to memory
-    memory.add(memory_content, tags)
-    print("✅ Successfully added content to memory")
+    # Process tags
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except json.JSONDecodeError:
+            tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
     
+    # Add memory
+    result = client.add(
+        memory_content,
+        user_id=user_id,
+        metadata={"tags": tags},
+        output_format="v1.1"
+    )
+    
+    print("✅ Successfully added memory")
+
 except Exception as e:
     print(f"❌ Error: {str(e)}")
-    exit(1)
+    sys.exit(1)
 EOL
 
 # Execute the Python script
