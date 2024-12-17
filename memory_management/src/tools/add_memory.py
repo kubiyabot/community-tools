@@ -76,8 +76,4 @@ python3 /tmp/add_memory.py
             args=memory_args
         )
 
-# Create instance
-add_memory_tool = AddMemoryTool()
-
-# Export both class and instance
-__all__ = ["AddMemoryTool", "add_memory_tool"]
+__all__ = ["AddMemoryTool"]

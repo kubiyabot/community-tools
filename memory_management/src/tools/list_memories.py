@@ -133,8 +133,4 @@ python3 /tmp/list_memories.py
             args=memory_args
         )
 
-# Create instance
-list_memories_tool = ListMemoriesTool()
-
-# Export both class and instance
-__all__ = ["ListMemoriesTool", "list_memories_tool"] 
+__all__ = ["ListMemoriesTool"] 
