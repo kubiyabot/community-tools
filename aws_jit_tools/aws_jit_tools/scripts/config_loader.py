@@ -65,20 +65,6 @@ def _load_from_file(config_name: str) -> Dict[str, Any]:
             logger.error(f"Invalid JSON in configuration file {config_name}: {str(e)}")
             return {}
 
-def _parse_config_value(config_value: Any) -> Dict[str, Any]:
-    """Helper function to parse configuration value that might be a JSON string or dict."""
-    if isinstance(config_value, str):
-        try:
-            return json.loads(config_value)
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON string in configuration: {str(e)}")
-            return {}
-    elif isinstance(config_value, dict):
-        return config_value
-    else:
-        logger.error(f"Unexpected configuration type: {type(config_value)}")
-        return {}
-
 def load_config(config_name: str) -> Dict[str, Any]:
     """Load and validate configuration from dynamic config or file."""
     try:
@@ -88,8 +74,24 @@ def load_config(config_name: str) -> Dict[str, Any]:
         
         if dynamic_config:
             print("⚠️  dynamic configuration provided")
-            config_value = dynamic_config.get(config_name, {})
-            config = _parse_config_value(config_value)
+            config_str = dynamic_config.get(config_name, "{}")
+            
+            # Strip any extra quotes if present
+            if isinstance(config_str, str):
+                config_str = config_str.strip('"')
+                print(f"📝 Parsing {config_name} configuration string: {config_str}")
+                try:
+                    config = json.loads(config_str)
+                except json.JSONDecodeError:
+                    # Try one more time in case it's double-encoded
+                    try:
+                        config = json.loads(json.loads(config_str))
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Failed to parse {config_name} configuration: {str(e)}")
+                        return {}
+            else:
+                config = config_str
+            
             print(f"📝 Using {config_name} configuration: {config}")
         else:
             print("⚠️  No dynamic configuration provided, trying file")            
