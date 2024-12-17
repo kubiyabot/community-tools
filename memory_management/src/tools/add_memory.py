@@ -23,7 +23,6 @@ for script_path in scripts_dir.glob("*.py"):
 
 class AddMemoryTool(MemoryManagementTool):
     def __init__(self):
-        # Define memory arguments
         memory_args = [
             Arg(
                 name="memory_content",
@@ -39,13 +38,7 @@ class AddMemoryTool(MemoryManagementTool):
                 - Comma-separated: "tag1,tag2"
                 - Single tag: "tag1" """,
                 required=True
-            ),
-            Arg(
-                name="custom_prompt",
-                type="str",
-                description="Optional custom prompt for entity extraction",
-                required=False
-            ),
+            )
         ]
 
         super().__init__(
@@ -59,33 +52,37 @@ import sys
 import json
 from mem0 import MemoryClient
 
-try:
-    # Initialize client
-    client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
-    
-    # Get user ID
-    user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
-    
-    # Process tags
-    if isinstance(tags, str):
-        try:
-            tags = json.loads(tags)
-        except json.JSONDecodeError:
-            tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
-    
-    # Add memory
-    result = client.add(
-        memory_content,
-        user_id=user_id,
-        metadata={"tags": tags},
-        output_format="v1.1"
-    )
-    
-    print("✅ Successfully added memory")
+def add_memory(content, tags):
+    try:
+        # Initialize client
+        client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
+        
+        # Get user ID
+        user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
+        
+        # Process tags
+        if isinstance(tags, str):
+            try:
+                tags = json.loads(tags)
+            except json.JSONDecodeError:
+                tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
+        
+        # Add memory
+        result = client.add(
+            content,
+            user_id=user_id,
+            metadata={"tags": tags},
+            output_format="v1.1"
+        )
+        
+        print("✅ Successfully added memory")
 
-except Exception as e:
-    print(f"❌ Error: {str(e)}")
-    sys.exit(1)
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    add_memory("{{ .memory_content }}", "{{ .tags }}")
 EOL
 
 # Execute the Python script
