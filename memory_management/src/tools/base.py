@@ -23,7 +23,12 @@ class MemorySettings:
     def required_packages(self) -> List[str]:
         """Get required packages based on backend type"""
         if self.backend_type == 'hosted':
-            return ['mem0ai==0.1.29']
+            return [
+                'mem0ai==0.1.29',
+                'langchain-community',
+                'langchain',
+                'langchain-openai'
+            ]
         elif self.backend_type == 'neo4j':
             return [
                 'mem0ai==0.1.29',
@@ -37,7 +42,10 @@ class MemorySettings:
             return [
                 'mem0ai==0.1.29',
                 'chromadb',
-                'tiktoken'
+                'tiktoken',
+                'langchain',
+                'langchain-community',
+                'langchain-openai'
             ]
 
 class MemoryConfig:
