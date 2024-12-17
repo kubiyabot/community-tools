@@ -8,29 +8,29 @@ class ListMemoriesTool(MemoryManagementTool):
     def __init__(self):
         memory_args = [
             Arg(
-                name="page",
+                name="filter",
                 type="str",
-                description="Page number for viewing recent conversation history (start with '1')",
+                description='Optional filter to find specific context. Example: "kubernetes" or "deployment"',
                 required=False,
-                default="1"
+                default=""
             ),
             Arg(
-                name="page_size",
+                name="limit",
                 type="str",
-                description="Number of memories per page (default: 50)",
+                description="Maximum number of context entries to return (default: 10)",
                 required=False,
-                default="50"
+                default="10"
             )
         ]
 
         super().__init__(
             name="list_memories",
-            description="""🎯 View what I remember from our current conversation.
+            description="""🔍 Get relevant context from our conversation.
 
 WHEN TO USE:
-- To check what I understood from our discussion
-- Before asking follow-up questions
-- To reference earlier points in the conversation""",
+- To check what I know about the current topic
+- To continue a previous discussion
+- Before providing recommendations""",
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/list_memories.py << 'EOL'
@@ -39,7 +39,7 @@ import sys
 import json
 from mem0 import MemoryClient
 
-def list_memories(page, page_size):
+def list_memories(filter_text, limit):
     try:
         # Initialize client
         client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
@@ -47,33 +47,46 @@ def list_memories(page, page_size):
         # Get user ID
         user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
         
-        # Get memories with pagination
+        # Build filters
+        filters = {
+            "AND": [{"user_id": user_id}]
+        }
+        
+        if filter_text:
+            filters["AND"].append({
+                "OR": [
+                    {"content": {"contains": filter_text}},
+                    {"metadata.tags": {"contains": filter_text}}
+                ]
+            })
+        
+        # Get memories with filters
         memories = client.get_all(
-            user_id=user_id,
-            page=int(page),
-            page_size=int(page_size),
-            output_format="v1.1"
+            version="v2",
+            filters=filters,
+            page=1,
+            page_size=int(limit)
         )
         
         if not memories.get('memories'):
-            print("📭 No memories found")
+            print("📭 No relevant context found")
             sys.exit(0)
             
-        print(f"🧠 Found {len(memories['memories'])} memories:")
+        print(f"🧠 Found {len(memories['memories'])} relevant items:")
         for memory in memories['memories']:
             tags = memory.get('metadata', {}).get('tags', [])
-            tags_str = f"[{', '.join(tags)}]" if tags else "[]"
-            print(f"📌 ID: {memory.get('id', 'unknown')}")
-            print(f"   Content: {memory.get('content', '')}")
-            print(f"   Tags: {tags_str}")
-            print(f"   Added: {memory.get('created_at', 'unknown')}\n")
+            tags_str = f"[{', '.join(tags)}]" if tags else ""
+            print(f"💡 {memory.get('content', '')}")
+            if tags_str:
+                print(f"   Tags: {tags_str}")
+            print()
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    list_memories("{{ .page }}", "{{ .page_size }}")
+    list_memories("{{ .filter }}", "{{ .limit }}")
 EOL
 
 # Execute the Python script
