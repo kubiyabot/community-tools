@@ -112,6 +112,11 @@ if ! check_package "tiktoken"; then
     su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet tiktoken" > /dev/null 2>&1
 fi
 
+if ! check_package "rank_bm25"; then
+    echo "📦 Installing rank-bm25..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet rank-bm25" > /dev/null 2>&1
+fi
+
 # Configure Mem0
 export MEM0_API_KEY=$MEM0_API_KEY
 export NEO4J_URI=$NEO4J_URI
