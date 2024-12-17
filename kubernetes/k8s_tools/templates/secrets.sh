@@ -7,6 +7,7 @@ NAME=$(echo "$name" | sed 's/[^a-zA-Z0-9-]//g')
 
 case "$ACTION" in
   create)
+<<<<<<< HEAD
     # Create secret YAML and apply it
     cat <<EOF | kubectl $KUBECTL_AUTH_ARGS apply -f -
 apiVersion: v1
@@ -46,6 +47,27 @@ EOF
         [[ $KEY =~ ^#.*$ ]] || [ -z "$KEY" ] && continue
         echo "  $KEY: $(echo -n "$VALUE" | base64)" | kubectl $KUBECTL_AUTH_ARGS apply -f -
       done < "$from_env_file"
+=======
+    # Create secret from literal values if provided
+    if [ -n "${from_literal:-}" ]; then
+      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
+        --namespace "$NAMESPACE" \
+        --from-literal="$from_literal"
+    fi
+
+    # Create secret from files if provided
+    if [ -n "${from_file:-}" ]; then
+      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
+        --namespace "$NAMESPACE" \
+        --from-file="$from_file"
+    fi
+
+    # Create secret from env file if provided
+    if [ -n "${from_env_file:-}" ]; then
+      kubectl $KUBECTL_AUTH_ARGS create secret generic "$NAME" \
+        --namespace "$NAMESPACE" \
+        --from-env-file="$from_env_file"
+>>>>>>> 7f2cf51 (added secrets and configmaps)
     fi
     ;;
 
