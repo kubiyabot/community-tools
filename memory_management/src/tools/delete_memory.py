@@ -8,45 +8,58 @@ project_root = str(Path(__file__).resolve().parents[2])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from kubiya_sdk.tools import Arg, FileSpec
+from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
 from ..utils import get_script_files
 
-delete_memory_tool = MemoryManagementTool(
-    name="delete_memory",
-    description=(
-        "Delete a stored user preference from memory based on its ID. "
-        "Use this tool when a user's preference has changed or is no longer valid."
-    ),
-    content="""
-# Run the delete memory handler script
-python /opt/scripts/delete_memory_handler.py "{{ .memory_id }}"
+class DeleteMemoryTool(MemoryManagementTool):
+    def __init__(self):
+        try:
+            import mem0
+            description = "Delete memories with specified tags"
+        except ImportError:
+            description = "Delete memories with specified tags (mem0 package will be installed at runtime)"
+
+        # Get memory configuration
+        memory_config = tool_registry.get_tool_config("memory")
+        backend_type = memory_config.get('backend', 'hosted') if memory_config else 'hosted'
+
+        # Define base environment variables and secrets
+        env = ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
+        secrets = []
+
+        # Add mode-specific requirements
+        if backend_type == 'hosted':
+            secrets.append("MEM0_API_KEY")
+        elif backend_type == 'neo4j':
+            env.extend(["NEO4J_URI", "NEO4J_USER"])
+            secrets.append("NEO4J_PASSWORD")
+
+        super().__init__(
+            name="delete_memory",
+            description=description,
+            content="""
+try:
+    import mem0
+    from mem0.memory import Memory
+    
+    # Initialize memory
+    memory = Memory()
+    
+    # Delete memories with tags
+    memory.delete(tags)
+    print("✅ Successfully deleted memories with specified tags")
+    
+except Exception as e:
+    print(f"❌ Error: {str(e)}")
+    exit(1)
 """,
-    args=[
-        Arg(
-            name="memory_id",
-            description=(
-                "The ID of the memory to delete. You can obtain the memory ID from the output of the `list_memories` tool.\n"
-                "**Example**: \"bf4d4092-cf91-4181-bfeb-b6fa2ed3061b\""
-            ),
-            required=True,
-        ),
-    ],
-    env=[
-        "KUBIYA_USER_EMAIL",
-        "KUBIYA_USER_ORG",
-    ],
-    secrets=[
-        "MEM0_API_KEY",
-    ],
-    with_files=[
-        FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
-        for script_name, script_content in get_script_files().items()
-    ],
-)
+            env=env,
+            secrets=secrets
+        )
 
 # Register the tool
-tool_registry.register("memory_management", delete_memory_tool)
+tool_registry.register("memory_management", DeleteMemoryTool())
 
-__all__ = ["delete_memory_tool"] 
+__all__ = ["DeleteMemoryTool"] 

@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
 import json
+import logging
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
-MEMORY_ICON_URL = "https://www.onlygfx.com/wp-content/uploads/2022/04/brain-icon-3.png"
+logger = logging.getLogger(__name__)
 
 @dataclass
 class MemorySettings:
@@ -13,61 +14,26 @@ class MemorySettings:
     neo4j_uri: str = 'bolt://localhost:7687'
     neo4j_username: str = 'neo4j'
     local_path: str = '/data/memory'
-    package_versions: Dict[str, str] = None
-
-    def __post_init__(self):
-        if self.package_versions is None:
-            self.package_versions = {}
-
-    @property
-    def required_packages(self) -> List[str]:
-        """Get required packages based on backend type"""
-        # Base packages required for all modes
-        base_packages = [
-            'mem0ai==0.1.29',
-            'neo4j',  # Required by mem0ai
-            'langchain-community',
-            'langchain',
-            'langchain-openai',
-            'rank-bm25'
-        ]
-        
-        if self.backend_type == 'hosted':
-            return base_packages
-        elif self.backend_type == 'neo4j':
-            return base_packages + [
-                'langchain-neo4j'
-            ]
-        else:  # local
-            return base_packages + [
-                'chromadb',
-                'tiktoken'
-            ]
 
 class MemoryConfig:
-    """Builder for Memory management configuration"""
-
+    """Memory configuration manager"""
+    
     @classmethod
-    def parse_config(cls, config: Optional[Dict]) -> MemorySettings:
-        """Parse and validate configuration"""
+    def initialize(cls) -> MemorySettings:
+        """Initialize memory configuration from tool registry"""
         try:
-            # If config is a string, try to parse it as JSON
-            if isinstance(config, str):
-                try:
-                    config = json.loads(config)
-                except json.JSONDecodeError:
-                    print(f"⚠️ Warning: Invalid JSON configuration provided, falling back to hosted mode")
-                    return MemorySettings()
-
-            # If no config or empty, return default hosted settings
+            # Get configuration from tool registry
+            config = tool_registry.get_tool_config("memory")
+            logger.info(f"📝 Received memory configuration: {config}")
+            
             if not config:
-                print("ℹ️ No configuration provided, using hosted mode")
+                logger.warning("⚠️ No configuration provided, using hosted mode")
                 return MemorySettings()
 
             # Parse backend configuration
             backend_type = config.get('backend', 'hosted')
             if backend_type not in ['hosted', 'neo4j', 'local']:
-                print(f"⚠️ Warning: Unsupported backend type: {backend_type}, falling back to hosted mode")
+                logger.warning(f"⚠️ Unsupported backend type: {backend_type}, falling back to hosted mode")
                 return MemorySettings()
 
             # Create settings object
@@ -75,15 +41,50 @@ class MemoryConfig:
                 backend_type=backend_type,
                 neo4j_uri=config.get('neo4j_uri', 'bolt://localhost:7687'),
                 neo4j_username=config.get('neo4j_username', 'neo4j'),
-                local_path=config.get('local_path', '/data/memory'),
-                package_versions=config.get('package_versions', {})
+                local_path=config.get('local_path', '/data/memory')
             )
 
+            logger.info(f"✅ Using memory backend: {settings.backend_type}")
             return settings
 
         except Exception as e:
-            print(f"⚠️ Warning: Error parsing configuration: {str(e)}, falling back to hosted mode")
+            logger.error(f"❌ Configuration error: {str(e)}, falling back to hosted mode")
             return MemorySettings()
+
+    @classmethod
+    def get_requirements(cls, settings: MemorySettings) -> Dict[str, List[str]]:
+        """Get environment and secret requirements based on backend type"""
+        env = ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
+        secrets = []
+
+        if settings.backend_type == 'hosted':
+            secrets.append("MEM0_API_KEY")
+        elif settings.backend_type == 'neo4j':
+            env.extend(["NEO4J_URI", "NEO4J_USER"])
+            secrets.append("NEO4J_PASSWORD")
+
+        return {
+            "env": env,
+            "secrets": secrets
+        }
+
+    @classmethod
+    def get_packages(cls, settings: MemorySettings) -> List[str]:
+        """Get required packages based on backend type"""
+        if settings.backend_type == 'hosted':
+            return ['mem0ai==0.1.29']
+        elif settings.backend_type == 'neo4j':
+            return [
+                'mem0ai==0.1.29',
+                'neo4j',
+                'langchain-neo4j'
+            ]
+        else:  # local
+            return [
+                'mem0ai==0.1.29',
+                'chromadb',
+                'tiktoken'
+            ]
 
 class MemoryManagementTool(Tool):
     def __init__(
@@ -100,44 +101,15 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
-        try:
-            memory_config = tool_registry.get_tool_config("memory")
-            print(f"ℹ️ Using memory configuration: {memory_config}")
-        except Exception as e:
-            print(f"⚠️ Warning: Could not get memory configuration: {str(e)}, falling back to hosted mode")
-            memory_config = None
+        # Initialize configuration
+        settings = MemoryConfig.initialize()
+        
+        # Get requirements
+        requirements = MemoryConfig.get_requirements(settings)
+        env = env + requirements["env"]
+        secrets = secrets + requirements["secrets"]
 
-        settings = MemoryConfig.parse_config(memory_config)
-        print(f"ℹ️ Using backend type: {settings.backend_type}")
-
-        # Add memory arguments
-        memory_args = [
-            Arg(
-                name="memory_content",
-                type="str",
-                description="The content to store in memory",
-                required=True
-            ),
-            Arg(
-                name="tags",
-                type="str",
-                description="""Tags to categorize the memory. Can be:
-                - JSON array: '["tag1", "tag2"]'
-                - Comma-separated: "tag1,tag2"
-                - Single tag: "tag1" """,
-                required=True
-            ),
-            Arg(
-                name="custom_prompt",
-                type="str",
-                description="Optional custom prompt for entity extraction",
-                required=False
-            ),
-        ]
-
-        combined_args = memory_args + args
-
-        # Build enhanced content with minimal setup
+        # Build enhanced content
         enhanced_content = f"""#!/bin/sh
 # Install only required system packages
 apk add py3-pip
@@ -151,7 +123,7 @@ echo "📦 Installing required packages for {settings.backend_type} backend..."
 """
 
         # Add package installation commands
-        for package in settings.required_packages:
+        for package in MemoryConfig.get_packages(settings):
             enhanced_content += f"""
 echo "📦 Installing {package}..."
 pip install --quiet {package} > /dev/null 2>&1
@@ -164,14 +136,14 @@ pip install --quiet {package} > /dev/null 2>&1
 export NEO4J_URI="{settings.neo4j_uri}"
 export NEO4J_USER="{settings.neo4j_username}"
 export NEO4J_PASSWORD="$NEO4J_PASSWORD"
+export MEMORY_BACKEND="neo4j"
 """
-            secrets = secrets + ["NEO4J_PASSWORD"]
         elif settings.backend_type == "hosted":
             enhanced_content += """
 # Configure Mem0 hosted service
 export MEM0_API_KEY="$MEM0_API_KEY"
+export MEMORY_BACKEND="hosted"
 """
-            secrets = secrets + ["MEM0_API_KEY"]
         else:
             enhanced_content += f"""
 # Configure local storage
@@ -184,12 +156,12 @@ export MEMORY_PATH="{settings.local_path}"
         super().__init__(
             name=name,
             description=description,
-            icon_url=MEMORY_ICON_URL,
+            icon_url="https://www.onlygfx.com/wp-content/uploads/2022/04/brain-icon-3.png",
             type="docker",
             image=image,
             content=enhanced_content,
-            args=combined_args,
-            env=env + ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"],
+            args=args,
+            env=env,
             secrets=secrets,
             long_running=long_running,
             with_files=with_files,

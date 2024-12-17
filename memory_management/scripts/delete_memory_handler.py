@@ -1,11 +1,18 @@
+#!/usr/bin/env python3
 import os
 import sys
-from mem0 import MemoryClient
 
 def delete_memory(memory_id: str) -> None:
     """Delete a memory by its ID."""
     try:
-        # Initialize Memory client with API key from environment
+        # Import mem0 at runtime
+        try:
+            from mem0 import MemoryClient
+        except ImportError:
+            print("❌ Error: mem0 package not installed. Installing required packages...")
+            sys.exit(1)
+
+        # Initialize Memory client
         client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
         
         # Get user ID
@@ -15,9 +22,9 @@ def delete_memory(memory_id: str) -> None:
         success = client.delete(memory_id=memory_id)
 
         if success:
-            print("🗑️ Memory deleted successfully.")
+            print("✅ Memory deleted successfully")
         else:
-            print("🚫 Memory not found or you do not have permission to delete it.")
+            print("⚠️ Memory not found or you don't have permission to delete it")
 
     except Exception as e:
         print(f"❌ Error: {str(e)}")
