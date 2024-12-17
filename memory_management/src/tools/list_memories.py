@@ -10,14 +10,20 @@ class ListMemoriesTool(MemoryManagementTool):
             Arg(
                 name="filter",
                 type="str",
-                description='Optional filter to find specific context. Example: "kubernetes" or "deployment"',
+                description="""Filter to find specific context from our conversation.
+                
+                Examples:
+                - "kubernetes" - find all Kubernetes-related context
+                - "deployment error" - find deployment issues
+                - "preferences" - find user preferences
+                - Leave empty to see all recent context""",
                 required=False,
                 default=""
             ),
             Arg(
                 name="limit",
                 type="str",
-                description="Maximum number of context entries to return (default: 10)",
+                description="Number of most recent memories to show (default: 10)",
                 required=False,
                 default="10"
             )
@@ -25,12 +31,15 @@ class ListMemoriesTool(MemoryManagementTool):
 
         super().__init__(
             name="list_memories",
-            description="""🔍 Get relevant context from our conversation.
+            description="""🔍 Find relevant context from our conversation.
 
 WHEN TO USE:
-- To check what I know about the current topic
-- To continue a previous discussion
-- Before providing recommendations""",
+- Before suggesting solutions: "filter: error" to see previous issues
+- To continue a topic: "filter: kubernetes" to recall Kubernetes discussion
+- To check preferences: "filter: prefer" or "filter: settings"
+- Leave filter empty to see all recent context
+
+The tool searches both content and tags to find relevant information.""",
             content="""#!/bin/sh
 # Create Python script
 cat > /tmp/list_memories.py << 'EOL'
@@ -77,7 +86,10 @@ def list_memories(filter_text, limit):
         
         # Handle both list and dict response formats
         if isinstance(memories, dict):
-            memories_list = memories.get('memories', [])
+            if 'results' in memories:
+                memories_list = memories['results']
+            else:
+                memories_list = memories.get('memories', [])
         else:
             memories_list = memories if isinstance(memories, list) else []
         
@@ -87,11 +99,27 @@ def list_memories(filter_text, limit):
             
         print(f"🧠 Found {len(memories_list)} relevant items:")
         for memory in memories_list:
-            tags = memory.get('metadata', {}).get('tags', [])
-            tags_str = f"[{', '.join(tags)}]" if tags else ""
-            print(f"💡 {memory.get('content', '')}")
+            # Get memory content
+            content = memory.get('content', '') or memory.get('memory', '')
+            
+            # Get metadata and categories
+            metadata = memory.get('metadata', {}) or {}
+            categories = memory.get('categories', [])
+            tags = metadata.get('tags', []) if metadata else []
+            
+            # Combine all tags and categories
+            all_tags = list(set(tags + categories))
+            tags_str = f"[{', '.join(all_tags)}]" if all_tags else ""
+            
+            # Get timestamps
+            created = memory.get('created_at', '').split('T')[0]
+            
+            # Print formatted memory
+            print(f"📌 {content}")
             if tags_str:
                 print(f"   Tags: {tags_str}")
+            if created:
+                print(f"   Added: {created}")
             print()
 
     except Exception as e:
