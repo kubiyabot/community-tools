@@ -47,17 +47,20 @@ class MemoryManagementTool(Tool):
 
         # Add both LiteLLM and Mem0 configuration
         enhanced_content = """
-# Create and activate virtual environment
-python -m venv /opt/venv > /dev/null
-. /opt/venv/bin/activate > /dev/null
+# Create virtual environment as non-root user
+useradd -m kubiya
+chown -R kubiya:kubiya /opt
+su - kubiya -c "python -m venv /opt/venv" > /dev/null 2>&1
+
+# Activate virtual environment
+. /opt/venv/bin/activate
 
 # Configure LiteLLM
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
-# Install required packages
-pip install --upgrade pip > /dev/null
-pip install mem0ai==0.1.29 litellm neo4j 2>&1 | grep -v '[notice]' > /dev/null
+# Install required packages silently
+su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet --upgrade pip mem0ai==0.1.29 litellm neo4j" > /dev/null 2>&1
 
 # Configure Mem0
 export MEM0_API_KEY=$MEM0_API_KEY
