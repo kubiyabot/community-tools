@@ -47,6 +47,13 @@ def list_memories(filter_text, limit):
         # Get user ID
         user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
         
+        # Handle default values
+        filter_text = filter_text if filter_text != "<no value>" else ""
+        try:
+            limit = int(limit) if limit != "<no value>" else 10
+        except ValueError:
+            limit = 10
+        
         # Build filters
         filters = {
             "AND": [{"user_id": user_id}]
@@ -65,7 +72,7 @@ def list_memories(filter_text, limit):
             version="v2",
             filters=filters,
             page=1,
-            page_size=int(limit)
+            page_size=limit
         )
         
         if not memories.get('memories'):
