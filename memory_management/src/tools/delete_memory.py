@@ -61,4 +61,8 @@ python3 /tmp/delete_memory.py
             args=memory_args
         )
 
-__all__ = ["DeleteMemoryTool"] 
+# Create instance
+delete_memory_tool = DeleteMemoryTool()
+
+# Export both class and instance
+__all__ = ["DeleteMemoryTool", "delete_memory_tool"] 
