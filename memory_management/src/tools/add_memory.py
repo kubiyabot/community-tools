@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
 
 class AddMemoryTool(MemoryManagementTool):
@@ -75,5 +76,9 @@ python3 /tmp/add_memory.py
 """,
             args=memory_args
         )
+
+# Create and register tool
+add_memory_tool = AddMemoryTool()
+tool_registry.register("memory_management", add_memory_tool)
 
 __all__ = ["AddMemoryTool"]
