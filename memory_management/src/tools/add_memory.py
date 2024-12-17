@@ -23,30 +23,34 @@ for script_path in scripts_dir.glob("*.py"):
 
 class AddMemoryTool(MemoryManagementTool):
     def __init__(self):
-        try:
-            import mem0
-            description = "Add content to memory with specified tags"
-        except ImportError:
-            description = "Add content to memory with specified tags (mem0 package will be installed at runtime)"
-
-        # Get memory configuration
-        memory_config = tool_registry.get_tool_config("memory")
-        backend_type = memory_config.get('backend', 'hosted') if memory_config else 'hosted'
-
-        # Define base environment variables and secrets
-        env = ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG"]
-        secrets = ["LLM_API_KEY"]  # Always needed for entity extraction
-
-        # Add mode-specific requirements
-        if backend_type == 'hosted':
-            secrets.append("MEM0_API_KEY")
-        elif backend_type == 'neo4j':
-            env.extend(["NEO4J_URI", "NEO4J_USER"])
-            secrets.append("NEO4J_PASSWORD")
+        # Define memory arguments
+        memory_args = [
+            Arg(
+                name="memory_content",
+                type="str",
+                description="The content to store in memory",
+                required=True
+            ),
+            Arg(
+                name="tags",
+                type="str",
+                description="""Tags to categorize the memory. Can be:
+                - JSON array: '["tag1", "tag2"]'
+                - Comma-separated: "tag1,tag2"
+                - Single tag: "tag1" """,
+                required=True
+            ),
+            Arg(
+                name="custom_prompt",
+                type="str",
+                description="Optional custom prompt for entity extraction",
+                required=False
+            ),
+        ]
 
         super().__init__(
             name="add_memory",
-            description=description,
+            description="Add content to memory with specified tags",
             content="""
 try:
     import mem0
@@ -63,11 +67,11 @@ except Exception as e:
     print(f"❌ Error: {str(e)}")
     exit(1)
 """,
-            env=env,
-            secrets=secrets
+            args=memory_args
         )
 
-# Register the tool
-tool_registry.register("memory_management", AddMemoryTool())
+# Create and register the tool
+add_memory_tool = AddMemoryTool()
+tool_registry.register("memory_management", add_memory_tool)
 
-__all__ = ["AddMemoryTool"] 
+__all__ = ["add_memory_tool", "AddMemoryTool"] 
