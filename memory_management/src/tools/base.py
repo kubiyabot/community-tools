@@ -104,7 +104,7 @@ class MemoryManagementTool(Tool):
         # Initialize configuration
         settings = MemoryConfig.initialize()
         
-        # Get requirements
+        # Get requirements from base config
         requirements = MemoryConfig.get_requirements(settings)
         env = env + requirements["env"]
         secrets = secrets + requirements["secrets"]
