@@ -17,19 +17,25 @@ class MemoryManagementTool(Tool):
         mermaid=None,
         with_volumes=None,
     ):
-        # Add LiteLLM configuration
+        # Add both LiteLLM and Mem0 configuration
         enhanced_content = """
-# Configure LiteLLM
-export OPENAI_API_KEY=$LLM_API_KEY
-export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
-
 # Create and activate virtual environment
 python -m venv /opt/venv > /dev/null
 . /opt/venv/bin/activate > /dev/null
 
+# Configure LiteLLM
+export OPENAI_API_KEY=$LLM_API_KEY
+export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
+
 # Install required packages
 pip install --upgrade pip > /dev/null
-pip install mem0ai litellm 2>&1 | grep -v '[notice]' > /dev/null
+pip install mem0ai==0.1.29 litellm neo4j 2>&1 | grep -v '[notice]' > /dev/null
+
+# Configure Mem0
+export MEM0_API_KEY=$MEM0_API_KEY
+export NEO4J_URI=$NEO4J_URI
+export NEO4J_USER=$NEO4J_USER
+export NEO4J_PASSWORD=$NEO4J_PASSWORD
 
 """ + content
 
@@ -41,8 +47,8 @@ pip install mem0ai litellm 2>&1 | grep -v '[notice]' > /dev/null
             image=image,
             content=enhanced_content,
             args=args,
-            env=env,
-            secrets=secrets + ["LLM_API_KEY", "MEM0_API_KEY"],
+            env=env + ["KUBIYA_USER_EMAIL", "KUBIYA_USER_ORG", "NEO4J_URI", "NEO4J_USER"],
+            secrets=secrets + ["LLM_API_KEY", "MEM0_API_KEY", "NEO4J_PASSWORD"],
             long_running=long_running,
             with_files=with_files,
             mermaid=mermaid,
