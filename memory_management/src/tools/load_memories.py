@@ -34,11 +34,6 @@ python /opt/scripts/load_memories_handler.py || exit 1
     env=[
         "KUBIYA_USER_EMAIL",
         "KUBIYA_USER_ORG",
-        "NEO4J_URI",
-        "NEO4J_USER",
-    ],
-    secrets=[
-        "NEO4J_PASSWORD",
     ],
     with_files=[
         FileSpec(destination=f"/opt/scripts/{script_name}", content=script_content)
