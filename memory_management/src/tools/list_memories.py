@@ -1,13 +1,5 @@
-import inspect
 import sys
-import os
 from pathlib import Path
-
-# Add the project root to Python path
-project_root = str(Path(__file__).resolve().parents[2])
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool

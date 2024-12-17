@@ -1,25 +1,8 @@
-import inspect
 import sys
-import os
 from pathlib import Path
-import json
-
-# Add the project root to Python path
-project_root = str(Path(__file__).resolve().parents[2])
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
-
 from .base import MemoryManagementTool
-
-# Import all scripts from the scripts directory
-scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
-script_files = {}
-for script_path in scripts_dir.glob("*.py"):
-    with open(script_path, "r") as f:
-        script_files[script_path.name] = f.read()
 
 class AddMemoryTool(MemoryManagementTool):
     def __init__(self):

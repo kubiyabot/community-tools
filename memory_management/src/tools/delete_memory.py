@@ -1,13 +1,5 @@
-import inspect
 import sys
-import os
 from pathlib import Path
-
-# Add the project root to Python path
-project_root = str(Path(__file__).resolve().parents[2])
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
@@ -18,8 +10,8 @@ class DeleteMemoryTool(MemoryManagementTool):
             Arg(
                 name="memory_id",
                 type="str",
-                description="""ID of the memory to remove (use list_memories to find IDs).
-                Example: "bf4d4092-cf91-4181-bfeb-b6fa2ed3061b""",
+                description='ID of the memory to remove (use list_memories to find IDs). '
+                          'Example: "bf4d4092-cf91-4181-bfeb-b6fa2ed3061b"',
                 required=True
             )
         ]
