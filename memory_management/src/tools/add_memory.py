@@ -51,7 +51,9 @@ class AddMemoryTool(MemoryManagementTool):
         super().__init__(
             name="add_memory",
             description="Add content to memory with specified tags",
-            content="""
+            content="""#!/bin/sh
+# Create Python script
+cat > /tmp/add_memory.py << 'EOL'
 try:
     import mem0
     from mem0.memory import Memory
@@ -66,6 +68,10 @@ try:
 except Exception as e:
     print(f"❌ Error: {str(e)}")
     exit(1)
+EOL
+
+# Execute the Python script
+python3 /tmp/add_memory.py
 """,
             args=memory_args
         )
