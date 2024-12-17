@@ -1,40 +1,39 @@
 import os
-from mem0 import Memory
+import sys
+from mem0 import MemoryClient
 
-def search_memories(query):
-    # Retrieve Mem0 configuration from environment variables
-    uri = os.environ["NEO4J_URI"]
-    username = os.environ["NEO4J_USER"]
-    password = os.environ["NEO4J_PASSWORD"]
-    user_email = os.environ["KUBIYA_USER_EMAIL"]
-    user_org = os.environ["KUBIYA_USER_ORG"]
+def search_memories(query: str) -> None:
+    """Search memories using the provided query."""
+    try:
+        # Initialize Memory client
+        client = MemoryClient(api_key=os.environ["MEM0_API_KEY"])
+        
+        # Get user ID
+        user_id = f"{os.environ['KUBIYA_USER_ORG']}.{os.environ['KUBIYA_USER_EMAIL']}"
 
-    # Build the Mem0 configuration
-    config = {
-        "graph_store": {
-            "provider": "neo4j",
-            "config": {
-                "url": uri,
-                "username": username,
-                "password": password,
-            }
-        },
-        "version": "v1.1"
-    }
+        print(f"🔍 Searching memories for: {query}")
+        
+        # Search memories with v1.1 format
+        results = client.search(query, user_id=user_id, output_format="v1.1")
+        
+        if not results or not results.get('results'):
+            print("No matching memories found.")
+            return
+            
+        print("\n✨ Found matching memories:\n")
+        for memory in results['results']:
+            print(f"📌 {memory.get('content', '')}")
+            if 'metadata' in memory and 'tags' in memory['metadata']:
+                print(f"   Tags: {', '.join(memory['metadata']['tags'])}")
+            print(f"   Score: {memory.get('score', 0):.2f}")
+            print()
 
-    # Instantiate the Memory client
-    m = Memory.from_config(config_dict=config)
+    except Exception as e:
+        print(f"❌ Error: {str(e)}")
+        sys.exit(1)
 
-    # Use org.user_email as user_id
-    user_id = f"{user_org}.{user_email}"
-
-    # Search memories
-    results = m.search(query=query, user_id=user_id)
-
-    if not results['results']:
-        print("🔍 No matching memories found.")
-    else:
-        print(f"🔍 Search results for '{query}':\n")
-        for mem in results['results']:
-            tags = mem.get('metadata', {}).get('tags', [])
-            print(f"ID: {mem['id']}, Content: {mem['memory']}, Tags: {tags}, Score: {mem['score']}") 
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: search_memories_handler.py <query>")
+        sys.exit(1)
+    search_memories(sys.argv[1])
