@@ -1,7 +1,4 @@
-import sys
-from pathlib import Path
 from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
 
 class DeleteMemoryTool(MemoryManagementTool):
@@ -64,8 +61,4 @@ python3 /tmp/delete_memory.py
             args=memory_args
         )
 
-# Create and register the tool
-delete_memory_tool = DeleteMemoryTool()
-tool_registry.register("memory_management", delete_memory_tool)
-
-__all__ = ["DeleteMemoryTool", "delete_memory_tool"] 
+__all__ = ["DeleteMemoryTool"] 

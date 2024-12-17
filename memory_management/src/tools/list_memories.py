@@ -1,7 +1,4 @@
-import sys
-from pathlib import Path
 from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
 from .base import MemoryManagementTool
 
 class ListMemoriesTool(MemoryManagementTool):
@@ -136,8 +133,4 @@ python3 /tmp/list_memories.py
             args=memory_args
         )
 
-# Create and register the tool
-list_memories_tool = ListMemoriesTool()
-tool_registry.register("memory_management", list_memories_tool)
-
-__all__ = ["ListMemoriesTool", "list_memories_tool"] 
+__all__ = ["ListMemoriesTool"] 
