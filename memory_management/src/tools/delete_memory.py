@@ -68,4 +68,4 @@ python3 /tmp/delete_memory.py
 delete_memory_tool = DeleteMemoryTool()
 tool_registry.register("memory_management", delete_memory_tool)
 
-__all__ = ["delete_memory_tool", "DeleteMemoryTool"] 
+__all__ = ["DeleteMemoryTool", "delete_memory_tool"] 

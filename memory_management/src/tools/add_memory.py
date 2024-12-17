@@ -83,4 +83,4 @@ python3 /tmp/add_memory.py
 add_memory_tool = AddMemoryTool()
 tool_registry.register("memory_management", add_memory_tool)
 
-__all__ = ["add_memory_tool", "AddMemoryTool"] 
+__all__ = ["AddMemoryTool", "add_memory_tool"] 

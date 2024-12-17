@@ -99,4 +99,4 @@ python3 /tmp/list_memories.py
 list_memories_tool = ListMemoriesTool()
 tool_registry.register("memory_management", list_memories_tool)
 
-__all__ = ["list_memories_tool", "ListMemoriesTool"] 
+__all__ = ["ListMemoriesTool", "list_memories_tool"] 
