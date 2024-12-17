@@ -59,8 +59,36 @@ su - kubiya -c "python -m venv /opt/venv" > /dev/null 2>&1
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
-# Install required packages silently
-su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet --upgrade pip mem0ai==0.1.29 litellm neo4j" > /dev/null 2>&1
+# Function to check if a package is installed
+check_package() {
+    python -c "import $1" 2>/dev/null
+    return $?
+}
+
+# List of required packages with their pip names
+declare -A PACKAGES=(
+    ["mem0"]="mem0ai==0.1.29"
+    ["litellm"]="litellm"
+    ["neo4j"]="neo4j"
+    ["langchain"]="langchain"
+    ["langchain_community"]="langchain-community"
+    ["langchain_openai"]="langchain-openai"
+    ["chromadb"]="chromadb"
+    ["tiktoken"]="tiktoken"
+)
+
+# First upgrade pip
+echo "📦 Upgrading pip..."
+su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet --upgrade pip" > /dev/null 2>&1
+
+# Check and install missing packages
+for package in "${!PACKAGES[@]}"; do
+    if ! check_package "$package"; then
+        pip_package="${PACKAGES[$package]}"
+        echo "📦 Installing missing package: $pip_package"
+        su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet $pip_package" > /dev/null 2>&1
+    fi
+done
 
 # Configure Mem0
 export MEM0_API_KEY=$MEM0_API_KEY
