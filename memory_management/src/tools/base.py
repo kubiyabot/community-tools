@@ -13,50 +13,35 @@ class MemorySettings:
     neo4j_uri: str = 'bolt://localhost:7687'
     neo4j_username: str = 'neo4j'
     local_path: str = '/data/memory'
-    required_packages: List[str] = None
     package_versions: Dict[str, str] = None
-    advanced_settings: Dict[str, Any] = None
 
     def __post_init__(self):
-        if self.required_packages is None:
-            self.required_packages = [
-                'mem0', 'litellm', 'neo4j', 'langchain', 
-                'langchain_community', 'langchain_openai',
-                'chromadb', 'tiktoken', 'rank_bm25'
-            ]
         if self.package_versions is None:
-            self.package_versions = {
-                'mem0': 'mem0ai==0.1.29'
-            }
-        if self.advanced_settings is None:
-            self.advanced_settings = {
-                'use_embeddings': True,
-                'chunk_size': 1000,
-                'chunk_overlap': 200
-            }
+            self.package_versions = {}
+
+    @property
+    def required_packages(self) -> List[str]:
+        """Get required packages based on backend type"""
+        if self.backend_type == 'hosted':
+            return ['mem0ai==0.1.29']
+        elif self.backend_type == 'neo4j':
+            return [
+                'mem0ai==0.1.29',
+                'neo4j',
+                'langchain-neo4j',
+                'langchain',
+                'langchain-community',
+                'langchain-openai'
+            ]
+        else:  # local
+            return [
+                'mem0ai==0.1.29',
+                'chromadb',
+                'tiktoken'
+            ]
 
 class MemoryConfig:
     """Builder for Memory management configuration"""
-
-    DEFAULT_PACKAGE_VERSIONS = {
-        'mem0': 'mem0ai==0.1.29',
-        'litellm': 'litellm',
-        'neo4j': 'neo4j',
-        'langchain': 'langchain',
-        'langchain_community': 'langchain-community',
-        'langchain_openai': 'langchain-openai',
-        'chromadb': 'chromadb',
-        'tiktoken': 'tiktoken',
-        'rank_bm25': 'rank-bm25'
-    }
-
-    DEFAULT_ADVANCED_SETTINGS = {
-        'use_embeddings': True,
-        'chunk_size': 1000,
-        'chunk_overlap': 200,
-        'similarity_threshold': 0.8,
-        'max_tokens': 4000
-    }
 
     @classmethod
     def parse_config(cls, config: Optional[Dict]) -> MemorySettings:
@@ -81,24 +66,13 @@ class MemoryConfig:
                 print(f"⚠️ Warning: Unsupported backend type: {backend_type}, falling back to hosted mode")
                 return MemorySettings()
 
-            # Parse package versions
-            package_versions = cls.DEFAULT_PACKAGE_VERSIONS.copy()
-            if 'package_versions' in config:
-                package_versions.update(config['package_versions'])
-
-            # Parse advanced settings
-            advanced_settings = cls.DEFAULT_ADVANCED_SETTINGS.copy()
-            if 'advanced_settings' in config:
-                advanced_settings.update(config['advanced_settings'])
-
             # Create settings object
             settings = MemorySettings(
                 backend_type=backend_type,
                 neo4j_uri=config.get('neo4j_uri', 'bolt://localhost:7687'),
                 neo4j_username=config.get('neo4j_username', 'neo4j'),
                 local_path=config.get('local_path', '/data/memory'),
-                package_versions=package_versions,
-                advanced_settings=advanced_settings
+                package_versions=config.get('package_versions', {})
             )
 
             return settings
@@ -118,7 +92,7 @@ class MemoryManagementTool(Tool):
         secrets=[],
         long_running=False,
         with_files=None,
-        image="python:3.11-slim",
+        image="python:3.9-alpine",  # Using Alpine-based Python image
         mermaid=None,
         with_volumes=None,
     ):
@@ -162,42 +136,24 @@ class MemoryManagementTool(Tool):
         # Combine memory args with any additional args
         combined_args = memory_args + args
 
-        # Build enhanced content with package installation
+        # Build enhanced content with minimal setup
         enhanced_content = """
-# Create virtual environment as non-root user
-useradd -m kubiya
-chown -R kubiya:kubiya /opt
-su - kubiya -c "python -m venv /opt/venv" > /dev/null 2>&1
-
-# Activate virtual environment
-. /opt/venv/bin/activate
+# Install only required system packages
+apk add py3-pip
 
 # Configure LiteLLM
 export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
-# Function to check if a package is installed
-check_package() {
-    python -c "import $1" 2>/dev/null
-    return $?
-}
-
-# First upgrade pip
-echo "📦 Upgrading pip..."
-su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet --upgrade pip" > /dev/null 2>&1
-
-# Check and install each package
-echo "📦 Checking required packages..."
+# Install required packages
+echo "📦 Installing required packages for ${settings.backend_type} backend..."
 """
 
         # Add package installation commands
         for package in settings.required_packages:
-            package_version = settings.package_versions.get(package, package)
             enhanced_content += f"""
-if ! check_package "{package}"; then
-    echo "📦 Installing {package}..."
-    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet {package_version}" > /dev/null 2>&1
-fi
+echo "📦 Installing {package}..."
+pip install --quiet {package} > /dev/null 2>&1
 """
 
         # Add backend-specific configuration
@@ -221,13 +177,6 @@ export MEM0_API_KEY="${MEM0_API_KEY}"
 export MEMORY_BACKEND="local"
 export MEMORY_PATH="{settings.local_path}"
 """
-
-        # Add advanced settings
-        enhanced_content += """
-# Configure advanced settings
-"""
-        for key, value in settings.advanced_settings.items():
-            enhanced_content += f'export MEMORY_{key.upper()}="{value}"\n'
 
         enhanced_content = enhanced_content + content
 
