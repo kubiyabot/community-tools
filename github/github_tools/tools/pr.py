@@ -64,12 +64,91 @@ pr_close = GitHubCliTool(
 
 pr_comment = GitHubCliTool(
     name="github_pr_comment",
-    description="Add a comment to a pull request.",
-    content="gh pr comment --repo $repo $number --body \"$body\"",
+    description="Add a comment to a pull request with proper formatting and timestamp. Updates existing Kubiya comments if found.",
+    content="""
+# Format the timestamp in ISO format
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+# First, check for existing Kubiya comments
+echo "🔍 Checking for existing Kubiya comments..."
+EXISTING_COMMENTS=$(gh api repos/$repo/issues/$number/comments | jq -r '.[] | select(.body | contains("Generated automatically by Kubiya AI")) | {id: .id, body: .body}')
+
+if [ -n "$EXISTING_COMMENTS" ]; then
+    echo "Found existing Kubiya comment(s)"
+    # Get the most recent comment ID
+    COMMENT_ID=$(echo "$EXISTING_COMMENTS" | jq -r '.id' | tail -n1)
+    # Get existing content
+    EXISTING_BODY=$(echo "$EXISTING_COMMENTS" | jq -r '.body' | tail -n1)
+    
+    # Extract the previous content (everything between the header and the disclaimer)
+    PREVIOUS_CONTENT=$(echo "$EXISTING_BODY" | awk '/### 💬 Comment Added via Kubiya AI/{p=1;next} /---/{p=0} p')
+    
+    # Prepare the updated comment with collapsible previous content
+    FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+
+$body
+
+<details>
+<summary>📜 Previous Comments</summary>
+
+$PREVIOUS_CONTENT
+</details>
+
+---
+<sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
+
+    # Update the existing comment
+    echo "📝 Updating existing comment..."
+    UPDATE_RESULT=$(gh api repos/$repo/issues/comments/$COMMENT_ID -X PATCH -f body="$FORMATTED_COMMENT" 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to update comment"
+        echo "Error: $UPDATE_RESULT"
+        exit 1
+    fi
+    COMMENT_URL="https://github.com/$repo/pull/$number#issuecomment-$COMMENT_ID"
+else
+    # Create new comment if no existing Kubiya comment found
+    echo "📝 Creating new comment..."
+    FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+
+$body
+
+---
+<sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
+
+    COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to add comment"
+        echo "Error: $COMMENT_URL"
+        exit 1
+    fi
+    COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
+fi
+
+# Verify the comment
+echo "🔍 Verifying comment..."
+COMMENT_CHECK=$(gh api repos/$repo/issues/comments/$COMMENT_ID)
+if [ $? -eq 0 ]; then
+    echo "✅ Comment processed successfully for PR #$number"
+    echo "🔗 Comment URL: $COMMENT_URL"
+    echo "⏰ Timestamp: $TIMESTAMP"
+    
+    # Verify content matches
+    ACTUAL_BODY=$(echo "$COMMENT_CHECK" | jq -r .body)
+    if [[ "$ACTUAL_BODY" == *"$body"* ]] && [[ "$ACTUAL_BODY" == *"$TIMESTAMP"* ]]; then
+        echo "✅ Comment content verified"
+    else
+        echo "⚠️ Warning: Comment content may not match expected format"
+    fi
+else
+    echo "❌ Failed to verify comment"
+    exit 1
+fi
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
-        Arg(name="body", type="str", description="Comment text. Example: 'Great work! Just a few minor suggestions.'", required=True),
+        Arg(name="body", type="str", description="Comment text in markdown format. Example: '**Great work!** The changes look good.'", required=True),
     ],
 )
 
