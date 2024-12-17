@@ -65,30 +65,52 @@ check_package() {
     return $?
 }
 
-# List of required packages with their pip names
-declare -A PACKAGES=(
-    ["mem0"]="mem0ai==0.1.29"
-    ["litellm"]="litellm"
-    ["neo4j"]="neo4j"
-    ["langchain"]="langchain"
-    ["langchain_community"]="langchain-community"
-    ["langchain_openai"]="langchain-openai"
-    ["chromadb"]="chromadb"
-    ["tiktoken"]="tiktoken"
-)
-
 # First upgrade pip
 echo "📦 Upgrading pip..."
 su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet --upgrade pip" > /dev/null 2>&1
 
-# Check and install missing packages
-for package in "${!PACKAGES[@]}"; do
-    if ! check_package "$package"; then
-        pip_package="${PACKAGES[$package]}"
-        echo "📦 Installing missing package: $pip_package"
-        su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet $pip_package" > /dev/null 2>&1
-    fi
-done
+# Check and install each package
+echo "📦 Checking required packages..."
+
+if ! check_package "mem0"; then
+    echo "📦 Installing mem0ai..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet mem0ai==0.1.29" > /dev/null 2>&1
+fi
+
+if ! check_package "litellm"; then
+    echo "📦 Installing litellm..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet litellm" > /dev/null 2>&1
+fi
+
+if ! check_package "neo4j"; then
+    echo "📦 Installing neo4j..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet neo4j" > /dev/null 2>&1
+fi
+
+if ! check_package "langchain"; then
+    echo "📦 Installing langchain..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet langchain" > /dev/null 2>&1
+fi
+
+if ! check_package "langchain_community"; then
+    echo "📦 Installing langchain-community..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet langchain-community" > /dev/null 2>&1
+fi
+
+if ! check_package "langchain_openai"; then
+    echo "📦 Installing langchain-openai..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet langchain-openai" > /dev/null 2>&1
+fi
+
+if ! check_package "chromadb"; then
+    echo "📦 Installing chromadb..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet chromadb" > /dev/null 2>&1
+fi
+
+if ! check_package "tiktoken"; then
+    echo "📦 Installing tiktoken..."
+    su - kubiya -c ". /opt/venv/bin/activate && pip install --quiet tiktoken" > /dev/null 2>&1
+fi
 
 # Configure Mem0
 export MEM0_API_KEY=$MEM0_API_KEY
