@@ -119,14 +119,13 @@ export OPENAI_API_KEY=$LLM_API_KEY
 export OPENAI_API_BASE=https://llm-proxy.kubiya.ai
 
 # Install required packages
-echo "📦 Validating packages for {settings.backend_type} backend..."
+echo "🧠 Connecting to {settings.backend_type} knowledge graph... Let's get those synapses firing! ✨"
 """
 
         # Add package installation commands
         for package in MemoryConfig.get_packages(settings):
             enhanced_content += f"""
 if ! pip show {package} > /dev/null 2>&1; then
-    echo "📦 Installing {package}..."
     pip install --quiet {package} > /dev/null 2>&1
 fi
 """
