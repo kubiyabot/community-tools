@@ -27,7 +27,8 @@ class MemorySettings:
                 'mem0ai==0.1.29',
                 'langchain-community',
                 'langchain',
-                'langchain-openai'
+                'langchain-openai',
+                'rank-bm25'
             ]
         elif self.backend_type == 'neo4j':
             return [
@@ -36,7 +37,8 @@ class MemorySettings:
                 'langchain-neo4j',
                 'langchain',
                 'langchain-community',
-                'langchain-openai'
+                'langchain-openai',
+                'rank-bm25'
             ]
         else:  # local
             return [
@@ -45,7 +47,8 @@ class MemorySettings:
                 'tiktoken',
                 'langchain',
                 'langchain-community',
-                'langchain-openai'
+                'langchain-openai',
+                'rank-bm25'
             ]
 
 class MemoryConfig:
