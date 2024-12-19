@@ -73,11 +73,8 @@ class GitHubCliTool(Tool):
 
         # Add common shell functions and content
         enhanced_content = f'''
-#!/bin/sh
-set -eu
-
-# Import common functions
-{LOG_PROCESSING_FUNCTIONS}
+#!/bin/bash
+set -euo pipefail
 
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
@@ -101,7 +98,7 @@ fi
 
 # Main script content
 {content}
-'''.format(LOG_PROCESSING_FUNCTIONS)
+'''
             
         super().__init__(
             name=name,
