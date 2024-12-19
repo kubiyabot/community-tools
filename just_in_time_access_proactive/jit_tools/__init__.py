@@ -13,6 +13,5 @@ def initialize():
 print("Loading Kubernetes tools module...")
 initialize()
 
-from . import tools
-
-__all__ = ['tools']
+# Import tools after initialization
+from .tools import *
