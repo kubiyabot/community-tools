@@ -154,81 +154,91 @@ pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a comment to a pull request or update an existing comment with detailed workflow diagnostics.",
     content="""
-printf "\U0001F4AC Processing comment for pull request #$number in $repo...\n"
-printf "\U0001F517 PR Link: https://github.com/$repo/pull/$number\n"
-printf "\U0001F4A1 Workflow Name: $workflow_name\n"
-printf "\U0001F6A8 Failures: $failures\n"
-printf "\U0001F527 Fixes: $fixes\n"
-printf "\U0001F4C8 Workflow Steps: $workflow_steps\n"
-printf "\U0001F6A8 Failed Steps: $failed_steps\n"
-printf "\U0001F4DD Error Logs: $error_logs\n"
-printf "\U0001F4C3 Run Details: $run_details\n"
+# Main Script
+printf ":speech_balloon: Processing comment for pull request #%s in %s...\n" "$number" "$repo"
+printf ":link: PR Link: https://github.com/%s/pull/%s\n" "$repo" "$number"
+printf ":bulb: Workflow Name: %s\n" "$workflow_name"
+printf ":warning: Failures: %s\n" "$failures"
+printf ":wrench: Fixes: %s\n" "$fixes"
+printf ":chart_with_upwards_trend: Workflow Steps: %s\n" "$workflow_steps"
+printf ":warning: Failed Steps: %s\n" "$failed_steps"
+printf ":memo: Error Logs: %s\n" "$error_logs"
+printf ":page_with_curl: Run Details: %s\n" "$run_details"
 
-format_github_comment() {
-    local workflow_name="$1"
-    local failures="$2"
-    local fixes="$3"
-    local workflow_steps="$4"
-    local failed_steps="$5"
-    local error_logs="$6"
-    local run_details="$7"
-    
-    # Generate the failures and reasons section
-    local failure_details=""
-    while IFS=":" read -r step reason; do
-        failure_details+="- **$step:** $reason\n"
-    done <<< "$failures"
+# Generate the failures and reasons section
+failure_details=""
+while IFS=":" read -r step reason; do
+    failure_details+="- **$step:** $reason"$'\n'
+done <<< "$failures"
 
-    # Generate the fixes section
-    local fix_details=""
-    while IFS=":" read -r step fix; do
-        fix_details+="- **$step:** $fix\n"
-    done <<< "$fixes"
+# Generate the fixes section
+fix_details=""
+while IFS=":" read -r step fix; do
+    fix_details+="- **$step:** $fix"$'\n'
+done <<< "$fixes"
 
-    # Generate mermaid diagram
-    local mermaid_steps=""
-    for step in ${workflow_steps//,/ }; do
-        if [[ $failed_steps == *"$step"* ]]; then
-            mermaid_steps+="    $step:::error --> "
-        else
-            mermaid_steps+="    $step --> "
-        fi
-    done
-    mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
+# Generate mermaid diagram
+mermaid_steps=""
+for step in ${workflow_steps//,/ }; do
+    if [[ $failed_steps == *"$step"* ]]; then
+        mermaid_steps+="    $step:::error --> "
+    else
+        mermaid_steps+="    $step --> "
+    fi
+done
+mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
 
-    local mermaid_diagram="\`\`\`mermaid\ngraph TD\n$mermaid_steps\n\nclassDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;\n\`\`\`"
+# Correctly format the Mermaid diagram in markdown
+mermaid_diagram='```mermaid
+graph TD
+'"$mermaid_steps"'
 
-    # Format error logs in a collapsible section
-    local collapsible_logs="<details>\n  <summary>\U0001F527 Error Logs</summary>\n\n\`\`\`plaintext\n$error_logs\n\`\`\`\n</details>"
-    
-    # Return the final comment using printf
-    echo -e "### Workflow Diagnostics\n\n#### What Failed?\n$failure_details\n#### Suggested Fix\n$fix_details\n#### Mermaid Diagram\n$mermaid_diagram\n\n---\n\n### \U0001F527 Logs and Details\n$collapsible_logs\n\n---\n\n### Run Details\n$run_details"
-}
-GITHUB_ACTOR=$(gh api user --jq '.login')
-printf "Debug 1\n"
-FULL_COMMENT=$(format_github_comment "$workflow_name" "$failures" "$fixes" "$workflow_steps" "$failed_steps" "$error_logs" "$run_details")
-echo $FULL_COMMENT
+classDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;
+```'
+
+# Format error logs in a collapsible section
+collapsible_logs="<details>
+<summary>:wrench: Error Logs</summary>
+
+\`\`\`plaintext
+$error_logs
+\`\`\`
+
+</details>"
+
+# Final comment using printf
+FULL_COMMENT="### Workflow Diagnostics
+
+#### What Failed?
+$failure_details
+
+#### Suggested Fix
+$fix_details
+
+#### Mermaid Diagram
+$mermaid_diagram
+
+---
+
+### :wrench: Logs and Details
+$collapsible_logs
+
+---
+
+### Run Details
+$run_details"
+
+# Add disclaimer
 FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
 
 # Get existing comments by the current user
+GITHUB_ACTOR=$(gh api user --jq '.login')
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
 
-# if [ -n "$EXISTING_COMMENT_ID" ]; then
-#     # Update existing comment
-#     printf "\U0001F504 Updating existing comment...\n"
-#     # Count number of edits in the comment
-#     EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
-#     EDIT_COUNT=$((EDIT_COUNT + 1))
-# 
-#     UPDATED_COMMENT=$(printf "### Workflow Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api \"repos/$repo/issues/comments/$EXISTING_COMMENT_ID\" --jq .body)\\n\\n</details>")
-#     gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
-#     printf "\u2705 Comment updated successfully!\n"
-# else
 # Add new comment
-echo "\u2795 Adding new comment...\n"
-gh pr comment --repo $repo $number --body "$FULL_COMMENT"
-echo "\u2705 Comment added successfully!\n"
-# fi
+echo -e ":heavy_plus_sign: Adding new comment...\n"
+gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"
+echo -e ":white_check_mark: Comment added successfully!\n"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
