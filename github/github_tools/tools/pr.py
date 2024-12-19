@@ -156,6 +156,17 @@ pr_comment = GitHubCliTool(
     content="""
 FULL_COMMENT="Hello"
 
+# Main Script
+printf ":speech_balloon: Processing comment for pull request #%s in %s...\n" "$number" "$repo"
+printf ":link: PR Link: https://github.com/%s/pull/%s\n" "$repo" "$number"
+printf ":bulb: Workflow Name: %s\n" "$workflow_name"
+printf ":warning: Failures: %s\n" "$failures"
+printf ":wrench: Fixes: %s\n" "$fixes"
+printf ":chart_with_upwards_trend: Workflow Steps: %s\n" "$workflow_steps"
+printf ":warning: Failed Steps: %s\n" "$failed_steps"
+printf ":memo: Error Logs: %s\n" "$error_logs"
+printf ":page_with_curl: Run Details: %s\n" "$run_details"
+
 gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"
 """,
     args=[
