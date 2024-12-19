@@ -213,7 +213,7 @@ export RUN_DETAILS="$RUN_DETAILS"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
-GENERATED_COMMENT=$(python /opt/scripts/comment_generator.py) || {
+GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
     echo "❌ Failed to generate comment"
     exit 1
 }
