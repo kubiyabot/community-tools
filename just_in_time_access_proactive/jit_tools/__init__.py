@@ -1,16 +1,16 @@
 def initialize():
-    """Initialize Kubernetes tools and KubeWatch configuration."""
+    """Initialize JIT tools and Enforcer configuration."""
     try:
-        print("Starting Kubernetes tools initialization...")
+        print("Starting Enforcer set up...")
         from .initialization import initialize as init_kubewatch
         init_kubewatch()
-        print("Kubernetes tools initialization completed")
+        print("Enforcer tools initialization completed")
     except Exception as e:
-        print(f"Failed to initialize Kubernetes tools: {str(e)}")
+        print(f"Failed to initialize Enforcer : {str(e)}")
         raise
 
 # Run initialization when module is imported
-print("Loading Kubernetes tools module...")
+print("Loading JIT tools module...")
 initialize()
 
 # Import tools after initialization
