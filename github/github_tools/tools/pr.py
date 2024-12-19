@@ -157,17 +157,15 @@ pr_comment = GitHubCliTool(
 #!/bin/bash
 set -euo pipefail
 
-# Create __init__.py file for the scripts project
+# Create __init__.py files for the Python package structure
 if [ ! -f /opt/scripts/__init__.py ]; then
     touch /opt/scripts/__init__.py
 fi
 
-# Create __init__.py file for the utils project
 if [ ! -f /opt/scripts/utils/__init__.py ]; then
     touch /opt/scripts/utils/__init__.py
 fi
 
-# Create __init__.py file for the utils.templating project
 if [ ! -f /opt/scripts/utils/templating/__init__.py ]; then
     touch /opt/scripts/utils/templating/__init__.py
 fi
@@ -270,23 +268,117 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
-        Arg(name="workflow_steps", type="str", description="JSON string representing workflow steps", required=True),
-        Arg(name="failures", type="str", description="JSON string representing failures", required=True),
-        Arg(name="fixes", type="str", description="JSON string representing fixes", required=True),
-        Arg(name="run_details", type="str", description="JSON string representing run details", required=True),
-        Arg(name="error_logs", type="str", description="JSON string representing error logs", required=True),
+        Arg(
+            name="repo", 
+            type="str", 
+            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            required=True
+        ),
+        Arg(
+            name="number", 
+            type="str", 
+            description="Pull request number. Example: '123'", 
+            required=True
+        ),
+        Arg(
+            name="workflow_steps",
+            type="str",
+            description="""JSON array of workflow steps. Example:
+[
+    {
+        "name": "Install Dependencies",
+        "status": "success",
+        "conclusion": "success",
+        "number": 1
+    },
+    {
+        "name": "Run Tests",
+        "status": "failure",
+        "conclusion": "failure",
+        "number": 2
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="failures",
+            type="str",
+            description="""JSON array of workflow failures. Example:
+[
+    {
+        "step": "Run Tests",
+        "error": "Test failed: expected 200 but got 404",
+        "file": "tests/api_test.go",
+        "line": "42"
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="fixes",
+            type="str",
+            description="""JSON array of suggested fixes. Example:
+[
+    {
+        "step": "Run Tests",
+        "description": "Update the expected status code in the API test",
+        "code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="error_logs",
+            type="str",
+            description="""Raw error logs from the workflow run. Will be truncated and formatted in the comment. Example:
+=== RUN   TestAPIEndpoint
+    api_test.go:42: 
+        Error Trace:    api_test.go:42
+        Error:          Not equal:
+                       expected: 200
+                       actual  : 404
+        Test:          TestAPIEndpoint
+FAIL""",
+            required=True
+        ),
+        Arg(
+            name="run_details",
+            type="str",
+            description="""JSON object with workflow run details and PR information. Example:
+{
+    "id": "12345678",
+    "name": "CI Pipeline",
+    "started_at": "2024-01-20T10:00:00Z",
+    "status": "completed",
+    "conclusion": "failure",
+    "actor": "octocat",
+    "trigger_event": "pull_request",
+    "pr_details": {
+        "title": "Add new API endpoint",
+        "description": "Implements the /api/v1/users endpoint",
+        "author": "octocat",
+        "created_at": "2024-01-20T09:00:00Z",
+        "updated_at": "2024-01-20T10:00:00Z",
+        "commits_count": 3,
+        "additions": 150,
+        "deletions": 50,
+        "labels": ["feature", "api"],
+        "base_branch": "main",
+        "head_branch": "feature/api-endpoint"
+    }
+}""",
+            required=True
+        ),
     ],
     with_files=[
         FileSpec(destination="/opt/scripts/comment_generator.py", 
-                content=str(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py')),
+                content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()),
         FileSpec(destination="/opt/scripts/utils/templating/template_handler.py",
-                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py')),
+                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py').read()),
         FileSpec(destination="/opt/scripts/utils/templating/schema.py",
-                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py')),
+                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py').read()),
         FileSpec(destination="/opt/scripts/utils/templating/templates/workflow_failure.jinja2",
-                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2')),
+                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2').read()),
     ],
 ).register("github")
 
