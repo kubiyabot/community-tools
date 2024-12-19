@@ -13,6 +13,14 @@ KUBIYA_DISCLAIMER = '''
 > 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
 '''
 
+class GitHubCliTool:
+    def __init__(self, name, description, content, args, with_files=None):
+        self.name = name
+        self.description = description
+        self.content = content
+        self.args = args
+        self.with_files = with_files or []
+
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository",
