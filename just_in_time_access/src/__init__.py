@@ -5,7 +5,7 @@ def initialize():
     """Initialize JIT tools and Enforcer configuration."""
     try:
         print("Starting Enforcer initialization...")
-        from .initialization import initialize as init_enforcer
+        from . import initialize as init_enforcer
         init_enforcer()
         print("Enforcer initialization completed")
     except Exception as e:
@@ -13,7 +13,7 @@ def initialize():
         raise
 
 # Run initialization when module is imported
-print("Loading Kubernetes tools module...")
+print("Loading Enforcer tools module...")
 initialize()
 
 # Import tools after initialization
