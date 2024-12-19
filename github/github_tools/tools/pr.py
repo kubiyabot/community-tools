@@ -231,7 +231,7 @@ printf ":page_with_curl: Run Details: %s\n" "$run_details"
 FULL_COMMENT="Hello"
 
 # Add disclaimer
-FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
+# FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
 
 # Get existing comments by the current user
 GITHUB_ACTOR=$(gh api user --jq '.login')
