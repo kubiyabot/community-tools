@@ -1,25 +1,15 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool, GitHubRepolessCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from .base import GitHubCliTool
 from kubiya_sdk.tools.models import FileSpec
 from pathlib import Path
 
 # Common disclaimer for automated actions
 KUBIYA_DISCLAIMER = '''
-
 ---
 > **Note**: This action was performed by Kubiya.ai on behalf of @${GITHUB_ACTOR}
 > 
 > 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
 '''
-
-class GitHubCliTool:
-    def __init__(self, name, description, content, args, with_files=None):
-        self.name = name
-        self.description = description
-        self.content = content
-        self.args = args
-        self.with_files = with_files or []
 
 pr_create = GitHubCliTool(
     name="github_pr_create",
@@ -72,9 +62,9 @@ echo "📋 Details: $PR_URL"
         Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Use `@me` to self-assign", required=False),
         Arg(name="reviewer", type="str", description="The github user's login that should review this pr", required=False),
     ],
-)
+).register("github")
 
-pr_list = GitHubRepolessCliTool(
+pr_list = GitHubCliTool(
     name="github_pr_list", 
     description="List pull requests in a GitHub repository.",
     content="""
@@ -108,7 +98,7 @@ echo "$RESULT"
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
         Arg(name="org", type="str", description="The github organization to look for prs in. Example: octocat", required=False),
     ],
-)
+).register("github")
 
 pr_view = GitHubCliTool(
     name="github_pr_view",
@@ -122,7 +112,7 @@ gh pr view --repo $repo $number
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_merge = GitHubCliTool(
     name="github_pr_merge",
@@ -142,7 +132,7 @@ echo "✅ Pull request merged successfully!"
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
         Arg(name="merge_method", type="str", description="Merge method to use (merge, squash, rebase). Example: 'squash'", required=True),
     ],
-)
+).register("github")
 
 pr_close = GitHubCliTool(
     name="github_pr_close",
@@ -158,7 +148,7 @@ echo "✅ Pull request closed successfully!"
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_comment = GitHubCliTool(
     name="github_pr_comment",
@@ -279,7 +269,15 @@ else
     echo "✅ Comment added successfully!"
 fi
 """,
-    args=[],
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="workflow_steps", type="str", description="JSON string representing workflow steps", required=True),
+        Arg(name="failures", type="str", description="JSON string representing failures", required=True),
+        Arg(name="fixes", type="str", description="JSON string representing fixes", required=True),
+        Arg(name="run_details", type="str", description="JSON string representing run details", required=True),
+        Arg(name="error_logs", type="str", description="JSON string representing error logs", required=True),
+    ],
     with_files=[
         FileSpec(destination="/opt/scripts/comment_generator.py", 
                 content=str(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py')),
@@ -290,7 +288,7 @@ fi
         FileSpec(destination="/opt/scripts/utils/templating/templates/workflow_failure.jinja2",
                 content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2')),
     ],
-)
+).register("github")
 
 pr_review = GitHubCliTool(
     name="github_pr_review",
@@ -310,7 +308,7 @@ echo "✅ Review submitted successfully!"
         Arg(name="review_type", type="str", description="Type of review (approve, request-changes, comment). Example: 'approve'", required=True),
         Arg(name="body", type="str", description="Review comment. Example: 'LGTM! Approved with some minor suggestions.'", required=False),
     ],
-)
+).register("github")
 
 pr_diff = GitHubCliTool(
     name="github_pr_diff",
@@ -324,7 +322,7 @@ gh pr diff --repo $repo $number
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_ready = GitHubCliTool(
     name="github_pr_ready",
@@ -339,7 +337,7 @@ echo "✅ Pull request is now ready for review!"
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_checks = GitHubCliTool(
     name="github_pr_checks",
@@ -353,7 +351,7 @@ gh pr checks --repo $repo $number
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_files = GitHubCliTool(
     name="github_pr_files",
@@ -367,7 +365,7 @@ gh pr diff --repo $repo $number --name-only
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
     ],
-)
+).register("github")
 
 pr_assign = GitHubCliTool(
     name="github_pr_assign",
@@ -384,7 +382,7 @@ echo "✅ Pull request assigned successfully!"
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
         Arg(name="assignee", type="str", description="The github user's login to whom this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
     ],
-)
+).register("github")
 
 pr_add_reviewer = GitHubCliTool(
     name="github_add_reviewer",
@@ -401,11 +399,7 @@ echo "✅ Reviewer added successfully!"
         Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
         Arg(name="reviewer", type="str", description="The github user's login that should be added as a reviewer to this pr. Example: joe_doe.", required=True),
     ],
-)
-
-# Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
-    tool_registry.register("github", tool)
+).register("github")
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_comment', 'pr_create', 'pr_review', 'pr_diff', 'pr_ready']
