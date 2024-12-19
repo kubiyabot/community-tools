@@ -195,7 +195,7 @@ format_github_comment() {
     local collapsible_logs="<details>\\n  <summary>\U0001F527 Error Logs</summary>\\n\\n\`\`\`plaintext\\n$error_logs\\n\`\`\`\\n</details>"
 
     # Create the formatted comment
-    printf "### Workflow Diagnostics\\n\\n#### What Failed?\\n$failure_details\\n#### Suggested Fix\\n$fix_details\\n#### Mermaid Diagram\\n$mermaid_diagram\\n\\n---\\n\\n### \U0001F527 Logs and Details\\n$collapsible_logs\\n\\n---\\n\\n### Run Details\\n$run_details"
+    echo -e "### Workflow Diagnostics\n\n#### What Failed?\n$failure_details\n#### Suggested Fix\n$fix_details\n#### Mermaid Diagram\n$mermaid_diagram\n\n---\n\n### \U0001F527 Logs and Details\n$collapsible_logs\n\n---\n\n### Run Details\n$run_details"
 }
 
 GITHUB_ACTOR=$(gh api user --jq '.login')
@@ -234,7 +234,6 @@ fi
         Arg(name="run_details", type="str", description="Details about the workflow run.", required=True),
     ],
 )
-
 
 
 
