@@ -54,7 +54,7 @@ if ! command -v python3; then
     apk add python3
 fi
 
-pip install jinja2
+pip3 install jinja2
 
 {content}
 '''
