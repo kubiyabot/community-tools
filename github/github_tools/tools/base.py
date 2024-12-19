@@ -101,7 +101,7 @@ fi
 
 # Main script content
 {content}
-'''
+'''.format(LOG_PROCESSING_FUNCTIONS=LOG_PROCESSING_FUNCTIONS)
             
         super().__init__(
             name=name,
