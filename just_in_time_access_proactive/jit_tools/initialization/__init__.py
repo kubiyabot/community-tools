@@ -31,16 +31,11 @@ class EnforcerConfigBuilder:
         return settings
 
 def initialize():
-    print("\n=== Starting Enforcer Initialization ===")
-    print("\n=== Starting Enforcer Initialization ===")
-    print("\n=== Starting Enforcer Initialization ===")
-    print("\n=== Starting Enforcer Initialization ===")
-
-    print("\n=== ============= ===")
     """Initialize Enforcer components and configuration."""
     try:
         print("\n=== Starting Enforcer Initialization ===")
         
+        print(f"📝 getting dynamic config: ")
         # Get dynamic configuration
         config = tool_registry.dynamic_config
         print(f"📝 Received dynamic configuration: {config}")
