@@ -154,8 +154,8 @@ pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a comment to a pull request or update an existing comment with detailed workflow diagnostics.",
     content="""
-echo "\U0001F4AC Processing comment for pull request #$number in $repo..."
-echo "\U0001F517 PR Link: https://github.com/$repo/pull/$number"
+printf "\U0001F4AC Processing comment for pull request #$number in $repo...\n"
+printf "\U0001F517 PR Link: https://github.com/$repo/pull/$number\n"
 
 format_github_comment() {
     local workflow_name="$1"
@@ -169,13 +169,13 @@ format_github_comment() {
     # Generate the failures and reasons section
     local failure_details=""
     while IFS=":" read -r step reason; do
-        failure_details+="- **$step:** $reason\n"
+        failure_details+="- **$step:** $reason\\n"
     done <<< "$failures"
 
     # Generate the fixes section
     local fix_details=""
     while IFS=":" read -r step fix; do
-        fix_details+="- **$step:** $fix\n"
+        fix_details+="- **$step:** $fix\\n"
     done <<< "$fixes"
 
     # Generate mermaid diagram
@@ -189,13 +189,13 @@ format_github_comment() {
     done
     mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
 
-    local mermaid_diagram="\n\`\`\`mermaid\ngraph TD\n$mermaid_steps\n\nclassDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;\n\`\`\`"
+    local mermaid_diagram="\`\`\`mermaid\\ngraph TD\\n$mermaid_steps\\n\\nclassDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;\\n\`\`\`"
 
     # Format error logs in a collapsible section
-    local collapsible_logs="<details>\n  <summary>\U0001F527 Error Logs</summary>\n\n\`\`\`plaintext\n$error_logs\n\`\`\`\n</details>"
+    local collapsible_logs="<details>\\n  <summary>\U0001F527 Error Logs</summary>\\n\\n\`\`\`plaintext\\n$error_logs\\n\`\`\`\\n</details>"
 
     # Create the formatted comment
-    echo -e "### Workflow Diagnostics\n\n#### What Failed?\n$failure_details\n#### Suggested Fix\n$fix_details\n#### Mermaid Diagram\n$mermaid_diagram\n\n---\n\n### \U0001F527 Logs and Details\n$collapsible_logs\n\n---\n\n### Run Details\n$run_details"
+    printf "### Workflow Diagnostics\\n\\n#### What Failed?\\n$failure_details\\n#### Suggested Fix\\n$fix_details\\n#### Mermaid Diagram\\n$mermaid_diagram\\n\\n---\\n\\n### \U0001F527 Logs and Details\\n$collapsible_logs\\n\\n---\\n\\n### Run Details\\n$run_details"
 }
 
 GITHUB_ACTOR=$(gh api user --jq '.login')
@@ -207,19 +207,19 @@ EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | s
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
-    echo "\U0001F504 Updating existing comment..."
+    printf "\U0001F504 Updating existing comment...\n"
     # Count number of edits in the comment
     EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
     EDIT_COUNT=$((EDIT_COUNT + 1))
 
-    UPDATED_COMMENT="### Workflow Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\n\n$FULL_COMMENT\n\n---\n\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\n\n<details><summary>Previous Comment</summary>\n\n$(gh api \"repos/$repo/issues/comments/$EXISTING_COMMENT_ID\" --jq .body)\n\n</details>"
+    UPDATED_COMMENT=$(printf "### Workflow Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api \"repos/$repo/issues/comments/$EXISTING_COMMENT_ID\" --jq .body)\\n\\n</details>")
     gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
-    echo "\u2705 Comment updated successfully!"
+    printf "\u2705 Comment updated successfully!\n"
 else
     # Add new comment
-    echo "\u2795 Adding new comment..."
+    printf "\u2795 Adding new comment...\n"
     gh pr comment --repo $repo $number --body "$FULL_COMMENT"
-    echo "\u2705 Comment added successfully!"
+    printf "\u2705 Comment added successfully!\n"
 fi
 """,
     args=[
@@ -234,6 +234,7 @@ fi
         Arg(name="run_details", type="str", description="Details about the workflow run.", required=True),
     ],
 )
+
 
 
 
