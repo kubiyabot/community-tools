@@ -10,9 +10,9 @@ GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 LOG_PROCESSING_FUNCTIONS = """
 function process_log {
     local log="\$1"
-    while IFS= read -r line; do
+    echo "\$log" | while IFS= read -r line; do
         echo "\$line" | sed 's/\\x1b\\[[0-9;]*m//g'
-    done <<< "\$log"
+    done
 }
 
 function format_timestamp {
@@ -37,13 +37,13 @@ function stream_logs {
     
     log_info "Starting log stream for run \$run_id"
     
-    if ! gh run view "\$run_id" --repo "\$repo" --log; then
+    if ! gh run view "\$run_id" --repo "\$repo" --log 2>&1; then
         log_error "Failed to stream logs for run \$run_id"
         return 1
     fi
     
     local status
-    status=\$(gh run view "\$run_id" --repo "\$repo" --json status --jq '.status')
+    status=\$(gh run view "\$run_id" --repo "\$repo" --json status --jq '.status' 2>/dev/null)
     
     case "\$status" in
         "completed")
@@ -57,6 +57,27 @@ function stream_logs {
             log_info "Workflow status: \$status"
             ;;
     esac
+}
+
+function check_requirements {
+    local missing_tools=()
+    
+    if ! command -v jq >/dev/null 2>&1; then
+        missing_tools+=("jq")
+    fi
+    
+    if ! command -v python3 >/dev/null 2>&1; then
+        missing_tools+=("python3")
+    fi
+    
+    if ! command -v envsubst >/dev/null 2>&1; then
+        missing_tools+=("gettext")
+    fi
+    
+    if [ \${#missing_tools[@]} -gt 0 ]; then
+        log_info "Installing required tools: \${missing_tools[*]}"
+        apk add --quiet \${missing_tools[@]} >/dev/null 2>&1
+    fi
 }
 """
 
@@ -73,18 +94,8 @@ set -euo pipefail
 
 {LOG_PROCESSING_FUNCTIONS}
 
-# Install required tools
-if ! command -v jq >/dev/null 2>&1; then
-    apk add --quiet jq >/dev/null 2>&1
-fi
-
-if ! command -v python3 >/dev/null 2>&1; then
-    apk add --quiet python3 py3-pip >/dev/null 2>&1
-fi
-
-if ! command -v envsubst >/dev/null 2>&1; then
-    apk add --quiet gettext >/dev/null 2>&1
-fi
+# Check and install requirements
+check_requirements
 
 {content}
 """
@@ -129,7 +140,7 @@ stream_workflow_logs = GitHubCliTool(
     content="""
 if [ -z "\${run_id:-}" ]; then
     log_info "No run ID provided. Fetching the latest workflow run..."
-    run_id=\$(gh run list --repo "\$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
+    run_id=\$(gh run list --repo "\$repo" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
     if [ -z "\$run_id" ]; then
         log_error "No workflow runs found for the repository."
         exit 1
