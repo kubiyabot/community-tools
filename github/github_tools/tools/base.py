@@ -50,6 +50,12 @@ if ! command -v jq >/dev/null 2>&1; then
     apk add --quiet jq >/dev/null 2>&1
 fi
 
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --quiet python3 >/dev/null 2>&1
+fi
+
+pip install --quiet jinja2 >/dev/null 2>&1
+
 {content}
 '''
             
