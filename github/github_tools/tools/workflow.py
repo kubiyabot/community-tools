@@ -2,11 +2,14 @@ from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
-# First, let's add these shell functions at the beginning of the content for tools that need log processing
+# Advanced log processing functions
 LOG_PROCESSING_FUNCTIONS = '''
-# Function to extract relevant error context from logs efficiently
-function extract_error_context() {
-    awk '
+# Generic log processor with advanced functionality
+function process_logs() {
+    local pattern="$1"
+    local max_lines="$2"
+    
+    awk -v pattern="$pattern" -v max_lines="$max_lines" '
         BEGIN {
             # Configure sizes
             max_buffer = 100    # Lines to keep before error
@@ -160,155 +163,118 @@ function search_logs_with_context() {
 
 workflow_list = GitHubCliTool(
     name="github_workflow_list",
-    description="List GitHub Actions workflows in a repository.",
-    content="gh workflow list --repo $repo $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
+    description="List GitHub Actions workflows",
+    content="""
+echo "📋 Fetching workflow list..."
+gh workflow list --repo $repo --limit $([[ -n "$limit" ]] && echo "$limit") || exit 1
+echo "✨ Successfully retrieved workflow list!"
+""",
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="limit", type="int", description="Maximum number of workflows to list. Example: 10", required=False),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="limit", type="str", description="Maximum workflows to list", required=False),
     ],
 )
 
 workflow_view = GitHubCliTool(
     name="github_workflow_view",
-    description="View details of a specific GitHub Actions workflow.",
-    content="gh workflow view --repo $repo $workflow",
+    description="View workflow details",
+    content="""
+echo "🔍 Fetching workflow details..."
+gh workflow view --repo $repo $workflow || exit 1
+echo "✨ Successfully retrieved workflow details!"
+""",
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or ID. Example: 'main.yml' or '1234567'", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
     ],
 )
 
 workflow_run = GitHubCliTool(
     name="github_workflow_run",
-    description="Manually trigger a GitHub Actions workflow.",
-    content="gh workflow run --repo $repo $workflow $([[ -n \"$ref\" ]] && echo \"--ref $ref\") $([[ -n \"$inputs\" ]] && echo \"--raw-field $inputs\")",
+    description="Run a workflow",
+    content="""
+echo "🚀 Triggering workflow..."
+gh workflow run --repo $repo $workflow $([[ -n "$ref" ]] && echo "--ref $ref") $([[ -n "$inputs" ]] && echo "--inputs $inputs") || exit 1
+echo "✨ Workflow triggered successfully!"
+""",
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or ID. Example: 'main.yml' or '1234567'", required=True),
-        Arg(name="ref", type="str", description="Branch or tag name to run workflow on. Example: 'main'", required=False),
-        Arg(name="inputs", type="str", description="JSON object of input keys and values. Example: '{\"name\":\"value\"}'", required=False),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
+        Arg(name="ref", type="str", description="Branch or tag name", required=False),
+        Arg(name="inputs", type="str", description="JSON inputs {key:value}", required=False),
     ],
 )
 
-workflow_disable = GitHubCliTool(
-    name="github_workflow_disable",
-    description="Disable a GitHub Actions workflow.",
-    content="gh workflow disable --repo $repo $workflow",
+workflow_logs = GitHubCliTool(
+    name="github_workflow_logs",
+    description="View workflow run logs with advanced processing",
+    content=f'''
+#!/bin/sh
+set -e
+{LOG_PROCESSING_FUNCTIONS}
+
+echo "🔍 Fetching logs for run ID: $run_id"
+LOGS=$(gh run view --repo $repo $run_id --log || true)
+
+if [ -z "$LOGS" ]; then
+    echo "❌ No logs available for run ID: $run_id"
+    exit 1
+fi
+
+if [ -n "$search" ]; then
+    echo "🔍 Filtering logs for pattern: $search"
+    echo "$LOGS" | process_logs "$search" 150
+else
+    echo "$LOGS" | while IFS= read -r line; do
+        timestamp=$(parse_timestamp "$line")
+        if [ -z "$timestamp" ]; then
+            timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        fi
+        
+        level=$(get_log_level "$line")
+        case "$level" in
+            "ERROR")   printf "[%s] %-7s ❌ %s\\n" "$timestamp" "$level" "$line" ;;
+            "WARN")    printf "[%s] %-7s ⚠️  %s\\n" "$timestamp" "$level" "$line" ;;
+            "SUCCESS") printf "[%s] %-7s ✅ %s\\n" "$timestamp" "$level" "$line" ;;
+            "DEBUG")   printf "[%s] %-7s 🔍 %s\\n" "$timestamp" "$level" "$line" ;;
+            *)         printf "[%s] %-7s ℹ️  %s\\n" "$timestamp" "$level" "$line" ;;
+        esac
+    done
+fi
+echo "✨ Log processing completed!"
+''',
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or ID. Example: 'main.yml' or '1234567'", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="run_id", type="str", description="Workflow run ID", required=True),
+        Arg(name="search", type="str", description="Optional: Search pattern", required=False),
     ],
 )
 
 workflow_enable = GitHubCliTool(
     name="github_workflow_enable",
-    description="Enable a GitHub Actions workflow.",
-    content="gh workflow enable --repo $repo $workflow",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or ID. Example: 'main.yml' or '1234567'", required=True),
-    ],
-)
-
-workflow_create = GitHubCliTool(
-    name="github_workflow_create",
-    description="Create a new GitHub Actions workflow.",
+    description="Enable a workflow",
     content="""
-    mkdir -p .github/workflows
-    echo "$content" > .github/workflows/$name
-    gh workflow enable --repo $repo .github/workflows/$name
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="name", type="str", description="Name of the workflow file. Example: 'main.yml'", required=True),
-        Arg(name="content", type="str", description="YAML content of the workflow. Example: 'name: CI\non: [push]\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v2\n      - run: npm test'", required=True),
-    ],
-)
-
-workflow_delete = GitHubCliTool(
-    name="github_workflow_delete",
-    description="Delete a GitHub Actions workflow.",
-    content="gh api --method DELETE /repos/$repo/actions/workflows/$workflow",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow ID. Example: '1234567'", required=True),
-    ],
-)
-
-workflow_run_list = GitHubCliTool(
-    name="github_workflow_run_list",
-    description="List recent runs of a GitHub Actions workflow.",
-    content="gh run list --repo $repo --workflow $workflow $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or ID. Example: 'main.yml' or '1234567'", required=True),
-        Arg(name="limit", type="int", description="Maximum number of runs to list. Example: 10", required=False),
-    ],
-)
-
-workflow_run_view = GitHubCliTool(
-    name="github_workflow_run_view",
-    description="View details of a specific workflow run.",
-    content="gh run view --repo $repo $run_id",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
-    ],
-)
-
-workflow_run_logs = GitHubCliTool(
-    name="github_workflow_run_logs",
-    description="""View GitHub Actions workflow logs with advanced search capabilities.
-    
-Shows workflow run logs (maximum 150 lines) with options to:
-- Search for specific patterns with case sensitivity control
-- Control context lines around matches (up to 5 lines before/after)
-- Use exact match or regular expressions for searching
-- Default shows last 100 lines if not searching""",
-    content="""
-# Enforce maximum lines limit
-MAX_LINES=150
-LINES=${tail_lines:-100}
-
-if [ $LINES -gt $MAX_LINES ]; then
-    LINES=$MAX_LINES
-fi
-
-if [ -n "$pattern" ]; then
-    # Build grep options
-    GREP_OPTS=""
-    if [ "$case_sensitive" != "true" ]; then
-        GREP_OPTS="$GREP_OPTS -i"  # Case insensitive by default
-    fi
-    if [ "$exact_match" = "true" ]; then
-        GREP_OPTS="$GREP_OPTS -w"  # Word match
-    fi
-    
-    # Set context lines (max 5 each)
-    BEFORE_LINES=${before_context:-2}
-    AFTER_LINES=${after_context:-2}
-    if [ $BEFORE_LINES -gt 5 ]; then BEFORE_LINES=5; fi
-    if [ $AFTER_LINES -gt 5 ]; then AFTER_LINES=5; fi
-    
-    echo "🔍 Searching for pattern '$pattern' in logs (📄 showing $BEFORE_LINES lines before and $AFTER_LINES lines after matches) 🎯"
-    gh run view --repo $repo $run_id --log | tail -n $MAX_LINES | \
-        grep $GREP_OPTS -B $BEFORE_LINES -A $AFTER_LINES "$pattern" | \
-        head -n $LINES
-else
-    # Just show the last N lines
-    echo "Showing last $LINES lines of logs"
-    gh run view --repo $repo $run_id --log | tail -n $LINES
-fi
+echo "🔓 Enabling workflow..."
+gh workflow enable --repo $repo $workflow || exit 1
+echo "✨ Workflow enabled successfully!"
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
-        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
-        Arg(name="pattern", type="str", description="Pattern to search in logs. Supports regular expressions", required=False),
-        Arg(name="case_sensitive", type="bool", description="Make pattern matching case sensitive. Default: false", required=False),
-        Arg(name="exact_match", type="bool", description="Match whole words only. Default: false", required=False),
-        Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
-        Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
+    ],
+)
+
+workflow_disable = GitHubCliTool(
+    name="github_workflow_disable",
+    description="Disable a workflow",
+    content="""
+echo "🔒 Disabling workflow..."
+gh workflow disable --repo $repo $workflow || exit 1
+echo "✨ Workflow disabled successfully!"
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="workflow", type="str", description="Workflow name or ID", required=True),
     ],
 )
 
@@ -435,91 +401,134 @@ workflow_discover_files = GitHubCliTool(
     rm -rf temp_repo
     """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
     ],
 )
 
-workflow_lint = GitHubCliTool(
-    name="github_workflow_lint",
-    description="Lint a GitHub Actions workflow file.",
-    content="""
-    echo "🔍 Linting workflow file $file_path"
-    gh workflow lint $file_path
-    """,
+workflow_run_logs_failed_by_id = GitHubCliTool(
+    name="github_workflow_run_logs_failed_by_id",
+    description="Get error logs from a specific failed workflow run",
+    content=f'''
+#!/bin/sh
+set -e
+{LOG_PROCESSING_FUNCTIONS}
+
+echo "🔍 Checking workflow run #${{run_id}} in: ${{repo}}"
+
+# Get run details
+RUN_INFO=$(gh run view --repo "${{repo}}" "${{run_id}}" --json conclusion,name,createdAt,url,status || echo "{{}}") 
+
+if [ "$RUN_INFO" = "{{}}" ]; then
+    echo "❌ Run #${{run_id}} not found"
+    exit 1
+fi
+
+CONCLUSION=$(echo "$RUN_INFO" | jq -r '.conclusion')
+STATUS=$(echo "$RUN_INFO" | jq -r '.status')
+NAME=$(echo "$RUN_INFO" | jq -r '.name')
+DATE=$(echo "$RUN_INFO" | jq -r '.createdAt')
+URL=$(echo "$RUN_INFO" | jq -r '.url')
+
+echo "📋 Run Details:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔖 Name: $NAME"
+echo "📅 Date: $DATE"
+echo "📊 Status: $STATUS"
+echo "🏁 Conclusion: $CONCLUSION"
+echo "🔗 URL: $URL"
+
+if [ "$CONCLUSION" != "failure" ]; then
+    echo "\\n⚠️  This run did not fail (conclusion: $CONCLUSION)"
+    if [ "${{show_logs}}" != "true" ]; then
+        echo "Use --show-logs=true to see logs anyway"
+        exit 0
+    fi
+fi
+
+echo "\\n📝 Error Logs:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Get logs and filter for errors/failures
+LOGS=$(gh run view --repo "${{repo}}" "${{run_id}}" --log || echo "No logs available")
+
+if [ "$LOGS" = "No logs available" ]; then
+    echo "❌ No logs available for this run"
+    exit 1
+fi
+
+echo "$LOGS" | awk \'
+    BEGIN {{ 
+        lines_printed = 0
+        context_lines = 5  # Show more context for specific run
+        buffer[""] = ""
+        buffer_size = 0
+        in_error_block = 0
+        error_count = 0
+    }}
+    
+    # Store line in circular buffer for context
+    {{
+        buffer[buffer_size % context_lines] = $0
+        buffer_size++
+    }}
+    
+    # Print error context when found
+    /error|fail|exception|fatal|panic/i {{
+        if (lines_printed < 100) {{  # Allow more lines for specific run
+            if (!in_error_block) {{
+                error_count++
+                print "\\n🚫 Error Block #" error_count ":"
+                print "-------------------"
+                # Print previous lines for context
+                for (i = 1; i <= context_lines; i++) {{
+                    idx = ((buffer_size - i - 1) + context_lines) % context_lines
+                    if (buffer[idx] != "") print "  " buffer[idx]
+                }}
+            }}
+            print "❌ " $0
+            in_error_block = 5  # Keep printing next 5 lines after error
+            lines_printed++
+        }}
+    }}
+    
+    # Print following lines in error block
+    {{
+        if (in_error_block > 0 && lines_printed < 100) {{
+            if (!/error|fail|exception|fatal|panic/i) {{
+                print "  " $0
+                lines_printed++
+            }}
+            in_error_block--
+        }}
+    }}
+    
+    END {{
+        if (error_count == 0) {{
+            print "No specific error messages found in logs"
+        }} else {{
+            print "\\nFound " error_count " error blocks"
+            if (lines_printed >= 100) {{
+                print "Output truncated. Use workflow_logs for full log"
+            }}
+        }}
+    }}
+\'
+echo "━━━━━━━━━━━━━━━━━━━━━━━"
+echo "\\n✨ Log analysis complete!"
+''',
     args=[
-        Arg(name="file_path", type="str", description="Path to the workflow file. Example: '.github/workflows/ci.yml'", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="run_id", type="str", description="Workflow run ID", required=True),
+        Arg(name="show_logs", type="bool", description="Show logs even if run didn't fail", required=False, default="false"),
     ],
 )
 
-workflow_visualize = GitHubCliTool(
-    name="github_workflow_visualize",
-    description="Visualize a GitHub Actions workflow (outputs a URL to view the workflow).",
-    content="""
-    echo "🔍 Visualizing workflow $workflow_file in repository $repo"
-    echo "https://github.com/$repo/actions/workflows/$(basename $workflow_file)"
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow_file", type="str", description="Name of the workflow file. Example: 'ci.yml'", required=True),
-    ],
-)
-
-workflow_dispatch_event = GitHubCliTool(
-    name="github_workflow_dispatch_event",
-    description="Manually trigger a workflow using the 'workflow_dispatch' event.",
-    content="""
-    echo "🔍 Triggering workflow $workflow_file in repository $repo"
-    gh workflow run $workflow_file --repo $repo $([[ -n "$ref" ]] && echo "--ref $ref") $([[ -n "$inputs" ]] && echo "--raw-field $inputs")
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="workflow_file", type="str", description="Name or ID of the workflow file. Example: 'ci.yml' or '1234567'", required=True),
-        Arg(name="ref", type="str", description="The branch or tag name to run the workflow on. Example: 'main'", required=False),
-        Arg(name="inputs", type="str", description="JSON object of input keys and values. Example: '{\"name\":\"value\"}'", required=False),
-    ],
-)
-
-workflow_get_usage = GitHubCliTool(
-    name="github_workflow_get_usage",
-    description="Get the usage of GitHub Actions in a repository.",
-    content="""
-    gh api repos/$repo/actions/workflows | jq '.workflows[] | {name: .name, state: .state, path: .path}'
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-    ],
-)
-
-workflow_set_secret = GitHubCliTool(
-    name="github_workflow_set_secret",
-    description="Set a secret for GitHub Actions in a repository.",
-    content="""
-    echo "🔍 Setting secret $secret_name in repository $repo"
-    gh secret set $secret_name --body "$secret_value" --repo $repo
-    """,
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="secret_name", type="str", description="Name of the secret. Example: 'API_KEY'", required=True),
-        Arg(name="secret_value", type="str", description="Value of the secret. Example: 'abcdef123456'", required=True),
-    ],
-)
-
-# Register all workflow tools
-for tool in [
-    workflow_list, workflow_view, workflow_run, workflow_disable, workflow_enable,
-    workflow_create, workflow_delete, workflow_run_list, workflow_run_view,
-    workflow_run_logs, workflow_run_cancel, workflow_run_rerun,
-    workflow_clone_repo, workflow_discover_files, workflow_lint,
-    workflow_visualize, workflow_dispatch_event, workflow_get_usage,
-    workflow_set_secret, workflow_run_logs_failed
-]:
-    tool_registry.register("github", tool)
-
-__all__ = [
-    'workflow_list', 'workflow_view', 'workflow_run', 'workflow_disable', 'workflow_enable',
-    'workflow_create', 'workflow_delete', 'workflow_run_list', 'workflow_run_view',
-    'workflow_run_logs', 'workflow_run_logs_failed', 'workflow_run_cancel', 'workflow_run_rerun',
-    'workflow_clone_repo', 'workflow_discover_files', 'workflow_lint',
-    'workflow_visualize', 'workflow_dispatch_event', 'workflow_get_usage',
-    'workflow_set_secret'
+# Register all tools
+WORKFLOW_TOOLS = [
+    workflow_list, workflow_view, workflow_run, workflow_logs,
+    workflow_enable, workflow_disable, workflow_run_logs_failed,
+    workflow_run_logs_failed_by_id
 ]
+
+for tool in WORKFLOW_TOOLS:
+    tool_registry.register("github", tool)
