@@ -8,30 +8,30 @@ GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 # Shell script functions for log processing
 LOG_PROCESSING_FUNCTIONS = """
-process_log() {
+function process_log {
     local log="\$1"
-    echo "\$log" | while IFS= read -r line; do
+    while IFS= read -r line; do
         echo "\$line" | sed 's/\\x1b\\[[0-9;]*m//g'
-    done
+    done <<< "\$log"
 }
 
-format_timestamp() {
+function format_timestamp {
     date -u "+%Y-%m-%d %H:%M:%S UTC"
 }
 
-log_info() {
+function log_info {
     echo "ℹ️ \$(format_timestamp) - \$1"
 }
 
-log_error() {
+function log_error {
     echo "❌ \$(format_timestamp) - \$1" >&2
 }
 
-log_success() {
+function log_success {
     echo "✅ \$(format_timestamp) - \$1"
 }
 
-stream_logs() {
+function stream_logs {
     local run_id="\$1"
     local repo="\$2"
     
@@ -71,7 +71,6 @@ class GitHubCliTool(Tool):
         enhanced_content = f"""#!/bin/bash
 set -euo pipefail
 
-# Import common functions
 {LOG_PROCESSING_FUNCTIONS}
 
 # Install required tools
@@ -87,7 +86,6 @@ if ! command -v envsubst >/dev/null 2>&1; then
     apk add --quiet gettext >/dev/null 2>&1
 fi
 
-# Main script content
 {content}
 """
             
@@ -111,7 +109,6 @@ fi
         )
 
     def register(self, namespace: str):
-        """Register the tool with the given namespace."""
         tool_registry.register(namespace, self)
         return self
 
@@ -132,16 +129,16 @@ stream_workflow_logs = GitHubCliTool(
     content="""
 if [ -z "\${run_id:-}" ]; then
     log_info "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
-    if [ -z "$run_id" ]; then
+    run_id=\$(gh run list --repo "\$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
+    if [ -z "\$run_id" ]; then
         log_error "No workflow runs found for the repository."
         exit 1
     fi
-    log_info "Using the latest run ID: $run_id"
+    log_info "Using the latest run ID: \$run_id"
 fi
 
-log_info "Streaming logs for workflow run $run_id in repository $repo..."
-stream_logs "$run_id" "$repo"
+log_info "Streaming logs for workflow run \$run_id in repository \$repo..."
+stream_logs "\$run_id" "\$repo"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
