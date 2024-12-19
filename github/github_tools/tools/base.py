@@ -12,7 +12,6 @@ LOG_PROCESSING_FUNCTIONS = r'''
 process_log() {{
     local log="${{1}}"
     echo "${{log}}" | while IFS= read -r line; do
-        # Remove ANSI color codes and format the line
         echo "${{line}}" | sed 's/\x1b\[[0-9;]*m//g'
     done
 }}
@@ -50,6 +49,7 @@ stream_logs() {{
     case "${{status}}" in
         "completed")
             log_success "Workflow run completed"
+            return 0
             ;;
         "failure")
             log_error "Workflow run failed"
@@ -57,8 +57,30 @@ stream_logs() {{
             ;;
         *)
             log_info "Workflow status: ${{status}}"
+            return 0
             ;;
     esac
+}}
+
+check_existing_comment() {{
+    local repo="${{1}}"
+    local pr_number="${{2}}"
+    local actor="${{3}}"
+    
+    gh api "repos/${{repo}}/issues/${{pr_number}}/comments" --jq ".[] | select(.user.login == \"${{actor}}\") | .id" | head -n 1
+}}
+
+update_comment() {{
+    local repo="${{1}}"
+    local pr_number="${{2}}"
+    local comment_id="${{3}}"
+    local body="${{4}}"
+    local edit_count="${{5}}"
+    
+    local updated_body
+    updated_body="### Last Update (Kubiya.ai) (Edit #${{edit_count}})\\n\\n${{body}}\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/${{repo}}/issues/comments/${{comment_id}}" --jq .body)\\n\\n</details>"
+    
+    gh api "repos/${{repo}}/issues/comments/${{comment_id}}" -X PATCH -f body="${{updated_body}}"
 }}
 '''
 
@@ -141,9 +163,9 @@ stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
     description="Stream logs from a GitHub Actions workflow run in real-time.",
     content="""
-if [ -z "$run_id" ]; then
+if [ -z "${run_id:-}" ]; then
     log_info "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
+    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
     if [ -z "$run_id" ]; then
         log_error "No workflow runs found for the repository."
         exit 1
@@ -152,24 +174,11 @@ if [ -z "$run_id" ]; then
 fi
 
 log_info "Streaming logs for workflow run $run_id in repository $repo..."
-
-# Stream logs with status monitoring
 stream_logs "$run_id" "$repo"
-exit_code=$?
-
-if [ $exit_code -eq 0 ]; then
-    log_success "Workflow completed successfully"
-else
-    log_error "Workflow failed"
-    exit 1
-fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
     ],
     long_running=True
-)
-
-# Register the stream_workflow_logs tool
-tool_registry.register("github", stream_workflow_logs)
+).register("github")
