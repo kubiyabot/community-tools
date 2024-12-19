@@ -71,13 +71,17 @@ class GitHubCliTool(Tool):
         if with_files is None:
             with_files = []
 
+        # Format shell functions for inclusion in script
+        formatted_functions = LOG_PROCESSING_FUNCTIONS.format(
+            name=name,
+            log_prefix=f"[{name}]"
+        )
+
         # Add common shell functions and content
-        enhanced_content = f'''
-#!/bin/bash
+        enhanced_content = f'''#!/bin/bash
 set -euo pipefail
 
-# Set operation type for disclaimer
-OPERATION_TYPE="{name}"
+{formatted_functions}
 
 # Install required tools
 if ! command -v jq >/dev/null 2>&1; then

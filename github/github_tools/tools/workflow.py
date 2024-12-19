@@ -211,7 +211,6 @@ workflow_logs = GitHubCliTool(
     content=f'''
 #!/bin/sh
 set -e
-{LOG_PROCESSING_FUNCTIONS}
 
 echo "🔍 Fetching logs for run ID: $run_id"
 LOGS=$(gh run view --repo $repo $run_id --log || true)
