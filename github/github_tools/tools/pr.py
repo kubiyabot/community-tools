@@ -3,14 +3,6 @@ from .base import GitHubCliTool
 from kubiya_sdk.tools.models import FileSpec
 from pathlib import Path
 
-# Common disclaimer for automated actions
-KUBIYA_DISCLAIMER = '''
----
-> **Note**: This action was performed by Kubiya.ai on behalf of @${GITHUB_ACTOR}
-> 
-> 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
-'''
-
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository",
@@ -31,20 +23,11 @@ echo "🔀 Head branch: $head"
 # Get current user
 GITHUB_ACTOR=$(gh api user --jq '.login')
 
-# Get the expanded disclaimer
-DISCLAIMER='{KUBIYA_DISCLAIMER}'
-EXPANDED_DISCLAIMER=$(echo "$DISCLAIMER" | envsubst)
-
-# Create full PR body with disclaimer
-FULL_BODY="$body
-
-$EXPANDED_DISCLAIMER"
-
 # Create PR with proper quoting
 PR_URL=$(gh pr create \
     --repo "$repo" \
     --title "$title" \
-    --body "$FULL_BODY" \
+    --body "$body" \
     --base "$base" \
     --head "$head" \
     $([ -n "${{assignee:-}}" ] && echo "--assignee '$assignee'") \
@@ -123,7 +106,7 @@ echo "📝 Using merge method: $merge_method"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 
 GITHUB_ACTOR=$(gh api user --jq '.login')
-gh pr merge --repo $repo $number --$merge_method -b "Merged via automated workflow${KUBIYA_DISCLAIMER}"
+gh pr merge --repo $repo $number --$merge_method
 
 echo "✅ Pull request merged successfully!"
 """,
@@ -141,7 +124,7 @@ pr_close = GitHubCliTool(
 echo "🚫 Closing pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 GITHUB_ACTOR=$(gh api user --jq '.login')
-gh pr close --repo $repo $number -c "Closed via automated workflow${KUBIYA_DISCLAIMER}"
+gh pr close --repo $repo $number
 echo "✅ Pull request closed successfully!"
 """,
     args=[
@@ -223,8 +206,6 @@ GITHUB_ACTOR=$(gh api user --jq '.login') || {
     exit 1
 }
 
-FULL_COMMENT="${GENERATED_COMMENT}${KUBIYA_DISCLAIMER}"
-
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
@@ -235,7 +216,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || printf '0')
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
-    UPDATED_COMMENT="### Last Update (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
+    UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)\\n\\n$GENERATED_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
     if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"; then
         echo "❌ Failed to update comment"
         exit 1
@@ -244,7 +225,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
 else
     # Add new comment
     echo "➕ Adding new comment..."
-    if ! gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"; then
+    if ! gh pr comment --repo "$repo" "$number" --body "$GENERATED_COMMENT"; then
         echo "❌ Failed to add comment"
         exit 1
     fi
@@ -374,8 +355,7 @@ echo "👀 Adding review to pull request #$number in $repo..."
 echo "📝 Review type: $review_type"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 GITHUB_ACTOR=$(gh api user --jq '.login')
-FULL_BODY="$body${KUBIYA_DISCLAIMER}"
-gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
+gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$body\\"")
 echo "✅ Review submitted successfully!"
 """,
     args=[
