@@ -210,13 +210,6 @@ format_github_comment() {
     # Format error logs in a collapsible section
     local collapsible_logs="<details>\n  <summary>\U0001F527 Error Logs</summary>\n\n\`\`\`plaintext\n$error_logs\n\`\`\`\n</details>"
     
-    # print all formated sections
-    echo "Failure Details: $failure_details"
-    echo "Fix Details: $fix_details"
-    echo "Mermaid Diagram: $mermaid_diagram"
-    echo "Collapsible Logs: $collapsible_logs"
-    echo "Run Details: $run_details"
-    
     # Combine everything into one string to return
     local comment
     comment+="### Workflow Diagnostics\n\n"
@@ -228,33 +221,34 @@ format_github_comment() {
     comment+="---\n\n"
     comment+="### Run Details\n$run_details"
 
-    # Return the final comment
-    echo -e "$comment"
+    # Return the final comment using printf
+    printf "%s" "$comment"
 }
-
 GITHUB_ACTOR=$(gh api user --jq '.login')
+printf "Debug 1\n"
 FULL_COMMENT=$(format_github_comment "$workflow_name" "$failures" "$fixes" "$workflow_steps" "$failed_steps" "$error_logs" "$run_details")
+printf $FULL_COMMENT
 FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
 
 # Get existing comments by the current user
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
 
-if [ -n "$EXISTING_COMMENT_ID" ]; then
-    # Update existing comment
-    printf "\U0001F504 Updating existing comment...\n"
-    # Count number of edits in the comment
-    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
-    EDIT_COUNT=$((EDIT_COUNT + 1))
-
-    UPDATED_COMMENT=$(printf "### Workflow Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api \"repos/$repo/issues/comments/$EXISTING_COMMENT_ID\" --jq .body)\\n\\n</details>")
-    gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
-    printf "\u2705 Comment updated successfully!\n"
-else
-    # Add new comment
-    printf "\u2795 Adding new comment...\n"
-    gh pr comment --repo $repo $number --body "$FULL_COMMENT"
-    printf "\u2705 Comment added successfully!\n"
-fi
+# if [ -n "$EXISTING_COMMENT_ID" ]; then
+#     # Update existing comment
+#     printf "\U0001F504 Updating existing comment...\n"
+#     # Count number of edits in the comment
+#     EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
+#     EDIT_COUNT=$((EDIT_COUNT + 1))
+# 
+#     UPDATED_COMMENT=$(printf "### Workflow Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api \"repos/$repo/issues/comments/$EXISTING_COMMENT_ID\" --jq .body)\\n\\n</details>")
+#     gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
+#     printf "\u2705 Comment updated successfully!\n"
+# else
+# Add new comment
+printf "\u2795 Adding new comment...\n"
+gh pr comment --repo $repo $number --body "$FULL_COMMENT"
+printf "\u2705 Comment added successfully!\n"
+# fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
