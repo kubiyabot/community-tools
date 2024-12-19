@@ -23,7 +23,6 @@ def __getattr__(name):
 
 __all__ = [
     'JustInTimeAccessTool',
-    'approve_access_tool',
     'request_access_tool',
     'describe_access_request_tool',
     'list_active_access_requests_tool',
