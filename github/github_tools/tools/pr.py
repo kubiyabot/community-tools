@@ -279,78 +279,7 @@ else
     echo "✅ Comment added successfully!"
 fi
 """,
-    args=[
-        Arg(
-            name="repo", 
-            type="str", 
-            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
-            required=True
-        ),
-        Arg(
-            name="number", 
-            type="str", 
-            description="Pull request number. Example: '123'", 
-            required=True
-        ),
-        Arg(
-            name="workflow_steps",
-            type="str",
-            description="""JSON array of workflow steps. Example:
-[
-    {"name": "Install Dependencies", "status": "success", "conclusion": "success", "number": 1},
-    {"name": "Run Tests", "status": "failure", "conclusion": "failure", "number": 2}
-]""",
-            required=True
-        ),
-        Arg(
-            name="failures",
-            type="str",
-            description="""JSON array of workflow failures. Example:
-[
-    {
-        "step": "Run Tests",
-        "error": "fmt.Errorf format %w has arg err of wrong type",
-        "file": "internal/tui/execution.go",
-        "line": "23"
-    }
-]""",
-            required=True
-        ),
-        Arg(
-            name="fixes",
-            type="str",
-            description="""JSON array of suggested fixes. Example:
-[
-    {
-        "step": "Run Tests",
-        "description": "Ensure error type matches format specifier",
-        "code_sample": "fmt.Errorf(\"error: %v\", err)"
-    }
-]""",
-            required=True
-        ),
-        Arg(
-            name="error_logs",
-            type="str",
-            description="Raw error logs from the workflow run. Example: '2024-03-20T10:15:00Z ERROR: Test failure in module xyz'",
-            required=True
-        ),
-        Arg(
-            name="run_details",
-            type="str",
-            description="""JSON object with workflow run details. Example:
-{
-    "id": "12345678",
-    "name": "CI Pipeline",
-    "started_at": "2024-01-20T10:00:00Z",
-    "status": "completed",
-    "conclusion": "failure",
-    "actor": "octocat",
-    "trigger_event": "pull_request"
-}""",
-            required=True
-        ),
-    ],
+    args=[],
     with_files=[
         FileSpec(destination="/opt/scripts/comment_generator.py", 
                 content=str(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py')),
