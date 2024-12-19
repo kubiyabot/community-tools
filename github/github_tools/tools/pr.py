@@ -165,46 +165,46 @@ printf ":warning: Failed Steps: %s\n" "$failed_steps"
 printf ":memo: Error Logs: %s\n" "$error_logs"
 printf ":page_with_curl: Run Details: %s\n" "$run_details"
 
-# Generate the failures and reasons section
-failure_details=""
-while IFS=":" read -r step reason; do
-    failure_details+="- **$step:** $reason"$'\n'
-done <<< "$failures"
-
-# Generate the fixes section
-fix_details=""
-while IFS=":" read -r step fix; do
-    fix_details+="- **$step:** $fix"$'\n'
-done <<< "$fixes"
-
-# Generate mermaid diagram
-mermaid_steps=""
-for step in ${workflow_steps//,/ }; do
-    if [[ $failed_steps == *"$step"* ]]; then
-        mermaid_steps+="    $step:::error --> "
-    else
-        mermaid_steps+="    $step --> "
-    fi
-done
-mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
-
-# Correctly format the Mermaid diagram in markdown
-mermaid_diagram='```mermaid
-graph TD
-'"$mermaid_steps"'
-
-classDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;
-```'
-
-# Format error logs in a collapsible section
-collapsible_logs="<details>
-<summary>:wrench: Error Logs</summary>
-
-\`\`\`plaintext
-$error_logs
-\`\`\`
-
-</details>"
+# # Generate the failures and reasons section
+# failure_details=""
+# while IFS=":" read -r step reason; do
+#     failure_details+="- **$step:** $reason"$'\n'
+# done <<< "$failures"
+# 
+# # Generate the fixes section
+# fix_details=""
+# while IFS=":" read -r step fix; do
+#     fix_details+="- **$step:** $fix"$'\n'
+# done <<< "$fixes"
+# 
+# # Generate mermaid diagram
+# mermaid_steps=""
+# for step in ${workflow_steps//,/ }; do
+#     if [[ $failed_steps == *"$step"* ]]; then
+#         mermaid_steps+="    $step:::error --> "
+#     else
+#         mermaid_steps+="    $step --> "
+#     fi
+# done
+# mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
+# 
+# # Correctly format the Mermaid diagram in markdown
+# mermaid_diagram='```mermaid
+# graph TD
+# '"$mermaid_steps"'
+# 
+# classDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;
+# ```'
+# 
+# # Format error logs in a collapsible section
+# collapsible_logs="<details>
+# <summary>:wrench: Error Logs</summary>
+# 
+# \`\`\`plaintext
+# $error_logs
+# \`\`\`
+# 
+# </details>"
 
 # # Final comment using printf
 # FULL_COMMENT="### Workflow Diagnostics
