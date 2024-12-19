@@ -73,8 +73,8 @@ class GitHubCliTool(Tool):
 
         # Add common shell functions and content
         enhanced_content = f'''
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 # Import common functions
 {LOG_PROCESSING_FUNCTIONS}
@@ -101,7 +101,7 @@ fi
 
 # Main script content
 {content}
-'''.format(LOG_PROCESSING_FUNCTIONS=LOG_PROCESSING_FUNCTIONS)
+'''.format(LOG_PROCESSING_FUNCTIONS)
             
         super().__init__(
             name=name,
