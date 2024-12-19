@@ -154,9 +154,6 @@ pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
     content="""
-#!/bin/bash
-set -euo pipefail
-
 # Create __init__.py files for the Python package structure
 if [ ! -f /opt/scripts/__init__.py ]; then
     touch /opt/scripts/__init__.py
@@ -174,7 +171,7 @@ echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
 for input in "$workflow_steps" "$failures" "$fixes" "$run_details"; do
-    if ! echo "$input" | jq empty; then
+    if ! printf '%s' "$input" | jq empty; then
         echo "❌ Invalid JSON input provided"
         exit 1
     fi
@@ -216,7 +213,7 @@ PR_DETAILS=$(gh api "repos/$repo/pulls/$number" --jq '{
 }
 
 # Update run details with PR context
-RUN_DETAILS=$(echo "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
+RUN_DETAILS=$(printf '%s' "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
 
 # Export variables for the Python script
 export REPO="$repo"
@@ -248,7 +245,7 @@ EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | s
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
     echo "🔄 Updating existing comment..."
-    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
+    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || printf '0')
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
     UPDATED_COMMENT="### Last Update (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
@@ -260,7 +257,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
 else
     # Add new comment
     echo "➕ Adding new comment..."
-    if ! gh pr comment --repo $repo $number --body "$FULL_COMMENT"; then
+    if ! gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"; then
         echo "❌ Failed to add comment"
         exit 1
     fi
