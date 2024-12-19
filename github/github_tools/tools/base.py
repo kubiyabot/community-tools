@@ -32,9 +32,11 @@ KUBIYA_DISCLAIMER_TEXT = '''
 '''
 
 class GitHubCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, with_volumes=None):
+    def __init__(self, name, description, content, args, long_running=False, with_volumes=None, with_files=None):
         if with_volumes is None:
             with_volumes = []
+        if with_files is None:
+            with_files = []
 
         # Add disclaimer to content based on operation type
         enhanced_content = f'''
@@ -74,6 +76,7 @@ add_disclaimer() {{
             type="docker",
             image=GITHUB_CLI_DOCKER_IMAGE,
             content=enhanced_content,
+            with_files=with_files,
             args=args,
             env=COMMON_ENV + [
                 "KUBIYA_AGENT_PROFILE",
