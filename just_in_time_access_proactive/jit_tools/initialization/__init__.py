@@ -39,7 +39,7 @@ def initialize():
         
         print(f"📝 getting dynamic config: ")
         # Get dynamic configuration
-        config = tool_registry.dynamic_config
+        config = "test"
         print(f"📝 Received dynamic configuration: {config}")
         
         if not config:
