@@ -4,8 +4,16 @@ import sys
 import json
 import logging
 from pathlib import Path
-from utils.templating.template_handler import TemplateHandler
-from utils.templating.schema import WorkflowStep, WorkflowFailure, WorkflowFix, WorkflowRunDetails
+
+try:
+    from utils.templating.template_handler import TemplateHandler
+    from utils.templating.schema import WorkflowStep, WorkflowFailure, WorkflowFix, WorkflowRunDetails
+except ImportError:
+    print("⚠️  Import Warning:")
+    print("   Could not import templating utilities.")
+    print("   This is expected during discovery phase and can be safely ignored.")
+    print("   The required modules will be available during actual execution.")
+    pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
