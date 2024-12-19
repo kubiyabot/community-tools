@@ -173,15 +173,6 @@ format_github_comment() {
     local error_logs="$6"
     local run_details="$7"
     
-    # print all arguments
-    echo "Workflow Name: $workflow_name"
-    echo "Failures: $failures"
-    echo "Fixes: $fixes"
-    echo "Workflow Steps: $workflow_steps"
-    echo "Failed Steps: $failed_steps"
-    echo "Error Logs: $error_logs"
-    echo "Run Details: $run_details"
-    
     # Generate the failures and reasons section
     local failure_details=""
     while IFS=":" read -r step reason; do
@@ -210,24 +201,13 @@ format_github_comment() {
     # Format error logs in a collapsible section
     local collapsible_logs="<details>\n  <summary>\U0001F527 Error Logs</summary>\n\n\`\`\`plaintext\n$error_logs\n\`\`\`\n</details>"
     
-    # Combine everything into one string to return
-    local comment
-    comment+="### Workflow Diagnostics\n\n"
-    comment+="#### What Failed?\n$failure_details\n"
-    comment+="#### Suggested Fix\n$fix_details\n"
-    comment+="#### Mermaid Diagram\n$mermaid_diagram\n\n"
-    comment+="---\n\n"
-    comment+="### \U0001F527 Logs and Details\n$collapsible_logs\n\n"
-    comment+="---\n\n"
-    comment+="### Run Details\n$run_details"
-
     # Return the final comment using printf
-    printf "%s" "$comment"
+    echo -e "### Workflow Diagnostics\n\n#### What Failed?\n$failure_details\n#### Suggested Fix\n$fix_details\n#### Mermaid Diagram\n$mermaid_diagram\n\n---\n\n### \U0001F527 Logs and Details\n$collapsible_logs\n\n---\n\n### Run Details\n$run_details"
 }
 GITHUB_ACTOR=$(gh api user --jq '.login')
 printf "Debug 1\n"
 FULL_COMMENT=$(format_github_comment "$workflow_name" "$failures" "$fixes" "$workflow_steps" "$failed_steps" "$error_logs" "$run_details")
-printf $FULL_COMMENT
+echo $FULL_COMMENT
 FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
 
 # Get existing comments by the current user
@@ -245,9 +225,9 @@ EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | s
 #     printf "\u2705 Comment updated successfully!\n"
 # else
 # Add new comment
-printf "\u2795 Adding new comment...\n"
+echo "\u2795 Adding new comment...\n"
 gh pr comment --repo $repo $number --body "$FULL_COMMENT"
-printf "\u2705 Comment added successfully!\n"
+echo "\u2705 Comment added successfully!\n"
 # fi
 """,
     args=[
