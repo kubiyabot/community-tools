@@ -1,0 +1,66 @@
+### Summary of Findings
+
+#### 🛠️ **What Failed:**
+{% for step in failed_steps.split(',') %}
+- The "{{ step }}" step of the `{{ workflow_name }}` workflow
+{% endfor %}
+
+#### ❗ **Why It Failed:**
+{% for failure in failures.split('|') %}
+{% set parts = failure.split(':') %}
+- **{{ parts[0] }}**: `{{ parts[1] }}`
+{% endfor %}
+
+#### 🛠️ **How To Fix It:**
+{% for fix in fixes.split('|') %}
+{% set parts = fix.split(':') %}
+{{ loop.index }}. **{{ parts[0] }}**:
+    - {{ parts[1] }}
+{% endfor %}
+
+### Details and Context
+
+#### 🧑‍💻 **Pull Request Details:**
+- PR Link: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
+
+#### 🛑 **Error Logs:**
+<details>
+<summary><b>Click to Expand</b></summary>
+
+```
+{{ error_logs }}
+```
+
+</details>
+
+#### 📅 **Workflow Details:**
+{% for detail in run_details.split('|') %}
+{% set parts = detail.split(':') %}
+- **{{ parts[0] }}**: {{ parts[1] }}
+{% endfor %}
+
+### 📊 **Workflow Steps Diagram**:
+
+```mermaid
+graph TD;
+    {% for step in workflow_steps.split(',') %}
+    {% set step_id = loop.index %}
+    {% if not loop.first %}
+    {{ step_id - 1 }} --> {{ step_id }};
+    {% endif %}
+    {{ step_id }}["{{ step }}"];
+    {% if step in failed_steps.split(',') %}
+    style {{ step_id }} fill:#f96,stroke:#333,stroke-width:4px;
+    {% endif %}
+    {% endfor %}
+```
+
+#### 📝 **Next Steps:**
+1. Apply the recommended fixes
+2. Re-run the `{{ workflow_name }}` workflow to validate the changes
+
+---
+
+⚡ **Happy Coding!** 🚀
+
+--- 

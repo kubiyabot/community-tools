@@ -152,37 +152,191 @@ echo "✅ Pull request closed successfully!"
 
 pr_comment = GitHubCliTool(
     name="github_pr_comment",
-    description="Add a comment to a pull request or update existing comment.",
+    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
     content="""
+#!/bin/bash
+set -euo pipefail
+
 echo "💬 Processing comment for pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-GITHUB_ACTOR=$(gh api user --jq '.login')
-FULL_COMMENT="$body${KUBIYA_DISCLAIMER}"
+
+# Validate JSON inputs
+for input in "$workflow_steps" "$failures" "$fixes" "$run_details"; do
+    if ! echo "$input" | jq empty; then
+        echo "❌ Invalid JSON input provided"
+        exit 1
+    fi
+done
+
+# Get PR file changes
+echo "📂 Fetching PR file changes..."
+PR_FILES=$(gh api "repos/$repo/pulls/$number/files" --jq '[.[] | {
+    filename: .filename,
+    status: .status,
+    additions: .additions,
+    deletions: .deletions,
+    changes: .changes,
+    patch: .patch,
+    previous_filename: .previous_filename
+}]' 2>/dev/null) || {
+    echo "❌ Failed to fetch PR files"
+    exit 1
+}
+
+# Get PR details
+echo "ℹ️ Fetching PR details..."
+PR_DETAILS=$(gh api "repos/$repo/pulls/$number" --jq '{
+    title: .title,
+    description: .body,
+    author: .user.login,
+    created_at: .created_at,
+    updated_at: .updated_at,
+    changed_files: '"$PR_FILES"',
+    commits_count: .commits,
+    additions: .additions,
+    deletions: .deletions,
+    labels: [.labels[].name],
+    base_branch: .base.ref,
+    head_branch: .head.ref
+}' 2>/dev/null) || {
+    echo "❌ Failed to fetch PR details"
+    exit 1
+}
+
+# Update run details with PR context
+RUN_DETAILS=$(echo "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
+
+# Export variables for the Python script
+export REPO="$repo"
+export PR_NUMBER="$number"
+export WORKFLOW_STEPS="$workflow_steps"
+export FAILURES="$failures"
+export FIXES="$fixes"
+export ERROR_LOGS="$error_logs"
+export RUN_DETAILS="$RUN_DETAILS"
+
+# Generate comment using template
+echo "🔨 Generating analysis comment..."
+GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
+    echo "❌ Failed to generate comment"
+    exit 1
+}
+
+GITHUB_ACTOR=$(gh api user --jq '.login') || {
+    echo "❌ Failed to get GitHub user information"
+    exit 1
+}
+
+FULL_COMMENT="${GENERATED_COMMENT}${KUBIYA_DISCLAIMER}"
 
 # Get existing comments by the current user
+echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
     echo "🔄 Updating existing comment..."
-    # Count number of edits in the comment
     EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || echo 0)
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
-    UPDATED_COMMENT="### Last Diagnostics (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
-    gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"
+    UPDATED_COMMENT="### Last Update (Kubiya.ai) (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
+    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"; then
+        echo "❌ Failed to update comment"
+        exit 1
+    fi
     echo "✅ Comment updated successfully!"
 else
     # Add new comment
     echo "➕ Adding new comment..."
-    gh pr comment --repo $repo $number --body "$FULL_COMMENT"
+    if ! gh pr comment --repo $repo $number --body "$FULL_COMMENT"; then
+        echo "❌ Failed to add comment"
+        exit 1
+    fi
     echo "✅ Comment added successfully!"
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
-        Arg(name="body", type="str", description="Comment text. Example: 'Great work! Just a few minor suggestions.'", required=True),
+        Arg(
+            name="repo", 
+            type="str", 
+            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            required=True
+        ),
+        Arg(
+            name="number", 
+            type="str", 
+            description="Pull request number. Example: '123'", 
+            required=True
+        ),
+        Arg(
+            name="workflow_steps",
+            type="str",
+            description="""JSON array of workflow steps. Example:
+[
+    {"name": "Install Dependencies", "status": "success", "conclusion": "success", "number": 1},
+    {"name": "Run Tests", "status": "failure", "conclusion": "failure", "number": 2}
+]""",
+            required=True
+        ),
+        Arg(
+            name="failures",
+            type="str",
+            description="""JSON array of workflow failures. Example:
+[
+    {
+        "step": "Run Tests",
+        "error": "fmt.Errorf format %w has arg err of wrong type",
+        "file": "internal/tui/execution.go",
+        "line": "23"
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="fixes",
+            type="str",
+            description="""JSON array of suggested fixes. Example:
+[
+    {
+        "step": "Run Tests",
+        "description": "Ensure error type matches format specifier",
+        "code_sample": "fmt.Errorf(\"error: %v\", err)"
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="error_logs",
+            type="str",
+            description="Raw error logs from the workflow run. Example: '2024-03-20T10:15:00Z ERROR: Test failure in module xyz'",
+            required=True
+        ),
+        Arg(
+            name="run_details",
+            type="str",
+            description="""JSON object with workflow run details. Example:
+{
+    "id": "12345678",
+    "name": "CI Pipeline",
+    "started_at": "2024-01-20T10:00:00Z",
+    "status": "completed",
+    "conclusion": "failure",
+    "actor": "octocat",
+    "trigger_event": "pull_request"
+}""",
+            required=True
+        ),
+    ],
+    with_files=[
+        FileSpec(destination="/opt/scripts/comment_generator.py", 
+                content=Path(__file__).parent.parent / 'scripts' / 'comment_generator.py'),
+        FileSpec(destination="/opt/scripts/utils/templating/template_handler.py",
+                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py'),
+        FileSpec(destination="/opt/scripts/utils/templating/schema.py",
+                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py'),
+        FileSpec(destination="/opt/scripts/utils/templating/templates/workflow_failure.jinja2",
+                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2'),
+        FileSpec(destination="/opt/scripts/utils/templating/__init__.py",
+                content=""),
     ],
 )
 
