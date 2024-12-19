@@ -1,4 +1,5 @@
 from kubiya_sdk.tools.registry import tool_registry
+from ..utils.script_runner import run_script
 class EnforcerConfigBuilder:
     @staticmethod
     def parse_config(config):
