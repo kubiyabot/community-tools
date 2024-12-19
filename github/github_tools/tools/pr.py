@@ -206,27 +206,29 @@ $error_logs
 
 </details>"
 
-# Final comment using printf
-FULL_COMMENT="### Workflow Diagnostics
+# # Final comment using printf
+# FULL_COMMENT="### Workflow Diagnostics
+# 
+# #### What Failed?
+# $failure_details
+# 
+# #### Suggested Fix
+# $fix_details
+# 
+# #### Mermaid Diagram
+# $mermaid_diagram
+# 
+# ---
+# 
+# ### :wrench: Logs and Details
+# $collapsible_logs
+# 
+# ---
+# 
+# ### Run Details
+# $run_details"
 
-#### What Failed?
-$failure_details
-
-#### Suggested Fix
-$fix_details
-
-#### Mermaid Diagram
-$mermaid_diagram
-
----
-
-### :wrench: Logs and Details
-$collapsible_logs
-
----
-
-### Run Details
-$run_details"
+FULL_COMMENT="Hello"
 
 # Add disclaimer
 FULL_COMMENT="$FULL_COMMENT${KUBIYA_DISCLAIMER}"
