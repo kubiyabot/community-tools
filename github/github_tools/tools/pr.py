@@ -165,17 +165,26 @@ format_github_comment() {
     local failed_steps="$5"
     local error_logs="$6"
     local run_details="$7"
-
+    
+    # print all arguments
+    echo "Workflow Name: $workflow_name"
+    echo "Failures: $failures"
+    echo "Fixes: $fixes"
+    echo "Workflow Steps: $workflow_steps"
+    echo "Failed Steps: $failed_steps"
+    echo "Error Logs: $error_logs"
+    echo "Run Details: $run_details"
+    
     # Generate the failures and reasons section
     local failure_details=""
     while IFS=":" read -r step reason; do
-        failure_details+="- **$step:** $reason\\n"
+        failure_details+="- **$step:** $reason\n"
     done <<< "$failures"
 
     # Generate the fixes section
     local fix_details=""
     while IFS=":" read -r step fix; do
-        fix_details+="- **$step:** $fix\\n"
+        fix_details+="- **$step:** $fix\n"
     done <<< "$fixes"
 
     # Generate mermaid diagram
@@ -189,13 +198,31 @@ format_github_comment() {
     done
     mermaid_steps="${mermaid_steps% --> }" # Remove trailing arrow
 
-    local mermaid_diagram="\`\`\`mermaid\\ngraph TD\\n$mermaid_steps\\n\\nclassDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;\\n\`\`\`"
+    local mermaid_diagram="\`\`\`mermaid\ngraph TD\n$mermaid_steps\n\nclassDef error fill:#ffcccc,stroke:#ff0000,stroke-width:4px;\n\`\`\`"
 
     # Format error logs in a collapsible section
-    local collapsible_logs="<details>\\n  <summary>\U0001F527 Error Logs</summary>\\n\\n\`\`\`plaintext\\n$error_logs\\n\`\`\`\\n</details>"
+    local collapsible_logs="<details>\n  <summary>\U0001F527 Error Logs</summary>\n\n\`\`\`plaintext\n$error_logs\n\`\`\`\n</details>"
+    
+    # print all formated sections
+    echo "Failure Details: $failure_details"
+    echo "Fix Details: $fix_details"
+    echo "Mermaid Diagram: $mermaid_diagram"
+    echo "Collapsible Logs: $collapsible_logs"
+    echo "Run Details: $run_details"
+    
+    # Combine everything into one string to return
+    local comment
+    comment+="### Workflow Diagnostics\n\n"
+    comment+="#### What Failed?\n$failure_details\n"
+    comment+="#### Suggested Fix\n$fix_details\n"
+    comment+="#### Mermaid Diagram\n$mermaid_diagram\n\n"
+    comment+="---\n\n"
+    comment+="### \U0001F527 Logs and Details\n$collapsible_logs\n\n"
+    comment+="---\n\n"
+    comment+="### Run Details\n$run_details"
 
-    # Create the formatted comment
-    echo -e "### Workflow Diagnostics\n\n#### What Failed?\n$failure_details\n#### Suggested Fix\n$fix_details\n#### Mermaid Diagram\n$mermaid_diagram\n\n---\n\n### \U0001F527 Logs and Details\n$collapsible_logs\n\n---\n\n### Run Details\n$run_details"
+    # Return the final comment
+    echo -e "$comment"
 }
 
 GITHUB_ACTOR=$(gh api user --jq '.login')
