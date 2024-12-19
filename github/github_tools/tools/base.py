@@ -6,29 +6,62 @@ from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
-KUBIYA_DISCLAIMER_MARKDOWN = '''
+# Shell script functions for log processing
+LOG_PROCESSING_FUNCTIONS = '''
+# Log processing functions
+process_log() {
+    local log="$1"
+    echo "$log" | while IFS= read -r line; do
+        # Remove ANSI color codes and format the line
+        echo "$line" | sed 's/\x1b\[[0-9;]*m//g'
+    done
+}
 
----
-> 🤖 **Automated Action Notice**
-> 
-> This action was performed by [Kubiya.ai](https://kubiya.ai) teammate **${KUBIYA_AGENT_PROFILE}** on behalf of @${GITHUB_ACTOR}.
-> 
-> <details>
-> <summary>Action Details</summary>
->
-> - **Teammate ID**: [${KUBIYA_AGENT_UUID}](https://app.kubiya.ai/teammates/${KUBIYA_AGENT_UUID})
-> - **Timestamp**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-> - **Operation**: ${OPERATION_TYPE}
-> </details>
-'''
+format_timestamp() {
+    date -u "+%Y-%m-%d %H:%M:%S UTC"
+}
 
-KUBIYA_DISCLAIMER_TEXT = '''
----
-🤖 Automated Action by Kubiya.ai
-• Teammate: ${KUBIYA_AGENT_PROFILE}
-• On behalf of: @${GITHUB_ACTOR}
-• Teammate Configuration URL: https://app.kubiya.ai/teammates/${KUBIYA_AGENT_UUID}
-• Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+log_info() {
+    echo "ℹ️ $(format_timestamp) - $1"
+}
+
+log_error() {
+    echo "❌ $(format_timestamp) - $1" >&2
+}
+
+log_success() {
+    echo "✅ $(format_timestamp) - $1"
+}
+
+stream_logs() {
+    local run_id="$1"
+    local repo="$2"
+    
+    log_info "Starting log stream for run $run_id"
+    
+    # Stream logs with proper error handling
+    if ! gh run view "$run_id" --repo "$repo" --log; then
+        log_error "Failed to stream logs for run $run_id"
+        return 1
+    fi
+    
+    # Check final status
+    local status
+    status=$(gh run view "$run_id" --repo "$repo" --json status --jq '.status')
+    
+    case "$status" in
+        "completed")
+            log_success "Workflow run completed"
+            ;;
+        "failure")
+            log_error "Workflow run failed"
+            return 1
+            ;;
+        *)
+            log_info "Workflow status: $status"
+            ;;
+    esac
+}
 '''
 
 class GitHubCliTool(Tool):
@@ -38,14 +71,18 @@ class GitHubCliTool(Tool):
         if with_files is None:
             with_files = []
 
-        # Add disclaimer to content based on operation type
+        # Add common shell functions and content
         enhanced_content = f'''
-#!/bin/sh
-set -e
+#!/bin/bash
+set -euo pipefail
+
+# Import common functions
+{LOG_PROCESSING_FUNCTIONS}
 
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
 
+# Install required tools
 if ! command -v jq >/dev/null 2>&1; then
     apk add --quiet jq >/dev/null 2>&1
 fi
@@ -54,8 +91,11 @@ if ! command -v python3 >/dev/null 2>&1; then
     apk add --quiet python3 py3-pip >/dev/null 2>&1
 fi
 
-pip3 install --quiet jinja2 >/dev/null 2>&1
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
+fi
 
+# Main script content
 {content}
 '''
             
@@ -93,35 +133,33 @@ class GitHubRepolessCliTool(GitHubCliTool):
             with_files=with_files or []
         )
 
-# Define stream_workflow_logs tool
+# Update stream_workflow_logs tool to use the common functions
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
+    description="Stream logs from a GitHub Actions workflow run in real-time.",
     content="""
-#!/bin/sh
-set -e
-
 if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
+    log_info "No run ID provided. Fetching the latest workflow run..."
+    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
     if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
+        log_error "No workflow runs found for the repository."
         exit 1
     fi
-    echo "Using the latest run ID: $run_id"
+    log_info "Using the latest run ID: $run_id"
 fi
 
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
+log_info "Streaming logs for workflow run $run_id in repository $repo..."
 
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
+# Stream logs with status monitoring
+stream_logs "$run_id" "$repo"
+exit_code=$?
+
+if [ $exit_code -eq 0 ]; then
+    log_success "Workflow completed successfully"
+else
+    log_error "Workflow failed"
+    exit 1
+fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
