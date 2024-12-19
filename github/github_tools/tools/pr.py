@@ -150,9 +150,82 @@ echo "✅ Pull request closed successfully!"
     ],
 ).register("github")
 
-pr_comment = GitHubCliTool(
-    name="github_pr_comment",
-    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
+pr_simple_comment = GitHubCliTool(
+    name="github_pr_simple_comment",
+    description="Add a simple comment to a pull request.",
+    content="""
+#!/bin/bash
+set -euo pipefail
+
+echo "💬 Adding comment to pull request #$number in $repo..."
+
+# Get GitHub actor
+GITHUB_ACTOR=$(gh api user --jq '.login') || {
+    echo "❌ Failed to get GitHub user information"
+    exit 1
+}
+
+# Create full comment with disclaimer
+FULL_COMMENT="${comment}${KUBIYA_DISCLAIMER}"
+
+# Get existing comments by the current user
+echo "🔍 Checking for existing comments..."
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+
+if [ -n "$EXISTING_COMMENT_ID" ]; then
+    # Update existing comment
+    echo "🔄 Updating existing comment..."
+    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || printf '0')
+    EDIT_COUNT=$((EDIT_COUNT + 1))
+    
+    UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)\\n\\n$FULL_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
+    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"; then
+        echo "❌ Failed to update comment"
+        exit 1
+    fi
+    echo "✅ Comment updated successfully!"
+else
+    # Add new comment
+    echo "➕ Adding new comment..."
+    if ! gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"; then
+        echo "❌ Failed to add comment"
+        exit 1
+    fi
+    echo "✅ Comment added successfully!"
+fi
+""",
+    args=[
+        Arg(
+            name="repo", 
+            type="str", 
+            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            required=True
+        ),
+        Arg(
+            name="number", 
+            type="str", 
+            description="Pull request number. Example: '123'", 
+            required=True
+        ),
+        Arg(
+            name="comment",
+            type="str",
+            description="""The comment text in markdown format. Example:
+Great work! A few suggestions:
+
+- Consider adding error handling
+- Add unit tests for the new feature
+- Update the documentation
+
+Let me know if you need any clarification.""",
+            required=True
+        ),
+    ],
+).register("github")
+
+pr_workflow_failure_comment = GitHubCliTool(
+    name="github_pr_workflow_failure_comment",
+    description="Add a detailed workflow failure analysis comment to a pull request with error analysis and suggested fixes.",
     content="""
 echo "💬 Processing comment for pull request #$number in $repo..."
 
@@ -478,4 +551,4 @@ echo "✅ Reviewer added successfully!"
 ).register("github")
 
 # Export all PR tools
-__all__ = ['pr_comment', 'pr_create', 'pr_review', 'pr_diff', 'pr_ready']
+__all__ = ['pr_simple_comment', 'pr_workflow_failure_comment', 'pr_create', 'pr_review', 'pr_diff', 'pr_ready']
