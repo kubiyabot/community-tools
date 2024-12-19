@@ -255,102 +255,43 @@ fi
         Arg(
             name="repo", 
             type="str", 
-            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            description="Repository name (owner/repo)", 
             required=True
         ),
         Arg(
             name="number", 
             type="str", 
-            description="Pull request number. Example: '123'", 
+            description="Pull request number", 
             required=True
         ),
         Arg(
             name="workflow_steps",
-            type="str",
-            description="""JSON array of workflow steps. Example:
-[
-    {
-        "name": "Install Dependencies",
-        "status": "success",
-        "conclusion": "success",
-        "number": 1
-    },
-    {
-        "name": "Run Tests",
-        "status": "failure",
-        "conclusion": "failure",
-        "number": 2
-    }
-]""",
+            type="str", 
+            description="JSON array containing workflow step details including name, status, conclusion and step number",
             required=True
         ),
         Arg(
             name="failures",
             type="str",
-            description="""JSON array of workflow failures. Example:
-[
-    {
-        "step": "Run Tests",
-        "error": "Test failed: expected 200 but got 404",
-        "file": "tests/api_test.go",
-        "line": "42"
-    }
-]""",
+            description="JSON array containing failure details including step name, error message, file and line number",
             required=True
         ),
         Arg(
             name="fixes",
             type="str",
-            description="""JSON array of suggested fixes. Example:
-[
-    {
-        "step": "Run Tests",
-        "description": "Update the expected status code in the API test",
-        "code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
-    }
-]""",
+            description="JSON array containing suggested fixes including step name, description and code sample",
             required=True
         ),
         Arg(
             name="error_logs",
             type="str",
-            description="""Raw error logs from the workflow run. Will be truncated and formatted in the comment. Example:
-=== RUN   TestAPIEndpoint
-    api_test.go:42: 
-        Error Trace:    api_test.go:42
-        Error:          Not equal:
-                       expected: 200
-                       actual  : 404
-        Test:          TestAPIEndpoint
-FAIL""",
+            description="Raw error logs from the workflow run",
             required=True
         ),
         Arg(
             name="run_details",
             type="str",
-            description="""JSON object with workflow run details and PR information. Example:
-{
-    "id": "12345678",
-    "name": "CI Pipeline",
-    "started_at": "2024-01-20T10:00:00Z",
-    "status": "completed",
-    "conclusion": "failure",
-    "actor": "octocat",
-    "trigger_event": "pull_request",
-    "pr_details": {
-        "title": "Add new API endpoint",
-        "description": "Implements the /api/v1/users endpoint",
-        "author": "octocat",
-        "created_at": "2024-01-20T09:00:00Z",
-        "updated_at": "2024-01-20T10:00:00Z",
-        "commits_count": 3,
-        "additions": 150,
-        "deletions": 50,
-        "labels": ["feature", "api"],
-        "base_branch": "main",
-        "head_branch": "feature/api-endpoint"
-    }
-}""",
+            description="JSON object containing workflow run metadata and PR information",
             required=True
         ),
     ],
