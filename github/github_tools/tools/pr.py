@@ -476,7 +476,7 @@ echo "✅ Reviewer added successfully!"
 
 # Register all PR tools
 for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
-    tool_registry.register("github", tool)
+    tool_registry.register_tool("github", tool)
 
 # Export all PR tools
 __all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
