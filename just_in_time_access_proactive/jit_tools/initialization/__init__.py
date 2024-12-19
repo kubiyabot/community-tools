@@ -1,3 +1,4 @@
+from kubiya_sdk.tools.registry import tool_registry
 class EnforcerConfigBuilder:
     @staticmethod
     def parse_config(config):
