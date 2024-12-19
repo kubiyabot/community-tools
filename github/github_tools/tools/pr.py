@@ -167,6 +167,12 @@ printf ":warning: Failed Steps: %s\n" "$failed_steps"
 printf ":memo: Error Logs: %s\n" "$error_logs"
 printf ":page_with_curl: Run Details: %s\n" "$run_details"
 
+# Generate the failures and reasons section
+failure_details=""
+while IFS=":" read -r step reason; do
+   failure_details+="- **$step:** $reason"$'\n'
+done <<< "$failures"
+
 gh pr comment --repo "$repo" "$number" --body "$FULL_COMMENT"
 """,
     args=[
