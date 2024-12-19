@@ -7,45 +7,49 @@ GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 # Shell script functions for log processing
-LOG_PROCESSING_FUNCTIONS = """
-function process_log {
-    local log="\$1"
-    echo "\$log" | while IFS= read -r line; do
-        echo "\$line" | sed 's/\\x1b\\[[0-9;]*m//g'
+LOG_PROCESSING_FUNCTIONS = '''
+# Log processing functions
+process_log() {
+    local log="$1"
+    echo "$log" | while IFS= read -r line; do
+        # Remove ANSI color codes and format the line
+        echo "$line" | sed 's/\x1b\[[0-9;]*m//g'
     done
 }
 
-function format_timestamp {
+format_timestamp() {
     date -u "+%Y-%m-%d %H:%M:%S UTC"
 }
 
-function log_info {
-    echo "ℹ️ \$(format_timestamp) - \$1"
+log_info() {
+    echo "ℹ️ $(format_timestamp) - $1"
 }
 
-function log_error {
-    echo "❌ \$(format_timestamp) - \$1" >&2
+log_error() {
+    echo "❌ $(format_timestamp) - $1" >&2
 }
 
-function log_success {
-    echo "✅ \$(format_timestamp) - \$1"
+log_success() {
+    echo "✅ $(format_timestamp) - $1"
 }
 
-function stream_logs {
-    local run_id="\$1"
-    local repo="\$2"
+stream_logs() {
+    local run_id="$1"
+    local repo="$2"
     
-    log_info "Starting log stream for run \$run_id"
+    log_info "Starting log stream for run $run_id"
     
-    if ! gh run view "\$run_id" --repo "\$repo" --log 2>&1; then
-        log_error "Failed to stream logs for run \$run_id"
+    # Stream logs with proper error handling
+    if ! gh run view "$run_id" --repo "$repo" --log; then
+        log_error "Failed to stream logs for run $run_id"
         return 1
     fi
     
+    # Check final status
     local status
-    status=\$(gh run view "\$run_id" --repo "\$repo" --json status --jq '.status' 2>/dev/null)
+    status=$(gh run view "$run_id" --repo "$repo" --json status --jq '.status')
     
-    case "\$status" in
+    case "$status" in
         "completed")
             log_success "Workflow run completed"
             ;;
@@ -54,32 +58,11 @@ function stream_logs {
             return 1
             ;;
         *)
-            log_info "Workflow status: \$status"
+            log_info "Workflow status: $status"
             ;;
     esac
 }
-
-function check_requirements {
-    local missing_tools=()
-    
-    if ! command -v jq >/dev/null 2>&1; then
-        missing_tools+=("jq")
-    fi
-    
-    if ! command -v python3 >/dev/null 2>&1; then
-        missing_tools+=("python3")
-    fi
-    
-    if ! command -v envsubst >/dev/null 2>&1; then
-        missing_tools+=("gettext")
-    fi
-    
-    if [ \${#missing_tools[@]} -gt 0 ]; then
-        log_info "Installing required tools: \${missing_tools[*]}"
-        apk add --quiet \${missing_tools[@]} >/dev/null 2>&1
-    fi
-}
-"""
+'''
 
 class GitHubCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, with_volumes=None, with_files=None):
@@ -89,16 +72,36 @@ class GitHubCliTool(Tool):
             with_files = []
 
         # Add common shell functions and content
-        enhanced_content = f"""#!/bin/bash
+        enhanced_content = f'''
+#!/bin/bash
 set -euo pipefail
 
+# Import common functions
 {LOG_PROCESSING_FUNCTIONS}
 
-# Check and install requirements
-check_requirements
+# Set operation type for disclaimer
+OPERATION_TYPE="{name}"
 
+# Install required tools
+if ! command -v jq >/dev/null 2>&1; then
+    apk add --quiet jq >/dev/null 2>&1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --quiet python3 py3-pip >/dev/null 2>&1
+fi
+
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
+fi
+
+if ! python3 -c "import jinja2" >/dev/null 2>&1; then
+    pip3 install --quiet jinja2 >/dev/null 2>&1
+fi
+
+# Main script content
 {content}
-"""
+'''
             
         super().__init__(
             name=name,
@@ -120,6 +123,7 @@ check_requirements
         )
 
     def register(self, namespace: str):
+        """Register the tool with the given namespace."""
         tool_registry.register(namespace, self)
         return self
 
@@ -133,27 +137,40 @@ class GitHubRepolessCliTool(GitHubCliTool):
             with_files=with_files or []
         )
 
-# Update stream_workflow_logs tool
+# Update stream_workflow_logs tool to use the common functions
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
     description="Stream logs from a GitHub Actions workflow run in real-time.",
     content="""
-if [ -z "\${run_id:-}" ]; then
+if [ -z "$run_id" ]; then
     log_info "No run ID provided. Fetching the latest workflow run..."
-    run_id=\$(gh run list --repo "\$repo" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
-    if [ -z "\$run_id" ]; then
+    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId')
+    if [ -z "$run_id" ]; then
         log_error "No workflow runs found for the repository."
         exit 1
     fi
-    log_info "Using the latest run ID: \$run_id"
+    log_info "Using the latest run ID: $run_id"
 fi
 
-log_info "Streaming logs for workflow run \$run_id in repository \$repo..."
-stream_logs "\$run_id" "\$repo"
+log_info "Streaming logs for workflow run $run_id in repository $repo..."
+
+# Stream logs with status monitoring
+stream_logs "$run_id" "$repo"
+exit_code=$?
+
+if [ $exit_code -eq 0 ]; then
+    log_success "Workflow completed successfully"
+else
+    log_error "Workflow failed"
+    exit 1
+fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
     ],
     long_running=True
-).register("github")
+)
+
+# Register the stream_workflow_logs tool
+tool_registry.register("github", stream_workflow_logs)
