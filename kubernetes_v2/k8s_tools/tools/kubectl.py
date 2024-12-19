@@ -1,6 +1,7 @@
 from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
+import sys
 
 kubectl_tool = KubernetesTool(
     name="kubectl",
@@ -35,4 +36,8 @@ kubectl_tool = KubernetesTool(
     ],
 )
 
-tool_registry.register("kubernetes", kubectl_tool)
+try:
+    tool_registry.register("kubernetes", kubectl_tool)
+except Exception as e:
+    print(f"❌ Failed to register kubectl tool: {str(e)}", file=sys.stderr)
+    raise

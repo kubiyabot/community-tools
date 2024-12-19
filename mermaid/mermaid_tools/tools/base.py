@@ -11,7 +11,6 @@ class MermaidTool(Tool):
         # Add SLACK_API_TOKEN as a secret
         secrets.extend(["SLACK_API_TOKEN"])
 
-
         super().__init__(
             name=name,
             description=description,

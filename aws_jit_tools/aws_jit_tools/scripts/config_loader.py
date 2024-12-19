@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Dict, Any
+from kubiya_sdk.tools.registry import tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -51,48 +52,56 @@ S3_CONFIG_SCHEMA = {
     }
 }
 
+def _load_from_file(config_name: str) -> Dict[str, Any]:
+    """Helper function to load configuration from file."""
+    config_path = Path(__file__).parent / 'configs' / f'{config_name}.json'
+    if not config_path.exists():
+        return {}
+
+    with open(config_path) as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in configuration file {config_name}: {str(e)}")
+            return {}
+
 def load_config(config_name: str) -> Dict[str, Any]:
-    """Load and validate configuration from JSON file."""
+    """Load and validate configuration from dynamic config or file."""
     try:
-        config_path = Path(__file__).parent / 'configs' / f'{config_name}.json'
-        if not config_path.exists():
-            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+        # Get dynamic configuration
+        dynamic_config = tool_registry.dynamic_config
+        print(f"📝 Received dynamic configuration: {dynamic_config}")
+        
+        if dynamic_config:
+            print("⚠️  dynamic configuration provided")
+            config = dynamic_config.get(config_name, {})
+            print(f"📝 Using {config_name} configuration: {config}")
+        else:
+            print("⚠️  No dynamic configuration provided, trying file")            
+            config = _load_from_file(config_name)
 
-        with open(config_path) as f:
-            try:
-                config = json.load(f)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in configuration file {config_name}: {str(e)}")
-
-        # Validate configuration if jsonschema is available
-        if JSONSCHEMA_AVAILABLE:
+        # Validate configuration if jsonschema is available and config is not empty
+        if JSONSCHEMA_AVAILABLE and config:
             schema = ACCESS_CONFIG_SCHEMA if config_name == 'access_configs' else S3_CONFIG_SCHEMA
             try:
                 validate(instance=config, schema=schema)
             except Exception as e:
-                raise ValueError(f"Configuration validation failed for {config_name}: {str(e)}")
+                logger.error(f"Configuration validation failed for {config_name}: {str(e)}")
+                return {}
 
         return config
 
     except Exception as e:
         logger.error(f"Error loading configuration {config_name}: {str(e)}")
-        raise
+        return {}
 
 def get_access_configs() -> Dict[str, Any]:
     """Get access configurations."""
-    try:
-        return load_config('access_configs')
-    except Exception as e:
-        logger.error(f"Failed to load access configurations: {str(e)}")
-        return {}
+    return load_config('access_configs')
 
 def get_s3_configs() -> Dict[str, Any]:
     """Get S3 access configurations."""
-    try:
-        return load_config('s3_configs')
-    except Exception as e:
-        logger.error(f"Failed to load S3 configurations: {str(e)}")
-        return {}
+    return load_config('s3_configs')
 
 def validate_configs():
     """Validate all configuration files exist and are valid."""
@@ -100,13 +109,16 @@ def validate_configs():
         access_configs = get_access_configs()
         s3_configs = get_s3_configs()
         
-        if not access_configs and not s3_configs:
-            raise ValueError("No valid configurations found")
+        # Return true if at least one config is present and valid
+        if access_configs or s3_configs:
+            return True
+            
+        logger.warning("No valid configurations found")
+        return False
         
-        return True
     except Exception as e:
         logger.error(f"Configuration validation failed: {str(e)}")
         return False
 
 # Export the functions
-__all__ = ['get_access_configs', 'get_s3_configs', 'validate_configs'] 
+__all__ = ['get_access_configs', 'get_s3_configs', 'validate_configs']

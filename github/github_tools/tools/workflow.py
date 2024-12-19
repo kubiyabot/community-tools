@@ -11,57 +11,156 @@ function process_logs() {
     
     awk -v pattern="$pattern" -v max_lines="$max_lines" '
         BEGIN {
-            buffer_size = 10
-            line_count = 0
+            # Configure sizes
+            max_buffer = 100    # Lines to keep before error
+            after_lines = 20    # Lines to show after error
+            buffer_size = 0     # Current buffer size
+            buffer_start = 0    # Start position in circular buffer
+            printing = 0        # Number of lines left to print after match
+            found_error = 0     # Track if we found any errors
+            
+            # Error patterns
+            err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
+            # Noise patterns to filter
+            noise_pattern = "(Download|Progress|download|progress)"
         }
         
+        # Skip noisy lines early
+        $0 ~ noise_pattern { next }
+        
         {
-            # Store in small circular buffer
-            buffer[NR % buffer_size] = $0
+            # Store in circular buffer
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
             
-            if (pattern && $0 ~ pattern) {
-                # Show match with minimal context
-                print "\\n--- Context Start ---\\n"
-                for (i = 5; i > 0; i--) {
-                    idx = ((NR - i) % buffer_size)
-                    if (buffer[idx]) print buffer[idx]
-                }
-                print ">>> MATCH: " $0 "\\n--- Context End ---\\n"
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
             }
             
-            # Count lines for limit
-            line_count++
-            if (max_lines && line_count >= max_lines) exit
+            # Check for errors
+            if ($0 ~ err_pattern) {
+                found_error = 1
+                # Generate a hash of the surrounding context to avoid duplicates
+                context = ""
+                for (i = 0; i < 3; i++) {  # Use 3 lines for context hash
+                    pos = (buffer_pos - i + max_buffer) % max_buffer
+                    if (buffer[pos]) {
+                        context = context buffer[pos]
+                    }
+                }
+                context_hash = context
+                
+                # Only print if we have not seen this context
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    
+                    # Print separator for readability
+                    print "\\n=== Error Context ===\\n"
+                    
+                    # Print buffer content (previous lines)
+                    for (i = 0; i < buffer_size; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print buffer[pos]
+                    }
+                    
+                    # Start printing aftermath
+                    printing = after_lines
+                }
+            }
+            else if (printing > 0) {
+                print
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Context ===\\n"
+                }
+            }
+        }
+        
+        END {
+            if (!found_error) {
+                print "No error patterns found in the logs."
+            }
         }
     '
 }
 
-# Function to extract timestamp from log line
-function parse_timestamp() {
-    local line="$1"
-    echo "$line" | grep -o "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}T[0-9]\\{2\\}:[0-9]\\{2\\}:[0-9]\\{2\\}Z" || echo ""
-}
-
-# Function to determine log level
-function get_log_level() {
-    local line="$1"
-    if echo "$line" | grep -qi "error\\|failed\\|exception"; then
-        echo "ERROR"
-    elif echo "$line" | grep -qi "warning\\|warn"; then
-        echo "WARN"
-    elif echo "$line" | grep -qi "info\\|notice"; then
-        echo "INFO"
-    elif echo "$line" | grep -qi "debug"; then
-        echo "DEBUG"
-    elif echo "$line" | grep -qi "success\\|completed"; then
-        echo "SUCCESS"
-    else
-        echo "INFO"
-    fi
+# Function to search logs with context efficiently
+function search_logs_with_context() {
+    local pattern="$1"
+    local before_context="${2:-5}"
+    local after_context="${3:-5}"
+    
+    awk -v pattern="$pattern" -v before="$before_context" -v after="$after_context" '
+        BEGIN {
+            # Initialize circular buffer
+            max_buffer = before + 1
+            buffer_size = 0
+            buffer_start = 0
+            printing = 0
+            found_match = 0
+            
+            # Noise pattern to filter
+            noise_pattern = "(Download|Progress|download|progress)"
+        }
+        
+        # Skip noisy lines early
+        $0 ~ noise_pattern { next }
+        
+        {
+            # Store in circular buffer
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
+            
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
+            }
+            
+            # Check for pattern match
+            if ($0 ~ pattern) {
+                found_match = 1
+                # Generate context hash to avoid duplicates
+                context_hash = $0  # Use matching line as hash
+                
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    
+                    print "\\n=== Match Found ===\\n"
+                    
+                    # Print previous lines from buffer
+                    for (i = 0; i < buffer_size - 1; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print "BEFORE | " buffer[pos]
+                    }
+                    
+                    # Print matching line
+                    print "MATCH  | " $0
+                    
+                    # Start printing aftermath
+                    printing = after
+                }
+            }
+            else if (printing > 0) {
+                print "AFTER  | " $0
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Match ===\\n"
+                }
+            }
+        }
+        
+        END {
+            if (!found_match) {
+                print "No matches found for pattern: " pattern
+            }
+        }
+    '
 }
 '''
 
-# GitHub CLI tools
 workflow_list = GitHubCliTool(
     name="github_workflow_list",
     description="List GitHub Actions workflows",
@@ -180,73 +279,127 @@ echo "✨ Workflow disabled successfully!"
 )
 
 workflow_run_logs_failed = GitHubCliTool(
-    name="github_workflow_run_logs_failed",
-    description="Get logs from failed workflow runs with focus on error messages",
-    content=f'''
-#!/bin/sh
-set -e
+    name="workflow_run_logs_failed",
+    description="""View failed job outputs from GitHub Actions workflow run with advanced error detection.
+    
+Shows only the failed job logs with:
+- Automatic error context extraction
+- Smart filtering of noise
+- Configurable context lines around errors
+- Default shows last 100 lines if not searching""",
+    content="""
+# Include the log processing functions
 {LOG_PROCESSING_FUNCTIONS}
 
-echo "🔍 Finding failed workflow runs in: $repo"
+# Enforce maximum lines limit
+MAX_LINES=150
+LINES=${tail_lines:-100}
 
-# Get recent failed runs
-FAILED_RUNS=$(gh run list --repo "$repo" --json databaseId,name,conclusion,createdAt,url \
-    --jq '[.[] | select(.conclusion == "failure")] | sort_by(.createdAt) | reverse | .[0:5]')
-
-if [ -z "$FAILED_RUNS" ] || [ "$FAILED_RUNS" = "[]" ]; then
-    echo "✅ No failed runs found in recent history"
-    exit 0
+if [ $LINES -gt $MAX_LINES ]; then
+    LINES=$MAX_LINES
 fi
 
-# Process each failed run
-echo "$FAILED_RUNS" | jq -c '.[]' | while read -r run; do
-    run_id=$(echo "$run" | jq -r '.databaseId')
-    name=$(echo "$run" | jq -r '.name')
-    date=$(echo "$run" | jq -r '.createdAt')
-    url=$(echo "$run" | jq -r '.url')
-    
-    echo "\\n❌ Failed Run: $name"
-    echo "📅 Date: $date"
-    echo "🔗 URL: $url"
-    echo "🆔 Run ID: $run_id"
-    echo "\\n📝 Error Logs:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━"
-    
-    # Get logs and filter for errors/failures
-    LOGS=$(gh run view --repo "$repo" "$run_id" --log || echo "No logs available")
-    
-    echo "$LOGS" | awk \'
-        BEGIN {{ lines_printed = 0; context_lines = 3; buffer[""] = ""; buffer_size = 0; }}
-        
-        # Store line in circular buffer for context
-        {{
-            buffer[buffer_size % context_lines] = $0
-            buffer_size++
-        }}
-        
-        # Print error context when found
-        /error|fail|exception|fatal/i {{
-            if (lines_printed < 50) {{  # Limit total output
-                print "\\n--- Error Context ---"
-                # Print previous lines for context
-                for (i = 1; i <= context_lines; i++) {{
-                    idx = ((buffer_size - i - 1) + context_lines) % context_lines
-                    if (buffer[idx] != "") print buffer[idx]
-                }}
-                print ">>> " $0  # Print the error line
-                lines_printed += context_lines + 1
-            }}
-        }}
-        
-        END {{
-            if (lines_printed == 0) print "No specific error messages found in logs"
-        }}
-    \'
-    echo "━━━━━━━━━━━━━━━━━━━━━━━"
-done
+echo "📊 Fetching failed job logs for run ID: $run_id"
 
-echo "\\n✨ Log analysis complete!"
-''',
+# First attempt - try getting failed logs directly
+LOGS=$(gh run view --repo $repo $run_id --log-failed 2>/dev/null)
+if [ -z "$LOGS" ]; then
+    echo "⚠️ No failed logs found directly, attempting to get full logs..."
+    # Second attempt - get full logs and filter for errors
+    LOGS=$(gh run view --repo $repo $run_id --log 2>/dev/null)
+fi
+
+if [ -z "$LOGS" ]; then
+    echo "❌ No logs available for this run. The run may still be in progress or logs have expired."
+    exit 1
+fi
+
+# Create a temporary file for the logs
+TEMP_LOG_FILE=$(mktemp)
+echo "$LOGS" > "$TEMP_LOG_FILE"
+
+if [ -n "$pattern" ]; then
+    echo "🔍 Searching for pattern '$pattern' in logs..."
+    RESULTS=$(cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
+    if [ -n "$RESULTS" ]; then
+        echo "$RESULTS"
+    else
+        echo "❌ No matches found for pattern: $pattern"
+    fi
+else
+    echo "🔍 Extracting error context from logs..."
+    RESULTS=$(cat "$TEMP_LOG_FILE" | extract_error_context)
+    if [ -n "$RESULTS" ]; then
+        echo "$RESULTS" | tail -n $LINES
+    else
+        echo "❌ No error patterns found in the logs"
+        echo "Showing last $LINES lines of logs instead:"
+        tail -n $LINES "$TEMP_LOG_FILE"
+    fi
+fi
+
+# Clean up
+rm -f "$TEMP_LOG_FILE"
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
+        Arg(name="pattern", type="str", description="Pattern to search in failed logs. Supports regular expressions", required=False),
+        Arg(name="case_sensitive", type="bool", description="Make pattern matching case sensitive. Default: false", required=False),
+        Arg(name="exact_match", type="bool", description="Match whole words only. Default: false", required=False),
+        Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
+        Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
+    ],
+)
+
+workflow_run_cancel = GitHubCliTool(
+    name="github_workflow_run_cancel",
+    description="Cancel a workflow run.",
+    content="gh run cancel --repo $repo $run_id",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+    ],
+)
+
+workflow_run_rerun = GitHubCliTool(
+    name="github_workflow_run_rerun",
+    description="Rerun a workflow run.",
+    content="gh run rerun --repo $repo $run_id",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
+    ],
+)
+
+workflow_clone_repo = GitHubCliTool(
+    name="github_workflow_clone_repo",
+    description="Clone a repository containing GitHub Actions workflows.",
+    content="""
+    echo "🔄 Cloning repository $repo into $([[ -n "$directory" ]] && echo "$directory" || echo "$(basename $repo)")"
+    gh repo clone $repo $([[ -n "$directory" ]] && echo "$directory")
+    cd $([[ -n "$directory" ]] && echo "$directory" || echo "$(basename $repo)")
+    echo "Repository cloned successfully."
+    """,
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="directory", type="str", description="Directory to clone into. If not specified, uses the repository name.", required=False),
+    ],
+)
+
+workflow_discover_files = GitHubCliTool(
+    name="github_workflow_discover_files",
+    description="Discover GitHub Actions workflow files in a repository.",
+    content="""
+    echo "🔍 Discovering workflow files in repository $repo"
+    gh repo clone $repo temp_repo
+    cd temp_repo
+    echo "Workflow files found:"
+    find .github/workflows -name "*.yml" -o -name "*.yaml"
+    cd ..
+    rm -rf temp_repo
+    """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
     ],
