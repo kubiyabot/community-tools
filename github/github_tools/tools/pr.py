@@ -156,6 +156,13 @@ pr_comment = GitHubCliTool(
     content="""
 printf "\U0001F4AC Processing comment for pull request #$number in $repo...\n"
 printf "\U0001F517 PR Link: https://github.com/$repo/pull/$number\n"
+printf "\U0001F4A1 Workflow Name: $workflow_name\n"
+printf "\U0001F6A8 Failures: $failures\n"
+printf "\U0001F527 Fixes: $fixes\n"
+printf "\U0001F4C8 Workflow Steps: $workflow_steps\n"
+printf "\U0001F6A8 Failed Steps: $failed_steps\n"
+printf "\U0001F4DD Error Logs: $error_logs\n"
+printf "\U0001F4C3 Run Details: $run_details\n"
 
 format_github_comment() {
     local workflow_name="$1"
