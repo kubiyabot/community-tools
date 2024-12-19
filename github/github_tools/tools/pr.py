@@ -159,6 +159,21 @@ pr_comment = GitHubCliTool(
 #!/bin/bash
 set -euo pipefail
 
+# Create __init__.py file for the scripts project
+if [ ! -f /opt/scripts/__init__.py ]; then
+    touch /opt/scripts/__init__.py
+fi
+
+# Create __init__.py file for the utils project
+if [ ! -f /opt/scripts/utils/__init__.py ]; then
+    touch /opt/scripts/utils/__init__.py
+fi
+
+# Create __init__.py file for the utils.templating project
+if [ ! -f /opt/scripts/utils/templating/__init__.py ]; then
+    touch /opt/scripts/utils/templating/__init__.py
+fi
+
 echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
@@ -330,15 +345,13 @@ fi
     ],
     with_files=[
         FileSpec(destination="/opt/scripts/comment_generator.py", 
-                content=Path(__file__).parent.parent / 'scripts' / 'comment_generator.py'),
+                content=str(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py')),
         FileSpec(destination="/opt/scripts/utils/templating/template_handler.py",
-                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py'),
+                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py')),
         FileSpec(destination="/opt/scripts/utils/templating/schema.py",
-                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py'),
+                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py')),
         FileSpec(destination="/opt/scripts/utils/templating/templates/workflow_failure.jinja2",
-                content=Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2'),
-        FileSpec(destination="/opt/scripts/utils/templating/__init__.py",
-                content=""),
+                content=str(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2')),
     ],
 )
 
