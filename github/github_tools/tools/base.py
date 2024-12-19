@@ -46,15 +46,15 @@ set -e
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
 
-if ! command -v jq; then
-    apk add jq
+if ! command -v jq >/dev/null 2>&1; then
+    apk add --quiet jq >/dev/null 2>&1
 fi
 
-if ! command -v python3; then
-    apk add python3
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --quiet python3 py3-pip >/dev/null 2>&1
 fi
 
-pip3 install jinja2
+pip3 install --quiet jinja2 >/dev/null 2>&1
 
 {content}
 '''
