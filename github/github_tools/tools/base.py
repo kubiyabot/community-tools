@@ -7,49 +7,47 @@ GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
 # Shell script functions for log processing
-LOG_PROCESSING_FUNCTIONS = '''
+LOG_PROCESSING_FUNCTIONS = r'''
 # Log processing functions
-process_log() {
-    local log="$1"
-    echo "$log" | while IFS= read -r line; do
+process_log() {{
+    local log="${{1}}"
+    echo "${{log}}" | while IFS= read -r line; do
         # Remove ANSI color codes and format the line
-        echo "$line" | sed 's/\x1b\[[0-9;]*m//g'
+        echo "${{line}}" | sed 's/\x1b\[[0-9;]*m//g'
     done
-}
+}}
 
-format_timestamp() {
+format_timestamp() {{
     date -u "+%Y-%m-%d %H:%M:%S UTC"
-}
+}}
 
-log_info() {
-    echo "ℹ️ $(format_timestamp) - $1"
-}
+log_info() {{
+    echo "ℹ️ $(format_timestamp) - {log_prefix} ${{1}}"
+}}
 
-log_error() {
-    echo "❌ $(format_timestamp) - $1" >&2
-}
+log_error() {{
+    echo "❌ $(format_timestamp) - {log_prefix} ${{1}}" >&2
+}}
 
-log_success() {
-    echo "✅ $(format_timestamp) - $1"
-}
+log_success() {{
+    echo "✅ $(format_timestamp) - {log_prefix} ${{1}}"
+}}
 
-stream_logs() {
-    local run_id="$1"
-    local repo="$2"
+stream_logs() {{
+    local run_id="${{1}}"
+    local repo="${{2}}"
     
-    log_info "Starting log stream for run $run_id"
+    log_info "Starting log stream for run ${{run_id}}"
     
-    # Stream logs with proper error handling
-    if ! gh run view "$run_id" --repo "$repo" --log; then
-        log_error "Failed to stream logs for run $run_id"
+    if ! gh run view "${{run_id}}" --repo "${{repo}}" --log 2>&1; then
+        log_error "Failed to stream logs for run ${{run_id}}"
         return 1
     fi
     
-    # Check final status
     local status
-    status=$(gh run view "$run_id" --repo "$repo" --json status --jq '.status')
+    status=$(gh run view "${{run_id}}" --repo "${{repo}}" --json status --jq '.status' 2>/dev/null)
     
-    case "$status" in
+    case "${{status}}" in
         "completed")
             log_success "Workflow run completed"
             ;;
@@ -58,10 +56,10 @@ stream_logs() {
             return 1
             ;;
         *)
-            log_info "Workflow status: $status"
+            log_info "Workflow status: ${{status}}"
             ;;
     esac
-}
+}}
 '''
 
 class GitHubCliTool(Tool):
