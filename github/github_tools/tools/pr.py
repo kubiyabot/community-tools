@@ -154,19 +154,6 @@ pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
     content="""
-# Create __init__.py files for the Python package structure
-if [ ! -f /opt/scripts/__init__.py ]; then
-    touch /opt/scripts/__init__.py
-fi
-
-if [ ! -f /opt/scripts/utils/__init__.py ]; then
-    touch /opt/scripts/utils/__init__.py
-fi
-
-if [ ! -f /opt/scripts/utils/templating/__init__.py ]; then
-    touch /opt/scripts/utils/templating/__init__.py
-fi
-
 echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
