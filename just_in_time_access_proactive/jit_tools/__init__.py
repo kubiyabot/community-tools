@@ -11,7 +11,6 @@ def initialize():
 
 # Run initialization when module is imported
 print("Loading Kubernetes tools module...")
-initialize()
 
 # Import tools after initialization
 from .tools import *
