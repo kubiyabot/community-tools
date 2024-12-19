@@ -20,13 +20,3 @@ def __getattr__(name):
         from .search_access_requests import search_access_requests_tool
         return search_access_requests_tool
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
-__all__ = [
-    'JustInTimeAccessTool',
-    'approve_access_tool',
-    'request_access_tool',
-    'describe_access_request_tool',
-    'list_active_access_requests_tool',
-    'view_user_requests_tool',
-    'search_access_requests_tool',
-]
