@@ -21,28 +21,30 @@ class MermaidTool(Tool):
         content = f"""#!/bin/sh
 set -e
 
-echo "🎨 Preparing to draw diagram..."
+echo "🎨 Setting up environment..."
 
-# Install required packages if not already installed
-if ! command -v curl >/dev/null || ! command -v jq >/dev/null; then
-    echo "📦 Installing required packages..."
-    apk add curl jq >/dev/null 2>&1
-fi
+# Install required packages
+apk add curl jq >/dev/null 2>&1
 
-# Install slack-cli if not already installed
-if [ ! -f "/usr/local/bin/slack" ]; then
-    echo "📥 Connecting to Slack..."
-    curl -s -L -o /usr/local/bin/slack \
-        https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
-        chmod +x /usr/local/bin/slack
-fi
+# Install slack-cli
+curl -s -L -o /usr/local/bin/slack \
+    https://raw.githubusercontent.com/rockymadden/slack-cli/master/src/slack && \
+    chmod +x /usr/local/bin/slack
 
 # Prepare script
 mkdir -p /tmp/scripts
 chmod +x {script_path}
 
+# Run script
 exec {script_path}
 """
+
+        # Define the Mermaid service
+        mermaid_service = ServiceSpec(
+            name="mermaid",
+            image="ghcr.io/kubiyabot/mermaid-server",
+            exposed_ports=[80]
+        )
 
         super().__init__(
             name=name,
