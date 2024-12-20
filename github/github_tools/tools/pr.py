@@ -137,6 +137,9 @@ pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
     content="""
+#!/bin/bash
+set -euo pipefail
+
 echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
@@ -201,6 +204,7 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
     exit 1
 }
 
+# Get GitHub actor
 GITHUB_ACTOR=$(gh api user --jq '.login') || {
     echo "❌ Failed to get GitHub user information"
     exit 1
@@ -208,16 +212,39 @@ GITHUB_ACTOR=$(gh api user --jq '.login') || {
 
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
+    --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
     echo "🔄 Updating existing comment..."
-    EDIT_COUNT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body' | grep -c "Edit #" || printf '0')
+    
+    # Get current comment content
+    CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
+    
+    # Count existing edits
+    EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
-    UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)\\n\\n$GENERATED_COMMENT\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq .body)\\n\\n</details>"
-    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" -X PATCH -f body="$UPDATED_COMMENT"; then
+    # Create updated comment with edit history
+    UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)
+
+$GENERATED_COMMENT
+
+---
+
+*Note: To reduce noise, this comment was edited rather than creating a new one.*
+
+<details><summary>Previous Comment</summary>
+
+$CURRENT_CONTENT
+
+</details>"
+
+    # Update the comment
+    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
+        -X PATCH \
+        -f body="$UPDATED_COMMENT"; then
         echo "❌ Failed to update comment"
         exit 1
     fi
@@ -255,12 +282,6 @@ fi
         "status": "success",
         "conclusion": "success",
         "number": 1
-    },
-    {
-        "name": "Run Tests",
-        "status": "failure",
-        "conclusion": "failure",
-        "number": 2
     }
 ]""",
             required=True
@@ -295,21 +316,13 @@ fi
         Arg(
             name="error_logs",
             type="str",
-            description="""Raw error logs from the workflow run. Will be truncated and formatted in the comment. Example:
-=== RUN   TestAPIEndpoint
-    api_test.go:42: 
-        Error Trace:    api_test.go:42
-        Error:          Not equal:
-                       expected: 200
-                       actual  : 404
-        Test:          TestAPIEndpoint
-FAIL""",
+            description="Raw error logs from the workflow run",
             required=True
         ),
         Arg(
             name="run_details",
             type="str",
-            description="""JSON object with workflow run details and PR information. Example:
+            description="""JSON object with workflow run details. Example:
 {
     "id": "12345678",
     "name": "CI Pipeline",
@@ -317,20 +330,7 @@ FAIL""",
     "status": "completed",
     "conclusion": "failure",
     "actor": "octocat",
-    "trigger_event": "pull_request",
-    "pr_details": {
-        "title": "Add new API endpoint",
-        "description": "Implements the /api/v1/users endpoint",
-        "author": "octocat",
-        "created_at": "2024-01-20T09:00:00Z",
-        "updated_at": "2024-01-20T10:00:00Z",
-        "commits_count": 3,
-        "additions": 150,
-        "deletions": 50,
-        "labels": ["feature", "api"],
-        "base_branch": "main",
-        "head_branch": "feature/api-endpoint"
-    }
+    "trigger_event": "pull_request"
 }""",
             required=True
         ),
