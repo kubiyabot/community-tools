@@ -1,7 +1,4 @@
-from .tools.repositories import *
-from .tools.pull_requests import *
-from .tools.branches import *
-from .tools.commits import *
+from .tools import *
 
 __all__ = [
     'repo_list',

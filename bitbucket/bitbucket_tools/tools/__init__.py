@@ -1,7 +1,6 @@
-from .repositories import repo_get, repo_list, repo_create
-from .pull_requests import pr_create, pr_get, pr_list, pr_merge
-from .branches import branch_create, branch_delete, branch_list
-from .commits import commit_get, commit_list
+from .repo import *
+from .pr import *
+from .pipeline import *
 
 __all__ = [
     'repo_get',
