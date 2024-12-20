@@ -287,25 +287,145 @@ Shows only the failed job logs with:
 - Configurable context lines around errors
 - Default shows last 100 lines if not searching""",
     content="""
-# Include the log processing functions
-{LOG_PROCESSING_FUNCTIONS}
+#!/bin/sh
+set -e
 
-# Enforce maximum lines limit
-MAX_LINES=150
-LINES=${tail_lines:-100}
+# Define log processing functions
+process_logs() {
+    local pattern="$1"
+    local max_lines="$2"
+    
+    awk -v pattern="$pattern" -v max_lines="$max_lines" '
+        BEGIN {
+            max_buffer = 100    # Lines to keep before error
+            after_lines = 20    # Lines to show after error
+            buffer_size = 0     # Current buffer size
+            buffer_start = 0    # Start position in circular buffer
+            printing = 0        # Number of lines left to print after match
+            found_error = 0     # Track if we found any errors
+            
+            err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
+            noise_pattern = "(Download|Progress|download|progress)"
+        }
+        
+        $0 ~ noise_pattern { next }
+        
+        {
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
+            
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
+            }
+            
+            if ($0 ~ err_pattern) {
+                found_error = 1
+                context = ""
+                for (i = 0; i < 3; i++) {
+                    pos = (buffer_pos - i + max_buffer) % max_buffer
+                    if (buffer[pos]) {
+                        context = context buffer[pos]
+                    }
+                }
+                context_hash = context
+                
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    print "\\n=== Error Context ===\\n"
+                    for (i = 0; i < buffer_size; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print buffer[pos]
+                    }
+                    printing = after_lines
+                }
+            }
+            else if (printing > 0) {
+                print
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Context ===\\n"
+                }
+            }
+        }
+        
+        END {
+            if (!found_error) {
+                print "No error patterns found in the logs."
+            }
+        }
+    '
+}
 
-if [ $LINES -gt $MAX_LINES ]; then
-    LINES=$MAX_LINES
-fi
+search_logs_with_context() {
+    local pattern="$1"
+    local before_context="${2:-5}"
+    local after_context="${3:-5}"
+    
+    awk -v pattern="$pattern" -v before="$before_context" -v after="$after_context" '
+        BEGIN {
+            max_buffer = before + 1
+            buffer_size = 0
+            buffer_start = 0
+            printing = 0
+            found_match = 0
+            
+            noise_pattern = "(Download|Progress|download|progress)"
+        }
+        
+        $0 ~ noise_pattern { next }
+        
+        {
+            buffer_pos = (buffer_start + buffer_size) % max_buffer
+            buffer[buffer_pos] = $0
+            
+            if (buffer_size < max_buffer) {
+                buffer_size++
+            } else {
+                buffer_start = (buffer_start + 1) % max_buffer
+            }
+            
+            if ($0 ~ pattern) {
+                found_match = 1
+                context_hash = $0
+                
+                if (!(context_hash in seen)) {
+                    seen[context_hash] = 1
+                    print "\\n=== Match Found ===\\n"
+                    for (i = 0; i < buffer_size - 1; i++) {
+                        pos = (buffer_start + i) % max_buffer
+                        print "BEFORE | " buffer[pos]
+                    }
+                    print "MATCH  | " $0
+                    printing = after
+                }
+            }
+            else if (printing > 0) {
+                print "AFTER  | " $0
+                printing--
+                if (printing == 0) {
+                    print "\\n=== End of Match ===\\n"
+                }
+            }
+        }
+        
+        END {
+            if (!found_match) {
+                print "No matches found for pattern: " pattern
+            }
+        }
+    '
+}
 
 echo "📊 Fetching failed job logs for run ID: $run_id"
 
 # First attempt - try getting failed logs directly
-LOGS=$(gh run view --repo $repo $run_id --log-failed 2>/dev/null)
+LOGS=$(gh run view --repo "$repo" $run_id --log-failed 2>/dev/null)
 if [ -z "$LOGS" ]; then
     echo "⚠️ No failed logs found directly, attempting to get full logs..."
     # Second attempt - get full logs and filter for errors
-    LOGS=$(gh run view --repo $repo $run_id --log 2>/dev/null)
+    LOGS=$(gh run view --repo "$repo" $run_id --log 2>/dev/null)
 fi
 
 if [ -z "$LOGS" ]; then
@@ -319,22 +439,10 @@ echo "$LOGS" > "$TEMP_LOG_FILE"
 
 if [ -n "$pattern" ]; then
     echo "🔍 Searching for pattern '$pattern' in logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
-    if [ -n "$RESULTS" ]; then
-        echo "$RESULTS"
-    else
-        echo "❌ No matches found for pattern: $pattern"
-    fi
+    cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}"
 else
     echo "🔍 Extracting error context from logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | extract_error_context)
-    if [ -n "$RESULTS" ]; then
-        echo "$RESULTS" | tail -n $LINES
-    else
-        echo "❌ No error patterns found in the logs"
-        echo "Showing last $LINES lines of logs instead:"
-        tail -n $LINES "$TEMP_LOG_FILE"
-    fi
+    cat "$TEMP_LOG_FILE" | process_logs "" "${tail_lines:-100}"
 fi
 
 # Clean up
@@ -345,8 +453,6 @@ rm -f "$TEMP_LOG_FILE"
         Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
         Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
         Arg(name="pattern", type="str", description="Pattern to search in failed logs. Supports regular expressions", required=False),
-        Arg(name="case_sensitive", type="bool", description="Make pattern matching case sensitive. Default: false", required=False),
-        Arg(name="exact_match", type="bool", description="Match whole words only. Default: false", required=False),
         Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
         Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
     ],
