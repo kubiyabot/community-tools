@@ -1,6 +1,7 @@
 from .repo import *
 from .pr import *
 from .pipeline import *
+from .branches import *
 
 __all__ = [
     'repo_get',
@@ -15,4 +16,6 @@ __all__ = [
     'branch_list',
     'commit_get',
     'commit_list',
+    'pipeline_list',
+    'pipeline_logs',
 ]
