@@ -425,9 +425,9 @@ rm -f "$TEMP_LOG_FILE"
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format", required=True),
         Arg(name="run_id", type="str", description="Run ID", required=True),
         Arg(name="pattern", type="str", description="Pattern to search in failed logs", required=False),
-        Arg(name="before_context", type="int", description="Lines to show before each match (max 5)", required=False, default=2),
-        Arg(name="after_context", type="int", description="Lines to show after each match (max 5)", required=False, default=2),
-        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150)", required=False, default=100),
+        Arg(name="before_context", type="str", description="Lines to show before each match (max 5)", required=False, default="2"),
+        Arg(name="after_context", type="str", description="Lines to show after each match (max 5)", required=False, default="2"),
+        Arg(name="tail_lines", type="str", description="Number of recent lines to show (1-150)", required=False, default="100"),
     ],
 )
 
