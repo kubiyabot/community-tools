@@ -208,40 +208,45 @@ echo "✨ Workflow triggered successfully!"
 workflow_logs = GitHubCliTool(
     name="github_workflow_logs",
     description="View workflow run logs with advanced processing",
-    content=f'''
-#!/bin/sh
-set -e
+    content="""
+#!/bin/bash
+set -euo pipefail
 
-echo "🔍 Fetching logs for run ID: $run_id"
-LOGS=$(gh run view --repo $repo $run_id --log || true)
+echo "🔍 Fetching logs for run ID: ${run_id}"
+LOGS=$(gh run view --repo "${repo}" "${run_id}" --log || true)
 
 if [ -z "$LOGS" ]; then
-    echo "❌ No logs available for run ID: $run_id"
+    echo "❌ No logs available for run ID: ${run_id}"
     exit 1
 fi
 
-if [ -n "$search" ]; then
-    echo "🔍 Filtering logs for pattern: $search"
-    echo "$LOGS" | process_logs "$search" 150
+# Handle optional search parameter with default empty value
+SEARCH_PATTERN="${search:-}"
+
+if [ -n "$SEARCH_PATTERN" ]; then
+    echo "🔍 Filtering logs for pattern: $SEARCH_PATTERN"
+    echo "$LOGS" | process_logs "$SEARCH_PATTERN" 150
 else
     echo "$LOGS" | while IFS= read -r line; do
-        timestamp=$(parse_timestamp "$line")
-        if [ -z "$timestamp" ]; then
-            timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-        fi
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         
-        level=$(get_log_level "$line")
-        case "$level" in
-            "ERROR")   printf "[%s] %-7s ❌ %s\\n" "$timestamp" "$level" "$line" ;;
-            "WARN")    printf "[%s] %-7s ⚠️  %s\\n" "$timestamp" "$level" "$line" ;;
-            "SUCCESS") printf "[%s] %-7s ✅ %s\\n" "$timestamp" "$level" "$line" ;;
-            "DEBUG")   printf "[%s] %-7s 🔍 %s\\n" "$timestamp" "$level" "$line" ;;
-            *)         printf "[%s] %-7s ℹ️  %s\\n" "$timestamp" "$level" "$line" ;;
-        esac
+        # Determine log level from content
+        if [[ "$line" =~ ERROR|FAIL|FATAL ]]; then
+            printf "[%s] %-7s ❌ %s\\n" "$timestamp" "ERROR" "$line"
+        elif [[ "$line" =~ WARN|WARNING ]]; then
+            printf "[%s] %-7s ⚠️  %s\\n" "$timestamp" "WARN" "$line"
+        elif [[ "$line" =~ SUCCESS|PASSED ]]; then
+            printf "[%s] %-7s ✅ %s\\n" "$timestamp" "SUCCESS" "$line"
+        elif [[ "$line" =~ DEBUG ]]; then
+            printf "[%s] %-7s 🔍 %s\\n" "$timestamp" "DEBUG" "$line"
+        else
+            printf "[%s] %-7s ℹ️  %s\\n" "$timestamp" "INFO" "$line"
+        fi
     done
 fi
+
 echo "✨ Log processing completed!"
-''',
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID", required=True),
@@ -287,96 +292,47 @@ Shows only the failed job logs with:
 - Configurable context lines around errors
 - Default shows last 100 lines if not searching""",
     content="""
-#!/bin/sh
-set -e
+#!/bin/bash
+set -euo pipefail
 
-# Define log processing functions
-process_logs() {
-    local pattern="$1"
-    local max_lines="$2"
-    
-    awk -v pattern="$pattern" -v max_lines="$max_lines" '
-        BEGIN {
-            max_buffer = 100    # Lines to keep before error
-            after_lines = 20    # Lines to show after error
-            buffer_size = 0     # Current buffer size
-            buffer_start = 0    # Start position in circular buffer
-            printing = 0        # Number of lines left to print after match
-            found_error = 0     # Track if we found any errors
-            
-            err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
-            noise_pattern = "(Download|Progress|download|progress)"
-        }
-        
-        $0 ~ noise_pattern { next }
-        
-        {
-            buffer_pos = (buffer_start + buffer_size) % max_buffer
-            buffer[buffer_pos] = $0
-            
-            if (buffer_size < max_buffer) {
-                buffer_size++
-            } else {
-                buffer_start = (buffer_start + 1) % max_buffer
-            }
-            
-            if ($0 ~ err_pattern) {
-                found_error = 1
-                context = ""
-                for (i = 0; i < 3; i++) {
-                    pos = (buffer_pos - i + max_buffer) % max_buffer
-                    if (buffer[pos]) {
-                        context = context buffer[pos]
-                    }
-                }
-                context_hash = context
-                
-                if (!(context_hash in seen)) {
-                    seen[context_hash] = 1
-                    print "\\n=== Error Context ===\\n"
-                    for (i = 0; i < buffer_size; i++) {
-                        pos = (buffer_start + i) % max_buffer
-                        print buffer[pos]
-                    }
-                    printing = after_lines
-                }
-            }
-            else if (printing > 0) {
-                print
-                printing--
-                if (printing == 0) {
-                    print "\\n=== End of Context ===\\n"
-                }
-            }
-        }
-        
-        END {
-            if (!found_error) {
-                print "No error patterns found in the logs."
-            }
-        }
-    '
-}
+# Handle optional parameters with defaults
+PATTERN="${pattern:-}"
+BEFORE_CONTEXT="${before_context:-2}"
+AFTER_CONTEXT="${after_context:-2}"
+TAIL_LINES="${tail_lines:-100}"
 
-search_logs_with_context() {
-    local pattern="$1"
-    local before_context="${2:-5}"
-    local after_context="${3:-5}"
-    
-    awk -v pattern="$pattern" -v before="$before_context" -v after="$after_context" '
+echo "📊 Fetching failed job logs for run ID: ${run_id}"
+
+# First attempt - try getting failed logs directly
+LOGS=$(gh run view --repo "${repo}" "${run_id}" --log-failed 2>/dev/null || true)
+if [ -z "$LOGS" ]; then
+    echo "⚠️ No failed logs found directly, attempting to get full logs..."
+    # Second attempt - get full logs and filter for errors
+    LOGS=$(gh run view --repo "${repo}" "${run_id}" --log 2>/dev/null || true)
+fi
+
+if [ -z "$LOGS" ]; then
+    echo "❌ No logs available for this run. The run may still be in progress or logs have expired."
+    exit 1
+fi
+
+# Create a temporary file for the logs
+TEMP_LOG_FILE=$(mktemp)
+echo "$LOGS" > "$TEMP_LOG_FILE"
+
+if [ -n "$PATTERN" ]; then
+    echo "🔍 Searching for pattern '$PATTERN' in logs..."
+    cat "$TEMP_LOG_FILE" | awk -v pattern="$PATTERN" -v before="$BEFORE_CONTEXT" -v after="$AFTER_CONTEXT" '
         BEGIN {
             max_buffer = before + 1
             buffer_size = 0
             buffer_start = 0
             printing = 0
             found_match = 0
-            
-            noise_pattern = "(Download|Progress|download|progress)"
         }
         
-        $0 ~ noise_pattern { next }
-        
         {
+            # Store in circular buffer
             buffer_pos = (buffer_start + buffer_size) % max_buffer
             buffer[buffer_pos] = $0
             
@@ -388,18 +344,19 @@ search_logs_with_context() {
             
             if ($0 ~ pattern) {
                 found_match = 1
-                context_hash = $0
+                print "\\n=== Match Found ===\\n"
                 
-                if (!(context_hash in seen)) {
-                    seen[context_hash] = 1
-                    print "\\n=== Match Found ===\\n"
-                    for (i = 0; i < buffer_size - 1; i++) {
-                        pos = (buffer_start + i) % max_buffer
-                        print "BEFORE | " buffer[pos]
-                    }
-                    print "MATCH  | " $0
-                    printing = after
+                # Print previous lines from buffer
+                for (i = 0; i < buffer_size - 1; i++) {
+                    pos = (buffer_start + i) % max_buffer
+                    print "BEFORE | " buffer[pos]
                 }
+                
+                # Print matching line
+                print "MATCH  | " $0
+                
+                # Start printing aftermath
+                printing = after
             }
             else if (printing > 0) {
                 print "AFTER  | " $0
@@ -416,45 +373,61 @@ search_logs_with_context() {
             }
         }
     '
-}
-
-echo "📊 Fetching failed job logs for run ID: $run_id"
-
-# First attempt - try getting failed logs directly
-LOGS=$(gh run view --repo "$repo" $run_id --log-failed 2>/dev/null)
-if [ -z "$LOGS" ]; then
-    echo "⚠️ No failed logs found directly, attempting to get full logs..."
-    # Second attempt - get full logs and filter for errors
-    LOGS=$(gh run view --repo "$repo" $run_id --log 2>/dev/null)
-fi
-
-if [ -z "$LOGS" ]; then
-    echo "❌ No logs available for this run. The run may still be in progress or logs have expired."
-    exit 1
-fi
-
-# Create a temporary file for the logs
-TEMP_LOG_FILE=$(mktemp)
-echo "$LOGS" > "$TEMP_LOG_FILE"
-
-if [ -n "$pattern" ]; then
-    echo "🔍 Searching for pattern '$pattern' in logs..."
-    cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}"
 else
     echo "🔍 Extracting error context from logs..."
-    cat "$TEMP_LOG_FILE" | process_logs "" "${tail_lines:-100}"
+    tail -n "$TAIL_LINES" "$TEMP_LOG_FILE" | awk '
+        BEGIN {
+            err_pattern = "(error|Error|ERROR|exited|Exited|failed|Failed|FAILED|exit code|Exception|EXCEPTION|fatal|Fatal|FATAL)"
+            found_error = 0
+            context_lines = 5
+            buffer[""] = ""
+            buffer_size = 0
+            printing = 0
+        }
+        
+        {
+            # Store line in buffer
+            buffer[buffer_size % context_lines] = $0
+            buffer_size++
+            
+            if ($0 ~ err_pattern) {
+                found_error = 1
+                print "\\n=== Error Context ===\\n"
+                
+                # Print previous lines for context
+                for (i = 1; i <= context_lines; i++) {
+                    idx = ((buffer_size - i - 1) + context_lines) % context_lines
+                    if (buffer[idx] != "") print "  " buffer[idx]
+                }
+                
+                # Print error line
+                print "❌ " $0
+                printing = 5
+            }
+            else if (printing > 0) {
+                print "  " $0
+                printing--
+            }
+        }
+        
+        END {
+            if (!found_error) {
+                print "No error patterns found in the logs"
+            }
+        }
+    '
 fi
 
 # Clean up
 rm -f "$TEMP_LOG_FILE"
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Run ID. Example: '1234567890'", required=True),
-        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150). Default: 100", required=False),
-        Arg(name="pattern", type="str", description="Pattern to search in failed logs. Supports regular expressions", required=False),
-        Arg(name="before_context", type="int", description="Lines to show before each match (max 5). Default: 2", required=False),
-        Arg(name="after_context", type="int", description="Lines to show after each match (max 5). Default: 2", required=False),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format", required=True),
+        Arg(name="run_id", type="str", description="Run ID", required=True),
+        Arg(name="pattern", type="str", description="Pattern to search in failed logs", required=False),
+        Arg(name="before_context", type="int", description="Lines to show before each match (max 5)", required=False, default=2),
+        Arg(name="after_context", type="int", description="Lines to show after each match (max 5)", required=False, default=2),
+        Arg(name="tail_lines", type="int", description="Number of recent lines to show (1-150)", required=False, default=100),
     ],
 )
 
