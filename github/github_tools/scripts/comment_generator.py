@@ -5,20 +5,10 @@ import json
 import logging
 from pathlib import Path
 
-try:
-    from utils.templating.template_handler import TemplateHandler
-    from utils.templating.schema import WorkflowStep, WorkflowFailure, WorkflowFix, WorkflowRunDetails
-except ImportError:
-    print("⚠️  Import Warning:")
-    print("   Could not import templating utilities.")
-    print("   This is expected during discovery phase and can be safely ignored.")
-    print("   The required modules will be available during actual execution.")
-    pass
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def parse_workflow_steps(steps_json: str) -> list[WorkflowStep]:
+def parse_workflow_steps(steps_json: str) -> list:
     """Parse workflow steps from JSON string."""
     try:
         return json.loads(steps_json)
@@ -26,7 +16,7 @@ def parse_workflow_steps(steps_json: str) -> list[WorkflowStep]:
         logger.error(f"Invalid workflow steps JSON: {e}")
         sys.exit(1)
 
-def parse_failures(failures_json: str) -> list[WorkflowFailure]:
+def parse_failures(failures_json: str) -> list:
     """Parse workflow failures from JSON string."""
     try:
         return json.loads(failures_json)
@@ -34,7 +24,7 @@ def parse_failures(failures_json: str) -> list[WorkflowFailure]:
         logger.error(f"Invalid failures JSON: {e}")
         sys.exit(1)
 
-def parse_fixes(fixes_json: str) -> list[WorkflowFix]:
+def parse_fixes(fixes_json: str) -> list:
     """Parse workflow fixes from JSON string."""
     try:
         return json.loads(fixes_json)
@@ -42,7 +32,7 @@ def parse_fixes(fixes_json: str) -> list[WorkflowFix]:
         logger.error(f"Invalid fixes JSON: {e}")
         sys.exit(1)
 
-def parse_run_details(details_json: str) -> WorkflowRunDetails:
+def parse_run_details(details_json: str) -> dict:
     """Parse workflow run details from JSON string."""
     try:
         return json.loads(details_json)
@@ -59,22 +49,37 @@ def generate_comment(variables: dict) -> str:
         fixes = parse_fixes(variables['fixes'])
         run_details = parse_run_details(variables['run_details'])
 
-        # Create template context with parsed data
+        # Create template context
         context = {
-            'repo': variables['repo'],
+            'workflow_name': run_details.get('name', 'Unknown Workflow'),
+            'failed_steps': ','.join(f['step'] for f in failures),
+            'failures': '|'.join(f"{f['step']}:{f['error']}" for f in failures),
+            'fixes': '|'.join(f"{f['step']}:{f['description']}" for f in fixes),
+            'workflow_steps': ','.join(s['name'] for s in workflow_steps),
+            'error_logs': variables['error_logs'],
+            'run_details': '|'.join(f"{k}:{v}" for k, v in run_details.items() if k not in ['pr_details']),
             'number': variables['pr_number'],
-            'workflow_steps': workflow_steps,
-            'failures': failures,
-            'fixes': fixes,
-            'run_details': run_details,
-            'error_logs': variables['error_logs']
+            'repo': variables['repo']
         }
 
-        handler = TemplateHandler()
-        comment = handler.render_template('workflow_failure', context)
+        # Load and render template
+        template_path = Path(__file__).parent / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2'
+        if not template_path.exists():
+            raise FileNotFoundError(f"Template not found at {template_path}")
+
+        with open(template_path) as f:
+            template_content = f.read()
+
+        # Simple template rendering (without Jinja2 dependency)
+        comment = template_content
+        for key, value in context.items():
+            comment = comment.replace('{{ ' + key + ' }}', str(value))
+            comment = comment.replace('{{' + key + '}}', str(value))
+
         if not comment:
             raise ValueError("Failed to generate comment from template")
         return comment
+
     except Exception as e:
         logger.error(f"Error generating comment: {str(e)}")
         sys.exit(1)
