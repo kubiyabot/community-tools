@@ -40,6 +40,24 @@ def parse_run_details(details_json: str) -> dict:
         logger.error(f"Invalid run details JSON: {e}")
         sys.exit(1)
 
+def find_template_file() -> Path:
+    """Find the workflow failure template file."""
+    possible_paths = [
+        # Check relative to script location
+        Path(__file__).parent / 'templating' / 'templates' / 'workflow_failure.jinja2',
+        Path(__file__).parent / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2',
+        # Check in /opt/scripts path (Docker container)
+        Path('/opt/scripts/templating/templates/workflow_failure.jinja2'),
+        Path('/opt/scripts/utils/templating/templates/workflow_failure.jinja2'),
+    ]
+    
+    for path in possible_paths:
+        if path.exists():
+            logger.info(f"Found template at: {path}")
+            return path
+            
+    raise FileNotFoundError("Could not find workflow_failure.jinja2 template in any expected location")
+
 def generate_comment(variables: dict) -> str:
     """Generate a comment using the workflow failure template."""
     try:
@@ -62,15 +80,12 @@ def generate_comment(variables: dict) -> str:
             'repo': variables['repo']
         }
 
-        # Load and render template
-        template_path = Path(__file__).parent / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2'
-        if not template_path.exists():
-            raise FileNotFoundError(f"Template not found at {template_path}")
-
+        # Find and load template
+        template_path = find_template_file()
         with open(template_path) as f:
             template_content = f.read()
 
-        # Simple template rendering (without Jinja2 dependency)
+        # Simple template rendering
         comment = template_content
         for key, value in context.items():
             comment = comment.replace('{{ ' + key + ' }}', str(value))
@@ -78,6 +93,8 @@ def generate_comment(variables: dict) -> str:
 
         if not comment:
             raise ValueError("Failed to generate comment from template")
+            
+        logger.info("Successfully generated comment")
         return comment
 
     except Exception as e:
@@ -99,11 +116,13 @@ def main():
                 raise KeyError(f"Missing required environment variable: {var}")
             variables[var.lower()] = os.environ[var]
         
+        logger.info("Starting comment generation...")
         comment = generate_comment(variables)
         print(comment)
+        logger.info("Comment generation completed successfully")
         
     except KeyError as e:
-        logger.error(str(e))
+        logger.error(f"Missing environment variable: {str(e)}")
         sys.exit(1)
     except Exception as e:
         logger.error(f"Error: {str(e)}")

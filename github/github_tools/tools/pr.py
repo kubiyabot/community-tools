@@ -336,14 +336,14 @@ fi
         ),
     ],
     with_files=[
-        FileSpec(destination="/opt/scripts/comment_generator.py", 
-                content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()),
-        FileSpec(destination="/opt/scripts/utils/templating/template_handler.py",
-                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'template_handler.py').read()),
-        FileSpec(destination="/opt/scripts/utils/templating/schema.py",
-                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'schema.py').read()),
-        FileSpec(destination="/opt/scripts/utils/templating/templates/workflow_failure.jinja2",
-                content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2').read()),
+        FileSpec(
+            destination="/opt/scripts/comment_generator.py", 
+            content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()
+        ),
+        FileSpec(
+            destination="/opt/scripts/templating/templates/workflow_failure.jinja2",
+            content=open(Path(__file__).parent.parent / 'scripts' / 'templating' / 'templates' / 'workflow_failure.jinja2').read()
+        ),
     ],
 ).register("github")
 
