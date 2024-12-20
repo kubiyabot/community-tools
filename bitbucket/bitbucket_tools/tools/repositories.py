@@ -1,7 +1,7 @@
-from .base import BitbucketTool, register_bitbucket_tool
+from .base import BitbucketCliTool, register_bitbucket_tool
 from kubiya_sdk.tools import Arg
 
-repo_get = BitbucketTool(
+repo_get = BitbucketCliTool(
     name="repo_get",
     description="Get Bitbucket repository details",
     content="""
@@ -23,7 +23,7 @@ print(f"Repository details: {repo}")
     ],
 )
 
-repo_list = BitbucketTool(
+repo_list = BitbucketCliTool(
     name="repo_list",
     description="List Bitbucket repositories",
     content="""
@@ -45,7 +45,7 @@ for repo in repos:
     ],
 )
 
-repo_create = BitbucketTool(
+repo_create = BitbucketCliTool(
     name="repo_create",
     description="Create a new Bitbucket repository",
     content="""

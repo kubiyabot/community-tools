@@ -1,5 +1,6 @@
 from kubiya_sdk.tools import Tool, FileSpec
 from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools.registry import tool_registry
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
 BITBUCKET_ICON_URL = "https://cdn-icons-png.flaticon.com/512/6125/6125001.png"
