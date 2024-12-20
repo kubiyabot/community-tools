@@ -38,7 +38,7 @@ commit_create = BitbucketCliTool(
         Arg(name="repo", type="str", description="Repository name", required=True),
         Arg(name="branch", type="str", description="Branch to commit to", required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=True),
-        Arg(name="files", type="list", description="List of files to commit, each with 'path' and 'content' fields", required=True),
+        Arg(name="files", type="array", description="Array of files to commit, each with 'path' and 'content' fields", required=True),
     ],
 )
 
