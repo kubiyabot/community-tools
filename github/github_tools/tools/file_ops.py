@@ -256,11 +256,28 @@ get_file = GitHubCliTool(
 WHEN TO USE:
 - Need to view file contents
 - Want to fetch file from specific branch/ref""",
-    content=f'''
-{FILE_OPS_SCRIPT}
+    content="""
+#!/bin/bash
+set -euo pipefail
 
-get_file_contents "${{repo}}" "${{file_path}}" "${{ref}}"
-''',
+echo "📄 Fetching file: ${file_path} from ${repo}"
+if [ -n "${ref:-}" ]; then
+    echo "📌 From ref: ${ref}"
+    CONTENT=$(gh api "repos/${repo}/contents/${file_path}?ref=${ref}" --jq '.content' | base64 -d)
+else
+    CONTENT=$(gh api "repos/${repo}/contents/${file_path}" --jq '.content' | base64 -d)
+fi
+
+if [ -n "$CONTENT" ]; then
+    echo "📝 File content:"
+    echo "-------------------"
+    echo "$CONTENT"
+    echo "-------------------"
+else
+    echo "❌ File not found or empty"
+    exit 1
+fi
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="file_path", type="str", description="Path to file in repository", required=True),
@@ -277,11 +294,43 @@ WHEN TO USE:
 - Want to search across branches
 - Need to search large repositories
 - Want to fetch specific file contents""",
-    content=f'''
-{FILE_OPS_SCRIPT}
+    content="""
+#!/bin/bash
+set -euo pipefail
 
-remote_search "${{repo}}" "${{pattern}}" "${{file}}"
-''',
+echo "🔍 Searching in repository: ${repo}"
+PATTERN="${pattern:-}"
+FILE="${file:-}"
+
+if [ -n "$FILE" ]; then
+    echo "📄 Fetching specific file: $FILE"
+    CONTENT=$(gh api "repos/${repo}/contents/${FILE}" --jq '.content' | base64 -d)
+    if [ -n "$CONTENT" ]; then
+        echo "📝 File content:"
+        echo "-------------------"
+        if [ -n "$PATTERN" ]; then
+            echo "$CONTENT" | grep --color=always -n "$PATTERN" || echo "Pattern not found in file"
+        else
+            echo "$CONTENT"
+        fi
+        echo "-------------------"
+    else
+        echo "❌ File not found or empty"
+        exit 1
+    fi
+else
+    if [ -z "$PATTERN" ]; then
+        echo "❌ Either pattern or file must be specified"
+        exit 1
+    fi
+    
+    echo "🔍 Searching for: $PATTERN"
+    gh api -X GET "search/code" \
+        -f "q=repo:${repo} ${PATTERN}" \
+        -f "per_page=100" \
+        --jq '.items[] | "📄 \(.path)\n   🔗 \(.html_url)\n   📝 \(.text_matches[].fragment // "No preview")\n"'
+fi
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="pattern", type="str", description="Search pattern (optional if fetching specific file)", required=False),
@@ -296,19 +345,23 @@ list_files = GitHubCliTool(
 #!/bin/bash
 set -euo pipefail
 
-echo "📂 Listing files in repository: $repo"
-[[ -n "${filter:-}" ]] && echo "🔍 Filter: $filter" 
-[[ -n "${ref:-}" ]] && echo "🔖 Ref: $ref"
+echo "📂 Listing files in repository: ${repo}"
+FILTER="${filter:-}"
+REF="${ref:-HEAD}"
+SHOW_DETAILS="${show_details:-false}"
+
+[ -n "$FILTER" ] && echo "🔍 Filter: $FILTER" 
+[ "$REF" != "HEAD" ] && echo "🔖 Ref: $REF"
 
 # Build the API query
-API_PATH="repos/$repo/git/trees/$([[ -n "${ref:-}" ]] && echo "$ref" || echo "HEAD")?recursive=1"
+API_PATH="repos/${repo}/git/trees/${REF}?recursive=1"
 
 # Fetch repository tree
 echo "🔍 Fetching repository structure..."
 TREE=$(gh api "$API_PATH")
 
 # Process and display the tree structure
-echo "$TREE" | jq -r '
+echo "$TREE" | jq -r --arg show_details "$SHOW_DETAILS" '
     .tree | 
     sort_by(.path) | 
     .[] | 
@@ -317,8 +370,8 @@ echo "$TREE" | jq -r '
     else
         if .type == "blob" then
             "  📄 " + .path + 
-            if env.show_details == "true" then
-                "\\n    📊 Size: " + (.size|tostring) + " bytes"
+            if $show_details == "true" then
+                "\n    📊 Size: " + (.size|tostring) + " bytes"
             else 
                 ""
             end
@@ -328,18 +381,19 @@ echo "$TREE" | jq -r '
     end
 ' | while read -r line; do
     # Apply filters if specified
-    if [[ -n "${filter:-}" ]] && [[ ! "$line" =~ "$filter" ]]; then
+    if [ -n "$FILTER" ] && [[ ! "$line" =~ $FILTER ]]; then
         continue
     fi
     echo "$line"
 done
+
 echo "✨ File listing complete!"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
         Arg(name="filter", type="str", description="Optional filter pattern for file names. Example: '.py' or 'test'", required=False),
         Arg(name="ref", type="str", description="Optional git reference (branch, tag, or commit SHA). Example: 'main' or 'v1.0.0'", required=False),
-        Arg(name="show_details", type="bool", description="Show file size", required=False, default="false"),
+        Arg(name="show_details", type="str", description="Show file size", required=False, default="false"),
     ],
 )
 
