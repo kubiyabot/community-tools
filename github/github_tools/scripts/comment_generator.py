@@ -70,12 +70,12 @@ def generate_comment(variables: dict) -> str:
         # Create template context
         context = {
             'workflow_name': run_details.get('name', 'Unknown Workflow'),
-            'failed_steps': ','.join(f['step'] for f in failures),
-            'failures': '|'.join(f"{f['step']}:{f['error']}" for f in failures),
-            'fixes': '|'.join(f"{f['step']}:{f['description']}" for f in fixes),
-            'workflow_steps': ','.join(s['name'] for s in workflow_steps),
+            'failed_steps': ','.join(failure['step'] for failure in failures),
+            'failures': '|'.join(f"{failure['step']}:{failure['error']}" for failure in failures),
+            'fixes': '|'.join(f"{fix['step']}:{fix['description']}" for fix in fixes),
+            'workflow_steps': ','.join(step['name'] for step in workflow_steps),
             'error_logs': variables['error_logs'],
-            'run_details': '|'.join(f"{k}:{v}" for k, v in run_details.items() if k not in ['pr_details']),
+            'run_details': '|'.join(f"{k}:{v}" for k, v in run_details.items()),
             'number': variables['pr_number'],
             'repo': variables['repo']
         }
@@ -90,7 +90,16 @@ def generate_comment(variables: dict) -> str:
         for key, value in context.items():
             comment = comment.replace('{{ ' + key + ' }}', str(value))
             comment = comment.replace('{{' + key + '}}', str(value))
+            # Also replace filter expressions with empty string
+            comment = comment.replace('| selectattr', '')
+            comment = comment.replace('| first', '')
+            comment = comment.replace('| replace', '')
 
+        # Clean up any remaining template syntax
+        comment = comment.replace('{%', '').replace('%}', '')
+        comment = comment.replace('{#', '').replace('#}', '')
+        comment = comment.replace('endfor', '')
+        
         if not comment:
             raise ValueError("Failed to generate comment from template")
             
