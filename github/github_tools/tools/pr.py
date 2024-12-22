@@ -159,7 +159,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+EXISTING_COMMENTS=$(gh api "repos/$repo/issues/$number/comments" --jq "[.[] | select(.user.login == \\"$GITHUB_ACTOR\\")]")
 
 COMMENTS=$(gh api "repos/$repo/issues/$number/comments")
 echo "COMMENTS: $COMMENTS"  
