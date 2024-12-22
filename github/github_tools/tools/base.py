@@ -1,77 +1,129 @@
-from kubiya_sdk.tools import Tool, FileSpec
+from kubiya_sdk.tools.models import Tool, FileSpec
 from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools.registry import tool_registry
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
 GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
 GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
 
+# Shell script functions for log processing
+LOG_PROCESSING_FUNCTIONS = r'''
+# Log processing functions
+process_log() {{
+    local log="${{1}}"
+    echo "${{log}}" | while IFS= read -r line; do
+        echo "${{line}}" | sed 's/\x1b\[[0-9;]*m//g'
+    done
+}}
+
+format_timestamp() {{
+    date -u "+%Y-%m-%d %H:%M:%S UTC"
+}}
+
+log_info() {{
+    echo "ℹ️ $(format_timestamp) - {log_prefix} ${{1}}"
+}}
+
+log_error() {{
+    echo "❌ $(format_timestamp) - {log_prefix} ${{1}}" >&2
+}}
+
+log_success() {{
+    echo "✅ $(format_timestamp) - {log_prefix} ${{1}}"
+}}
+
+stream_logs() {{
+    local run_id="${{1}}"
+    local repo="${{2}}"
+    
+    log_info "Starting log stream for run ${{run_id}}"
+    
+    if ! gh run view "${{run_id}}" --repo "${{repo}}" --log 2>&1; then
+        log_error "Failed to stream logs for run ${{run_id}}"
+        return 1
+    fi
+    
+    local status
+    status=$(gh run view "${{run_id}}" --repo "${{repo}}" --json status --jq '.status' 2>/dev/null)
+    
+    case "${{status}}" in
+        "completed")
+            log_success "Workflow run completed"
+            return 0
+            ;;
+        "failure")
+            log_error "Workflow run failed"
+            return 1
+            ;;
+        *)
+            log_info "Workflow status: ${{status}}"
+            return 0
+            ;;
+    esac
+}}
+
+check_existing_comment() {{
+    local repo="${{1}}"
+    local pr_number="${{2}}"
+    local actor="${{3}}"
+    
+    gh api "repos/${{repo}}/issues/${{pr_number}}/comments" --jq ".[] | select(.user.login == \"${{actor}}\") | .id" | head -n 1
+}}
+
+update_comment() {{
+    local repo="${{1}}"
+    local pr_number="${{2}}"
+    local comment_id="${{3}}"
+    local body="${{4}}"
+    local edit_count="${{5}}"
+    
+    local updated_body
+    updated_body="### Last Update (Kubiya.ai) (Edit #${{edit_count}})\\n\\n${{body}}\\n\\n---\\n\\n*Note: To reduce noise, this comment was edited rather than creating a new one.*\\n\\n<details><summary>Previous Comment</summary>\\n\\n$(gh api "repos/${{repo}}/issues/comments/${{comment_id}}" --jq .body)\\n\\n</details>"
+    
+    gh api "repos/${{repo}}/issues/comments/${{comment_id}}" -X PATCH -f body="${{updated_body}}"
+}}
+'''
+
 class GitHubCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False):
-        enhanced_content = f"""
-#!/bin/sh
-set -e
+    def __init__(self, name, description, content, args, long_running=False, with_volumes=None, with_files=None):
+        if with_volumes is None:
+            with_volumes = []
+        if with_files is None:
+            with_files = []
 
+        # Format shell functions for inclusion in script
+        formatted_functions = LOG_PROCESSING_FUNCTIONS.format(
+            name=name,
+            log_prefix=f"[{name}]"
+        )
+
+        # Add common shell functions and content
+        enhanced_content = f'''#!/bin/bash
+set -euo pipefail
+
+{formatted_functions}
+
+# Install required tools
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
     apk add --quiet jq >/dev/null 2>&1
 fi
 
-check_and_set_org() {{
-    if [ -n "$org" ]; then
-        echo "Using organization: $org"
-    else
-        orgs=$(gh api user/orgs --jq '.[].login')
-        org_count=$(echo "$orgs" | wc -l)
-        if [ "$org_count" -eq 0 ]; then
-            echo "You are not part of any organization."
-        elif [ "$org_count" -eq 1 ]; then
-            org=$orgs
-            echo "You are part of one organization: $org. Using this organization."
-        else
-            echo "You are part of the following organizations:"
-            echo "$orgs"
-            echo "Please specify the organization in your command if needed."
-        fi
-    fi
-}}
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --quiet python3 py3-pip >/dev/null 2>&1
+fi
 
-get_repo_context() {{
-    if [ -z "$repo" ]; then
-        if [ -n "$org" ]; then
-            echo "No repository specified. Here are your 10 most recently updated repositories in the $org organization:"
-            gh repo list $org --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
-        else
-            echo "No repository specified. Here are your 10 most recently updated repositories:"
-            gh repo list --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
-        fi
-        echo "NOTE: This is not a complete list of your repositories."
-        echo "Please specify a repository name in your command."
-        exit 1
-    else
-        if [[ "$repo" != *"/"* ]]; then
-            if [ -n "$org" ]; then
-                repo="${{org}}/${{repo}}"
-            else
-                current_user=$(gh api user --jq '.login')
-                repo="${{current_user}}/${{repo}}"
-            fi
-        fi
-        echo "Using repository: $repo"
-    fi
-}}
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
+fi
 
-check_and_set_org
-get_repo_context
+if ! python3 -c "import jinja2" >/dev/null 2>&1; then
+    pip3 install --quiet jinja2 >/dev/null 2>&1
+fi
 
+# Main script content
 {content}
-"""
-
-        updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
-        updated_args.extend([
-            Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False),
-            Arg(name="repo", type="str", description="Repository name. If org is provided or auto-detected, you can just specify the repo name. Otherwise, use the format 'owner/repo'.", required=False)
-        ])
-
+'''
+            
         super().__init__(
             name=name,
             description=description,
@@ -79,145 +131,54 @@ get_repo_context
             type="docker",
             image=GITHUB_CLI_DOCKER_IMAGE,
             content=enhanced_content,
-            args=updated_args,
-            env=COMMON_ENV,
+            with_files=with_files,
+            args=args,
+            env=COMMON_ENV + [
+                "KUBIYA_AGENT_PROFILE",
+                "KUBIYA_AGENT_UUID",
+            ],
             files=COMMON_FILES,
             secrets=COMMON_SECRETS,
-            long_running=long_running
+            long_running=long_running,
+            with_volumes=with_volumes
         )
 
-# Add this new tool for streaming GitHub Actions workflow logs
-stream_workflow_logs = GitHubCliTool(
-    name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time.",
-    content="""
-#!/bin/sh
-set -e
+    def register(self, namespace: str):
+        """Register the tool with the given namespace."""
+        tool_registry.register(namespace, self)
+        return self
 
-if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
-    if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
-        exit 1
-    fi
-    echo "Using the latest run ID: $run_id"
-fi
-
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
-
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
-""",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
-    ],
-    long_running=True
-)
-
-# Don't forget to register the new tool
-from kubiya_sdk.tools.registry import tool_registry
-tool_registry.register("github", stream_workflow_logs)
-
-
-class GitHubRepolessCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False):
-        enhanced_content = f"""
-#!/bin/sh
-set -e
-
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
-    apk add --quiet jq >/dev/null 2>&1
-fi
-
-check_and_set_org() {{
-    if [ -n "$org" ]; then
-        echo "Using organization: $org"
-    else
-        orgs=$(gh api user/orgs --jq '.[].login')
-        org_count=$(echo "$orgs" | wc -l)
-        if [ "$org_count" -eq 0 ]; then
-            echo "You are not part of any organization."
-        elif [ "$org_count" -eq 1 ]; then
-            org=$orgs
-            echo "You are part of one organization: $org. Using this organization."
-        else
-            echo "You are part of the following organizations:"
-            echo "$orgs"
-            echo "Please specify the organization in your command if needed."
-        fi
-    fi
-}}
-check_and_set_org
-
-{content}
-"""
-
-        updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
-        updated_args.extend([
-            Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False),
-        ])
-
+class GitHubRepolessCliTool(GitHubCliTool):
+    def __init__(self, name, description, content, args=None, with_files=None):
         super().__init__(
             name=name,
             description=description,
-            icon_url=GITHUB_ICON_URL,
-            type="docker",
-            image=GITHUB_CLI_DOCKER_IMAGE,
-            content=enhanced_content,
-            args=updated_args,
-            env=COMMON_ENV,
-            files=COMMON_FILES,
-            secrets=COMMON_SECRETS,
-            long_running=long_running
+            content=content,
+            args=args or [],
+            with_files=with_files or []
         )
 
-# Add this new tool for streaming GitHub Actions workflow logs
+# Update stream_workflow_logs tool to use the common functions
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
     description="Stream logs from a GitHub Actions workflow run in real-time.",
     content="""
-#!/bin/sh
-set -e
-
-if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
+if [ -z "${run_id:-}" ]; then
+    log_info "No run ID provided. Fetching the latest workflow run..."
+    run_id=$(gh run list --repo "$repo" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null)
     if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
+        log_error "No workflow runs found for the repository."
         exit 1
     fi
-    echo "Using the latest run ID: $run_id"
+    log_info "Using the latest run ID: $run_id"
 fi
 
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
-
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
+log_info "Streaming logs for workflow run $run_id in repository $repo..."
+stream_logs "$run_id" "$repo"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
     ],
     long_running=True
-)
-
-# Don't forget to register the new tool
-from kubiya_sdk.tools.registry import tool_registry
-tool_registry.register("github", stream_workflow_logs)
+).register("github")

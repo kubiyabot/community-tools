@@ -1,0 +1,141 @@
+# 🔍 Workflow Analysis Report
+
+## 🚨 Summary of Findings
+
+{% set total_failures = workflow_steps | selectattr("status", "equalto", "failure") | list | length %}
+{% if total_failures == 1 %}
+**We found 1 failing step in your workflow.**
+{% else %}
+**We found {{ total_failures }} failing steps in your workflow.**
+{% endif %}
+
+### 🛑 Failed Steps:
+{% for step in workflow_steps if step.status == 'failure' %}
+- `{{ step.name }}` {% if loop.first %}(Primary Issue){% endif %}
+{% endfor %}
+
+## 📊 Detailed Analysis
+
+### 🔬 What Failed:
+{% for failure in failures %}
+<details>
+<summary><b>{{ failure.step }}</b> - Click to see details</summary>
+
+#### Error Details:
+- **Error Message**: 
+  ```
+  {{ failure.error }}
+  ```
+{% if failure.file %}
+- **Location**: `{{ failure.file }}` {% if failure.line %}(Line {{ failure.line }}){% endif %}
+{% endif %}
+
+#### 🔍 Context:
+```
+{{ error_logs | truncate(500) }}
+```
+[View Full Logs](#error-logs)
+
+</details>
+{% endfor %}
+
+### 🛠️ Recommended Fixes:
+{% for fix in fixes %}
+#### {{ loop.index }}. Fix for "{{ fix.step }}":
+- 📝 **Action Required**: {{ fix.description }}
+{% if fix.code_sample %}
+- ✨ **Suggested Code**:
+  ```
+  {{ fix.code_sample }}
+  ```
+{% endif %}
+{% endfor %}
+
+## 📁 Changed Files Analysis
+
+<details>
+<summary>📊 <b>Changes Overview</b> ({{ run_details.pr_details.changed_files | length }} files)</summary>
+
+{% set total_additions = run_details.pr_details.additions %}
+{% set total_deletions = run_details.pr_details.deletions %}
+
+- **Total Changes**: {{ total_additions + total_deletions }} lines
+- **Additions**: +{{ total_additions }} 📈
+- **Deletions**: -{{ total_deletions }} 📉
+- **Commits**: {{ run_details.pr_details.commits_count }} 📦
+
+### Modified Files:
+{% for file in run_details.pr_details.changed_files %}
+<details>
+<summary>{{ "✨ New" if file.status == "added" else "🔄 Modified" if file.status == "modified" else "❌ Deleted" }} <code>{{ file.filename }}</code> ({{ file.changes }} changes)</summary>
+
+```diff
+{{ file.patch }}
+```
+
+</details>
+{% endfor %}
+
+</details>
+
+## 🔄 Workflow Execution Details
+
+### 📊 Workflow Steps:
+```mermaid
+graph TD;
+    {% for step in workflow_steps %}
+    {{ step.number }}["{{ step.name }}{{ ' ✅' if step.status == 'success' else ' ❌' if step.status == 'failure' else ' ⏭️' }}"];
+    {% if not loop.first %}
+    {{ step.number - 1 }} --> {{ step.number }};
+    {% endif %}
+    {% if step.status == 'failure' %}
+    style {{ step.number }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
+    {% elif step.status == 'success' %}
+    style {{ step.number }} fill:#51cf66,stroke:#333,stroke-width:2px;
+    {% else %}
+    style {{ step.number }} fill:#868e96,stroke:#333,stroke-width:2px;
+    {% endif %}
+    {% endfor %}
+
+    classDef success fill:#51cf66,stroke:#333,stroke-width:2px;
+    classDef failure fill:#ff6b6b,stroke:#333,stroke-width:4px;
+    classDef skipped fill:#868e96,stroke:#333,stroke-width:2px;
+```
+
+### 🎯 Run Information:
+- **Run ID**: `{{ run_details.id }}`
+- **Workflow**: {{ run_details.name }}
+- **Started**: {{ run_details.started_at | replace("T", " ") | replace("Z", " UTC") }}
+- **Status**: {{ "✅ Success" if run_details.status == "success" else "❌ Failed" if run_details.status == "failure" else "⏳ " + run_details.status | title }}
+- **Triggered By**: [@{{ run_details.actor }}](https://github.com/{{ run_details.actor }})
+- **Event**: `{{ run_details.trigger_event }}`
+
+### 🔗 Quick Links:
+- **Pull Request**: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
+- **Workflow Run**: [View Run](https://github.com/{{ repo }}/actions/runs/{{ run_details.id }})
+- **Branch**: `{{ run_details.pr_details.head_branch }}` → `{{ run_details.pr_details.base_branch }}`
+
+## 📝 Next Steps
+
+1. Review the suggested fixes above
+2. Apply changes to the failing files
+3. Push your changes to trigger a new workflow run
+4. Monitor the new run for success
+
+<details>
+<summary>🎯 <b>Pro Tips</b></summary>
+
+- Make small, focused changes
+- Test locally if possible before pushing
+- Review the full error logs for additional context
+- Consider adding tests to prevent similar issues
+
+</details>
+
+---
+
+<div align="center">
+
+> 🤖 This action was automated by [Kubiya.ai](https://kubiya.ai) on behalf of @{{ run_details.actor }}
+
+</div>
