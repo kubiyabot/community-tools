@@ -44,13 +44,28 @@ def parse_module_urls(urls_input: Any) -> List[Dict[str, Any]]:
                     logger.warning(f"Skipping invalid module config: {item}")
                     
         elif isinstance(urls_input, dict):
-            # Handle dict format with metadata
-            for url, metadata in urls_input.items():
-                if not isinstance(metadata, dict):
-                    modules.append({"url": url.strip()})
-                else:
-                    modules.append({"url": url.strip(), **metadata})
-                    
+            # Handle new configuration format
+            for module_name, module_config in urls_input.items():
+                if isinstance(module_config, dict):
+                    # Convert registry format to URL format
+                    if '/' in module_config.get('source', ''):
+                        source_parts = module_config['source'].split('/')
+                        if len(source_parts) == 3:  # namespace/name/provider format
+                            url = f"registry.terraform.io/{module_config['source']}"
+                        else:
+                            url = module_config['source']
+                    else:
+                        url = module_config['source']
+
+                    modules.append({
+                        'url': url,
+                        'name': module_name,
+                        'version': module_config.get('version'),
+                        'auto_discover': module_config.get('auto_discover', True),
+                        'instructions': module_config.get('instructions'),
+                        'variables': module_config.get('variables', {})
+                    })
+
         else:
             logger.warning(f"Unexpected type for module URLs: {type(urls_input)}")
             return []

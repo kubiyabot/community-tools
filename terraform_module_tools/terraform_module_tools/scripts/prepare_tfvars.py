@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Dict, Any
 from terraform_module_tools.scripts.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+from .runtime_helper import get_runtime_instructions
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -84,6 +85,11 @@ def main():
     print_progress("Starting tfvars preparation...", "🚀")
     
     try:
+        # Get runtime instructions if available
+        if instructions := get_runtime_instructions(str(module_path)):
+            print_progress("Got special instructions from teammate:", "💡")
+            print(instructions)
+
         # Validate module variables file exists
         if not module_vars_file.exists():
             raise ScriptError(

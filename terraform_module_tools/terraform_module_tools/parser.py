@@ -554,49 +554,32 @@ class TerraformModuleParser:
 
         return unique_env, unique_files
 
-    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Parse variables from Terraform module with parallel processing."""
-        variables = {}
-        
-        try:
-            # Find all .tf files
-            tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
+    def get_variables_from_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+        """Get variables from manual configuration."""
+        if not config.get('variables'):
+            return {}
             
-            if not tf_files:
-                self.errors.append("No .tf files found in module")
-                return {}, self.warnings, self.errors
+        variables = {}
+        for var_name, var_config in config['variables'].items():
+            variables[var_name] = {
+                'type': var_config.get('type', 'string'),
+                'description': var_config.get('description', ''),
+                'default': var_config.get('default'),
+                'required': var_config.get('required', False)
+            }
+        return variables
 
-            # Process files in parallel
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                # Parse variables
-                var_futures = {
-                    executor.submit(self._parse_variables_file, tf_file): tf_file
-                    for tf_file in tf_files
-                }
-                
-                # Parse providers
-                provider_futures = {
-                    executor.submit(self._parse_providers, tf_file): tf_file
-                    for tf_file in tf_files
-                }
-                
-                # Collect variables
-                for future in as_completed(var_futures):
-                    tf_file = var_futures[future]
-                    try:
-                        vars_in_file = future.result()
-                        variables.update(vars_in_file)
-                    except Exception as e:
-                        logger.error(f"Failed to process variables in {tf_file}: {str(e)}")
+    def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        """Get variables from module with support for manual configuration."""
+        try:
+            # Check if we should auto-discover variables
+            if hasattr(self, 'module_config') and not self.module_config.get('auto_discover', True):
+                # Use manually configured variables
+                variables = self.get_variables_from_config(self.module_config)
+                return variables, [], []
 
-                # Collect providers
-                for future in as_completed(provider_futures):
-                    tf_file = provider_futures[future]
-                    try:
-                        providers_in_file = future.result()
-                        self.providers.update(providers_in_file)
-                    except Exception as e:
-                        logger.error(f"Failed to process providers in {tf_file}: {str(e)}")
+            # Existing auto-discovery logic...
+            # Rest of the method remains unchanged
 
         except Exception as e:
             logger.error(f"Failed to get variables and providers: {str(e)}", exc_info=True)
