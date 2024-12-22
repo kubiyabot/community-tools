@@ -391,8 +391,8 @@ class TerraformModuleParser:
             # Ensure git is installed (cached)
             self._ensure_git()
 
-            # Prepare clone URL once
-            clone_url = self._get_clone_url()
+            # Get clone URL from source
+            clone_url = self.source.get_clone_url()
             logger.info(f"Using clone URL: {clone_url}")
             
             # Prepare command list efficiently
@@ -427,6 +427,13 @@ class TerraformModuleParser:
             self.module_dir = os.path.join(temp_dir, self.path or '')
             if self.path and not os.path.exists(self.module_dir):
                 raise ValueError(f"Specified path '{self.path}' does not exist")
+
+            # Set README URL for GitHub repositories
+            if self.source.source_type in ('github', 'registry'):
+                base_url = clone_url.rstrip('.git')
+                ref = self.source.get_ref() or 'master'
+                path = self.source.get_path() or ''
+                self.readme_url = f"{base_url}/blob/{ref}/{path}/README.md".rstrip('/')
 
         except Exception as e:
             shutil.rmtree(temp_dir, ignore_errors=True)
