@@ -337,6 +337,7 @@ class TerraformModuleParser:
         source_url: str,
         ref: Optional[str] = None,
         path: Optional[str] = None,
+        module_config: Optional[Dict[str, Any]] = None,
         max_workers: int = 4
     ):
         self.source = ModuleSource(source_url, version=ref)
@@ -347,6 +348,7 @@ class TerraformModuleParser:
         self.module_dir = None
         self.max_workers = max_workers
         self.providers: Set[str] = set()
+        self.module_config = module_config
         self._clone_repository()
         ensure_hcl2json()
 
@@ -572,28 +574,59 @@ class TerraformModuleParser:
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """Get variables from module with support for manual configuration."""
         try:
-            # Check if we should auto-discover variables
-            if hasattr(self, 'module_config') and not self.module_config.get('auto_discover', True):
-                # Use manually configured variables
+            # Check if we should use manual configuration
+            if self.module_config and not self.module_config.get('auto_discover', True):
+                logger.info("Using manually configured variables")
                 variables = self.get_variables_from_config(self.module_config)
                 return variables, [], []
 
-            # Existing auto-discovery logic...
-            # Rest of the method remains unchanged
+            # Auto-discover variables
+            logger.info("Auto-discovering variables")
+            variables = {}
+            tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)
+            
+            if not tf_files:
+                self.errors.append("No .tf files found in module")
+                return {}, self.warnings, self.errors
+
+            # Process files in parallel
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                # Parse variables
+                var_futures = {
+                    executor.submit(self._parse_variables_file, tf_file): tf_file
+                    for tf_file in tf_files
+                }
+                
+                # Parse providers
+                provider_futures = {
+                    executor.submit(self._parse_providers, tf_file): tf_file
+                    for tf_file in tf_files
+                }
+                
+                # Collect variables
+                for future in as_completed(var_futures):
+                    tf_file = var_futures[future]
+                    try:
+                        vars_in_file = future.result()
+                        variables.update(vars_in_file)
+                    except Exception as e:
+                        logger.error(f"Failed to process variables in {tf_file}: {str(e)}")
+
+                # Collect providers
+                for future in as_completed(provider_futures):
+                    tf_file = provider_futures[future]
+                    try:
+                        providers_in_file = future.result()
+                        self.providers.update(providers_in_file)
+                    except Exception as e:
+                        logger.error(f"Failed to process providers in {tf_file}: {str(e)}")
+
+            return variables, self.warnings, self.errors
 
         except Exception as e:
-            logger.error(f"Failed to get variables and providers: {str(e)}", exc_info=True)
-            self.errors.append(f"Failed to get variables and providers: {str(e)}")
-        finally:
-            # Clean up the cloned repository
-            if self.module_dir and os.path.exists(os.path.dirname(self.module_dir)):
-                shutil.rmtree(os.path.dirname(self.module_dir))
-                logger.info(f"Cleaned up temporary directory: {self.module_dir}")
-
-        if not variables:
-            self.errors.append("No variables found in module")
-
-        return variables, self.warnings, self.errors
+            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
+            self.errors.append(f"Failed to get variables: {str(e)}")
+            return {}, self.warnings, self.errors
 
     def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process individual variable configuration."""

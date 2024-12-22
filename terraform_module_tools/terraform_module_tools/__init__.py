@@ -12,9 +12,22 @@ def initialize(dynamic_config=None):
         if not dynamic_config:
             logger.warning("No dynamic configuration provided")
             return []
-            
-        # Pass the dynamic config directly to initialize_tools
-        initialized_tools = initialize_tools(dynamic_config)
+
+        # Convert dynamic config to module configurations
+        module_configs = {}
+        for module_name, config in dynamic_config.items():
+            if isinstance(config, dict):
+                module_configs[module_name] = {
+                    'name': module_name,
+                    'source': config['source'],
+                    'version': config.get('version'),
+                    'auto_discover': config.get('auto_discover', True),
+                    'instructions': config.get('instructions'),
+                    'variables': config.get('variables', {})
+                }
+
+        # Initialize tools with module configurations
+        initialized_tools = initialize_tools(module_configs)
         if initialized_tools:
             logger.info(f"Successfully initialized {len(initialized_tools)} Terraform tools")
             return initialized_tools

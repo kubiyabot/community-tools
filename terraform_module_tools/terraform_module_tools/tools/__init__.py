@@ -161,34 +161,43 @@ def _get_clean_module_name(module_config: Dict[str, Any]) -> str:
 def create_terraform_module_tool(module_config: Dict[str, Any], action: str, with_pr: bool = False):
     """Create a Terraform module tool from module configuration."""
     try:
-        # Parse module information from URL
+        # Handle registry format URLs
+        source_url = module_config.get('url') or module_config.get('source')
+        if '/' in source_url and len(source_url.split('/')) == 3:
+            source_url = f"registry.terraform.io/{source_url}"
+
+        # Create parser with auto_discover flag
         parser = TerraformModuleParser(
-            source_url=module_config['url'],
-            ref=module_config.get('ref'),
-            path=module_config.get('path')
+            source_url=source_url,
+            ref=module_config.get('version') or module_config.get('ref'),
+            path=module_config.get('path'),
+            module_config=module_config  # Pass full config for manual variables
         )
         
         variables, warnings, errors = parser.get_variables()
         
         if errors:
-            logger.error(f"Failed to parse module {module_config['url']}: {errors}")
+            logger.error(f"Failed to parse module {source_url}: {errors}")
             return None
             
         for warning in warnings:
-            logger.warning(f"Warning for {module_config['url']}: {warning}")
+            logger.warning(f"Warning for {source_url}: {warning}")
 
         # Get clean module name
-        module_name = _get_clean_module_name(module_config)
+        module_name = module_config.get('name') or _get_clean_module_name(module_config)
         
         # Create module configuration
         tool_config = {
             'name': module_name,
             'description': module_config.get('description') or f"Terraform module for {module_name}",
             'source': {
-                'location': module_config['url'],
-                'version': module_config.get('ref') or parser.source.get_ref() or 'latest',
+                'location': source_url,
+                'version': module_config.get('version') or parser.source.get_ref() or 'latest',
                 'path': module_config.get('path')
             },
+            'auto_discover': module_config.get('auto_discover', True),
+            'instructions': module_config.get('instructions'),
+            'variables': module_config.get('variables'),
             'metadata': module_config.get('metadata', {})
         }
 
@@ -205,7 +214,7 @@ def create_terraform_module_tool(module_config: Dict[str, Any], action: str, wit
         )
 
     except Exception as e:
-        logger.error(f"Failed to create tool for {module_config['url']}: {str(e)}")
+        logger.error(f"Failed to create tool for {source_url}: {str(e)}")
         return None
 
 def initialize_tools(dynamic_config=None):
