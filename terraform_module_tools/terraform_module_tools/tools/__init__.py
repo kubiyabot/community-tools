@@ -217,17 +217,19 @@ def create_terraform_module_tool(module_config: Dict[str, Any], action: str, wit
         logger.error(f"Failed to create tool for {source_url}: {str(e)}")
         return None
 
-def initialize_tools(dynamic_config=None):
+def initialize_tools(module_configs=None):
     """Initialize all Terraform module tools from dynamic configuration."""
     tools = []
     try:
-        if not dynamic_config:
-            error_msg = "No dynamic configuration provided - please provide Terraform module URLs to initialize the tools for"
+        if not module_configs:
+            error_msg = "No module configurations provided"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Create tools for each module in the dynamic config
-        for module_name, module_config in dynamic_config.items():
+        logger.info(f"Initializing tools for {len(module_configs)} modules")
+
+        # Create tools for each module in the config
+        for module_name, module_config in module_configs.items():
             try:
                 logger.info(f"Creating tools for module: {module_name}")
                 
