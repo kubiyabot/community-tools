@@ -345,8 +345,11 @@ class TerraformModuleParser:
         self.max_workers = max_workers
         self.providers: Set[str] = set()
         self.module_config = module_config
-        self._clone_repository()
-        ensure_hcl2json()
+        
+        # Only clone repository if we need to auto-discover
+        if not module_config or module_config.get('auto_discover', True):
+            self._clone_repository()
+            ensure_hcl2json()
 
     def _clone_repository(self) -> None:
         """Clone the repository with optimized git operations."""
@@ -597,9 +600,15 @@ class TerraformModuleParser:
             if self.module_config and not self.module_config.get('auto_discover', True):
                 logger.info("Using manually configured variables")
                 variables = self.get_variables_from_config(self.module_config)
+                # Set providers if specified in config
+                if 'providers' in self.module_config:
+                    self.providers.update(self.module_config['providers'])
                 return variables, [], []
 
             # Auto-discover variables
+            if not self.module_dir:
+                raise ValueError("Module directory not set. Cannot auto-discover variables.")
+
             logger.info("Auto-discovering variables")
             variables = {}
             tf_files = glob.glob(os.path.join(self.module_dir, '**', '*.tf'), recursive=True)

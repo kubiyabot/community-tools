@@ -31,11 +31,24 @@ def create_tfvars(module_vars: Dict[str, Any], output_path: Path) -> None:
     tfvars = {}
     missing_vars = []
 
-    # Process each variable from module variables
+    # Load module config to check if it's manual
+    config_file = output_path.parent / '.module_config.json'
+    is_manual = False
+    if config_file.exists():
+        with config_file.open() as f:
+            config = json.load(f)
+            is_manual = not config.get('auto_discover', True)
+
+    # Process each variable
     for var_name, var_config in module_vars.items():
         env_var_value = os.environ.get(var_name)
         
         if env_var_value is not None:
+            # For manual config, validate against defined variables
+            if is_manual and var_name not in module_vars:
+                logger.warning(f"Variable {var_name} provided but not defined in module configuration")
+                continue
+
             # Convert environment variable value to appropriate type
             try:
                 if var_config.get('type') == 'bool':
