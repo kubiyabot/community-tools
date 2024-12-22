@@ -8,6 +8,7 @@ import re
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 from terraform_module_tools.scripts.error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+from .runtime_helper import get_runtime_instructions
 
 # Try to import slack_sdk
 try:
@@ -136,6 +137,12 @@ def main():
     slack.send_initial_message(f"Starting Terraform plan for workspace '{workspace_name}'...")
 
     try:
+        # Get runtime instructions if available
+        if instructions := get_runtime_instructions(str(module_path)):
+            print_progress("Got special instructions from teammate:", "💡")
+            print(instructions)
+            slack.update_progress(f"Special Instructions:\n{instructions}")
+
         # Validate module path
         validate_module_path(module_path)
         logger.info(f"Using module path: {module_path}")

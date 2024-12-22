@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Tool, Arg, FileSpec
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 import json
 import logging
@@ -212,6 +212,13 @@ class TerraformModuleTool(Tool):
             content=module_variables_signature
         )
         with_files.append(module_variables_file)
+
+        # Save module configuration for runtime use
+        module_config_file = FileSpec(
+            destination="/opt/scripts/.module_config.json",
+            content=json.dumps(values.get('module_config', {}))
+        )
+        with_files.append(module_config_file)
 
         # Update 'with_files' in values
         values['with_files'] = with_files
