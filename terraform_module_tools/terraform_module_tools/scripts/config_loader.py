@@ -130,7 +130,7 @@ def validate_config(config: Dict[str, Any]) -> bool:
     if not JSONSCHEMA_AVAILABLE:
         # Basic validation without jsonschema
         for module_name, module_config in config.items():
-            required_fields = ["name", "description", "source"]
+            required_fields = ["description", "source"] # name is optional
             for field in required_fields:
                 if field not in module_config:
                     raise ValueError(f"Missing required field '{field}' in module '{module_name}'")
@@ -168,4 +168,4 @@ def get_module_configs() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Failed to load module configurations: {str(e)}")
-        return {} 
+        raise ValueError(f"Failed to load module configurations: {str(e)}")
