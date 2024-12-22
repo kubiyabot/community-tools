@@ -9,78 +9,45 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
-class ModuleConfigError(Exception):
-    """Custom exception for module configuration errors."""
-    pass
-
 def validate_module_config(module_name: str, module_config: Dict[str, Any]) -> None:
-    """Validate module configuration and raise descriptive errors."""
-    required_fields = ['name', 'description', 'source']
-    missing_fields = [field for field in required_fields if field not in module_config]
-    
-    if missing_fields:
-        raise ModuleConfigError(
-            f"Module '{module_name}' is missing required fields: {', '.join(missing_fields)}"
-        )
+    """Validate module configuration."""
+    # Check for required source field
+    if 'source' not in module_config:
+        raise ValueError(f"Module '{module_name}' is missing required field 'source'")
 
-    # Validate source configuration
+    # Validate source format
     source = module_config['source']
-    if not isinstance(source, dict):
-        raise ModuleConfigError(
-            f"Module '{module_name}' has invalid source type. Expected dict, got {type(source)}"
-        )
-    
-    # Check required source fields
-    if 'location' not in source:
-        raise ModuleConfigError(
-            f"Module '{module_name}' source is missing required field 'location'"
-        )
+    if not isinstance(source, str) and not isinstance(source, dict):
+        raise ValueError(f"Module '{module_name}' has invalid source type. Expected string or dict")
 
-    # Validate auth if present
-    if 'auth' in source:
-        auth = source['auth']
-        if not isinstance(auth, dict):
-            raise ModuleConfigError(
-                f"Module '{module_name}' has invalid auth type. Expected dict, got {type(auth)}"
-            )
-        
-        if 'type' not in auth:
-            raise ModuleConfigError(
-                f"Module '{module_name}' auth is missing required field 'type'"
-            )
-        
-        if auth['type'] not in ['ssh', 'https', 'token']:
-            raise ModuleConfigError(
-                f"Module '{module_name}' has invalid auth type. Expected one of: ssh, https, token"
-            )
-        
-        if auth['type'] == 'ssh' and 'private_key_env' not in auth:
-            raise ModuleConfigError(
-                f"Module '{module_name}' SSH auth is missing required field 'private_key_env'"
-            )
-        
-        if auth['type'] == 'token' and 'token_env' not in auth:
-            raise ModuleConfigError(
-                f"Module '{module_name}' token auth is missing required field 'token_env'"
-            )
-    
-    # Validate variables if present
-    if 'variables' in module_config:
+    # If source is a dict, validate its structure
+    if isinstance(source, dict):
+        if 'location' not in source:
+            raise ValueError(f"Module '{module_name}' source is missing required field 'location'")
+
+        # Validate auth if present
+        if 'auth' in source:
+            auth = source['auth']
+            if not isinstance(auth, dict):
+                raise ValueError(f"Module '{module_name}' has invalid auth type")
+            
+            if 'type' not in auth:
+                raise ValueError(f"Module '{module_name}' auth is missing required field 'type'")
+            
+            if auth['type'] not in ['ssh', 'https', 'token']:
+                raise ValueError(f"Module '{module_name}' has invalid auth type")
+
+    # Validate variables if present and auto_discover is false
+    if not module_config.get('auto_discover', True) and 'variables' in module_config:
         if not isinstance(module_config['variables'], dict):
-            raise ModuleConfigError(
-                f"Module '{module_name}' has invalid variables type. Expected dict, got {type(module_config['variables'])}"
-            )
+            raise ValueError(f"Module '{module_name}' has invalid variables type")
         
         for var_name, var_config in module_config['variables'].items():
             if not isinstance(var_config, dict):
-                raise ModuleConfigError(
-                    f"Module '{module_name}' variable '{var_name}' has invalid configuration type. Expected dict, got {type(var_config)}"
-                )
+                raise ValueError(f"Module '{module_name}' variable '{var_name}' has invalid configuration")
             
             if 'type' not in var_config:
-                raise ModuleConfigError(
-                    f"Module '{module_name}' variable '{var_name}' is missing required field 'type'"
-                )
+                raise ValueError(f"Module '{module_name}' variable '{var_name}' is missing required field 'type'")
 
 def load_terraform_tools():
     """Load and register all Terraform tools from dynamic configuration."""
@@ -134,16 +101,22 @@ def _process_module(module_name: str, module_config: Dict[str, Any]) -> List[Too
     try:
         logger.info(f"📦 Processing module: {module_name}")
         
+        # Validate module configuration
+        validate_module_config(module_name, module_config)
+        
+        # Normalize source configuration
+        source_config = module_config['source']
+        if isinstance(source_config, str):
+            source_config = {
+                'location': source_config,
+                'version': module_config.get('version')
+            }
+        
         # Create module configuration
         config = {
             'name': module_name,
             'description': module_config.get('description', f"Terraform module for {module_name}"),
-            'source': {
-                'location': module_config['source']['location'],
-                'version': module_config['source'].get('version'),
-                'path': module_config['source'].get('path'),
-                'auth': module_config['source'].get('auth')
-            },
+            'source': source_config,
             'auto_discover': module_config.get('auto_discover', True),
             'instructions': module_config.get('instructions'),
             'variables': module_config.get('variables', {})
@@ -164,5 +137,3 @@ def _process_module(module_name: str, module_config: Dict[str, Any]) -> List[Too
         
     return module_tools
 
-# Export the loader function and error class
-__all__ = ['load_terraform_tools', 'ModuleConfigError']
