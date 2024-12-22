@@ -208,63 +208,68 @@ def create_terraform_module_tool(module_config: Dict[str, Any], action: str, wit
         logger.error(f"Failed to create tool for {module_config['url']}: {str(e)}")
         return None
 
-def initialize_tools():
+def initialize_tools(dynamic_config=None):
     """Initialize all Terraform module tools from dynamic configuration."""
     tools = []
     try:
-        # Get dynamic configuration from tool registry
-        config = tool_registry.dynamic_config
-        if not config:
+        if not dynamic_config:
             error_msg = "No dynamic configuration provided - please provide Terraform module URLs to initialize the tools for"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Get module URLs from configuration - try both keys for backward compatibility
-        module_urls = None
-        for key in ['tf_modules_urls', 'tf_modules', 'terraform_modules']:
-            if key in config:
-                module_urls = parse_module_urls(config[key])
-                if module_urls:
-                    logger.debug(f"Found module URLs using key: {key}")
-                    break
-                
+        # Convert the dynamic config directly to module URLs format
+        module_urls = {}
+        for module_name, module_config in dynamic_config.items():
+            if isinstance(module_config, dict):
+                module_urls[module_name] = {
+                    'source': module_config.get('source'),
+                    'version': module_config.get('version'),
+                    'auto_discover': module_config.get('auto_discover', True),
+                    'instructions': module_config.get('instructions'),
+                    'variables': module_config.get('variables', {})
+                }
+
         if not module_urls:
-            error_msg = "No Terraform module URLs provided in configuration - please provide module URLs using one of: tf_modules_urls, tf_modules, terraform_modules"
+            error_msg = "No valid module configurations found in dynamic configuration"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        logger.info(f"Found {len(module_urls)} module URLs in configuration")
+        logger.info(f"Found {len(module_urls)} module configurations")
 
         # Create tools for each module
-        for module_config in module_urls:
+        for module_name, module_config in module_urls.items():
             try:
-                logger.info(f"Creating tools for module: {module_config['url']}")
+                logger.info(f"Creating tools for module: {module_name}")
                 
                 # Create and register tools
                 created_tools = []
                 
-                for action in ['plan', 'plan_pr', 'apply']:
-                    with_pr = action == 'plan_pr'
-                    base_action = 'plan' if with_pr else action
-                    
-                    tool = create_terraform_module_tool(module_config, base_action, with_pr)
+                for action in ['plan', 'apply']:
+                    tool = create_terraform_module_tool(
+                        {
+                            'name': module_name,
+                            'url': f"registry.terraform.io/{module_config['source']}" if '/' in module_config['source'] else module_config['source'],
+                            'version': module_config.get('version'),
+                            'auto_discover': module_config.get('auto_discover', True),
+                            'instructions': module_config.get('instructions'),
+                            'variables': module_config.get('variables', {})
+                        }, 
+                        action
+                    )
                     if tool:
                         created_tools.append(tool)
                         tool_registry.register("terraform", tool)
-                        logger.info(f"Created {action} tool for {module_config['url']}")
+                        logger.info(f"Created {action} tool for {module_name}")
 
                 if created_tools:
                     tools.extend(created_tools)
-                    logger.info(f"Successfully created {len(created_tools)} tools for module: {module_config['url']}")
+                    logger.info(f"Successfully created {len(created_tools)} tools for module: {module_name}")
                 else:
-                    error_msg = f"Failed to create any tools for module: {module_config['url']}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+                    logger.warning(f"No tools were created for module: {module_name}")
                 
             except Exception as e:
-                error_msg = f"Failed to create tools for module {module_config['url']}: {str(e)}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+                continue
 
         if not tools:
             error_msg = "No tools were created from any modules"
