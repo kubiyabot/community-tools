@@ -174,7 +174,7 @@ echo "Extracting user logins..."
 gh api "repos/$repo/issues/$number/comments" --jq ".[] | .user.login"
 
 echo "Looking for comments by: $GITHUB_ACTOR"
-gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"Kubiya-Testing\")"
+gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login != 0)"
 
 echo "Extracting comment IDs for user: $GITHUB_ACTOR"
 gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id"
