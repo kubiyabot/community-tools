@@ -6,6 +6,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from ..parser import TerraformModuleParser
 from . import create_terraform_module_tool
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
@@ -99,64 +100,70 @@ def load_terraform_tools():
             logger.warning("No terraform modules found in dynamic configuration")
             return tools
 
-        if not isinstance(tf_modules, dict):
-            raise ModuleConfigError(
-                f"Invalid terraform modules configuration type. Expected dict, got {type(tf_modules)}"
-            )
-
         logger.info(f"Found {len(tf_modules)} modules in configuration")
 
-        # Process each module
-        for module_name, module_config in tf_modules.items():
-            try:
-                logger.info(f"📦 Loading module: {module_name}")
-                
-                # Validate module configuration
-                validate_module_config(module_name, module_config)
-                
-                # Create module configuration
-                config = {
-                    'name': module_config['name'],
-                    'description': module_config['description'],
-                    'source': {
-                        'location': module_config['source']['location'],
-                        'version': module_config['source'].get('version'),
-                        'path': module_config['source'].get('path'),
-                        'auth': module_config['source'].get('auth')
-                    },
-                    'auto_discover': module_config.get('auto_discover', True),
-                    'instructions': module_config.get('instructions'),
-                    'variables': module_config.get('variables', {})
-                }
-                
-                # Create tools for this module
-                for action in ['plan', 'apply']:
-                    tool = create_terraform_module_tool(config, action)
-                    if tool:
-                        tools.append(tool)
-                        tool_registry.register("terraform", tool)
-                        logger.info(f"✅ Created {action} tool for {module_name}")
-                    else:
-                        logger.warning(f"⚠️ Failed to create {action} tool for {module_name}")
-                    
-            except ModuleConfigError as e:
-                logger.error(f"❌ Invalid configuration for module {module_name}: {str(e)}")
-                continue
-            except Exception as e:
-                logger.error(f"❌ Failed to process module {module_name}: {str(e)}", exc_info=True)
-                continue
+        # Process modules in parallel
+        with ThreadPoolExecutor(max_workers=min(len(tf_modules), 4)) as executor:
+            future_to_module = {
+                executor.submit(_process_module, module_name, module_config): module_name
+                for module_name, module_config in tf_modules.items()
+            }
+
+            for future in as_completed(future_to_module):
+                module_name = future_to_module[future]
+                try:
+                    module_tools = future.result()
+                    if module_tools:
+                        tools.extend(module_tools)
+                        logger.info(f"✅ Successfully processed module: {module_name}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to process module {module_name}: {str(e)}")
 
         if tools:
             logger.info(f"✅ Successfully loaded {len(tools)} tools")
         else:
             logger.warning("⚠️ No tools were created")
 
-    except ModuleConfigError as e:
-        logger.error(f"❌ Configuration error: {str(e)}")
     except Exception as e:
         logger.error(f"❌ Failed to load tools: {str(e)}", exc_info=True)
 
     return tools
+
+def _process_module(module_name: str, module_config: Dict[str, Any]) -> List[Tool]:
+    """Process a single module in parallel."""
+    module_tools = []
+    try:
+        logger.info(f"📦 Processing module: {module_name}")
+        
+        # Create module configuration
+        config = {
+            'name': module_name,
+            'description': module_config.get('description', f"Terraform module for {module_name}"),
+            'source': {
+                'location': module_config['source']['location'],
+                'version': module_config['source'].get('version'),
+                'path': module_config['source'].get('path'),
+                'auth': module_config['source'].get('auth')
+            },
+            'auto_discover': module_config.get('auto_discover', True),
+            'instructions': module_config.get('instructions'),
+            'variables': module_config.get('variables', {})
+        }
+        
+        # Create tools for this module
+        for action in ['plan', 'apply']:
+            tool = create_terraform_module_tool(config, action)
+            if tool:
+                module_tools.append(tool)
+                tool_registry.register("terraform", tool)
+                logger.info(f"✅ Created {action} tool for {module_name}")
+            else:
+                logger.warning(f"⚠️ Failed to create {action} tool for {module_name}")
+                
+    except Exception as e:
+        logger.error(f"❌ Failed to process module {module_name}: {str(e)}", exc_info=True)
+        
+    return module_tools
 
 # Export the loader function and error class
 __all__ = ['load_terraform_tools', 'ModuleConfigError']

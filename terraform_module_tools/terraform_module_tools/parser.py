@@ -338,6 +338,9 @@ class TerraformModuleParser:
     # Add class-level cache for git installation check
     _git_installed = False
 
+    # Add class-level thread pool for reuse
+    _executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+
     @classmethod
     def _ensure_git(cls):
         """Ensure git is installed (cached)."""
@@ -358,7 +361,6 @@ class TerraformModuleParser:
         ref: Optional[str] = None,
         path: Optional[str] = None,
         module_config: Optional[Dict[str, Any]] = None,
-        max_workers: int = 4
     ):
         self.source = ModuleSource(source_url, version=ref)
         self.path = path or self.source.get_path()
@@ -366,16 +368,20 @@ class TerraformModuleParser:
         self.errors = []
         self.readme_url = None
         self.module_dir = None
-        self.max_workers = max_workers
         self.providers: Set[str] = set()
         self.module_config = module_config
         
-        # Always clone to validate module exists
-        self._clone_repository()
-        
-        # Only initialize HCL parser if we need to auto-discover
-        if not module_config or module_config.get('auto_discover', True):
-            ensure_hcl2json()
+        # Clone and initialize in parallel
+        future_clone = self._executor.submit(self._clone_repository)
+        future_hcl = self._executor.submit(ensure_hcl2json) if not module_config or module_config.get('auto_discover', True) else None
+
+        # Wait for initialization
+        try:
+            future_clone.result()
+            if future_hcl:
+                future_hcl.result()
+        except Exception as e:
+            raise ValueError(f"Failed to initialize: {str(e)}")
 
     def _clone_repository(self) -> None:
         """Optimized repository cloning."""
@@ -571,7 +577,7 @@ class TerraformModuleParser:
         return variables
 
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Optimized variable parsing."""
+        """Optimized parallel variable parsing."""
         try:
             if not self.module_dir:
                 raise ValueError("Module directory not set. Module may not exist or failed to clone.")
@@ -587,20 +593,22 @@ class TerraformModuleParser:
                 self._set_providers_from_config()
                 return variables, [], []
 
-            # Efficient file collection
+            # Collect files in parallel
             tf_files = list(Path(self.module_dir).rglob('*.tf'))
             if not tf_files:
                 self.errors.append("No .tf files found in module")
                 return {}, self.warnings, self.errors
 
-            # Parallel processing with shared dictionary
+            # Process files in parallel batches
+            batch_size = 10
             variables = {}
             providers = set()
             
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for i in range(0, len(tf_files), batch_size):
+                batch = tf_files[i:i + batch_size]
                 futures = {
-                    executor.submit(self._parse_file, tf_file): tf_file
-                    for tf_file in tf_files
+                    self._executor.submit(self._parse_file, tf_file): tf_file
+                    for tf_file in batch
                 }
                 
                 for future in as_completed(futures):
@@ -619,11 +627,12 @@ class TerraformModuleParser:
             self.errors.append(f"Failed to get variables: {str(e)}")
             return {}, self.warnings, self.errors
 
-    def _parse_file(self, file_path: Path) -> Tuple[Dict[str, Any], Set[str]]:
-        """Parse both variables and providers from a file in a single pass."""
+    @lru_cache(maxsize=100)
+    def _parse_file(self, file_path: str) -> Tuple[Dict[str, Any], Set[str]]:
+        """Parse both variables and providers from a file with caching."""
         try:
             result = subprocess.run(
-                ['/usr/local/bin/hcl2json', str(file_path)],
+                ['/usr/local/bin/hcl2json', file_path],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -631,22 +640,26 @@ class TerraformModuleParser:
             )
             
             tf_json = json.loads(result.stdout)
-            variables = {}
-            providers = set()
-
-            # Process variables and providers in a single pass
-            if 'variable' in tf_json:
-                variables = self._process_variables(tf_json['variable'])
-            if 'provider' in tf_json:
-                providers = self._process_providers(tf_json['provider'])
-            if 'terraform' in tf_json:
-                providers.update(self._process_required_providers(tf_json['terraform']))
-
-            return variables, providers
+            return self._process_tf_json(tf_json)
 
         except Exception as e:
             logger.error(f"Failed to parse {file_path}: {str(e)}")
             return {}, set()
+
+    @lru_cache(maxsize=100)
+    def _process_tf_json(self, tf_json: Dict[str, Any]) -> Tuple[Dict[str, Any], Set[str]]:
+        """Process Terraform JSON with caching."""
+        variables = {}
+        providers = set()
+
+        if 'variable' in tf_json:
+            variables = self._process_variables(tf_json['variable'])
+        if 'provider' in tf_json:
+            providers = self._process_providers(tf_json['provider'])
+        if 'terraform' in tf_json:
+            providers.update(self._process_required_providers(tf_json['terraform']))
+
+        return variables, providers
 
     def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process individual variable configuration."""
