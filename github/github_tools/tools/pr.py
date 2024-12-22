@@ -86,7 +86,9 @@ echo "Extracting user logins..."
 gh api "repos/$repo/issues/$number/comments" --jq ".[] | .user.login"
 
 echo "Looking for comments by: $GITHUB_ACTOR"
-gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\")"
+GITHUB_ACTOR_ESCAPED=$(printf '%q' "$GITHUB_ACTOR")
+echo "Escaped GitHub Actor: $GITHUB_ACTOR_ESCAPED"
+gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"GITHUB_ACTOR_ESCAPED\")"
 
 echo "Extracting comment IDs for user: $GITHUB_ACTOR"
 gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id"
