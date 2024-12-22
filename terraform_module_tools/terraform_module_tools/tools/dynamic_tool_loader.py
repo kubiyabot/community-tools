@@ -15,7 +15,7 @@ class ModuleConfigError(Exception):
 
 def validate_module_config(module_name: str, module_config: Dict[str, Any]) -> None:
     """Validate module configuration and raise descriptive errors."""
-    required_fields = ['source']
+    required_fields = ['name', 'description', 'source']
     missing_fields = [field for field in required_fields if field not in module_config]
     
     if missing_fields:
@@ -23,12 +23,46 @@ def validate_module_config(module_name: str, module_config: Dict[str, Any]) -> N
             f"Module '{module_name}' is missing required fields: {', '.join(missing_fields)}"
         )
 
-    # Validate source format
+    # Validate source configuration
     source = module_config['source']
-    if not isinstance(source, str):
+    if not isinstance(source, dict):
         raise ModuleConfigError(
-            f"Module '{module_name}' has invalid source type. Expected string, got {type(source)}"
+            f"Module '{module_name}' has invalid source type. Expected dict, got {type(source)}"
         )
+    
+    # Check required source fields
+    if 'location' not in source:
+        raise ModuleConfigError(
+            f"Module '{module_name}' source is missing required field 'location'"
+        )
+
+    # Validate auth if present
+    if 'auth' in source:
+        auth = source['auth']
+        if not isinstance(auth, dict):
+            raise ModuleConfigError(
+                f"Module '{module_name}' has invalid auth type. Expected dict, got {type(auth)}"
+            )
+        
+        if 'type' not in auth:
+            raise ModuleConfigError(
+                f"Module '{module_name}' auth is missing required field 'type'"
+            )
+        
+        if auth['type'] not in ['ssh', 'https', 'token']:
+            raise ModuleConfigError(
+                f"Module '{module_name}' has invalid auth type. Expected one of: ssh, https, token"
+            )
+        
+        if auth['type'] == 'ssh' and 'private_key_env' not in auth:
+            raise ModuleConfigError(
+                f"Module '{module_name}' SSH auth is missing required field 'private_key_env'"
+            )
+        
+        if auth['type'] == 'token' and 'token_env' not in auth:
+            raise ModuleConfigError(
+                f"Module '{module_name}' token auth is missing required field 'token_env'"
+            )
     
     # Validate variables if present
     if 'variables' in module_config:
@@ -82,10 +116,13 @@ def load_terraform_tools():
                 
                 # Create module configuration
                 config = {
-                    'name': module_name,
+                    'name': module_config['name'],
+                    'description': module_config['description'],
                     'source': {
-                        'location': module_config['source'],
-                        'version': module_config.get('version')
+                        'location': module_config['source']['location'],
+                        'version': module_config['source'].get('version'),
+                        'path': module_config['source'].get('path'),
+                        'auth': module_config['source'].get('auth')
                     },
                     'auto_discover': module_config.get('auto_discover', True),
                     'instructions': module_config.get('instructions'),
