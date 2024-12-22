@@ -9,65 +9,63 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_config_dir() -> str:
-    """Get the path to the configs directory."""
-    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'configs')
-
-def load_terraform_tools(config_dir: str = None):
-    """Load and register all Terraform tools from configuration files."""
+def load_terraform_tools():
+    """Load and register all Terraform tools from dynamic configuration."""
     tools = []
     
-    if not config_dir:
-        config_dir = get_config_dir()
-        
-    logger.info(f"Loading tools from config directory: {config_dir}")
-    
-    if not os.path.exists(config_dir):
-        logger.error(f"Config directory not found: {config_dir}")
-        return tools
-    
-    for filename in os.listdir(config_dir):
-        if filename.endswith('.json'):
-            config_path = os.path.join(config_dir, filename)
+    try:
+        # Get dynamic configuration from tool registry
+        dynamic_config = getattr(tool_registry, 'dynamic_config', None)
+        if not dynamic_config:
+            logger.warning("No dynamic configuration found in tool registry")
+            return tools
+
+        # Get terraform modules configuration
+        tf_modules = dynamic_config.get('tf_modules') or dynamic_config.get('terraform_modules')
+        if not tf_modules:
+            logger.warning("No terraform modules found in dynamic configuration")
+            return tools
+
+        logger.info(f"Found {len(tf_modules)} modules in configuration")
+
+        # Process each module
+        for module_name, module_config in tf_modules.items():
             try:
-                logger.info(f"Processing config file: {filename}")
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                
-                module_name = config.get('name')
-                if not module_name:
-                    logger.error(f"No module name found in {filename}")
-                    continue
-                    
                 logger.info(f"📦 Loading module: {module_name}")
                 
-                # Parse module variables
-                parser = TerraformModuleParser(
-                    source_url=config['source']['location'],
-                    ref=config['source'].get('version'),
-                )
-                
-                variables, warnings, errors = parser.get_variables()
-                
-                # Log any warnings or errors
-                for warning in warnings:
-                    logger.warning(f"⚠️ Warning for {module_name}: {warning}")
-                for error in errors:
-                    logger.error(f"❌ Error for {module_name}: {error}")
-                
-                if not variables:
-                    logger.warning(f"⚠️ No variables found for module {module_name}")
-                    continue
+                # Create module configuration
+                config = {
+                    'name': module_name,
+                    'source': {
+                        'location': module_config['source'],
+                        'version': module_config.get('version')
+                    },
+                    'auto_discover': module_config.get('auto_discover', True),
+                    'instructions': module_config.get('instructions'),
+                    'variables': module_config.get('variables', {})
+                }
                 
                 # Create tools for this module
-                for action in ['plan', 'apply', 'plan_pr']:
+                for action in ['plan', 'apply']:
                     tool = create_terraform_module_tool(config, action)
-                    tools.append(tool)
-                    logger.info(f"✅ Created {action} tool for {module_name}")
+                    if tool:
+                        tools.append(tool)
+                        tool_registry.register("terraform", tool)
+                        logger.info(f"✅ Created {action} tool for {module_name}")
+                    else:
+                        logger.warning(f"⚠️ Failed to create {action} tool for {module_name}")
                     
             except Exception as e:
-                logger.error(f"❌ Failed to load module from {filename}: {str(e)}", exc_info=True)
+                logger.error(f"❌ Failed to process module {module_name}: {str(e)}", exc_info=True)
                 continue
+
+        if tools:
+            logger.info(f"✅ Successfully loaded {len(tools)} tools")
+        else:
+            logger.warning("⚠️ No tools were created")
+
+    except Exception as e:
+        logger.error(f"❌ Failed to load tools: {str(e)}", exc_info=True)
 
     return tools
 
