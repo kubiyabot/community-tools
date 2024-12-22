@@ -164,20 +164,16 @@ class ModuleSource:
             else:
                 raise ValueError(f"Invalid registry format: {self.original_source}")
         
-        # Handle version constraints
-        version = self.version
-        if '//' in provider:  # Handle subpaths
-            provider, subpath = provider.split('//', 1)
-        else:
-            subpath = None
-            
+        # Construct GitHub URL for the module
+        github_url = f"https://github.com/terraform-aws-modules/terraform-{provider}-{name}"
+        
         return {
             'namespace': namespace,
             'name': name,
             'provider': provider,
-            'version': version,
-            'subpath': subpath,
-            'url': f"https://{self.REGISTRY_DOMAIN}/{namespace}/{name}/{provider}"
+            'version': self.version,
+            'url': github_url,
+            'clone_url': f"{github_url}.git"
         }
     
     def _parse_git_source(self) -> Dict[str, Any]:
@@ -359,16 +355,40 @@ class TerraformModuleParser:
         try:
             logger.info(f"Cloning repository from {self.source.get_clone_url()}")
             
+            # Install git and required packages
+            try:
+                subprocess.run(['git', '--version'], check=True, capture_output=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                logger.info("Installing git and required packages...")
+                subprocess.run(['apk', 'add', '--no-cache', 'git', 'git-remote-https'], check=True)
+
+            # Handle registry module source
+            if self.source.source_type == 'registry':
+                # For registry modules, construct the GitHub URL
+                source_parts = self.source.original_source.split('/')
+                if len(source_parts) == 3:  # namespace/name/provider format
+                    namespace, name, provider = source_parts
+                    # Remove git:: prefix and ?ref= suffix from URL
+                    clone_url = f"https://github.com/terraform-aws-modules/terraform-{provider}-{name}.git"
+                else:
+                    raise ValueError(f"Invalid registry source format: {self.source.original_source}")
+            else:
+                clone_url = self.source.get_clone_url()
+                if clone_url.startswith('git::'):
+                    # Remove git:: prefix and any ?ref= parameters
+                    clone_url = clone_url.replace('git::', '')
+                    if '?' in clone_url:
+                        clone_url = clone_url.split('?')[0]
+
+            logger.info(f"Using clone URL: {clone_url}")
+            
             clone_cmd = ['git', 'clone', '--depth', '1', '--single-branch']
             
             if ref := self.source.get_ref():
                 clone_cmd.extend(['--branch', ref])
             
-            clone_url = self.source.get_clone_url()
-            
             # Handle GitHub authentication tokens
             if 'github.com' in clone_url:
-                # Try GH_TOKEN first, then TOOLS_GH_TOKEN
                 github_token = os.environ.get('GH_TOKEN') or os.environ.get('TOOLS_GH_TOKEN')
                 if github_token:
                     logger.debug("Using GitHub token for authentication")
@@ -387,13 +407,15 @@ class TerraformModuleParser:
             
             # Run git clone command
             try:
+                logger.debug(f"Running git clone command: {' '.join(clone_cmd)}")
                 result = subprocess.run(
                     clone_cmd, 
                     check=True, 
                     capture_output=True,
                     text=True,
-                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '0'}  # Prevent git from prompting for credentials
+                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '0'}
                 )
+                logger.debug(f"Git clone output: {result.stdout}")
             except subprocess.CalledProcessError as e:
                 error_msg = f"Git clone failed: {e.stderr}"
                 if 'Authentication failed' in e.stderr:
@@ -407,25 +429,22 @@ class TerraformModuleParser:
                 raise ValueError(f"Specified path '{self.path}' does not exist")
 
             # Set README URL for GitHub repositories
-            if self.source.source_type == 'github':
-                base_url = self.source.parsed_source['url']
+            if self.source.source_type in ('github', 'registry'):
+                base_url = clone_url.rstrip('.git')
                 ref = self.source.get_ref() or 'master'
                 path = self.source.get_path() or ''
                 self.readme_url = f"{base_url}/blob/{ref}/{path}/README.md".rstrip('/')
 
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to clone repository: {e.stderr}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
         except Exception as e:
             error_msg = f"Failed to clone repository: {str(e)}"
             logger.error(error_msg)
             raise ValueError(error_msg)
         finally:
-            # Ensure we don't leave the token in the error messages
+            # Clean up sensitive information from logs
             if 'github_token' in locals():
                 for handler in logger.handlers:
-                    handler.formatter._fmt = handler.formatter._fmt.replace(github_token, '***')
+                    if hasattr(handler, 'formatter') and hasattr(handler.formatter, '_fmt'):
+                        handler.formatter._fmt = handler.formatter._fmt.replace(github_token, '***')
 
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
         """Parse variables from a Terraform file with error handling."""
