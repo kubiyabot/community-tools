@@ -77,19 +77,19 @@ class TerraformModuleTool(Tool):
         module_config = values.get('module_config')
         action = values.get('action', 'plan')
         with_pr = values.get('with_pr', False)
-        env = values.get('env') or []
-        secrets = values.get('secrets') or []
+        env = values.get('env', [])
+        secrets = values.get('secrets', [])
 
         logger.info(f"Creating tool for module: {name}")
-
-        # Existing logic from your __init__ method
-        # Parse variables using TerraformModuleParser
+        
         try:
+            # Parse variables using TerraformModuleParser
             logger.info(f"Discovering variables from: {module_config['source']['location']}")
             parser = TerraformModuleParser(
                 source_url=module_config['source']['location'],
                 ref=module_config['source'].get('version'),
-                max_workers=8
+                path=module_config['source'].get('path'),
+                module_config=module_config  # Pass module config for manual variables
             )
             variables, warnings, errors = parser.get_variables()
 
@@ -106,130 +106,126 @@ class TerraformModuleTool(Tool):
 
             logger.info(f"Found {len(variables)} variables")
 
-        except Exception as e:
-            logger.error(f"Failed to auto-discover variables: {str(e)}", exc_info=True)
-            raise ValueError(f"Variable discovery failed: {str(e)}")
+            # Convert variables to args list
+            args = []
+            for var_name, var_config in variables.items():
+                try:
+                    # Map to supported type
+                    arg_type = map_terraform_type_to_arg_type(var_config['type'])
+                    logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
 
-        # Convert variables to args list
-        args = []
-        for var_name, var_config in variables.items():
-            try:
-                # Map to supported type
-                arg_type = map_terraform_type_to_arg_type(var_config['type'])
-                logger.debug(f"Mapping variable {var_name} of type {var_config['type']} to {arg_type}")
+                    # Create description with optional/required status and default value
+                    description = truncate_description(
+                        var_config.get('description', 'No description'),
+                        var_config
+                    )
 
-                # Create description with optional/required status and default value
-                description = truncate_description(
-                    var_config.get('description', 'No description'),
-                    var_config
-                )
+                    # Create Arg object
+                    arg = Arg(
+                        name=var_name,
+                        description=description,
+                        type=arg_type,
+                        required=var_config.get('required', False)
+                    )
 
-                # Create Arg object
-                arg = Arg(
-                    name=var_name,
-                    description=description,
-                    type=arg_type,
-                    required=var_config.get('required', False)
-                )
+                    # Handle default value conversion
+                    if 'default' in var_config and var_config['default'] is not None:
+                        default_value = var_config['default']
 
-                # Handle default value conversion
-                if 'default' in var_config and var_config['default'] is not None:
-                    default_value = var_config['default']
+                        # Convert default value to string based on type
+                        if arg_type == 'str':
+                            if isinstance(default_value, (dict, list)):
+                                arg.default = json.dumps(default_value)
+                            else:
+                                arg.default = str(default_value)
+                        elif arg_type == 'int':
+                            try:
+                                arg.default = str(int(float(default_value)))
+                            except (ValueError, TypeError):
+                                logger.warning(f"Could not convert default value for {var_name} to int, setting to '0'")
+                                arg.default = '0'
+                        elif arg_type == 'bool':
+                            # Convert boolean to string 'true' or 'false'
+                            arg.default = str(default_value).lower()
 
-                    # Convert default value to string based on type
-                    if arg_type == 'str':
-                        if isinstance(default_value, (dict, list)):
-                            arg.default = json.dumps(default_value)
-                        else:
-                            arg.default = str(default_value)
-                    elif arg_type == 'int':
-                        try:
-                            arg.default = str(int(float(default_value)))
-                        except (ValueError, TypeError):
-                            logger.warning(f"Could not convert default value for {var_name} to int, setting to '0'")
-                            arg.default = '0'
-                    elif arg_type == 'bool':
-                        # Convert boolean to string 'true' or 'false'
-                        arg.default = str(default_value).lower()
+                    args.append(arg)
+                    logger.info(f"Added argument: {var_name} ({arg_type}) with default: {arg.default}")
 
-                args.append(arg)
-                logger.info(f"Added argument: {var_name} ({arg_type}) with default: {arg.default}")
+                except Exception as e:
+                    logger.error(f"Failed to process variable {var_name}: {str(e)}", exc_info=True)
+                    raise ValueError(f"Failed to process variable {var_name}: {str(e)}")
 
-            except Exception as e:
-                logger.error(f"Failed to process variable {var_name}: {str(e)}", exc_info=True)
-                raise ValueError(f"Failed to process variable {var_name}: {str(e)}")
+            if not args:
+                raise ValueError(f"No valid arguments created for module {name}")
 
-        if not args:
-            raise ValueError(f"No valid arguments created for module {name}")
+            # Prepare tool description
+            action_desc = {
+                'plan': 'Plan infrastructure changes for',
+                'apply': 'Apply infrastructure changes to',
+                'plan_pr': 'Plan infrastructure changes and create PR for'
+            }
+            current_action = 'plan_pr' if action == 'plan' and with_pr else action
+            tool_description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
 
-        # Prepare tool description
-        action_desc = {
-            'plan': 'Plan infrastructure changes for',
-            'apply': 'Apply infrastructure changes to',
-            'plan_pr': 'Plan infrastructure changes and create PR for'
-        }
-        current_action = 'plan_pr' if action == 'plan' and with_pr else action
-        tool_description = f"{action_desc[current_action]} {module_config['description']} (original source code: {module_config['source']['location']}) - version: {module_config['source'].get('version', 'unknown')} - This tool is managed by Kubiya and may not be updated to the latest version of the module. Please check the original source code for the latest version."
+            # Prepare script content
+            script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'terraform_{action}.py'
 
-        # Prepare script content
-        script_name = 'plan_with_pr.py' if action == 'plan' and with_pr else f'terraform_{action}.py'
+            # Read all script files from the scripts directory
+            script_files = {}
+            scripts_dir = Path(__file__).parent.parent / 'scripts'
+            required_files = {
+                # Core script files
+                'terraform_plan.py',
+                'terraform_apply.py',
+                'prepare_tfvars.py',
+                'terraform_handler.py',
+                'get_module_vars.py',
+                'error_handler.py',
+                # Config files
+                'configs/module_configs.json',
+                # Requirements file
+                'requirements.txt'
+            }
 
-        # Read all script files from the scripts directory
-        script_files = {}
-        scripts_dir = Path(__file__).parent.parent / 'scripts'
-        required_files = {
-            # Core script files
-            'terraform_plan.py',
-            'terraform_apply.py',
-            'prepare_tfvars.py',
-            'terraform_handler.py',
-            'get_module_vars.py',
-            'error_handler.py',
-            # Config files
-            'configs/module_configs.json',
-            # Requirements file
-            'requirements.txt'
-        }
+            # Create FileSpec objects for all required files
+            with_files = []
+            for filename in required_files:
+                file_path = scripts_dir / filename
+                if file_path.exists():
+                    dest_path = f"/opt/scripts/{filename}"
+                    # Add the actual file
+                    with_files.append(FileSpec(
+                        destination=dest_path,
+                        content=file_path.read_text()
+                    ))
+                else:
+                    logger.warning(f"Required script file not found: {filename}")
 
-        # Create FileSpec objects for all required files
-        with_files = []
-        for filename in required_files:
-            file_path = scripts_dir / filename
-            if file_path.exists():
-                dest_path = f"/opt/scripts/{filename}"
-                # Add the actual file
-                with_files.append(FileSpec(
-                    destination=dest_path,
-                    content=file_path.read_text()
-                ))
-            else:
-                logger.warning(f"Required script file not found: {filename}")
+            # Save module variables signature to a file
+            module_variables_signature = json.dumps(variables, indent=2)
+            module_variables_file = FileSpec(
+                destination="/opt/module_variables.json",
+                content=module_variables_signature
+            )
+            with_files.append(module_variables_file)
 
-        # Save module variables signature to a file
-        module_variables_signature = json.dumps(variables, indent=2)
-        module_variables_file = FileSpec(
-            destination="/opt/module_variables.json",
-            content=module_variables_signature
-        )
-        with_files.append(module_variables_file)
+            # Save module configuration for runtime use
+            module_config_file = FileSpec(
+                destination="/opt/scripts/.module_config.json",
+                content=json.dumps(values.get('module_config', {}))
+            )
+            with_files.append(module_config_file)
 
-        # Save module configuration for runtime use
-        module_config_file = FileSpec(
-            destination="/opt/scripts/.module_config.json",
-            content=json.dumps(values.get('module_config', {}))
-        )
-        with_files.append(module_config_file)
+            # Update 'with_files' in values
+            values['with_files'] = with_files
 
-        # Update 'with_files' in values
-        values['with_files'] = with_files
-
-        # Get Terraform version from environment or use latest
-        tf_version = os.environ.get("TERRAFORM_VERSION", "1.10.0")
-        
-        # Get module path from source config
-        module_path = module_config['source'].get('path', '')
-        
-        content = f"""#!/bin/sh
+            # Get Terraform version from environment or use latest
+            tf_version = os.environ.get("TERRAFORM_VERSION", "1.10.0")
+            
+            # Get module path from source config
+            module_path = module_config['source'].get('path', '')
+            
+            content = f"""#!/bin/sh
 # Exit on error and unset variables
 set -eu
 
@@ -417,7 +413,7 @@ fi
 printf "🚀 Running Terraform {action}...\\n"
 python3 -m terraform_tools.{script_name[:-3]}
 """
-        mermaid_diagram = f"""
+            mermaid_diagram = f"""
 sequenceDiagram
     participant U as 👤 User
     participant B as 🤖 Bot
@@ -480,24 +476,29 @@ sequenceDiagram
     Note over U,B: 🏁 All Done!
 """
 
-        # Update values dictionary with KUBIYA_USER_EMAIL requirement and new base image
-        values.update({
-            'description': tool_description,
-            'content': content,
-            'args': args,
-            'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
-            'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
-            'type': "docker",
-            'mermaid': mermaid_diagram,
-            'image': "python:3.9-alpine",  # Using Python Alpine as base image
-            'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
-        })
+            # Update values dictionary with KUBIYA_USER_EMAIL requirement and new base image
+            values.update({
+                'description': tool_description,
+                'content': content,
+                'args': args,
+                'env': env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"],
+                'secrets': secrets + ["SLACK_API_TOKEN", "GH_TOKEN"],
+                'type': "docker",
+                'mermaid': mermaid_diagram,
+                'image': "python:3.9-alpine",  # Using Python Alpine as base image
+                'icon_url': "https://user-images.githubusercontent.com/31406378/108641411-f9374f00-7496-11eb-82a7-0fa2a9cc5f93.png",
+            })
 
-        # Get provider requirements
-        required_env, required_files = parser.get_provider_requirements()
-        
-        # Add provider-specific requirements to values
-        values['env'] = (env or []) + required_env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"]
-        values['with_files'] = (with_files or []) + required_files
+            # Get provider requirements
+            required_env, required_files = parser.get_provider_requirements()
+            
+            # Add provider-specific requirements to values
+            values['env'] = env + required_env + ["SLACK_CHANNEL_ID", "SLACK_THREAD_TS", "KUBIYA_USER_EMAIL"]
+            values['secrets'] = secrets + ["SLACK_API_TOKEN", "GH_TOKEN"]
+            values['with_files'] = (values.get('with_files', []) or []) + required_files
 
-        return values
+            return values
+
+        except Exception as e:
+            logger.error(f"Failed to initialize tool: {str(e)}", exc_info=True)
+            raise ValueError(f"Tool initialization failed: {str(e)}")

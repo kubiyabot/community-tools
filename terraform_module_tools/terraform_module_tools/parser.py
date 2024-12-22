@@ -360,7 +360,7 @@ class TerraformModuleParser:
         source_url: str,
         ref: Optional[str] = None,
         path: Optional[str] = None,
-        module_config: Optional[Dict[str, Any]] = None,
+        module_config: Optional[Dict[str, Any]] = None
     ):
         self.source = ModuleSource(source_url, version=ref)
         self.path = path or self.source.get_path()
