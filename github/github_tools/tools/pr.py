@@ -72,7 +72,7 @@ GITHUB_ACTOR=$(gh api user --jq '.login')
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
 
 COMMENTS=$(gh api "repos/$repo/issues/$number/comments")
 echo "COMMENTS: $COMMENTS"  
