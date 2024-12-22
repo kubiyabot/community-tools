@@ -71,7 +71,8 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENTS=$(gh api repos/$repo/issues/$number/comments | jq -r '.[] | select(.body | contains("Generated automatically by Kubiya AI")) | {id: .id, body: .body}')
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \\"$GITHUB_ACTOR\\") | .id" | head -n 1)
+
 
 if [ -n "$EXISTING_COMMENTS" ]; then
     echo "Found existing Kubiya comment(s)"
@@ -97,15 +98,15 @@ $PREVIOUS_CONTENT
 ---
 <sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
 
-    # Update the existing comment
-    echo "📝 Updating existing comment..."
-    UPDATE_RESULT=$(gh api repos/$repo/issues/comments/$COMMENT_ID -X PATCH -f body="$FORMATTED_COMMENT" 2>&1)
+    # Create new comment instead of updating
+    echo "📝 Creating new comment with history..."
+    COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
     if [ $? -ne 0 ]; then
-        echo "❌ Failed to update comment"
-        echo "Error: $UPDATE_RESULT"
+        echo "❌ Failed to add comment"
+        echo "Error: $COMMENT_URL"
         exit 1
     fi
-    COMMENT_URL="https://github.com/$repo/pull/$number#issuecomment-$COMMENT_ID"
+    COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
 else
     # Create new comment if no existing Kubiya comment found
     echo "📝 Creating new comment..."
