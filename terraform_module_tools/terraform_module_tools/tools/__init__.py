@@ -226,27 +226,8 @@ def initialize_tools(dynamic_config=None):
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Convert the dynamic config directly to module URLs format
-        module_urls = {}
+        # Create tools for each module in the dynamic config
         for module_name, module_config in dynamic_config.items():
-            if isinstance(module_config, dict):
-                module_urls[module_name] = {
-                    'source': module_config.get('source'),
-                    'version': module_config.get('version'),
-                    'auto_discover': module_config.get('auto_discover', True),
-                    'instructions': module_config.get('instructions'),
-                    'variables': module_config.get('variables', {})
-                }
-
-        if not module_urls:
-            error_msg = "No valid module configurations found in dynamic configuration"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        logger.info(f"Found {len(module_urls)} module configurations")
-
-        # Create tools for each module
-        for module_name, module_config in module_urls.items():
             try:
                 logger.info(f"Creating tools for module: {module_name}")
                 
@@ -257,7 +238,7 @@ def initialize_tools(dynamic_config=None):
                     tool = create_terraform_module_tool(
                         {
                             'name': module_name,
-                            'url': f"registry.terraform.io/{module_config['source']}" if '/' in module_config['source'] else module_config['source'],
+                            'source': module_config['source'],
                             'version': module_config.get('version'),
                             'auto_discover': module_config.get('auto_discover', True),
                             'instructions': module_config.get('instructions'),

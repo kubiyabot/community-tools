@@ -1,33 +1,24 @@
 import logging
 from .tools import initialize_tools
+from kubiya_sdk.tools.registry import tool_registry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def initialize(dynamic_config=None):
+def initialize():
     """Initialize Terraform module tools using dynamic configuration."""
     try:
         logger.info("Starting Terraform module tools initialization...")
+        
+        # Get dynamic configuration from tool registry
+        dynamic_config = tool_registry.dynamic_config
         if not dynamic_config:
             logger.warning("No dynamic configuration provided")
             return []
 
-        # Convert dynamic config to module configurations
-        module_configs = {}
-        for module_name, config in dynamic_config.items():
-            if isinstance(config, dict):
-                module_configs[module_name] = {
-                    'name': module_name,
-                    'source': config['source'],
-                    'version': config.get('version'),
-                    'auto_discover': config.get('auto_discover', True),
-                    'instructions': config.get('instructions'),
-                    'variables': config.get('variables', {})
-                }
-
         # Initialize tools with module configurations
-        initialized_tools = initialize_tools(module_configs)
+        initialized_tools = initialize_tools(dynamic_config)
         if initialized_tools:
             logger.info(f"Successfully initialized {len(initialized_tools)} Terraform tools")
             return initialized_tools
