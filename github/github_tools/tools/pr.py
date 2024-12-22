@@ -73,6 +73,27 @@ GITHUB_ACTOR=$(gh api user --jq '.login')
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
+echo "EXISTING_COMMENT_ID: $EXISTING_COMMENT_ID"
+
+echo "Repository: $repo"
+echo "Issue Number: $number"
+echo "GitHub Actor: $GITHUB_ACTOR"
+
+echo "Running: gh api 'repos/$repo/issues/$number/comments'"
+gh api "repos/$repo/issues/$number/comments"
+
+echo "Extracting user logins..."
+gh api "repos/$repo/issues/$number/comments" --jq ".[] | .user.login"
+
+echo "Looking for comments by: $GITHUB_ACTOR"
+gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\")"
+
+echo "Extracting comment IDs for user: $GITHUB_ACTOR"
+gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id"
+
+echo "Extracting the first matching comment ID..."
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
+echo "Extracted Comment ID: $EXISTING_COMMENT_ID"
 
 if [ -n "$EXISTING_COMMENTS" ]; then
     echo "Found existing Kubiya comment(s)"
