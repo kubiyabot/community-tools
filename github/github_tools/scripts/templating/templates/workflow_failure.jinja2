@@ -3,43 +3,46 @@
 ## 🚨 Summary of Findings
 
 ### Failed Steps:
-{% for step in failed_steps.split(',') %}
+{% for step in failed_steps %}
 - ❌ `{{ step }}`
 {% endfor %}
 
 ### 📊 Workflow Details:
 - **Name**: {{ workflow_name }}
-- **Status**: {{ run_details.split('|') | selectattr('startswith', 'status:') | first | replace('status:', '') }}
-- **Conclusion**: {{ run_details.split('|') | selectattr('startswith', 'conclusion:') | first | replace('conclusion:', '') }}
-- **Triggered By**: {{ run_details.split('|') | selectattr('startswith', 'actor:') | first | replace('actor:', '') }}
+- **Status**: {{ run_details.status }}
+- **Conclusion**: {{ run_details.conclusion }}
+- **Triggered By**: {{ run_details.actor }}
 
 ## 🔬 Detailed Analysis
 
 ### ❌ Failures:
-{% for failure in failures.split('|') %}
-{% set parts = failure.split(':') %}
-#### {{ parts[0] }}
+{% for failure in failures %}
+#### {{ failure.step }}
 ```
-{{ parts[1] }}
+{{ failure.error }}
 ```
 {% endfor %}
 
 ### 🛠️ Suggested Fixes:
-{% for fix in fixes.split('|') %}
-{% set parts = fix.split(':') %}
-#### {{ parts[0] }}
-{{ parts[1] }}
+{% for fix in fixes %}
+#### {{ fix.step }}
+{{ fix.description }}
+{% if fix.code_sample %}
+```
+{{ fix.code_sample }}
+```
+{% endif %}
 {% endfor %}
 
 ### 📊 Workflow Steps:
 ```mermaid
 graph TD;
-{% for step in workflow_steps.split(',') %}
-    {{ loop.index }}["{{ step }}{{ ' ❌' if step in failed_steps.split(',') else ' ✅' }}"];
+{% for step in workflow_steps %}
+    {{ loop.index }}["{{ step }}{{ ' ❌' if step in failed_steps else ' ✅' }}"];
     {% if not loop.first %}
     {{ loop.index - 1 }} --> {{ loop.index }};
     {% endif %}
-    {% if step in failed_steps.split(',') %}
+    {% if step in failed_steps %}
     style {{ loop.index }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
     {% else %}
     style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
@@ -58,7 +61,7 @@ graph TD;
 
 ## 🔗 Links
 - **Pull Request**: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
-- **Workflow Run**: [View Run](https://github.com/{{ repo }}/actions/runs/{{ run_details.split('|') | selectattr('startswith', 'id:') | first | replace('id:', '') }})
+- **Workflow Run**: [View Run](https://github.com/{{ repo }}/actions/runs/{{ run_details | from_json | attr('id') }})
 
 ---
 

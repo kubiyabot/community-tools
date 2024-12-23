@@ -1,9 +1,13 @@
 #!/usr/bin/env python
+import jinja2
+from jinja2 import Environment, select_autoescape
 import os
 import sys
 import json
 import logging
 from pathlib import Path
+
+from .templating.template_handler import TemplateHandler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -70,36 +74,25 @@ def generate_comment(variables: dict) -> str:
         # Create template context
         context = {
             'workflow_name': run_details.get('name', 'Unknown Workflow'),
-            'failed_steps': ','.join(failure['step'] for failure in failures),
-            'failures': '|'.join(f"{failure['step']}:{failure['error']}" for failure in failures),
-            'fixes': '|'.join(f"{fix['step']}:{fix['description']}" for fix in fixes),
-            'workflow_steps': ','.join(step['name'] for step in workflow_steps),
+            'failed_steps': [failure['step'] for failure in failures],
+            'failures': failures,  # Pass the full failures list directly
+            'fixes': fixes,  # Pass the full fixes list directly 
+            'workflow_steps': [step['name'] for step in workflow_steps],
             'error_logs': variables['error_logs'],
-            'run_details': '|'.join(f"{k}:{v}" for k, v in run_details.items()),
+            'run_details': json.dumps(run_details),  # Pass as JSON string
             'number': variables['pr_number'],
             'repo': variables['repo']
         }
+        logger.info(f"context: {context}")
 
-        # Find and load template
-        template_path = find_template_file()
-        with open(template_path) as f:
-            template_content = f.read()
+        # Initialize template handler
+        template_handler = TemplateHandler()
 
-        # Simple template rendering
-        comment = template_content
-        for key, value in context.items():
-            comment = comment.replace('{{ ' + key + ' }}', str(value))
-            comment = comment.replace('{{' + key + '}}', str(value))
-            # Also replace filter expressions with empty string
-            comment = comment.replace('| selectattr', '')
-            comment = comment.replace('| first', '')
-            comment = comment.replace('| replace', '')
+        logger.info(f"Available templates: {template_handler.get_available_templates()}")
 
-        # Clean up any remaining template syntax
-        comment = comment.replace('{%', '').replace('%}', '')
-        comment = comment.replace('{#', '').replace('#}', '')
-        comment = comment.replace('endfor', '')
-        
+        # Render the template
+        comment = template_handler.render_template('workflow_failure', context)
+
         if not comment:
             raise ValueError("Failed to generate comment from template")
             

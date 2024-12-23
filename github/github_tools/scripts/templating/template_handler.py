@@ -2,6 +2,7 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
+import json
 
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -23,14 +24,24 @@ class TemplateHandler:
             trim_blocks=True,
             lstrip_blocks=True
         )
+        # Add JSON filter
+        self.env.filters['from_json'] = json.loads
 
     def render_template(self, template_name: str, variables: Dict[str, Any]) -> Optional[str]:
         """Render a template with given variables."""
         try:
             template = self.env.get_template(f"{template_name}.jinja2")
-            return template.render(**variables)
+            logger.info(f"Template '{template_name}' found and loaded")
+            try:
+                result = template.render(**variables)
+                logger.info("Template rendered successfully")
+                return result
+            except Exception as e:
+                logger.error(f"Template rendering failed: {str(e)}")
+                logger.error(f"Template variables: {variables}")
+                raise
         except Exception as e:
-            logger.error(f"Failed to render template {template_name}: {str(e)}")
+            logger.error(f"Failed to load template {template_name}: {str(e)}")
             return None
 
     def get_available_templates(self) -> list:
