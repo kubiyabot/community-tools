@@ -225,6 +225,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
     
     # Count existing edits
+    echo "Calculating edit count... $CURRENT_CONTENT"
     EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
