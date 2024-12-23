@@ -212,7 +212,10 @@ GITHUB_ACTOR=$(gh api user --jq '.login') || {
 
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments...!!!!!!!!!!!!"
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"${GITHUB_ACTOR}\") | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
+  --jq ".[] | select(.user.login == \"${GITHUB_ACTOR}\") | .id" \
+  | sed -n 1p)
+
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
