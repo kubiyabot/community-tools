@@ -211,7 +211,7 @@ GITHUB_ACTOR=$(gh api user --jq '.login') || {
 }
 
 # Get existing comments by the current user
-echo "🔍 Checking for existing comments...!!!!!!!!!!!!"
+echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
   --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
   | sed -n 1p)
@@ -229,6 +229,7 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     EDIT_COUNT=$((EDIT_COUNT + 1))
     
     # Create updated comment with edit history
+    echo "🔨 Creating updated comment..."
     UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)
 
 $GENERATED_COMMENT
@@ -244,6 +245,7 @@ $CURRENT_CONTENT
 </details>"
 
     # Update the comment
+    echo "🔨 Updating comment in $repo..."
     if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
         -X PATCH \
         -f body="$UPDATED_COMMENT"; then
