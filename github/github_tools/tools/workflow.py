@@ -321,13 +321,15 @@ Shows only the failed job logs with:
 - Smart filtering of noise
 - Configurable context lines around errors
 - Default shows last 100 lines if not searching""",
-    content="""
-# Include the log processing functions
+    content=f"""
+#!/bin/sh
+set -e
+
 {LOG_PROCESSING_FUNCTIONS}
 
 # Enforce maximum lines limit
 MAX_LINES=150
-LINES=${tail_lines:-100}
+LINES=${{tail_lines:-100}}
 
 if [ $LINES -gt $MAX_LINES ]; then
     LINES=$MAX_LINES
@@ -348,32 +350,13 @@ if [ -z "$LOGS" ]; then
     exit 1
 fi
 
-# Create a temporary file for the logs
-TEMP_LOG_FILE=$(mktemp)
-echo "$LOGS" > "$TEMP_LOG_FILE"
-
 if [ -n "$pattern" ]; then
     echo "🔍 Searching for pattern '$pattern' in logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | search_logs_with_context "$pattern" "${before_context:-2}" "${after_context:-2}")
-    if [ -n "$RESULTS" ]; then
-        echo "$RESULTS"
-    else
-        echo "❌ No matches found for pattern: $pattern"
-    fi
+    echo "$LOGS" | search_logs_with_context "$pattern" "${{before_context:-2}}" "${{after_context:-2}}"
 else
     echo "🔍 Extracting error context from logs..."
-    RESULTS=$(cat "$TEMP_LOG_FILE" | extract_error_context)
-    if [ -n "$RESULTS" ]; then
-        echo "$RESULTS" | tail -n $LINES
-    else
-        echo "❌ No error patterns found in the logs"
-        echo "Showing last $LINES lines of logs instead:"
-        tail -n $LINES "$TEMP_LOG_FILE"
-    fi
+    echo "$LOGS" | extract_error_context | tail -n $LINES
 fi
-
-# Clean up
-rm -f "$TEMP_LOG_FILE"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),

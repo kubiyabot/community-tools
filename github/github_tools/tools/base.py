@@ -89,7 +89,7 @@ get_repo_context
 # Add this new tool for streaming GitHub Actions workflow logs
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time.",
+    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
     content="""
 #!/bin/sh
 set -e
