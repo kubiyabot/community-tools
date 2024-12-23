@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 import subprocess
-from typing import Dict, Any, List, Optional, Tuple, Set
+from typing import Dict, Any, List, Optional, Tuple, Set, Union
 import logging
 import re
 import glob
@@ -639,7 +639,7 @@ class TerraformModuleParser:
         """Parse both variables and providers from a file with caching."""
         try:
             result = subprocess.run(
-                ['/usr/local/bin/hcl2json', file_path],
+                ['/usr/local/bin/hcl2json', str(file_path)],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -647,56 +647,114 @@ class TerraformModuleParser:
             )
             
             tf_json = json.loads(result.stdout)
-            return self._process_tf_json(tf_json)
+            variables = {}
+            providers = set()
+
+            # Process variables
+            if 'variable' in tf_json:
+                try:
+                    variables = self._process_variables(tf_json['variable'])
+                except Exception as e:
+                    logger.error(f"Failed to process variables in {file_path}: {str(e)}")
+
+            # Process providers
+            if 'provider' in tf_json:
+                try:
+                    providers.update(self._process_providers(tf_json['provider']))
+                except Exception as e:
+                    logger.error(f"Failed to process providers in {file_path}: {str(e)}")
+
+            # Process required providers
+            if 'terraform' in tf_json:
+                try:
+                    providers.update(self._process_required_providers(tf_json['terraform']))
+                except Exception as e:
+                    logger.error(f"Failed to process required providers in {file_path}: {str(e)}")
+
+            return variables, providers
 
         except Exception as e:
             logger.error(f"Failed to parse {file_path}: {str(e)}")
             return {}, set()
 
-    @lru_cache(maxsize=100)
-    def _process_tf_json(self, tf_json: Dict[str, Any]) -> Tuple[Dict[str, Any], Set[str]]:
-        """Process Terraform JSON with caching."""
+    def _process_variables(self, var_blocks: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Dict[str, Any]:
+        """Process variables with proper type handling."""
         variables = {}
+        
+        # Convert list format to dict format
+        if isinstance(var_blocks, list):
+            var_dict = {}
+            for block in var_blocks:
+                if isinstance(block, dict):
+                    var_dict.update(block)
+            var_blocks = var_dict
+
+        # Process each variable
+        for var_name, var_config in var_blocks.items():
+            # Handle list format from HCL2JSON
+            if isinstance(var_config, list):
+                var_config = var_config[0] if var_config else {}
+            
+            # Skip if not a dict
+            if not isinstance(var_config, dict):
+                logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
+                continue
+
+            try:
+                # Extract type, default, and description
+                var_type = var_config.get('type', 'string')
+                if isinstance(var_type, (dict, list)):
+                    # Handle complex types
+                    var_type = json.dumps(var_type)
+                
+                description = var_config.get('description', '')
+                if isinstance(description, (dict, list)):
+                    description = json.dumps(description)
+
+                # Handle default value
+                default = var_config.get('default')
+                if isinstance(default, (dict, list)):
+                    default = json.dumps(default)
+
+                variables[var_name] = {
+                    'type': str(var_type),
+                    'description': str(description),
+                    'default': default,
+                    'required': default is None
+                }
+
+            except Exception as e:
+                logger.warning(f"Failed to process variable {var_name}: {str(e)}")
+                continue
+
+        return variables
+
+    def _process_providers(self, provider_blocks: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Set[str]:
+        """Process provider blocks with proper type handling."""
         providers = set()
+        
+        # Handle both list and dict formats
+        if isinstance(provider_blocks, list):
+            for block in provider_blocks:
+                if isinstance(block, dict):
+                    providers.update(block.keys())
+        elif isinstance(provider_blocks, dict):
+            providers.update(provider_blocks.keys())
+        
+        return providers
 
-        if 'variable' in tf_json:
-            variables = self._process_variables(tf_json['variable'])
-        if 'provider' in tf_json:
-            providers = self._process_providers(tf_json['provider'])
-        if 'terraform' in tf_json:
-            providers.update(self._process_required_providers(tf_json['terraform']))
-
-        return variables, providers
-
-    def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Process individual variable configuration."""
+    def _process_required_providers(self, terraform_block: Dict[str, Any]) -> Set[str]:
+        """Process required_providers block with proper type handling."""
+        providers = set()
+        
         try:
-            # Extract type, default, and description
-            var_type = var_config.get('type', 'string')
-            default = var_config.get('default')
-            description = var_config.get('description', '')
-
-            # Clean up type string (remove interpolation syntax if any)
-            if isinstance(var_type, str):
-                var_type = re.sub(r'^\${(.*)}$', r'\1', var_type)
-                var_type = var_type.strip()
-
-            # Handle complex types by defaulting to 'string'
-            if var_type not in ['string', 'str', 'number', 'bool']:
-                logger.warning(f"Complex type '{var_type}' for variable '{var_name}' will be handled as 'string'")
-                var_type = 'str'
-
-            # Determine if variable is required
-            required = 'default' not in var_config
-
-            processed_var = {
-                'type': var_type,
-                'description': description,
-                'default': default if default is not None else None,
-                'required': required
-            }
-            return processed_var
-
+            required_providers = terraform_block.get('required_providers', {})
+            if isinstance(required_providers, list):
+                required_providers = required_providers[0] if required_providers else {}
+                
+            if isinstance(required_providers, dict):
+                providers.update(required_providers.keys())
         except Exception as e:
-            logger.warning(f"Failed to process variable {var_name}: {str(e)}")
-            return None
+            logger.error(f"Failed to process required providers: {str(e)}")
+        
+        return providers
