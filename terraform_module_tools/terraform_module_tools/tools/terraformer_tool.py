@@ -62,14 +62,14 @@ class TerraformerTool(Tool):
     def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
         """Initialize the tool with proper base class initialization."""
         try:
-            # Add print_output to base args
+            # Add print_output to base args with string default
             base_args = [
                 Arg(
                     name="print_output",
-                    description="Whether to print the generated Terraform code to stdout",
-                    type="bool",
+                    description="Whether to print the generated Terraform code to stdout (true/false)",
+                    type="str",
                     required=False,
-                    default=True
+                    default="true"
                 )
             ]
             args = args + base_args
@@ -343,9 +343,12 @@ chmod +x /usr/local/bin/terraformer_commands.py
             elif command_type == 'scan':
                 output_path = f"/var/lib/terraform/scan_output.{kwargs.get('output_format', 'hcl')}"
 
+            # Convert print_output to boolean for response handling
+            print_output = kwargs.get('print_output', 'true').lower() == 'true'
+
             return {
                 'success': True,
-                'output': result.stdout if kwargs.get('print_output', True) else "Output saved to volume",
+                'output': result.stdout if print_output else "Output saved to volume",
                 'command': ' '.join(cmd_args),
                 'output_path': output_path,
                 'volume_name': "terraform_code"
