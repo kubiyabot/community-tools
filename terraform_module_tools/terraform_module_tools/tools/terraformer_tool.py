@@ -1,6 +1,7 @@
 from kubiya_sdk.tools import Tool, Arg
 from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
+from pydantic import BaseModel, Field
 import logging
 from pathlib import Path
 from ..scripts.error_handler import handle_script_error, ScriptError, logger
@@ -13,6 +14,13 @@ class ProviderConfig(TypedDict):
     name: str
     resources: List[str]
     env_vars: List[str]
+
+class TerraformerToolConfig(BaseModel):
+    name: str
+    description: str
+    args: List[Arg]
+    env: Optional[List[str]] = Field(default_factory=list)
+    provider: Optional[str] = None
 
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
@@ -39,19 +47,17 @@ class TerraformerTool(Tool):
     def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
         """Initialize the tool with proper base class initialization."""
         try:
-            # Store name for use in script generation
-            self._tool_name = name
-            
-            # Ensure env is a list
-            env = env or []
-            if isinstance(env, str):
-                env = [env]
-            
-            # Get provider from name
-            provider = name.split('_')[-1] if '_' in name else None
+            # Validate inputs using Pydantic model
+            config = TerraformerToolConfig(
+                name=name,
+                description=description,
+                args=args,
+                env=env or [],
+                provider=name.split('_')[-1] if '_' in name else None
+            )
             
             # Create mermaid diagram string
-            if 'import' in name:
+            if 'import' in config.name:
                 mermaid = """
                     graph TD
                         A[Start] --> B[Validate Provider]
@@ -72,16 +78,16 @@ class TerraformerTool(Tool):
                 """
 
             # Generate scripts before initialization
-            wrapper_script = self._generate_wrapper_script(provider)
+            wrapper_script = self._generate_wrapper_script(config.provider)
             terraformer_script = self._get_script_content('terraformer.sh')
             commands_script = self._get_script_content('terraformer_commands.py')
 
             # Initialize base tool with proper schema
             super().__init__(
-                name=name,
-                description=description,
-                args=args,
-                env=env,
+                name=config.name,
+                description=config.description,
+                args=config.args,
+                env=config.env,
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
@@ -101,6 +107,9 @@ class TerraformerTool(Tool):
                 },
                 mermaid=mermaid
             )
+
+            # Store validated config
+            self._config = config
 
         except Exception as e:
             logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
@@ -143,7 +152,7 @@ chmod +x /usr/local/bin/terraformer_commands.py
         """Handle terraform commands by delegating to the shell script."""
         try:
             # Extract command type and provider from tool name
-            parts = self._tool_name.split('_')
+            parts = self._config.name.split('_')
             command_type = parts[1] if len(parts) > 1 else "scan"
             provider = parts[2] if len(parts) > 2 else "aws"
 
