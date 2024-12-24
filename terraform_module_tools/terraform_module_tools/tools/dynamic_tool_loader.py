@@ -11,10 +11,7 @@ logger = logging.getLogger(__name__)
 
 def validate_module_config(module_name: str, module_config: Dict[str, Any]) -> None:
     """Validate module configuration."""
-    # Check for required source field
-    if 'source' not in module_config:
-        raise ValueError(f"Module '{module_name}' is missing required field 'source'")
-
+    
     # Validate source format
     source = module_config['source']
     if not isinstance(source, str) and not isinstance(source, dict):
