@@ -68,15 +68,13 @@ __all__ = [
 logger.info("🚀 Initializing Terraform tools...")
 config = tool_registry.dynamic_config
 if not config:
-    logger.error("❌ No configuration found, please check your configuration and try again")
-    raise ValueError("No configuration found, please check your configuration and try again")
-
-try:
-    tools = initialize_tools(config)
-    if not tools:
-        logger.error("❌ No tools were initialized")
-        raise ValueError("Could not initialize tools from the given configuration, please check your configuration and try again")
-    logger.info(f"✅ Successfully initialized {len(tools)} tools")
-except Exception as e:
-    logger.error(f"Failed to initialize tools: {str(e)}")
-    raise ValueError(f"Failed to initialize tools from the given configuration: {str(e)}")
+    logger.warning("⚠️ No configuration found in registry")
+else:
+    try:
+        tools = initialize_tools(config)
+        if tools:
+            logger.info(f"✅ Successfully initialized {len(tools)} tools")
+        else:
+            logger.warning("⚠️ No tools were initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize tools: {str(e)}")
