@@ -1,15 +1,17 @@
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.models import FileSpec
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, ClassVar
 import os
 import logging
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+@dataclass
 class TerraformerTool(Tool):
     """Base class for reverse Terraform engineering tools."""
     
-    SUPPORTED_PROVIDERS = {
+    SUPPORTED_PROVIDERS: ClassVar[Dict[str, Dict[str, Any]]] = {
         'aws': {
             'env': [
                 "AWS_ACCESS_KEY_ID",

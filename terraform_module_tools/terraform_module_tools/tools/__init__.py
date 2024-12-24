@@ -2,8 +2,7 @@ import logging
 from typing import List, Any, Dict, Optional
 from kubiya_sdk.tools.registry import tool_registry
 from .terraform_module_tool import TerraformModuleTool
-from .terraformer_tool import initialize_terraformer_tools, TerraformerTool
-from ..parser import TerraformModuleParser
+from .terraformer_tool import TerraformerTool
 import re
 
 logger = logging.getLogger(__name__)
@@ -225,11 +224,11 @@ def initialize_tools(config=None):
             tools.extend(_initialize_module_tools(module_config))
 
         # Initialize Terraformer tools if enabled
-        if config.get('enable_terraformer'):
-            logger.info("Initializing Terraformer tools")
-            initialize_terraformer_tools(config)
+        if config.get('enable_reverse_terraform'):
+            logger.info("Initializing reverse Terraform engineering tools")
+            tools.extend(_initialize_reverse_terraform_tools(config))
 
-        if not tools and not config.get('enable_terraformer'):
+        if not tools:
             error_msg = "No tools were created from configuration"
             logger.error(error_msg)
             raise ValueError(error_msg)
@@ -269,6 +268,23 @@ def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformMod
                     
         except Exception as e:
             logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+            continue
+            
+    return tools
+
+def _initialize_reverse_terraform_tools(config: Dict[str, Any]) -> List[Tool]:
+    """Initialize reverse Terraform engineering tools."""
+    tools = []
+    enabled_providers = TerraformerTool.get_enabled_providers(config)
+    
+    for provider in enabled_providers:
+        try:
+            provider_tools = _initialize_provider_tools(provider)
+            tools.extend(provider_tools)
+            for tool in provider_tools:
+                tool_registry.register("terraform", tool)
+        except Exception as e:
+            logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
             continue
             
     return tools
