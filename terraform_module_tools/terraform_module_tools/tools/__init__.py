@@ -7,3 +7,6 @@ __all__ = [
     'load_tools',
     'register_tools'
 ]
+
+# register tools on import
+register_tools()

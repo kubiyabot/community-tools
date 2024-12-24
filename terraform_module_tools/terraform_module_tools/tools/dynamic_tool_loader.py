@@ -80,7 +80,3 @@ def register_tools():
         
     except Exception as e:
         logger.error(f"Failed to register tools: {str(e)}")
-
-# Automatically register tools when module is imported
-register_tools()
-
