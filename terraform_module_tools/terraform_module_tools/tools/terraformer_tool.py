@@ -20,7 +20,7 @@ AWS_COMMON_FILES = [
     }
 ]
 
-# Only need AWS_PROFILE
+# Define AWS_PROFILE once
 AWS_COMMON_ENV = ["AWS_PROFILE"]
 
 logger = logging.getLogger(__name__)
@@ -40,12 +40,12 @@ class TerraformerToolConfig(BaseModel):
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    # Update supported providers to remove duplicate env vars
+    # Remove AWS_PROFILE from provider config since it's in AWS_COMMON_ENV
     SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
         'aws': {
             'name': 'AWS',
             'resources': ['vpc', 'subnet', 'security-group', 'elb', 'rds', 'iam'],
-            'env_vars': ['AWS_PROFILE']  # Only AWS_PROFILE needed
+            'env_vars': []  # Remove AWS_PROFILE from here
         },
         'gcp': {
             'name': 'Google Cloud',
@@ -75,8 +75,10 @@ class TerraformerTool(Tool):
             if config.provider in self.SUPPORTED_PROVIDERS:
                 config.env.extend(self.SUPPORTED_PROVIDERS[config.provider]['env_vars'])
             
-            # Don't append AWS_COMMON_ENV since it's already in provider config
-            
+            # Add AWS_PROFILE only once
+            if config.provider == 'aws':
+                config.env.extend(AWS_COMMON_ENV)
+
             # Create mermaid diagram string
             if 'import' in config.name:
                 mermaid = """
