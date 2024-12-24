@@ -97,3 +97,9 @@ __all__ = [
 
 # Re-export the functions at the module level
 from .module_tools import create_terraform_module_tool, initialize_module_tools
+
+
+config = tool_registry.dynamic_config
+if not config:
+    logger.warning("⚠️ No dynamic configuration found. Terraform tools will not be initialized.")
+    raise ConfigurationError("No dynamic configuration found. Terraform tools will not be initialized.")
