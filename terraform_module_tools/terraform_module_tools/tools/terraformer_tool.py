@@ -7,6 +7,8 @@ from pathlib import Path
 from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import os
 import subprocess
+import uuid
+import re
 
 # Common AWS configuration
 AWS_COMMON_FILES = [
@@ -36,6 +38,13 @@ class TerraformerToolConfig(BaseModel):
     args: List[Arg]
     env: Optional[List[str]] = Field(default_factory=list)
     provider: Optional[str] = None
+
+def sanitize_email(email: str) -> str:
+    """Convert email to a filesystem-safe directory name."""
+    if not email:
+        return "anonymous"
+    # Replace @ and dots with underscores, remove any other special characters
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', email.replace('@', '_').replace('.', '_'))
 
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
@@ -73,6 +82,13 @@ class TerraformerTool(Tool):
                 )
             ]
             args = args + base_args
+
+            # Add required environment variables
+            required_env = ["KUBIYA_USER_EMAIL"]
+            if env:
+                env.extend(required_env)
+            else:
+                env = required_env
 
             # Validate inputs using Pydantic model
             config = TerraformerToolConfig(
@@ -154,6 +170,10 @@ set -e
 # Export tool name for command detection
 export TOOL_NAME="{config.name}"
 
+# Generate unique workspace directory based on user email and request ID
+USER_DIR="/var/lib/terraform/$(echo "$KUBIYA_USER_EMAIL" | tr '@.' '_')_$(uuidgen)"
+mkdir -p "$USER_DIR"
+
 # Determine command type and provider from tool name if not set
 if [[ -z "$COMMAND_TYPE" ]]; then
     if [[ "$TOOL_NAME" == *"_import_"* ]]; then
@@ -220,8 +240,8 @@ chmod +x /usr/local/bin/wrapper.sh
 # Execute wrapper script with proper arguments
 case "$COMMAND_TYPE" in
     import)
-        # Store output in volume and optionally print
-        TERRAFORM_OUTPUT_DIR="/var/lib/terraform/${{OUTPUT_DIR}}"
+        # Store output in user's workspace
+        TERRAFORM_OUTPUT_DIR="$USER_DIR/import"
         mkdir -p "$TERRAFORM_OUTPUT_DIR"
         
         exec /usr/local/bin/wrapper.sh import "$PROVIDER" \\
@@ -230,8 +250,8 @@ case "$COMMAND_TYPE" in
             "$TERRAFORM_OUTPUT_DIR" | tee >(if [[ "$PRINT_OUTPUT" == "true" ]]; then cat; fi)
         ;;
     scan)
-        # Store output in volume and optionally print
-        SCAN_OUTPUT_FILE="/var/lib/terraform/scan_output.${{OUTPUT_FORMAT}}"
+        # Store output in user's workspace
+        SCAN_OUTPUT_FILE="$USER_DIR/scan_output.${{OUTPUT_FORMAT}}"
         
         exec /usr/local/bin/wrapper.sh scan "$PROVIDER" \\
             "${{RESOURCE_TYPES}}" \\
@@ -298,6 +318,11 @@ chmod +x /usr/local/bin/terraformer_commands.py
             command_type = parts[1] if len(parts) > 1 else "scan"
             provider = parts[2] if len(parts) > 2 else "aws"
 
+            # Generate unique workspace path
+            user_email = os.environ.get('KUBIYA_USER_EMAIL', 'anonymous')
+            workspace_id = str(uuid.uuid4())
+            user_dir = f"/var/lib/terraform/{sanitize_email(user_email)}_{workspace_id}"
+
             # Convert kwargs to environment variables
             env = os.environ.copy()
             for key, value in kwargs.items():
@@ -337,11 +362,10 @@ chmod +x /usr/local/bin/terraformer_commands.py
             )
 
             # Prepare response with volume path information
-            output_path = None
             if command_type == 'import':
-                output_path = f"/var/lib/terraform/{kwargs.get('output_dir', 'terraform_imported')}"
-            elif command_type == 'scan':
-                output_path = f"/var/lib/terraform/scan_output.{kwargs.get('output_format', 'hcl')}"
+                output_path = f"{user_dir}/import"
+            else:  # scan
+                output_path = f"{user_dir}/scan_output.{kwargs.get('output_format', 'hcl')}"
 
             # Convert print_output to boolean for response handling
             print_output = kwargs.get('print_output', 'true').lower() == 'true'
@@ -351,7 +375,8 @@ chmod +x /usr/local/bin/terraformer_commands.py
                 'output': result.stdout if print_output else "Output saved to volume",
                 'command': ' '.join(cmd_args),
                 'output_path': output_path,
-                'volume_name': "terraform_code"
+                'volume_name': "terraform_code",
+                'workspace_id': workspace_id
             }
             
         except subprocess.CalledProcessError as e:
@@ -396,13 +421,6 @@ def _initialize_provider_tools(provider: str) -> List[Tool]:
                         description="ID or name of the resource to import",
                         type="str",
                         required=True
-                    ),
-                    Arg(
-                        name="output_dir",
-                        description="Directory to save the generated Terraform code",
-                        type="str",
-                        required=False,
-                        default="terraform_imported"
                     )
                 ],
                 env=provider_config.get('env_vars', [])
