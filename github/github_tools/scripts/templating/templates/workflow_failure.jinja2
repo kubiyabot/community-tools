@@ -17,11 +17,6 @@
 {% for item in failures_and_fixes %}
 ### Step: {{ item.step }}
 - **Error:** {{ item.error }}
-- **Source Code:** 
-```
-{{ step.source_code }}
-```
-
 - **Suggested Fix:** 
     - {{ item.fix_description }}
     - **Code Sample:** 

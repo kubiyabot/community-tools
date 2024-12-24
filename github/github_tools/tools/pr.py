@@ -302,7 +302,7 @@ fi
         "line": "42",
         "source_code": "assert.Equal(t, http.StatusOK, response.StatusCode)"
     }
-]"""
+]""",
             required=True
         ),
         Arg(
