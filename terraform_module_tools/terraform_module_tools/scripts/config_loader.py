@@ -1,171 +1,148 @@
-import json
 import logging
-from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List, Tuple
+import json
 import os
-import subprocess
-import tempfile
-import glob
-from kubiya_sdk.tools import tool_registry
+from kubiya_sdk.tools.registry import tool_registry
 
 logger = logging.getLogger(__name__)
 
-# Try to import jsonschema, but don't fail if it's not available
-try:
-    from jsonschema import validate
-    JSONSCHEMA_AVAILABLE = True
-except ImportError:
-    logger.warning("jsonschema not available - validation will be skipped")
-    JSONSCHEMA_AVAILABLE = False
+class ConfigurationError(Exception):
+    """Exception raised for configuration errors."""
+    pass
 
-# JSON Schema for validation
-MODULE_CONFIG_SCHEMA = {
-    "type": "object",
-    "patternProperties": {
-        ".*": {
-            "type": "object",
-            "required": ["name", "description", "source"],
-            "properties": {
-                "name": {"type": "string"},
-                "description": {"type": "string"},
-                "source": {
-                    "type": "object",
-                    "required": ["location"],
-                    "properties": {
-                        "location": {"type": "string"},
-                        "version": {"type": "string"},
-                        "path": {"type": "string"},
-                        "auth": {
-                            "type": "object",
-                            "properties": {
-                                "type": {
-                                    "type": "string",
-                                    "enum": ["ssh", "https", "token"]
-                                },
-                                "private_key_env": {"type": "string"},
-                                "token_env": {"type": "string"}
-                            }
-                        }
-                    }
-                },
-                "pre_script": {"type": "string"}
-            }
+def validate_module_config(module_name: str, config: Dict[str, Any]) -> None:
+    """Validate module configuration."""
+    required_fields = ['source']
+    optional_fields = ['version', 'description', 'variables', 'auto_discover']
+    
+    # Check required fields
+    missing_fields = [field for field in required_fields if field not in config]
+    if missing_fields:
+        raise ConfigurationError(
+            f"Module '{module_name}' is missing required fields: {', '.join(missing_fields)}"
+        )
+    
+    # Add default description if not provided
+    if 'description' not in config:
+        logger.warning(f"Module '{module_name}' is missing description. Using default.")
+        config['description'] = f"Terraform module for {module_name}"
+
+def validate_reverse_terraform_config(config: Dict[str, Any]) -> None:
+    """Validate reverse terraform configuration."""
+    if config.get('enable_reverse_terraform'):
+        providers = config.get('reverse_terraform_providers')
+        if not providers:
+            raise ConfigurationError(
+                "When enable_reverse_terraform is true, reverse_terraform_providers must be specified"
+            )
+        if not isinstance(providers, (list, str)):
+            raise ConfigurationError(
+                "reverse_terraform_providers must be a string or list of strings"
+            )
+
+def merge_configs(file_config: Optional[Dict[str, Any]], 
+                 dynamic_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Merge file-based and dynamic configurations."""
+    config = {
+        'terraform': {
+            'modules': {},
+            'enable_reverse_terraform': False,
+            'reverse_terraform_providers': []
         }
     }
-}
-
-def detect_source_type(location: str) -> str:
-    """Detect the type of source from its location."""
-    if location.startswith(('http://', 'https://', 'git@')):
-        return 'git'
-    elif '/' in location and not location.startswith('/'):
-        return 'registry'
-    else:
-        return 'local'
-
-def validate_module_path(source: dict) -> bool:
-    """Validate that the module path exists and contains valid Terraform files."""
-    location = source['location']
-    path = source.get('path')
     
-    if detect_source_type(location) == 'git':
-        # Clone repository to temporary directory
-        with tempfile.TemporaryDirectory() as temp_dir:
-            try:
-                # Clone repo
-                if location.startswith('git@'):
-                    # Handle SSH auth
-                    if 'auth' in source and source['auth']['type'] == 'ssh':
-                        # Set up SSH key
-                        key_env = source['auth']['private_key_env']
-                        if key_env not in os.environ:
-                            raise ValueError(f"SSH key environment variable {key_env} not set")
-                        # Clone with SSH
-                        subprocess.run(['git', 'clone', location, temp_dir], check=True)
-                else:
-                    # Clone with HTTPS
-                    subprocess.run(['git', 'clone', location, temp_dir], check=True)
+    # Merge file config if present
+    if file_config and 'terraform' in file_config:
+        config['terraform'].update(file_config['terraform'])
+    
+    # Merge dynamic config if present
+    if dynamic_config:
+        # Handle legacy tf_modules format
+        if 'tf_modules' in dynamic_config:
+            for module_name, module_config in dynamic_config['tf_modules'].items():
+                config['terraform']['modules'][module_name] = module_config
                 
-                # Checkout specific version if specified
-                if 'version' in source:
-                    subprocess.run(['git', 'checkout', source['version']], cwd=temp_dir, check=True)
-                
-                # Check module path
-                module_path = os.path.join(temp_dir, path) if path else temp_dir
-                return _validate_terraform_files(module_path)
-                
-            except subprocess.CalledProcessError as e:
-                raise ValueError(f"Git operation failed: {str(e)}")
-    else:
-        # For local paths, check directly
-        module_path = os.path.join(location, path) if path else location
-        return _validate_terraform_files(module_path)
-
-def _validate_terraform_files(path: str) -> bool:
-    """Check if directory contains valid Terraform files."""
-    if not os.path.isdir(path):
-        raise ValueError(f"Module path not found: {path}")
-    
-    # Check for Terraform files
-    tf_files = glob.glob(os.path.join(path, '*.tf'))
-    if not tf_files:
-        raise ValueError(f"No Terraform files found in {path}")
-    
-    # Check for multiple modules
-    module_dirs = [d for d in os.listdir(path) 
-                  if os.path.isdir(os.path.join(path, d)) and 
-                  glob.glob(os.path.join(path, d, '*.tf'))]
-    
-    if module_dirs:
-        if not path.endswith(('modules', 'examples')):
-            raise ValueError(
-                f"Multiple modules found in {path}. Please specify a specific module path using 'path' parameter. "
-                f"Available modules: {', '.join(module_dirs)}"
-            )
-    
-    return True
-
-def validate_config(config: Dict[str, Any]) -> bool:
-    """Validate configuration with fallback for missing jsonschema."""
-    if not JSONSCHEMA_AVAILABLE:
-        # Basic validation without jsonschema
-        for module_name, module_config in config.items():
-            required_fields = ["description", "source"] # name is optional
-            for field in required_fields:
-                if field not in module_config:
-                    raise ValueError(f"Missing required field '{field}' in module '{module_name}'")
+        # Handle new terraform section format
+        if 'terraform' in dynamic_config:
+            terraform_config = dynamic_config['terraform']
             
-            if not isinstance(module_config["source"], dict):
-                raise ValueError(f"'source' must be an object in module '{module_name}'")
+            # Merge modules
+            if 'modules' in terraform_config:
+                config['terraform']['modules'].update(terraform_config['modules'])
             
-            if "location" not in module_config["source"]:
-                raise ValueError(f"Missing required field 'location' in source of module '{module_name}'")
-        return True
-    else:
-        validate(instance=config, schema=MODULE_CONFIG_SCHEMA)
-        return True
+            # Merge reverse terraform settings
+            if 'enable_reverse_terraform' in terraform_config:
+                config['terraform']['enable_reverse_terraform'] = (
+                    terraform_config['enable_reverse_terraform']
+                )
+            if 'reverse_terraform_providers' in terraform_config:
+                config['terraform']['reverse_terraform_providers'] = (
+                    terraform_config['reverse_terraform_providers']
+                )
+    
+    return config
 
-def get_module_configs() -> Dict[str, Any]:
-    """Get Terraform module configurations."""
+def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
+    """Load and validate configuration from file and dynamic config."""
     try:
-        configs = tool_registry.dynamic_config or {}
-        if not configs:
-            logger.warning("No module configurations found")
-            raise ValueError("No module configurations found - please provide Terraform modules to convert to tools")
+        # Load file configuration
+        file_config = None
+        if config_path and os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                file_config = json.load(f)
         
-        # Validate configuration
-        validate_config(configs)
+        # Get dynamic configuration
+        dynamic_config = getattr(tool_registry, 'dynamic_config', None)
         
-        # Validate each module source
-        for module_name, config in configs.items():
-            try:
-                validate_module_path(config['source'])
-            except ValueError as e:
-                logger.error(f"Invalid module source for {module_name}: {str(e)}")
-                continue
+        # Merge configurations
+        config = merge_configs(file_config, dynamic_config)
         
-        return configs
-
+        # Validate terraform section
+        if 'terraform' not in config:
+            raise ConfigurationError("Missing 'terraform' section in configuration")
+            
+        terraform_config = config['terraform']
+        
+        # Validate modules if present
+        if 'modules' in terraform_config:
+            modules = terraform_config['modules']
+            if not isinstance(modules, dict):
+                raise ConfigurationError("'modules' must be a dictionary")
+                
+            # Validate each module
+            for module_name, module_config in modules.items():
+                try:
+                    validate_module_config(module_name, module_config)
+                except ConfigurationError as e:
+                    logger.error(f"Invalid configuration for module '{module_name}': {str(e)}")
+                    raise
+        
+        # Validate reverse terraform configuration
+        validate_reverse_terraform_config(terraform_config)
+        
+        # Ensure at least one feature is enabled
+        if not terraform_config.get('modules') and not terraform_config.get('enable_reverse_terraform'):
+            raise ConfigurationError(
+                "Configuration must include at least one module or enable reverse terraform"
+            )
+                
+        return config
+        
+    except json.JSONDecodeError as e:
+        error_msg = f"Failed to parse configuration file: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+        
     except Exception as e:
-        logger.error(f"Failed to load module configurations: {str(e)}")
-        raise ValueError(f"Failed to load module configurations: {str(e)}")
+        error_msg = f"Failed to load module configurations: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+
+def get_enabled_features(config: Dict[str, Any]) -> Tuple[bool, bool]:
+    """Get which features are enabled in the configuration."""
+    terraform_config = config.get('terraform', {})
+    has_modules = bool(terraform_config.get('modules'))
+    reverse_terraform_enabled = terraform_config.get('enable_reverse_terraform', False)
+    return has_modules, reverse_terraform_enabled
+
+__all__ = ['load_config', 'ConfigurationError', 'get_enabled_features']

@@ -6,6 +6,7 @@ from .terraform_module_tool import TerraformModuleTool
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools
 from ..parser import TerraformModuleParser
 import re
+from ..scripts.config_loader import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -215,36 +216,43 @@ def initialize_tools(config=None):
     tools = []
     try:
         if not config:
-            error_msg = "No configuration provided"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ConfigurationError("No configuration provided")
 
         # Initialize regular module tools
         module_config = config.get('modules', {})
         if module_config:
             logger.info("Initializing Terraform module tools")
-            tools.extend(_initialize_module_tools(module_config))
+            module_tools = _initialize_module_tools(module_config)
+            if not module_tools:
+                raise ConfigurationError("Failed to initialize any module tools")
+            tools.extend(module_tools)
 
         # Initialize Terraformer tools if enabled
         if config.get('enable_reverse_terraform'):
             logger.info("Initializing reverse Terraform engineering tools")
-            tools.extend(_initialize_reverse_terraform_tools(config))
+            reverse_tools = _initialize_reverse_terraform_tools(config)
+            if not reverse_tools:
+                raise ConfigurationError("Failed to initialize any reverse engineering tools")
+            tools.extend(reverse_tools)
 
         if not tools:
-            error_msg = "No tools were created from configuration"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ConfigurationError("No tools were created from configuration")
 
         logger.info(f"Successfully initialized all Terraform tools")
         return tools
         
-    except Exception as e:
-        logger.error(f"Failed to initialize tools: {str(e)}")
+    except ConfigurationError as e:
+        logger.error(f"Configuration error: {str(e)}")
         raise
+    except Exception as e:
+        error_msg = f"Failed to initialize tools: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
 
 def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformModuleTool]:
     """Initialize Terraform module tools from module configuration."""
     tools = []
+    errors = []
     
     for module_name, module_config in module_config.items():
         try:
@@ -255,8 +263,8 @@ def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformMod
                 'name': module_name,
                 'url': f"registry.terraform.io/{module_config['source']}" if '/' in module_config['source'] else module_config['source'],
                 'version': module_config.get('version'),
+                'description': module_config.get('description', f"Terraform module for {module_name}"),
                 'auto_discover': module_config.get('auto_discover', True),
-                'instructions': module_config.get('instructions'),
                 'variables': module_config.get('variables', {})
             }
             
@@ -267,10 +275,17 @@ def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformMod
                     tools.append(tool)
                     tool_registry.register("terraform", tool)
                     logger.info(f"Created {action} tool for {module_name}")
+                else:
+                    errors.append(f"Failed to create {action} tool for {module_name}")
                     
         except Exception as e:
-            logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+            error_msg = f"Failed to create tools for module {module_name}: {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
             continue
+    
+    if errors and not tools:
+        raise ConfigurationError(f"Failed to initialize any module tools: {'; '.join(errors)}")
             
     return tools
 
