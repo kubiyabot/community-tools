@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools import Tool, Arg, Volume
 from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
@@ -62,6 +62,18 @@ class TerraformerTool(Tool):
     def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
         """Initialize the tool with proper base class initialization."""
         try:
+            # Add print_output to base args
+            base_args = [
+                Arg(
+                    name="print_output",
+                    description="Whether to print the generated Terraform code to stdout",
+                    type="bool",
+                    required=False,
+                    default=True
+                )
+            ]
+            args = args + base_args
+
             # Validate inputs using Pydantic model
             config = TerraformerToolConfig(
                 name=name,
@@ -129,6 +141,12 @@ class TerraformerTool(Tool):
                     },
                     # Add AWS configuration files
                     *AWS_COMMON_FILES
+                ],
+                with_volumes=[
+                    Volume(
+                        name="terraform_code",
+                        path="/var/lib/terraform"
+                    )
                 ],
                 content=f"""#!/bin/bash
 set -e
@@ -202,15 +220,26 @@ chmod +x /usr/local/bin/wrapper.sh
 # Execute wrapper script with proper arguments
 case "$COMMAND_TYPE" in
     import)
+        # Store output in volume and optionally print
+        TERRAFORM_OUTPUT_DIR="/var/lib/terraform/${{OUTPUT_DIR}}"
+        mkdir -p "$TERRAFORM_OUTPUT_DIR"
+        
         exec /usr/local/bin/wrapper.sh import "$PROVIDER" \\
             "${{RESOURCE_TYPE}}" \\
             "${{RESOURCE_ID}}" \\
-            "${{OUTPUT_DIR}}"
+            "$TERRAFORM_OUTPUT_DIR" | tee >(if [[ "$PRINT_OUTPUT" == "true" ]]; then cat; fi)
         ;;
     scan)
+        # Store output in volume and optionally print
+        SCAN_OUTPUT_FILE="/var/lib/terraform/scan_output.${{OUTPUT_FORMAT}}"
+        
         exec /usr/local/bin/wrapper.sh scan "$PROVIDER" \\
             "${{RESOURCE_TYPES}}" \\
-            "${{OUTPUT_FORMAT}}"
+            "${{OUTPUT_FORMAT}}" > "$SCAN_OUTPUT_FILE"
+        
+        if [[ "$PRINT_OUTPUT" == "true" ]]; then
+            cat "$SCAN_OUTPUT_FILE"
+        fi
         ;;
     *)
         echo "Unknown command type: $COMMAND_TYPE"
@@ -307,11 +336,19 @@ chmod +x /usr/local/bin/terraformer_commands.py
                 check=True
             )
 
+            # Prepare response with volume path information
+            output_path = None
+            if command_type == 'import':
+                output_path = f"/var/lib/terraform/{kwargs.get('output_dir', 'terraform_imported')}"
+            elif command_type == 'scan':
+                output_path = f"/var/lib/terraform/scan_output.{kwargs.get('output_format', 'hcl')}"
+
             return {
                 'success': True,
-                'output': result.stdout,
+                'output': result.stdout if kwargs.get('print_output', True) else "Output saved to volume",
                 'command': ' '.join(cmd_args),
-                'output_dir': kwargs.get('output_dir') if command_type == 'import' else None
+                'output_path': output_path,
+                'volume_name': "terraform_code"
             }
             
         except subprocess.CalledProcessError as e:
