@@ -5,17 +5,28 @@ from .scripts.config_loader import load_config, get_module_configs, Configuratio
 
 logger = logging.getLogger(__name__)
 
-def initialize_terraform_tools(config=None):
+def initialize_terraform_tools(input_config=None):
     """Initialize all Terraform tools with given configuration."""
     try:
-        if config is None:
-            config = {}
+        # Normalize input configuration
+        if input_config is None:
+            input_config = {}
+            
+        # If config is not under 'terraform' key, wrap it
+        if 'terraform' not in input_config and any(
+            key in input_config for key in [
+                'enable_reverse_terraform',
+                'reverse_terraform_providers',
+                'modules',
+                'tf_modules'
+            ]
+        ):
+            input_config = {'terraform': input_config}
             
         # Load and validate configuration
         try:
-            config = load_config()
-            # Get module configurations
-            module_configs = get_module_configs(config)
+            config = load_config(input_config=input_config)
+            logger.info(f"Loaded configuration: {config}")
             
             # Initialize all tools with validated configurations
             return initialize_tools(config)

@@ -92,8 +92,9 @@ def validate_reverse_terraform_config(config: Dict[str, Any]) -> None:
             )
 
 def merge_configs(file_config: Optional[Dict[str, Any]], 
-                 dynamic_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Merge file-based and dynamic configurations."""
+                 dynamic_config: Optional[Dict[str, Any]],
+                 input_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Merge file-based, dynamic, and input configurations."""
     config = {
         'terraform': {
             'modules': {},
@@ -102,39 +103,52 @@ def merge_configs(file_config: Optional[Dict[str, Any]],
         }
     }
     
-    # Merge file config if present
-    if file_config and 'terraform' in file_config:
-        config['terraform'].update(file_config['terraform'])
-    
-    # Merge dynamic config if present
-    if dynamic_config:
+    # Helper function to merge terraform config
+    def merge_terraform_section(source_config):
+        if not source_config:
+            return
+            
+        # If config is not under 'terraform' key but has relevant keys, treat it as terraform config
+        if 'terraform' not in source_config and any(
+            key in source_config for key in [
+                'enable_reverse_terraform',
+                'reverse_terraform_providers',
+                'modules',
+                'tf_modules'
+            ]
+        ):
+            terraform_section = source_config
+        else:
+            terraform_section = source_config.get('terraform', {})
+            
+        # Merge modules
+        if 'modules' in terraform_section:
+            config['terraform']['modules'].update(terraform_section['modules'])
+            
         # Handle legacy tf_modules format
-        if 'tf_modules' in dynamic_config:
-            for module_name, module_config in dynamic_config['tf_modules'].items():
+        if 'tf_modules' in source_config:
+            for module_name, module_config in source_config['tf_modules'].items():
                 config['terraform']['modules'][module_name] = module_config
                 
-        # Handle new terraform section format
-        if 'terraform' in dynamic_config:
-            terraform_config = dynamic_config['terraform']
-            
-            # Merge modules
-            if 'modules' in terraform_config:
-                config['terraform']['modules'].update(terraform_config['modules'])
-            
-            # Merge reverse terraform settings
-            if 'enable_reverse_terraform' in terraform_config:
-                config['terraform']['enable_reverse_terraform'] = (
-                    terraform_config['enable_reverse_terraform']
-                )
-            if 'reverse_terraform_providers' in terraform_config:
-                config['terraform']['reverse_terraform_providers'] = (
-                    terraform_config['reverse_terraform_providers']
-                )
+        # Merge reverse terraform settings
+        if 'enable_reverse_terraform' in terraform_section:
+            config['terraform']['enable_reverse_terraform'] = (
+                terraform_section['enable_reverse_terraform']
+            )
+        if 'reverse_terraform_providers' in terraform_section:
+            config['terraform']['reverse_terraform_providers'] = (
+                terraform_section['reverse_terraform_providers']
+            )
+    
+    # Merge configurations in order of precedence
+    merge_terraform_section(file_config)
+    merge_terraform_section(dynamic_config)
+    merge_terraform_section(input_config)  # Input config takes highest precedence
     
     return config
 
-def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
-    """Load and validate configuration from file and dynamic config."""
+def load_config(config_path: Optional[str] = None, input_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Load and validate configuration from file, dynamic config, and input config."""
     try:
         # Load file configuration
         file_config = None
@@ -146,77 +160,11 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         dynamic_config = getattr(tool_registry, 'dynamic_config', None)
         
         # Merge configurations
-        config = merge_configs(file_config, dynamic_config)
+        config = merge_configs(file_config, dynamic_config, input_config)
         
-        # Validate terraform section
-        if 'terraform' not in config:
-            raise ConfigurationError(
-                "Missing 'terraform' section in configuration",
-                expected_structure={
-                    "terraform": {
-                        "modules": {
-                            "module_name": {
-                                "source": "module-source",
-                                "version": "module-version",
-                                "description": "module-description",
-                                "variables": {}
-                            }
-                        },
-                        "enable_reverse_terraform": True,
-                        "reverse_terraform_providers": ["aws", "gcp", "azure"]
-                    }
-                }
-            )
-            
-        terraform_config = config['terraform']
+        # Validate the merged configuration
+        validate_config(config)
         
-        # Validate modules if present
-        if 'modules' in terraform_config:
-            modules = terraform_config['modules']
-            if not isinstance(modules, dict):
-                raise ConfigurationError(
-                    "'modules' must be a dictionary",
-                    expected_structure={
-                        "terraform": {
-                            "modules": {
-                                "module_name": {
-                                    "source": "module-source",
-                                    "version": "module-version"
-                                }
-                            }
-                        }
-                    }
-                )
-                
-            # Validate each module
-            for module_name, module_config in modules.items():
-                try:
-                    validate_module_config(module_name, module_config)
-                except ConfigurationError as e:
-                    logger.error(f"Invalid configuration for module '{module_name}': {e.get_formatted_message()}")
-                    raise
-        
-        # Validate reverse terraform configuration
-        validate_reverse_terraform_config(terraform_config)
-        
-        # Ensure at least one feature is enabled
-        if not terraform_config.get('modules') and not terraform_config.get('enable_reverse_terraform'):
-            raise ConfigurationError(
-                "Configuration must include at least one module or enable reverse terraform",
-                expected_structure={
-                    "terraform": {
-                        "modules": {
-                            "module_name": {
-                                "source": "module-source"
-                            }
-                        },
-                        # OR
-                        "enable_reverse_terraform": True,
-                        "reverse_terraform_providers": ["aws"]
-                    }
-                }
-            )
-                
         return config
         
     except json.JSONDecodeError as e:
