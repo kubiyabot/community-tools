@@ -1,15 +1,9 @@
-from .tools import (
-    initialize_tools,
-    create_terraform_module_tool,
-    initialize_module_tools,
-    TerraformModuleTool,
-    TerraformerTool
-)
+from .tools import TerraformerTool, _initialize_provider_tools
+from .tools.dynamic_tool_loader import load_tools, register_tools
 
 __all__ = [
-    'initialize_tools',
-    'create_terraform_module_tool',
-    'initialize_module_tools',
-    'TerraformModuleTool',
-    'TerraformerTool'
+    'TerraformerTool',
+    '_initialize_provider_tools',
+    'load_tools',
+    'register_tools'
 ]

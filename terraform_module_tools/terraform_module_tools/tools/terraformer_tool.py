@@ -413,6 +413,13 @@ fi"""
     class Config:
         arbitrary_types_allowed = True
 
+    @staticmethod
+    def sanitize_email(email: str) -> str:
+        """Convert email to a filesystem-safe directory name."""
+        if not email:
+            return "anonymous"
+        return re.sub(r'[^a-zA-Z0-9_-]', '_', email.replace('@', '_').replace('.', '_'))
+
 def _initialize_provider_tools(provider: str) -> List[Tool]:
     """Initialize tools for a specific provider."""
     tools = []
