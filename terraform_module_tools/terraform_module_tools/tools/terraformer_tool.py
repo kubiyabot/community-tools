@@ -47,32 +47,28 @@ class TerraformerTool(Tool):
             # Get provider from name
             provider = name.split('_')[-1] if '_' in name else None
             
-            # Create mermaid diagram based on tool type
+            # Create mermaid diagram string based on tool type
             if 'import' in name:
-                mermaid = {
-                    'graph': """
-                        graph TD
-                            A[Start] --> B[Validate Provider]
-                            B --> C[Check Environment]
-                            C --> D[Import Resources]
-                            D --> E[Generate Terraform Code]
-                            E --> F[Save to Directory]
-                            F --> G[End]
-                    """
-                }
+                mermaid = """
+                    graph TD
+                        A[Start] --> B[Validate Provider]
+                        B --> C[Check Environment]
+                        C --> D[Import Resources]
+                        D --> E[Generate Terraform Code]
+                        E --> F[Save to Directory]
+                        F --> G[End]
+                """
             else:  # scan
-                mermaid = {
-                    'graph': """
-                        graph TD
-                            A[Start] --> B[Validate Provider]
-                            B --> C[Check Environment]
-                            C --> D[Scan Infrastructure]
-                            D --> E[Generate Report]
-                            E --> F[End]
-                    """
-                }
+                mermaid = """
+                    graph TD
+                        A[Start] --> B[Validate Provider]
+                        B --> C[Check Environment]
+                        C --> D[Scan Infrastructure]
+                        D --> E[Generate Report]
+                        E --> F[End]
+                """
 
-            # Initialize base tool
+            # Initialize base tool with proper schema
             super().__init__(
                 name=name,
                 description=description,
@@ -81,13 +77,12 @@ class TerraformerTool(Tool):
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
-                with_files={
-                    '/usr/local/bin/terraformer.sh': {
-                        'source': 'scripts/terraformer.sh',
-                        'mode': '0755'
-                    }
-                },
-                mermaid=mermaid
+                files=[{  # Changed from with_files to files and made it a list
+                    'path': '/usr/local/bin/terraformer.sh',
+                    'source': 'scripts/terraformer.sh',
+                    'mode': '0755'
+                }],
+                mermaid=mermaid  # Now passing string instead of dict
             )
 
         except Exception as e:
