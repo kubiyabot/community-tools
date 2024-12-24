@@ -12,8 +12,10 @@ def get_configured_providers() -> List[str]:
     """Get providers from configuration or environment."""
     try:
         # Try to get providers from environment variable
-        config_str = os.environ.get('TERRAFORM_CONFIG', '{}')
-        config = json.loads(config_str)
+        config = tool_registry.dynamic_config
+        if config is None:
+            logger.info("No dynamic config found")
+            return []
         
         # Check if terraform configuration exists and has providers specified
         terraform_config = config.get('terraform', {})
