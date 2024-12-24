@@ -91,20 +91,20 @@ class TerraformerTool(Tool):
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
-                with_files={
-                    '/usr/local/bin/terraformer.sh': {
+                with_files=[
+                    {
+                        'destination': '/usr/local/bin/terraformer.sh',
                         'content': terraformer_script,
-                        'mode': '0755'
                     },
-                    '/usr/local/bin/terraformer_commands.py': {
+                    {
+                        'destination': '/usr/local/bin/terraformer_commands.py',
                         'content': commands_script,
-                        'mode': '0755'
                     },
-                    '/usr/local/bin/wrapper.sh': {
+                    {
+                        'destination': '/usr/local/bin/wrapper.sh',
                         'content': wrapper_script,
-                        'mode': '0755'
                     }
-                },
+                ],
                 mermaid=mermaid
             )
 
