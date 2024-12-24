@@ -8,6 +8,25 @@ from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import os
 import subprocess
 
+# Common AWS configuration
+AWS_COMMON_FILES = [
+    {
+        'destination': '/root/.aws/credentials',
+        'source': '$HOME/.aws/credentials'
+    },
+    {
+        'destination': '/root/.aws/config',
+        'source': '$HOME/.aws/config'
+    }
+]
+
+AWS_COMMON_ENV = [
+    "AWS_PROFILE",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_REGION"
+]
+
 logger = logging.getLogger(__name__)
 
 class ProviderConfig(TypedDict):
@@ -56,6 +75,13 @@ class TerraformerTool(Tool):
                 provider=name.split('_')[-1] if '_' in name else None
             )
             
+            # Add provider-specific environment variables
+            if config.provider in self.SUPPORTED_PROVIDERS:
+                config.env.extend(self.SUPPORTED_PROVIDERS[config.provider]['env_vars'])
+            
+            # Add common AWS environment variables
+            config.env.extend(AWS_COMMON_ENV)
+
             # Create mermaid diagram string
             if 'import' in config.name:
                 mermaid = """
@@ -103,79 +129,17 @@ class TerraformerTool(Tool):
                     {
                         'destination': '/usr/local/bin/wrapper.sh',
                         'content': wrapper_script,
-                    }
+                    },
+                    # Add AWS configuration files
+                    *AWS_COMMON_FILES
                 ],
                 content=f"""#!/bin/bash
 set -e
 
-# Function to convert argument names to environment variables
-to_env_var() {{
-    echo "$1" | tr '[:lower:]' '[:upper:]' | tr '-' '_'
-}}
-
-# Initialize argument counter
-arg_count=0
-
 # Export tool name for command detection
 export TOOL_NAME="{config.name}"
 
-# First pass: Handle known arguments and their values
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --resource-type=*|--resource_type=*)
-            export RESOURCE_TYPE="${{1#*=}}"
-            ;;
-        --resource-id=*|--resource_id=*)
-            export RESOURCE_ID="${{1#*=}}"
-            ;;
-        --output-dir=*|--output_dir=*)
-            export OUTPUT_DIR="${{1#*=}}"
-            ;;
-        --resource-types=*|--resource_types=*)
-            export RESOURCE_TYPES="${{1#*=}}"
-            ;;
-        --output-format=*|--output_format=*)
-            export OUTPUT_FORMAT="${{1#*=}}"
-            ;;
-        *)
-            # Store other arguments for second pass
-            OTHER_ARGS+=("$1")
-            ;;
-    esac
-    shift
-done
-
-# Second pass: Handle remaining arguments
-for arg in "${{OTHER_ARGS[@]}}"; do
-    if [[ "$arg" == *"="* ]]; then
-        # Handle key=value pairs
-        key=$(echo "$arg" | cut -d'=' -f1)
-        value=$(echo "$arg" | cut -d'=' -f2)
-        env_key=$(to_env_var "$key")
-        export "$env_key"="$value"
-    else
-        # Handle positional arguments
-        case "$arg" in
-            scan|import)
-                export COMMAND_TYPE="$arg"
-                ;;
-            aws|gcp|azure)
-                export PROVIDER="$arg"
-                ;;
-            *)
-                # Convert argument name to environment variable
-                env_key=$(to_env_var "$arg")
-                if [[ -n "${{!env_key}}" ]]; then
-                    # Variable already exists, store as numbered argument
-                    env_key="ARG_$((arg_count++))"
-                fi
-                export "$env_key"="$arg"
-                ;;
-        esac
-    fi
-done
-
-# Determine command type and provider from environment if not set
+# Determine command type and provider from tool name if not set
 if [[ -z "$COMMAND_TYPE" ]]; then
     if [[ "$TOOL_NAME" == *"_import_"* ]]; then
         export COMMAND_TYPE="import"
@@ -193,10 +157,39 @@ if [[ -z "$PROVIDER" ]]; then
     done
 fi
 
-# Set default values for optional arguments
+# Set default values for optional arguments if not set
 : "${{RESOURCE_TYPES:=all}}"
 : "${{OUTPUT_FORMAT:=hcl}}"
 : "${{OUTPUT_DIR:=terraform_imported}}"
+
+# Validate required arguments based on command type
+if [[ "$COMMAND_TYPE" == "import" ]]; then
+    [[ -z "$RESOURCE_TYPE" ]] && echo "RESOURCE_TYPE is required for import" && exit 1
+    [[ -z "$RESOURCE_ID" ]] && echo "RESOURCE_ID is required for import" && exit 1
+fi
+
+# Validate provider-specific requirements
+case "$PROVIDER" in
+    aws)
+        [[ -z "$AWS_ACCESS_KEY_ID" ]] && echo "AWS_ACCESS_KEY_ID is required" && exit 1
+        [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && echo "AWS_SECRET_ACCESS_KEY is required" && exit 1
+        [[ -z "$AWS_REGION" ]] && echo "AWS_REGION is required" && exit 1
+        ;;
+    gcp)
+        [[ -z "$GOOGLE_CREDENTIALS" ]] && echo "GOOGLE_CREDENTIALS is required" && exit 1
+        [[ -z "$GOOGLE_PROJECT" ]] && echo "GOOGLE_PROJECT is required" && exit 1
+        ;;
+    azure)
+        [[ -z "$AZURE_SUBSCRIPTION_ID" ]] && echo "AZURE_SUBSCRIPTION_ID is required" && exit 1
+        [[ -z "$AZURE_CLIENT_ID" ]] && echo "AZURE_CLIENT_ID is required" && exit 1
+        [[ -z "$AZURE_CLIENT_SECRET" ]] && echo "AZURE_CLIENT_SECRET is required" && exit 1
+        [[ -z "$AZURE_TENANT_ID" ]] && echo "AZURE_TENANT_ID is required" && exit 1
+        ;;
+    *)
+        echo "Unsupported provider: $PROVIDER"
+        exit 1
+        ;;
+esac
 
 # Debug output
 if [[ "$DEBUG" == "true" ]]; then
@@ -215,8 +208,8 @@ chmod +x /usr/local/bin/wrapper.sh
 case "$COMMAND_TYPE" in
     import)
         exec /usr/local/bin/wrapper.sh import "$PROVIDER" \\
-            "${{RESOURCE_TYPE:-vpc}}" \\
-            "${{RESOURCE_ID:-}}" \\
+            "${{RESOURCE_TYPE}}" \\
+            "${{RESOURCE_ID}}" \\
             "${{OUTPUT_DIR}}"
         ;;
     scan)
