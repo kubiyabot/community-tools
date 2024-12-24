@@ -170,8 +170,10 @@ set -e
 # Export tool name for command detection
 export TOOL_NAME="{config.name}"
 
-# Generate unique workspace directory based on user email and request ID
-USER_DIR="/var/lib/terraform/$(echo "$KUBIYA_USER_EMAIL" | tr '@.' '_')_$(uuidgen)"
+# Generate unique workspace directory based on user email and UUID
+WORKSPACE_ID="$(python3 -c 'import uuid; print(str(uuid.uuid4()))')"
+USER_EMAIL="$(echo "$KUBIYA_USER_EMAIL" | tr '@.' '_')"
+USER_DIR="/var/lib/terraform/${USER_EMAIL}_${WORKSPACE_ID}"
 mkdir -p "$USER_DIR"
 
 # Determine command type and provider from tool name if not set
