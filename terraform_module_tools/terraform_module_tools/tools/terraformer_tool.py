@@ -8,6 +8,9 @@ import os
 import subprocess
 import uuid
 import re
+# import AWS_COMMON_FILES
+
+
 from ..scripts.conversion_runtime import convert_former2_to_terraform
 
 # Set up logger
@@ -38,6 +41,19 @@ class TerraformerToolConfig(BaseModel):
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
+    AWS_COMMON_FILES: ClassVar[List[Dict[str, str]]] = [
+        {
+            'destination': '/root/.aws/credentials',
+            'source': '$HOME/.aws/credentials'
+        },
+        {
+            'destination': '/root/.aws/config',
+            'source': '$HOME/.aws/config'
+        }
+    ]
+
+    AWS_COMMON_ENV: ClassVar[List[str]] = ["AWS_PROFILE"]
+
     SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
         'aws': {
             'name': 'AWS',
@@ -73,20 +89,6 @@ class TerraformerTool(Tool):
             }
         }
     }
-
-    # Common configurations
-    AWS_COMMON_FILES: ClassVar[List[Dict[str, str]]] = [
-        {
-            'destination': '/root/.aws/credentials',
-            'source': '$HOME/.aws/credentials'
-        },
-        {
-            'destination': '/root/.aws/config',
-            'source': '$HOME/.aws/config'
-        }
-    ]
-
-    AWS_COMMON_ENV: ClassVar[List[str]] = ["AWS_PROFILE"]
 
     def __init__(self, name: str, description: str, args: List[Arg], env: Optional[List[str]] = None):
         """Initialize the tool with proper base class initialization."""
@@ -132,7 +134,7 @@ class TerraformerTool(Tool):
             
             # Add AWS_PROFILE only once
             if config.provider == 'aws':
-                config.env.extend(AWS_COMMON_ENV)
+                config.env.extend(self.AWS_COMMON_ENV)
 
             # Create mermaid diagram string
             if 'import' in config.name:
@@ -159,25 +161,28 @@ class TerraformerTool(Tool):
             converter = next((arg.default for arg in args if arg.name == 'converter'), 'terraformer')
             
             # Get scripts for selected converter
-            converter_scripts = self.SUPPORTED_CONVERTERS[converter]['scripts']
+            converter_scripts = self.SUPPORTED_CONVERTERS.get(converter, self.SUPPORTED_CONVERTERS['terraformer'])
+            logger.info(f"Using converter: {converter}")
             
             # Prepare files list
             files = [
-                *AWS_COMMON_FILES  # AWS config files
+                *self.AWS_COMMON_FILES
             ]
             
             # Add converter-specific scripts
-            for script_name, script_file in converter_scripts.items():
+            for script_name, script_file in converter_scripts['scripts'].items():
                 files.append({
                     'destination': f'/usr/local/bin/{script_file}',
                     'content': self._get_script_content(script_file)
                 })
 
             # Generate appropriate content based on converter
-            if converter == 'former2':
+            if converter == 'former2' and config.provider == 'aws':
                 content = self._generate_former2_content()
-            else:  # terraformer
+                logger.info("Using Former2 content generator")
+            else:  # Default to terraformer
                 content = self._generate_terraformer_content()
+                logger.info("Using Terraformer content generator")
 
             # Initialize base tool
             super().__init__(
@@ -243,13 +248,11 @@ if '$PRINT_OUTPUT' == 'true':
         return """#!/bin/bash
 set -e
 
-# Runtime workspace generation will happen here
+# Runtime workspace generation
 python3 << 'EOF'
 import os
 import uuid
 import re
-import json
-from conversion_runtime import convert_former2_to_terraform
 
 def sanitize_email(email):
     if not email:
@@ -259,31 +262,6 @@ def sanitize_email(email):
 user_email = os.environ.get('KUBIYA_USER_EMAIL', 'anonymous')
 workspace_id = str(uuid.uuid4())
 user_dir = f"/var/lib/terraform/{sanitize_email(user_email)}_{workspace_id}"
-
-# Get converter type
-converter = os.environ.get('CONVERTER', 'terraformer').lower()
-command_type = os.environ.get('COMMAND_TYPE', '')
-provider = os.environ.get('PROVIDER', '')
-
-# Handle Former2 conversion if selected
-if converter == 'former2' and provider == 'aws':
-    try:
-        # Convert Former2 output to Terraform
-        former2_output = os.environ.get('FORMER2_OUTPUT', '')
-        if former2_output:
-            tf_code = convert_former2_to_terraform(former2_output)
-            output_file = f"{user_dir}/terraform_code.tf"
-            os.makedirs(user_dir, exist_ok=True)
-            with open(output_file, 'w') as f:
-                f.write(tf_code)
-            print(f"TERRAFORM_OUTPUT_FILE={output_file}")
-            print(f"CONVERSION_SUCCESS=true")
-        else:
-            print("CONVERSION_ERROR=No Former2 output provided")
-            exit(1)
-    except Exception as e:
-        print(f"CONVERSION_ERROR={str(e)}")
-        exit(1)
 
 print(f"USER_DIR={user_dir}")
 print(f"WORKSPACE_ID={workspace_id}")
@@ -297,19 +275,40 @@ eval "$(python3 -c 'import os; print("PROVIDER=" + os.environ.get("PROVIDER", ""
 # Create the workspace directory
 mkdir -p "$USER_DIR"
 
-# Handle conversion based on selected converter
-if [[ "$CONVERTER" == "former2" ]] && [[ "$PROVIDER" == "aws" ]]; then
-    if [[ -n "$CONVERSION_ERROR" ]]; then
-        echo "Error converting Former2 output: $CONVERSION_ERROR"
+# Make scripts executable
+chmod +x /usr/local/bin/terraformer.sh
+chmod +x /usr/local/bin/terraformer_commands.py
+chmod +x /usr/local/bin/wrapper.sh
+
+# Execute terraformer script with proper arguments
+case "$COMMAND_TYPE" in
+    import)
+        # Store output in user's workspace
+        TERRAFORM_OUTPUT_DIR="$USER_DIR/import"
+        mkdir -p "$TERRAFORM_OUTPUT_DIR"
+        
+        /usr/local/bin/wrapper.sh import "$PROVIDER" \\
+            "$RESOURCE_TYPE" \\
+            "$RESOURCE_ID" \\
+            "$TERRAFORM_OUTPUT_DIR" | tee >(if [[ "$PRINT_OUTPUT" == "true" ]]; then cat; fi)
+        ;;
+    scan)
+        # Store output in user's workspace
+        SCAN_OUTPUT_FILE="$USER_DIR/scan_output.$OUTPUT_FORMAT"
+        
+        /usr/local/bin/wrapper.sh scan "$PROVIDER" \\
+            "$RESOURCE_TYPES" \\
+            "$OUTPUT_FORMAT" > "$SCAN_OUTPUT_FILE"
+        
+        if [[ "$PRINT_OUTPUT" == "true" ]]; then
+            cat "$SCAN_OUTPUT_FILE"
+        fi
+        ;;
+    *)
+        echo "Unknown command type: $COMMAND_TYPE"
         exit 1
-    fi
-    
-    if [[ "$PRINT_OUTPUT" == "true" ]] && [[ -f "$TERRAFORM_OUTPUT_FILE" ]]; then
-        cat "$TERRAFORM_OUTPUT_FILE"
-    fi
-else
-    # ... (existing terraformer logic remains the same)
-fi"""
+        ;;
+esac"""
 
     def _get_script_content(self, script_name: str) -> str:
         """Get the content of a script file."""
@@ -333,7 +332,7 @@ fi"""
             # Generate unique workspace path
             user_email = os.environ.get('KUBIYA_USER_EMAIL', 'anonymous')
             workspace_id = str(uuid.uuid4())
-            user_dir = f"/var/lib/terraform/{sanitize_email(user_email)}_{workspace_id}"
+            user_dir = f"/var/lib/terraform/{self.sanitize_email(user_email)}_{workspace_id}"
 
             # Convert kwargs to environment variables
             env = os.environ.copy()
@@ -382,8 +381,14 @@ fi"""
             # Convert print_output to boolean for response handling
             print_output = kwargs.get('print_output', 'true').lower() == 'true'
 
-            # Handle Former2 conversion if selected
+            # Handle converter selection
             converter = kwargs.get('converter', 'terraformer').lower()
+            if converter not in self.SUPPORTED_CONVERTERS:
+                logger.warning(f"Unsupported converter: {converter}, falling back to terraformer")
+                converter = 'terraformer'
+                kwargs['converter'] = converter
+
+            # Handle Former2 conversion if selected
             if converter == 'former2':
                 if provider != 'aws':
                     raise ValueError("Former2 conversion is only supported for AWS")
