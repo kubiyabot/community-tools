@@ -1,128 +1,108 @@
-import os
-import json
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
-from ..tools.module_tools import create_terraform_module_tool
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from .terraformer_tool import TerraformerTool, _initialize_provider_tools
+from ..scripts.error_handler import handle_script_error, ScriptError
 
 logger = logging.getLogger(__name__)
 
-def validate_module_config(module_name: str, module_config: Dict[str, Any]) -> None:
-    """Validate module configuration."""
-    
-    # Validate source format
-    source = module_config['source']
-    if not isinstance(source, str) and not isinstance(source, dict):
-        raise ValueError(f"Module '{module_name}' has invalid source type. Expected string or dict")
+class DynamicToolLoader:
+    """Dynamically load and initialize terraform tools based on configuration."""
 
-    # If source is a dict, validate its structure
-    if isinstance(source, dict):
-        if 'location' not in source:
-            raise ValueError(f"Module '{module_name}' source is missing required field 'location'")
+    @classmethod
+    def load_tools(cls, config: Optional[Dict[str, Any]] = None) -> List[Tool]:
+        """Load and initialize tools based on configuration."""
+        tools = []
+        try:
+            if not config:
+                logger.warning("No configuration provided for tool loading")
+                return tools
 
-        # Validate auth if present
-        if 'auth' in source:
-            auth = source['auth']
-            if not isinstance(auth, dict):
-                raise ValueError(f"Module '{module_name}' has invalid auth type")
-            
-            if 'type' not in auth:
-                raise ValueError(f"Module '{module_name}' auth is missing required field 'type'")
-            
-            if auth['type'] not in ['ssh', 'https', 'token']:
-                raise ValueError(f"Module '{module_name}' has invalid auth type")
+            # Initialize terraformer tools if enabled
+            if config.get('terraform', {}).get('enable_reverse_terraform'):
+                logger.info("🔄 Loading terraformer tools...")
+                providers = TerraformerTool.get_enabled_providers(config)
+                
+                for provider in providers:
+                    try:
+                        provider_tools = _initialize_provider_tools(provider)
+                        if provider_tools:
+                            for tool in provider_tools:
+                                tools.append(tool)
+                                tool_registry.register("terraform", tool)
+                                logger.info(f"✅ Registered tool: {tool.name}")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
 
-    # Validate variables if present and auto_discover is false
-    if not module_config.get('auto_discover', True) and 'variables' in module_config:
-        if not isinstance(module_config['variables'], dict):
-            raise ValueError(f"Module '{module_name}' has invalid variables type")
-        
-        for var_name, var_config in module_config['variables'].items():
-            if not isinstance(var_config, dict):
-                raise ValueError(f"Module '{module_name}' variable '{var_name}' has invalid configuration")
-            
-            if 'type' not in var_config:
-                raise ValueError(f"Module '{module_name}' variable '{var_name}' is missing required field 'type'")
+            # Initialize module tools if configured
+            if config.get('terraform', {}).get('modules'):
+                logger.info("📦 Loading module tools...")
+                from .module_tools import initialize_module_tools
+                try:
+                    module_tools = initialize_module_tools(config)
+                    if module_tools:
+                        for tool in module_tools.values():
+                            tools.append(tool)
+                            tool_registry.register("terraform", tool)
+                            logger.info(f"✅ Registered module tool: {tool.name}")
+                except Exception as e:
+                    logger.error(f"Failed to initialize module tools: {str(e)}")
 
-def load_terraform_tools():
-    """Load and register all Terraform tools from dynamic configuration."""
-    tools = []
-    
-    try:
-        # Get dynamic configuration from tool registry
-        dynamic_config = getattr(tool_registry, 'dynamic_config', None)
-        if not dynamic_config:
-            logger.warning("No dynamic configuration found in tool registry")
+            if not tools:
+                logger.warning("⚠️ No tools were loaded")
+            else:
+                logger.info(f"🎉 Successfully loaded {len(tools)} tools")
+
             return tools
 
-        # Get terraform modules configuration
-        tf_modules = dynamic_config.get('tf_modules') or dynamic_config.get('terraform_modules')
-        if not tf_modules:
-            logger.warning("No terraform modules found in dynamic configuration")
+        except Exception as e:
+            logger.error(f"Error loading tools: {str(e)}")
             return tools
 
-        logger.info(f"Found {len(tf_modules)} modules in configuration")
-
-        # Process modules in parallel
-        with ThreadPoolExecutor(max_workers=min(len(tf_modules), 4)) as executor:
-            future_to_module = {
-                executor.submit(_process_module, module_name, module_config): module_name
-                for module_name, module_config in tf_modules.items()
+    @classmethod
+    def get_tool_config(cls, tool_name: str) -> Dict[str, Any]:
+        """Get tool configuration with proper defaults."""
+        try:
+            base_config = {
+                'type': 'docker',
+                'image': 'hashicorp/terraform:latest',
+                'mermaid': {
+                    'graph': f"""
+                        graph TD
+                            A[Start] --> B[{tool_name}]
+                            B --> C[Execute Command]
+                            C --> D[Return Result]
+                    """
+                }
             }
 
-            for future in as_completed(future_to_module):
-                module_name = future_to_module[future]
-                try:
-                    module_tools = future.result()
-                    if module_tools:
-                        tools.extend(module_tools)
-                        logger.info(f"✅ Successfully processed module: {module_name}")
-                except Exception as e:
-                    logger.error(f"❌ Failed to process module {module_name}: {str(e)}")
+            if 'import' in tool_name:
+                base_config.update({
+                    'description': 'Import existing infrastructure into Terraform code',
+                    'steps': [
+                        'Validate input parameters',
+                        'Create output directory',
+                        'Run terraformer import command',
+                        'Return results'
+                    ]
+                })
+            elif 'scan' in tool_name:
+                base_config.update({
+                    'description': 'Scan and discover infrastructure for Terraform import',
+                    'steps': [
+                        'Validate input parameters',
+                        'Run terraformer scan command',
+                        'Process and return results'
+                    ]
+                })
 
-        if tools:
-            logger.info(f"✅ Successfully loaded {len(tools)} tools")
-        else:
-            logger.warning("⚠️ No tools were created")
+            return base_config
 
-    except Exception as e:
-        logger.error(f"❌ Failed to load tools: {str(e)}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Error getting tool config for {tool_name}: {str(e)}")
+            return {}
 
-    return tools
-
-def _process_module(module_name: str, module_config: Dict[str, Any]) -> List[Tool]:
-    """Process a single module in parallel."""
-    module_tools = []
-    try:
-        logger.info(f"📦 Processing module: {module_name}")
-        
-        # Validate module configuration
-        validate_module_config(module_name, module_config)
-        
-        # Create module configuration
-        config = {
-            'name': module_name,
-            'description': module_config.get('description', f"Terraform module for {module_name}"),
-            'source': module_config['source'],
-            'auto_discover': module_config.get('auto_discover', True),
-            'instructions': module_config.get('instructions'),
-            'variables': module_config.get('variables', {})
-        }
-        
-        # Create tools for this module
-        for action in ['plan', 'apply']:
-            tool = create_terraform_module_tool(config, action)
-            if tool:
-                module_tools.append(tool)
-                tool_registry.register("terraform", tool)
-                logger.info(f"✅ Created {action} tool for {module_name}")
-            else:
-                logger.warning(f"⚠️ Failed to create {action} tool for {module_name}")
-                
-    except Exception as e:
-        logger.error(f"❌ Failed to process module {module_name}: {str(e)}", exc_info=True)
-        
-    return module_tools
+__all__ = ['DynamicToolLoader']
 
