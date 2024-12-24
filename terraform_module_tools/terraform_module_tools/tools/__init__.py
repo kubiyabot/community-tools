@@ -4,6 +4,7 @@ from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
 from .terraform_module_tool import TerraformModuleTool
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools
+from .module_tools import create_terraform_module_tool, initialize_module_tools
 from ..parser import TerraformModuleParser
 from ..scripts.config_loader import ConfigurationError
 import re
@@ -54,7 +55,6 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
         # Initialize module tools if modules are configured
         if terraform_config.get('modules'):
             logger.info("Initializing Terraform module tools")
-            from .module_tools import initialize_module_tools
             module_tools = initialize_module_tools(config)
             if module_tools:
                 tools.extend(module_tools.values())
@@ -112,8 +112,11 @@ class TerraformerTool(Tool):
                 
         return valid_providers
 
+# Export all necessary components
 __all__ = [
     'initialize_tools',
+    'create_terraform_module_tool',
+    'initialize_module_tools',
     'TerraformModuleTool',
     'TerraformerTool'
 ]
