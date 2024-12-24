@@ -5,8 +5,8 @@ from kubiya_sdk.tools.registry import tool_registry
 from .terraform_module_tool import TerraformModuleTool
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools
 from ..parser import TerraformModuleParser
+from ..scripts.config_loader import get_module_configs, get_reverse_terraform_config, ConfigurationError
 import re
-from ..scripts.config_loader import ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -218,17 +218,18 @@ def initialize_tools(config=None):
         if not config:
             raise ConfigurationError("No configuration provided")
 
-        # Initialize regular module tools
-        module_config = config.get('modules', {})
-        if module_config:
+        # Get validated module configurations
+        module_configs = get_module_configs(config)
+        if module_configs:
             logger.info("Initializing Terraform module tools")
-            module_tools = _initialize_module_tools(module_config)
+            module_tools = _initialize_module_tools(module_configs)
             if not module_tools:
                 raise ConfigurationError("Failed to initialize any module tools")
             tools.extend(module_tools)
 
-        # Initialize Terraformer tools if enabled
-        if config.get('enable_reverse_terraform'):
+        # Get reverse terraform configuration
+        reverse_config = get_reverse_terraform_config(config)
+        if reverse_config['enabled']:
             logger.info("Initializing reverse Terraform engineering tools")
             reverse_tools = _initialize_reverse_terraform_tools(config)
             if not reverse_tools:
@@ -249,28 +250,18 @@ def initialize_tools(config=None):
         logger.error(error_msg)
         raise ConfigurationError(error_msg)
 
-def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformModuleTool]:
-    """Initialize Terraform module tools from module configuration."""
+def _initialize_module_tools(module_configs: Dict[str, Dict[str, Any]]) -> List[TerraformModuleTool]:
+    """Initialize Terraform module tools from validated module configurations."""
     tools = []
     errors = []
     
-    for module_name, module_config in module_config.items():
+    for module_name, module_config in module_configs.items():
         try:
             logger.info(f"Creating tools for module: {module_name}")
             
-            # Create module configuration
-            module_data = {
-                'name': module_name,
-                'url': f"registry.terraform.io/{module_config['source']}" if '/' in module_config['source'] else module_config['source'],
-                'version': module_config.get('version'),
-                'description': module_config.get('description', f"Terraform module for {module_name}"),
-                'auto_discover': module_config.get('auto_discover', True),
-                'variables': module_config.get('variables', {})
-            }
-            
             # Create tools for each action
             for action in ['plan', 'apply']:
-                tool = create_terraform_module_tool(module_data, action)
+                tool = create_terraform_module_tool(module_config, action)
                 if tool:
                     tools.append(tool)
                     tool_registry.register("terraform", tool)
