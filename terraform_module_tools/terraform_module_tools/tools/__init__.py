@@ -120,3 +120,6 @@ __all__ = [
     'TerraformModuleTool',
     'TerraformerTool'
 ]
+
+# Make sure these are available at the package level
+from .module_tools import create_terraform_module_tool, initialize_module_tools

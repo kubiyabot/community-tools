@@ -53,16 +53,7 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
     )
 
 def initialize_module_tools(config: Optional[Dict[str, Any]] = None):
-    """
-    Initialize all Terraform module tools.
-    
-    Args:
-        config: Optional configuration dictionary. If not provided, will try to use
-               tool_registry.dynamic_config
-               
-    Returns:
-        Dict of initialized tools
-    """
+    """Initialize all Terraform module tools."""
     tools = {}
     try:
         if config is None:
@@ -121,4 +112,4 @@ def initialize_module_tools(config: Optional[Dict[str, Any]] = None):
 tools = {}
 
 # Export necessary components
-__all__ = ['create_terraform_module_tool', 'tools', 'initialize_module_tools'] 
+__all__ = ['create_terraform_module_tool', 'initialize_module_tools', 'tools'] 

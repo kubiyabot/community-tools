@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any, List
 from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
-from . import create_terraform_module_tool
+from .module_tools import create_terraform_module_tool
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
