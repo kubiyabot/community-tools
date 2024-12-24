@@ -1,22 +1,30 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="kubiya-terraform-module-tools",
+    name="terraform-module-tools",
     version="0.1.0",
     packages=find_packages(),
-    package_data={
-        'terraform_module_tools': [
-            'scripts/configs/*.json',
-            'scripts/*.py',
-            'scripts/*.sh',
+    install_requires=[
+        "kubiya-sdk",
+        "requests",
+        "typing",
+        "logging",
+    ],
+    entry_points={
+        'console_scripts': [
+            'terraform-module-tools=terraform_module_tools:main',
         ],
     },
-    include_package_data=True,
-    install_requires=[
-        "kubiya_sdk>=0.1.0",
-        "requests>=2.25.0",
-        "jsonschema>=3.2.0",
-        "slack_sdk>=3.19.0"
+    author="Your Name",
+    author_email="your.email@example.com",
+    description="Terraform module and terraformer tools for Kubiya",
+    long_description=open('README.md').read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/yourusername/terraform-module-tools",
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
     ],
-    python_requires=">=3.8",
+    python_requires='>=3.6',
 ) 
