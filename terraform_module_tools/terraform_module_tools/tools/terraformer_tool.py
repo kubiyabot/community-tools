@@ -20,12 +20,8 @@ AWS_COMMON_FILES = [
     }
 ]
 
-AWS_COMMON_ENV = [
-    "AWS_PROFILE",
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_REGION"
-]
+# Only need AWS_PROFILE
+AWS_COMMON_ENV = ["AWS_PROFILE"]
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +40,12 @@ class TerraformerToolConfig(BaseModel):
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    # Define supported providers and their configurations
+    # Update supported providers to remove duplicate env vars
     SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
         'aws': {
             'name': 'AWS',
             'resources': ['vpc', 'subnet', 'security-group', 'elb', 'rds', 'iam'],
-            'env_vars': ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION']
+            'env_vars': ['AWS_PROFILE']  # Only AWS_PROFILE needed
         },
         'gcp': {
             'name': 'Google Cloud',
@@ -79,9 +75,8 @@ class TerraformerTool(Tool):
             if config.provider in self.SUPPORTED_PROVIDERS:
                 config.env.extend(self.SUPPORTED_PROVIDERS[config.provider]['env_vars'])
             
-            # Add common AWS environment variables
-            config.env.extend(AWS_COMMON_ENV)
-
+            # Don't append AWS_COMMON_ENV since it's already in provider config
+            
             # Create mermaid diagram string
             if 'import' in config.name:
                 mermaid = """
@@ -171,9 +166,7 @@ fi
 # Validate provider-specific requirements
 case "$PROVIDER" in
     aws)
-        [[ -z "$AWS_ACCESS_KEY_ID" ]] && echo "AWS_ACCESS_KEY_ID is required" && exit 1
-        [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && echo "AWS_SECRET_ACCESS_KEY is required" && exit 1
-        [[ -z "$AWS_REGION" ]] && echo "AWS_REGION is required" && exit 1
+        [[ -z "$AWS_PROFILE" ]] && echo "AWS_PROFILE is required" && exit 1
         ;;
     gcp)
         [[ -z "$GOOGLE_CREDENTIALS" ]] && echo "GOOGLE_CREDENTIALS is required" && exit 1
