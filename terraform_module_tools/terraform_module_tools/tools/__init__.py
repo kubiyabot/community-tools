@@ -112,7 +112,7 @@ class TerraformerTool(Tool):
                 
         return valid_providers
 
-# Export all necessary components
+# Make sure to re-export these components
 __all__ = [
     'initialize_tools',
     'create_terraform_module_tool',
@@ -120,3 +120,6 @@ __all__ = [
     'TerraformModuleTool',
     'TerraformerTool'
 ]
+
+# Re-export the functions at the module level
+from .module_tools import create_terraform_module_tool, initialize_module_tools
