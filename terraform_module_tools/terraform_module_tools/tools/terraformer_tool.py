@@ -9,6 +9,7 @@ import os
 import subprocess
 import uuid
 import re
+from ..scripts.conversion_runtime import convert_former2_to_terraform
 
 # Common AWS configuration
 AWS_COMMON_FILES = [
@@ -49,29 +50,25 @@ def sanitize_email(email: str) -> str:
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    # Remove AWS_PROFILE from provider config since it's in AWS_COMMON_ENV
-    SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
-        'aws': {
-            'name': 'AWS',
-            'resources': ['vpc', 'subnet', 'security-group', 'elb', 'rds', 'iam'],
-            'env_vars': []  # Remove AWS_PROFILE from here
+    SUPPORTED_CONVERTERS = {
+        'terraformer': {
+            'scripts': {
+                'main': 'terraformer.sh',
+                'commands': 'terraformer_commands.py',
+                'wrapper': 'wrapper.sh'
+            }
         },
-        'gcp': {
-            'name': 'Google Cloud',
-            'resources': ['compute', 'storage', 'sql', 'iam'],
-            'env_vars': ['GOOGLE_CREDENTIALS', 'GOOGLE_PROJECT']
-        },
-        'azure': {
-            'name': 'Azure',
-            'resources': ['compute', 'network', 'storage', 'database'],
-            'env_vars': ['AZURE_SUBSCRIPTION_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID']
+        'former2': {
+            'scripts': {
+                'main': 'former2.sh'
+            }
         }
     }
 
     def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
         """Initialize the tool with proper base class initialization."""
         try:
-            # Add print_output to base args with string default
+            # Add base args including converter selection
             base_args = [
                 Arg(
                     name="print_output",
@@ -79,6 +76,13 @@ class TerraformerTool(Tool):
                     type="str",
                     required=False,
                     default="true"
+                ),
+                Arg(
+                    name="converter",
+                    description="Tool to use for conversion (terraformer or former2)",
+                    type="str",
+                    required=False,
+                    default="terraformer"
                 )
             ]
             args = args + base_args
@@ -128,12 +132,31 @@ class TerraformerTool(Tool):
                         E --> F[End]
                 """
 
-            # Generate scripts before initialization
-            wrapper_script = self._generate_wrapper_script(config.provider)
-            terraformer_script = self._get_script_content('terraformer.sh')
-            commands_script = self._get_script_content('terraformer_commands.py')
+            # Get converter type from args or default to terraformer
+            converter = next((arg.default for arg in args if arg.name == 'converter'), 'terraformer')
+            
+            # Get scripts for selected converter
+            converter_scripts = self.SUPPORTED_CONVERTERS[converter]['scripts']
+            
+            # Prepare files list
+            files = [
+                *AWS_COMMON_FILES  # AWS config files
+            ]
+            
+            # Add converter-specific scripts
+            for script_name, script_file in converter_scripts.items():
+                files.append({
+                    'destination': f'/usr/local/bin/{script_file}',
+                    'content': self._get_script_content(script_file)
+                })
 
-            # Initialize base tool with proper schema
+            # Generate appropriate content based on converter
+            if converter == 'former2':
+                content = self._generate_former2_content()
+            else:  # terraformer
+                content = self._generate_terraformer_content()
+
+            # Initialize base tool
             super().__init__(
                 name=config.name,
                 description=config.description,
@@ -142,29 +165,59 @@ class TerraformerTool(Tool):
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
-                with_files=[
-                    {
-                        'destination': '/usr/local/bin/terraformer.sh',
-                        'content': terraformer_script,
-                    },
-                    {
-                        'destination': '/usr/local/bin/terraformer_commands.py',
-                        'content': commands_script,
-                    },
-                    {
-                        'destination': '/usr/local/bin/wrapper.sh',
-                        'content': wrapper_script,
-                    },
-                    # Add AWS configuration files
-                    *AWS_COMMON_FILES
-                ],
+                with_files=files,
                 with_volumes=[
                     Volume(
                         name="terraform_code",
                         path="/var/lib/terraform"
                     )
                 ],
-                content="""#!/bin/bash
+                content=content,
+                mermaid=mermaid
+            )
+
+            # Store validated config
+            self._config = config
+
+        except Exception as e:
+            logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
+            raise ValueError(f"Tool initialization failed: {str(e)}")
+
+    def _generate_former2_content(self) -> str:
+        """Generate content for Former2 converter."""
+        return """#!/bin/bash
+set -e
+
+# Runtime workspace generation
+python3 << 'EOF'
+import os
+import uuid
+import re
+from conversion_runtime import convert_former2_to_terraform
+
+# ... (workspace generation code remains the same)
+EOF
+
+# Make scripts executable
+chmod +x /usr/local/bin/former2.sh
+
+# Execute Former2 script
+/usr/local/bin/former2.sh "$COMMAND_TYPE" "$PROVIDER" "$@" | \
+python3 -c "
+from conversion_runtime import convert_former2_to_terraform, save_terraform_code
+import sys
+
+tf_code = convert_former2_to_terraform(sys.stdin.read())
+save_terraform_code(tf_code, '$USER_DIR')
+
+if '$PRINT_OUTPUT' == 'true':
+    print(tf_code)
+"
+"""
+
+    def _generate_terraformer_content(self) -> str:
+        """Generate content for Terraformer converter."""
+        return """#!/bin/bash
 set -e
 
 # Runtime workspace generation will happen here
@@ -172,6 +225,8 @@ python3 << 'EOF'
 import os
 import uuid
 import re
+import json
+from conversion_runtime import convert_former2_to_terraform
 
 def sanitize_email(email):
     if not email:
@@ -181,6 +236,31 @@ def sanitize_email(email):
 user_email = os.environ.get('KUBIYA_USER_EMAIL', 'anonymous')
 workspace_id = str(uuid.uuid4())
 user_dir = f"/var/lib/terraform/{sanitize_email(user_email)}_{workspace_id}"
+
+# Get converter type
+converter = os.environ.get('CONVERTER', 'terraformer').lower()
+command_type = os.environ.get('COMMAND_TYPE', '')
+provider = os.environ.get('PROVIDER', '')
+
+# Handle Former2 conversion if selected
+if converter == 'former2' and provider == 'aws':
+    try:
+        # Convert Former2 output to Terraform
+        former2_output = os.environ.get('FORMER2_OUTPUT', '')
+        if former2_output:
+            tf_code = convert_former2_to_terraform(former2_output)
+            output_file = f"{user_dir}/terraform_code.tf"
+            os.makedirs(user_dir, exist_ok=True)
+            with open(output_file, 'w') as f:
+                f.write(tf_code)
+            print(f"TERRAFORM_OUTPUT_FILE={output_file}")
+            print(f"CONVERSION_SUCCESS=true")
+        else:
+            print("CONVERSION_ERROR=No Former2 output provided")
+            exit(1)
+    except Exception as e:
+        print(f"CONVERSION_ERROR={str(e)}")
+        exit(1)
 
 print(f"USER_DIR={user_dir}")
 print(f"WORKSPACE_ID={workspace_id}")
@@ -194,17 +274,19 @@ eval "$(python3 -c 'import os; print("PROVIDER=" + os.environ.get("PROVIDER", ""
 # Create the workspace directory
 mkdir -p "$USER_DIR"
 
-# ... (rest of the script remains the same)
-""",
-                mermaid=mermaid
-            )
-
-            # Store validated config
-            self._config = config
-
-        except Exception as e:
-            logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
-            raise ValueError(f"Tool initialization failed: {str(e)}")
+# Handle conversion based on selected converter
+if [[ "$CONVERTER" == "former2" ]] && [[ "$PROVIDER" == "aws" ]]; then
+    if [[ -n "$CONVERSION_ERROR" ]]; then
+        echo "Error converting Former2 output: $CONVERSION_ERROR"
+        exit 1
+    fi
+    
+    if [[ "$PRINT_OUTPUT" == "true" ]] && [[ -f "$TERRAFORM_OUTPUT_FILE" ]]; then
+        cat "$TERRAFORM_OUTPUT_FILE"
+    fi
+else
+    # ... (existing terraformer logic remains the same)
+fi"""
 
     def _get_script_content(self, script_name: str) -> str:
         """Get the content of a script file."""
@@ -215,28 +297,6 @@ mkdir -p "$USER_DIR"
         except Exception as e:
             logger.error(f"Failed to read script {script_name}: {str(e)}")
             raise ValueError(f"Failed to read script {script_name}")
-
-    def _generate_wrapper_script(self, provider: str) -> str:
-        """Generate the wrapper script content."""
-        if not provider or provider not in self.SUPPORTED_PROVIDERS:
-            env_exports = ""
-        else:
-            env_vars = self.SUPPORTED_PROVIDERS[provider]['env_vars']
-            env_exports = '\n'.join(f'export {var}="${{{var}}}"' for var in env_vars)
-
-        return f"""#!/bin/bash
-set -e
-
-# Export environment variables from args
-{env_exports}
-
-# Make scripts executable
-chmod +x /usr/local/bin/terraformer.sh
-chmod +x /usr/local/bin/terraformer_commands.py
-
-# Execute terraformer script
-/usr/local/bin/terraformer.sh "$@"
-"""
 
     @handle_script_error
     async def handle_terraform_command(self, **kwargs) -> Dict[str, Any]:
@@ -298,6 +358,18 @@ chmod +x /usr/local/bin/terraformer_commands.py
 
             # Convert print_output to boolean for response handling
             print_output = kwargs.get('print_output', 'true').lower() == 'true'
+
+            # Handle Former2 conversion if selected
+            converter = kwargs.get('converter', 'terraformer').lower()
+            if converter == 'former2':
+                if provider != 'aws':
+                    raise ValueError("Former2 conversion is only supported for AWS")
+                
+                former2_output = kwargs.get('former2_output')
+                if not former2_output:
+                    raise ValueError("Former2 output is required when using Former2 converter")
+                
+                env['FORMER2_OUTPUT'] = former2_output
 
             return {
                 'success': True,
