@@ -1,7 +1,7 @@
-from .tools.terraformer_tool import TerraformerTool, _initialize_provider_tools
-from .tools.dynamic_tool_loader import load_tools, register_tools
+# Import tools after they're defined
+from .tools import TerraformerTool, _initialize_provider_tools, load_tools, register_tools
 
-# Ensure tools are registered on module import
+# Register tools
 register_tools()
 
 __all__ = [

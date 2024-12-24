@@ -4,20 +4,23 @@ from kubiya_sdk.tools.registry import tool_registry
 import logging
 import os
 import json
-from .terraformer_tool import TerraformerTool, _initialize_provider_tools
+import importlib
 
 logger = logging.getLogger(__name__)
+
+def get_terraformer_tool():
+    """Dynamically import TerraformerTool to avoid circular imports."""
+    module = importlib.import_module('terraform_module_tools.tools.terraformer_tool')
+    return module.TerraformerTool, module._initialize_provider_tools
 
 def get_configured_providers() -> List[str]:
     """Get providers from configuration or environment."""
     try:
-        # Try to get providers from environment variable
         config = tool_registry.dynamic_config
         if config is None:
             logger.info("No dynamic config found")
             return []
         
-        # Check if terraform configuration exists and has providers specified
         terraform_config = config.get('terraform', {})
         if terraform_config.get('enable_reverse_terraform'):
             providers = terraform_config.get('reverse_terraform_providers', [])
@@ -34,6 +37,9 @@ def load_tools() -> List[Tool]:
     tools = []
     
     try:
+        # Dynamically import tools
+        _, initialize_provider_tools = get_terraformer_tool()
+        
         # Get configured providers
         providers = get_configured_providers()
         
@@ -44,7 +50,7 @@ def load_tools() -> List[Tool]:
         
         # Initialize tools for each configured provider
         for provider in providers:
-            provider_tools = _initialize_provider_tools(provider)
+            provider_tools = initialize_provider_tools(provider)
             if provider_tools:
                 tools.extend(provider_tools)
                 logger.info(f"Loaded {len(provider_tools)} tools for {provider}")
