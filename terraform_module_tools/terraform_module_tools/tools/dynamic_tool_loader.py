@@ -4,6 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 import logging
 from pathlib import Path
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools
+from .module_tools import initialize_module_tools
 from ..scripts.error_handler import handle_script_error, ScriptError
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,6 @@ class DynamicToolLoader:
             # Initialize module tools if configured
             if config.get('terraform', {}).get('modules'):
                 logger.info("📦 Loading module tools...")
-                from .module_tools import initialize_module_tools
                 try:
                     module_tools = initialize_module_tools(config)
                     if module_tools:

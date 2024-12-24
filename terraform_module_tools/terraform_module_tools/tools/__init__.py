@@ -3,6 +3,8 @@ from typing import List, Any, Dict, Optional
 from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
 from .dynamic_tool_loader import DynamicToolLoader
+from .module_tools import create_terraform_module_tool, initialize_module_tools
+from .terraformer_tool import TerraformerTool, _initialize_provider_tools
 from ..scripts.config_loader import ConfigurationError
 
 logger = logging.getLogger(__name__)
@@ -20,7 +22,13 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
         return []
 
 # Export necessary components
-__all__ = ['initialize_tools']
+__all__ = [
+    'initialize_tools',
+    'create_terraform_module_tool',
+    'initialize_module_tools',
+    'TerraformerTool',
+    'DynamicToolLoader'
+]
 
 # Initialize tools with dynamic config
 try:
