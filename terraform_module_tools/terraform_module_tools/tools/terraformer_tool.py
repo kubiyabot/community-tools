@@ -1,14 +1,20 @@
 from kubiya_sdk.tools import Tool, Arg
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, ClassVar
+from typing_extensions import TypedDict
 import logging
 
 logger = logging.getLogger(__name__)
 
+class ProviderConfig(TypedDict):
+    name: str
+    resources: List[str]
+    env_vars: List[str]
+
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    # Define supported providers and their configurations
-    SUPPORTED_PROVIDERS = {
+    # Define supported providers and their configurations using proper type annotation
+    SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
         'aws': {
             'name': 'AWS',
             'resources': ['vpc', 'subnet', 'security-group', 'elb', 'rds', 'iam'],
@@ -25,6 +31,9 @@ class TerraformerTool(Tool):
             'env_vars': ['AZURE_SUBSCRIPTION_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID']
         }
     }
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @classmethod
     def get_enabled_providers(cls, config: Dict[str, Any]) -> List[str]:
