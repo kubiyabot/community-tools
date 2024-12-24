@@ -145,4 +145,107 @@ def get_enabled_features(config: Dict[str, Any]) -> Tuple[bool, bool]:
     reverse_terraform_enabled = terraform_config.get('enable_reverse_terraform', False)
     return has_modules, reverse_terraform_enabled
 
-__all__ = ['load_config', 'ConfigurationError', 'get_enabled_features']
+def get_module_configs(config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """
+    Extract and validate module configurations from the main config.
+    
+    Args:
+        config: The full configuration dictionary
+        
+    Returns:
+        Dict[str, Dict[str, Any]]: Dictionary of validated module configurations
+        
+    Raises:
+        ConfigurationError: If module configurations are invalid
+    """
+    try:
+        terraform_config = config.get('terraform', {})
+        
+        # Handle both new and legacy formats
+        modules = {}
+        
+        # Handle new format (terraform.modules)
+        if 'modules' in terraform_config:
+            modules.update(terraform_config['modules'])
+            
+        # Handle legacy format (tf_modules)
+        if 'tf_modules' in config:
+            modules.update(config['tf_modules'])
+            
+        # Validate each module configuration
+        validated_modules = {}
+        for module_name, module_config in modules.items():
+            try:
+                # Validate the module configuration
+                validate_module_config(module_name, module_config)
+                
+                # Add validated configuration
+                validated_modules[module_name] = {
+                    'source': module_config['source'],
+                    'version': module_config.get('version'),
+                    'description': module_config.get('description', f"Terraform module for {module_name}"),
+                    'variables': module_config.get('variables', {}),
+                    'auto_discover': module_config.get('auto_discover', True)
+                }
+                
+            except Exception as e:
+                logger.error(f"Failed to validate module '{module_name}': {str(e)}")
+                raise ConfigurationError(f"Invalid configuration for module '{module_name}': {str(e)}")
+                
+        return validated_modules
+        
+    except Exception as e:
+        error_msg = f"Failed to process module configurations: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+
+def get_reverse_terraform_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract and validate reverse terraform configuration.
+    
+    Args:
+        config: The full configuration dictionary
+        
+    Returns:
+        Dict[str, Any]: Dictionary containing reverse terraform configuration
+        
+    Raises:
+        ConfigurationError: If reverse terraform configuration is invalid
+    """
+    try:
+        terraform_config = config.get('terraform', {})
+        
+        # Check if reverse terraform is enabled
+        if not terraform_config.get('enable_reverse_terraform'):
+            return {
+                'enabled': False,
+                'providers': []
+            }
+            
+        # Get and validate providers
+        providers = terraform_config.get('reverse_terraform_providers', [])
+        if isinstance(providers, str):
+            providers = [providers]
+            
+        if not providers:
+            raise ConfigurationError(
+                "When enable_reverse_terraform is true, reverse_terraform_providers must be specified"
+            )
+            
+        return {
+            'enabled': True,
+            'providers': providers
+        }
+        
+    except Exception as e:
+        error_msg = f"Failed to process reverse terraform configuration: {str(e)}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+
+__all__ = [
+    'load_config',
+    'ConfigurationError',
+    'get_enabled_features',
+    'get_module_configs',
+    'get_reverse_terraform_config'
+]
