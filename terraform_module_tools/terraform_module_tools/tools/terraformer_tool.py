@@ -1,51 +1,20 @@
 from kubiya_sdk.tools import Tool, Arg, Volume
-from typing import List, Dict, Any, Optional, ClassVar, TypedDict
-from typing_extensions import TypedDict
+from typing import List, Dict, Any, Optional, ClassVar, TypedDict, Literal
 from pydantic import BaseModel, Field
 import logging
 from pathlib import Path
-from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import os
 import subprocess
 import uuid
 import re
 from ..scripts.conversion_runtime import convert_former2_to_terraform
 
-# Common AWS configuration
-AWS_COMMON_FILES = [
-    {
-        'destination': '/root/.aws/credentials',
-        'source': '$HOME/.aws/credentials'
-    },
-    {
-        'destination': '/root/.aws/config',
-        'source': '$HOME/.aws/config'
-    }
-]
-
-# Define AWS_PROFILE once
-AWS_COMMON_ENV = ["AWS_PROFILE"]
-
-logger = logging.getLogger(__name__)
-
+# Type definitions
 class ProviderConfig(TypedDict):
     name: str
     resources: List[str]
     env_vars: List[str]
-
-class TerraformerToolConfig(BaseModel):
-    name: str
-    description: str
-    args: List[Arg]
-    env: Optional[List[str]] = Field(default_factory=list)
-    provider: Optional[str] = None
-
-def sanitize_email(email: str) -> str:
-    """Convert email to a filesystem-safe directory name."""
-    if not email:
-        return "anonymous"
-    # Replace @ and dots with underscores, remove any other special characters
-    return re.sub(r'[^a-zA-Z0-9_-]', '_', email.replace('@', '_').replace('.', '_'))
+    converters: Optional[List[str]]
 
 class ScriptConfig(TypedDict):
     main: str
@@ -53,11 +22,39 @@ class ScriptConfig(TypedDict):
     wrapper: Optional[str]
 
 class ConverterConfig(TypedDict):
-    scripts: Dict[str, str]
+    scripts: Dict[str, ScriptConfig]
+
+class TerraformerToolConfig(BaseModel):
+    name: str
+    description: str
+    args: List[Arg]
+    env: List[str] = Field(default_factory=list)
+    provider: Optional[str] = None
 
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
+    SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
+        'aws': {
+            'name': 'AWS',
+            'resources': ['vpc', 'subnet', 'security-group', 'elb', 'rds', 'iam'],
+            'env_vars': [],
+            'converters': ['terraformer', 'former2']
+        },
+        'gcp': {
+            'name': 'Google Cloud',
+            'resources': ['compute', 'storage', 'sql', 'iam'],
+            'env_vars': ['GOOGLE_CREDENTIALS', 'GOOGLE_PROJECT'],
+            'converters': ['terraformer']
+        },
+        'azure': {
+            'name': 'Azure',
+            'resources': ['compute', 'network', 'storage', 'database'],
+            'env_vars': ['AZURE_SUBSCRIPTION_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID'],
+            'converters': ['terraformer']
+        }
+    }
+
     SUPPORTED_CONVERTERS: ClassVar[Dict[str, ConverterConfig]] = {
         'terraformer': {
             'scripts': {
@@ -73,7 +70,21 @@ class TerraformerTool(Tool):
         }
     }
 
-    def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
+    # Common configurations
+    AWS_COMMON_FILES: ClassVar[List[Dict[str, str]]] = [
+        {
+            'destination': '/root/.aws/credentials',
+            'source': '$HOME/.aws/credentials'
+        },
+        {
+            'destination': '/root/.aws/config',
+            'source': '$HOME/.aws/config'
+        }
+    ]
+
+    AWS_COMMON_ENV: ClassVar[List[str]] = ["AWS_PROFILE"]
+
+    def __init__(self, name: str, description: str, args: List[Arg], env: Optional[List[str]] = None):
         """Initialize the tool with proper base class initialization."""
         try:
             # Add base args including converter selection
