@@ -143,7 +143,7 @@ chmod +x /usr/local/bin/terraformer_commands.py
         """Handle terraform commands by delegating to the shell script."""
         try:
             # Extract command type and provider from tool name
-            parts = self.name.split('_')
+            parts = self._tool_name.split('_')
             command_type = parts[1] if len(parts) > 1 else "scan"
             provider = parts[2] if len(parts) > 2 else "aws"
 
@@ -151,6 +151,12 @@ chmod +x /usr/local/bin/terraformer_commands.py
             env = os.environ.copy()
             for key, value in kwargs.items():
                 env[key.upper()] = str(value)
+
+            # Add provider-specific environment variables
+            if provider in self.SUPPORTED_PROVIDERS:
+                for var in self.SUPPORTED_PROVIDERS[provider]['env_vars']:
+                    if var in kwargs:
+                        env[var] = str(kwargs[var])
 
             # Build command arguments
             cmd_args = ['/usr/local/bin/wrapper.sh', command_type, provider]
@@ -166,6 +172,9 @@ chmod +x /usr/local/bin/terraformer_commands.py
                     kwargs.get('resource_types', 'all'),
                     kwargs.get('output_format', 'hcl')
                 ])
+
+            logger.info(f"Executing command: {' '.join(cmd_args)}")
+            logger.debug(f"Environment variables: {env}")
 
             # Execute the script with environment variables
             result = subprocess.run(
