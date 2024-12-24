@@ -4,56 +4,61 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 from .terraform_module_tool import TerraformModuleTool
 from ..scripts.config_loader import get_module_configs, ConfigurationError
+from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import logging
 
 logger = logging.getLogger(__name__)
 
+@handle_script_error
 def create_terraform_module_tool(config: dict, action: str, with_pr: bool = False):
     """Create a Terraform module tool from configuration."""
-    
-    # Generate tool name
-    action_suffix = f"_{action}"
-    if action == 'plan' and with_pr:
-        action_suffix = '_plan_pr'
-    base_name = config['name'].lower().replace(' ', '_')[:30]
-    tool_name = f"tf_self_service_{base_name}{action_suffix}"
+    try:
+        # Generate tool name
+        action_suffix = f"_{action}"
+        if action == 'plan' and with_pr:
+            action_suffix = '_plan_pr'
+        base_name = config['name'].lower().replace(' ', '_')[:30]
+        tool_name = f"tf_self_service_{base_name}{action_suffix}"
 
-    # Create tool description
-    action_desc = {
-        'plan': 'Plan changes for',
-        'plan_pr': 'Plan changes and create PR for',
-        'apply': 'Apply changes to'
-    }
-    description = f"{action_desc.get(action, 'Manage')} {config['description']}"
+        # Create tool description
+        action_desc = {
+            'plan': 'Plan changes for',
+            'plan_pr': 'Plan changes and create PR for',
+            'apply': 'Apply changes to'
+        }
+        description = f"{action_desc.get(action, 'Manage')} {config['description']}"
 
-    # Create module configuration
-    module_config = {
-        'name': config['name'],
-        'description': config['description'],
-        'source': config['source'],
-        'pre_script': config.get('pre_script')
-    }
-    
-    # Add mermaid diagram
-    mermaid = {
-        'graph': """
-            graph TD
-                A[Start] --> B[Load Module]
-                B --> C[Validate Variables]
-                C --> D[Apply Configuration]
-                D --> E[Execute Module]
-                E --> F[End]
-        """
-    }
-    
-    return TerraformModuleTool(
-        name=tool_name,
-        description=description,
-        module_config=module_config,
-        action=action,
-        with_pr=with_pr,
-        mermaid=mermaid
-    )
+        # Create module configuration
+        module_config = {
+            'name': config['name'],
+            'description': config['description'],
+            'source': config['source'],
+            'pre_script': config.get('pre_script')
+        }
+        
+        # Add mermaid diagram
+        mermaid = {
+            'graph': """
+                graph TD
+                    A[Start] --> B[Load Module]
+                    B --> C[Validate Variables]
+                    C --> D[Apply Configuration]
+                    D --> E[Execute Module]
+                    E --> F[End]
+            """
+        }
+        
+        return TerraformModuleTool(
+            name=tool_name,
+            description=description,
+            module_config=module_config,
+            action=action,
+            with_pr=with_pr,
+            mermaid=mermaid
+        )
+    except Exception as e:
+        logger.error(f"Failed to create terraform module tool: {str(e)}")
+        raise ScriptError(str(e))
 
 def initialize_module_tools(config: Optional[Dict[str, Any]] = None) -> Dict[str, Tool]:
     """Initialize all Terraform module tools."""

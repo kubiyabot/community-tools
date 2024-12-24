@@ -3,6 +3,7 @@ from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
 import logging
 from pathlib import Path
+from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import os
 import subprocess
 
@@ -151,7 +152,7 @@ chmod +x /usr/local/bin/terraformer_commands.py
                 env[key.upper()] = str(value)
 
             # Build command arguments
-            cmd_args = ['/usr/local/bin/terraformer.sh', command_type, provider]
+            cmd_args = ['/usr/local/bin/wrapper.sh', command_type, provider]
             
             if command_type == 'import':
                 cmd_args.extend([
@@ -182,6 +183,7 @@ chmod +x /usr/local/bin/terraformer_commands.py
             }
             
         except subprocess.CalledProcessError as e:
+            logger.error(f"Command failed: {e.stderr}")
             raise ScriptError(f"Command failed: {e.stderr}")
         except Exception as e:
             logger.error(f"Failed to handle terraform command: {str(e)}")
