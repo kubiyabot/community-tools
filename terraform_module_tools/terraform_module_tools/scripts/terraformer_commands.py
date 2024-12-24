@@ -1,95 +1,66 @@
 #!/usr/bin/env python3
-import subprocess
-from pathlib import Path
-from typing import Dict, Any, List
-from .error_handler import handle_script_error, ScriptError, validate_environment_vars, logger
+"""Helper script for terraformer commands."""
 
-def run_terraformer_command(command_type: str, provider: str, **kwargs) -> Dict[str, Any]:
-    """Run terraformer commands with proper error handling."""
+import os
+import sys
+import json
+import subprocess
+from typing import Dict, Any, List
+
+def validate_env_vars(provider: str) -> bool:
+    """Validate required environment variables are set."""
+    required_vars = {
+        'aws': ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_REGION'],
+        'gcp': ['GOOGLE_CREDENTIALS', 'GOOGLE_PROJECT'],
+        'azure': ['AZURE_SUBSCRIPTION_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_TENANT_ID']
+    }
+    
+    if provider not in required_vars:
+        print(f"Unsupported provider: {provider}")
+        return False
+        
+    missing = [var for var in required_vars[provider] if not os.getenv(var)]
+    if missing:
+        print(f"Missing required environment variables: {', '.join(missing)}")
+        return False
+    
+    return True
+
+def run_terraformer_command(command: str, provider: str, args: List[str]) -> Dict[str, Any]:
+    """Run terraformer command with proper arguments."""
+    if not validate_env_vars(provider):
+        return {'success': False, 'error': 'Environment validation failed'}
+
     try:
-        if command_type == 'import':
-            return _run_import_command(provider, **kwargs)
-        elif command_type == 'scan':
-            return _run_scan_command(provider, **kwargs)
-        else:
-            raise ScriptError(f"Unknown command type: {command_type}")
-            
+        cmd = ['terraformer', command, provider] + args
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        return {
+            'success': True,
+            'output': result.stdout,
+            'command': ' '.join(cmd)
+        }
+    except subprocess.CalledProcessError as e:
+        return {
+            'success': False,
+            'error': e.stderr,
+            'command': ' '.join(cmd)
+        }
     except Exception as e:
-        logger.error(f"Failed to run terraformer command: {str(e)}")
         return {
             'success': False,
             'error': str(e)
         }
 
-def _run_import_command(provider: str, resource_type: str, resource_id: str, output_dir: str = 'terraform_imported') -> Dict[str, Any]:
-    """Run terraformer import command."""
-    try:
-        # Create output directory
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        print("Usage: terraformer_commands.py <command> <provider> [args...]")
+        sys.exit(1)
         
-        # Build command
-        cmd = [
-            'terraformer',
-            'import',
-            provider,
-            '--resources', resource_type,
-            '--filter', resource_id,
-            '--path-output', output_dir
-        ]
-        
-        # Execute command
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        return {
-            'success': True,
-            'output': result.stdout,
-            'command': ' '.join(cmd),
-            'output_dir': output_dir
-        }
-        
-    except subprocess.CalledProcessError as e:
-        return {
-            'success': False,
-            'error': e.stderr,
-            'command': ' '.join(cmd)
-        }
-
-def _run_scan_command(provider: str, resource_types: str = 'all', output_format: str = 'hcl') -> Dict[str, Any]:
-    """Run terraformer scan command."""
-    try:
-        # Build command
-        cmd = [
-            'terraformer',
-            'scan',
-            provider,
-            '--resources', resource_types,
-            '--output', output_format
-        ]
-        
-        # Execute command
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        return {
-            'success': True,
-            'output': result.stdout,
-            'command': ' '.join(cmd)
-        }
-        
-    except subprocess.CalledProcessError as e:
-        return {
-            'success': False,
-            'error': e.stderr,
-            'command': ' '.join(cmd)
-        }
-
-__all__ = ['run_terraformer_command'] 
+    command = sys.argv[1]
+    provider = sys.argv[2]
+    args = sys.argv[3:]
+    
+    result = run_terraformer_command(command, provider, args)
+    print(json.dumps(result))
+    sys.exit(0 if result['success'] else 1) 

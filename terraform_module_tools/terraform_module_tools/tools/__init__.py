@@ -79,7 +79,10 @@ try:
     
     if not config:
         logger.info("No config found in registry, using default config")
-        config = {'terraform': {'enable_reverse_terraform': True}}
+        config = {'terraform': {
+            'enable_reverse_terraform': True,
+            'reverse_terraform_providers': ['aws', 'gcp', 'azure']
+        }}
     
     logger.info(f"Using configuration: {config}")
     tools = initialize_tools(config)
@@ -90,8 +93,6 @@ try:
             logger.info(f"Tool available: {tool.name}")
     else:
         logger.warning("⚠️ No tools were initialized")
-        logger.info("Checking tool registry state...")
-        registered_tools = tool_registry.get_tools()
-        logger.info(f"Tools in registry: {registered_tools}")
+        logger.info("No tools were registered in the registry")
 except Exception as e:
     logger.error(f"❌ Failed to initialize tools: {str(e)}", exc_info=True)

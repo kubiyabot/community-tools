@@ -68,10 +68,29 @@ class TerraformerTool(Tool):
                         E --> F[End]
                 """
 
-            # Read shell script content
-            script_path = Path(__file__).parent.parent / 'scripts' / 'terraformer.sh'
-            with open(script_path, 'r') as f:
-                script_content = f.read()
+            # Read all required scripts
+            scripts_dir = Path(__file__).parent.parent / 'scripts'
+            script_files = {
+                'terraformer.sh': scripts_dir / 'terraformer.sh',
+                'terraformer_commands.py': scripts_dir / 'terraformer_commands.py'
+            }
+
+            # Read script contents
+            script_contents = {}
+            for script_name, script_path in script_files.items():
+                with open(script_path, 'r') as f:
+                    script_contents[script_name] = f.read()
+
+            # Create wrapper script content
+            wrapper_script = f"""#!/bin/bash
+set -e
+
+# Export environment variables from args
+{self._generate_env_exports()}
+
+# Execute terraformer script with proper environment
+/usr/local/bin/terraformer.sh "$@"
+"""
 
             # Initialize base tool with proper schema
             super().__init__(
@@ -86,23 +105,24 @@ class TerraformerTool(Tool):
                     'path': '/usr/local/bin/terraformer.sh',
                     'source': 'scripts/terraformer.sh',
                     'mode': '0755'
+                }, {
+                    'path': '/usr/local/bin/terraformer_commands.py',
+                    'source': 'scripts/terraformer_commands.py',
+                    'mode': '0644'
                 }],
                 with_files={
                     '/usr/local/bin/terraformer.sh': {
                         'destination': '/usr/local/bin/terraformer.sh',
-                        'content': script_content,
+                        'content': script_contents['terraformer.sh'],
                         'mode': '0755'
+                    },
+                    '/usr/local/bin/terraformer_commands.py': {
+                        'destination': '/usr/local/bin/terraformer_commands.py',
+                        'content': script_contents['terraformer_commands.py'],
+                        'mode': '0644'
                     }
                 },
-                content=f"""#!/bin/bash
-set -e
-
-# Export environment variables from args
-{self._generate_env_exports()}
-
-# Execute terraformer script
-/usr/local/bin/terraformer.sh "$@"
-""",
+                content=wrapper_script,
                 mermaid=mermaid
             )
 
@@ -112,7 +132,7 @@ set -e
 
     def _generate_env_exports(self) -> str:
         """Generate environment variable export statements based on provider."""
-        provider = self.name.split('_')[-1] if '_' in name else None
+        provider = self.name.split('_')[-1] if self.name else None
         if not provider or provider not in self.SUPPORTED_PROVIDERS:
             return ""
         
@@ -201,12 +221,14 @@ def _initialize_provider_tools(provider: str) -> List[Tool]:
                     Arg(
                         name="resource_type",
                         description=f"Type of resource to import. Available: {', '.join(provider_config['resources'])}",
-                        type="str"
+                        type="str",
+                        required=True
                     ),
                     Arg(
                         name="resource_id",
                         description="ID or name of the resource to import",
-                        type="str"
+                        type="str",
+                        required=True
                     ),
                     Arg(
                         name="output_dir",
