@@ -161,34 +161,43 @@ def _get_clean_module_name(module_config: Dict[str, Any]) -> str:
 def create_terraform_module_tool(module_config: Dict[str, Any], action: str, with_pr: bool = False):
     """Create a Terraform module tool from module configuration."""
     try:
-        # Parse module information from URL
+        # Handle registry format URLs
+        source_url = module_config.get('url') or module_config.get('source')
+        if '/' in source_url and len(source_url.split('/')) == 3:
+            source_url = f"registry.terraform.io/{source_url}"
+
+        # Create parser with auto_discover flag
         parser = TerraformModuleParser(
-            source_url=module_config['url'],
-            ref=module_config.get('ref'),
-            path=module_config.get('path')
+            source_url=source_url,
+            ref=module_config.get('version') or module_config.get('ref'),
+            path=module_config.get('path'),
+            module_config=module_config  # Pass full config for manual variables
         )
         
         variables, warnings, errors = parser.get_variables()
         
         if errors:
-            logger.error(f"Failed to parse module {module_config['url']}: {errors}")
+            logger.error(f"Failed to parse module {source_url}: {errors}")
             return None
             
         for warning in warnings:
-            logger.warning(f"Warning for {module_config['url']}: {warning}")
+            logger.warning(f"Warning for {source_url}: {warning}")
 
         # Get clean module name
-        module_name = _get_clean_module_name(module_config)
+        module_name = module_config.get('name') or _get_clean_module_name(module_config)
         
         # Create module configuration
         tool_config = {
             'name': module_name,
             'description': module_config.get('description') or f"Terraform module for {module_name}",
             'source': {
-                'location': module_config['url'],
-                'version': module_config.get('ref') or parser.source.get_ref() or 'latest',
+                'location': source_url,
+                'version': module_config.get('version') or parser.source.get_ref() or 'latest',
                 'path': module_config.get('path')
             },
+            'auto_discover': module_config.get('auto_discover', True),
+            'instructions': module_config.get('instructions'),
+            'variables': module_config.get('variables'),
             'metadata': module_config.get('metadata', {})
         }
 
@@ -205,66 +214,54 @@ def create_terraform_module_tool(module_config: Dict[str, Any], action: str, wit
         )
 
     except Exception as e:
-        logger.error(f"Failed to create tool for {module_config['url']}: {str(e)}")
+        logger.error(f"Failed to create tool for {source_url}: {str(e)}")
         return None
 
-def initialize_tools():
+def initialize_tools(module_configs=None):
     """Initialize all Terraform module tools from dynamic configuration."""
     tools = []
     try:
-        # Get dynamic configuration from tool registry
-        config = tool_registry.dynamic_config
-        if not config:
-            error_msg = "No dynamic configuration provided - please provide Terraform module URLs to initialize the tools for"
+        if not module_configs:
+            error_msg = "No module configurations provided"
             logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Get module URLs from configuration - try both keys for backward compatibility
-        module_urls = None
-        for key in ['tf_modules_urls', 'tf_modules', 'terraform_modules']:
-            if key in config:
-                module_urls = parse_module_urls(config[key])
-                if module_urls:
-                    logger.debug(f"Found module URLs using key: {key}")
-                    break
-                
-        if not module_urls:
-            error_msg = "No Terraform module URLs provided in configuration - please provide module URLs using one of: tf_modules_urls, tf_modules, terraform_modules"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+        logger.info(f"Initializing tools for {len(module_configs)} modules")
 
-        logger.info(f"Found {len(module_urls)} module URLs in configuration")
-
-        # Create tools for each module
-        for module_config in module_urls:
+        # Create tools for each module in the config
+        for module_name, module_config in module_configs.items():
             try:
-                logger.info(f"Creating tools for module: {module_config['url']}")
+                logger.info(f"Creating tools for module: {module_name}")
                 
                 # Create and register tools
                 created_tools = []
                 
-                for action in ['plan', 'plan_pr', 'apply']:
-                    with_pr = action == 'plan_pr'
-                    base_action = 'plan' if with_pr else action
-                    
-                    tool = create_terraform_module_tool(module_config, base_action, with_pr)
+                for action in ['plan', 'apply']:
+                    tool = create_terraform_module_tool(
+                        {
+                            'name': module_name,
+                            'source': module_config['source'],
+                            'version': module_config.get('version'),
+                            'auto_discover': module_config.get('auto_discover', True),
+                            'instructions': module_config.get('instructions'),
+                            'variables': module_config.get('variables', {})
+                        }, 
+                        action
+                    )
                     if tool:
                         created_tools.append(tool)
                         tool_registry.register("terraform", tool)
-                        logger.info(f"Created {action} tool for {module_config['url']}")
+                        logger.info(f"Created {action} tool for {module_name}")
 
                 if created_tools:
                     tools.extend(created_tools)
-                    logger.info(f"Successfully created {len(created_tools)} tools for module: {module_config['url']}")
+                    logger.info(f"Successfully created {len(created_tools)} tools for module: {module_name}")
                 else:
-                    error_msg = f"Failed to create any tools for module: {module_config['url']}"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+                    logger.warning(f"No tools were created for module: {module_name}")
                 
             except Exception as e:
-                error_msg = f"Failed to create tools for module {module_config['url']}: {str(e)}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                logger.error(f"Failed to create tools for module {module_name}: {str(e)}")
+                continue
 
         if not tools:
             error_msg = "No tools were created from any modules"

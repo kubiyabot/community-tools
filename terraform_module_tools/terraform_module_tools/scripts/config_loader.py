@@ -6,6 +6,7 @@ import os
 import subprocess
 import tempfile
 import glob
+from kubiya_sdk.tools import tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +130,7 @@ def validate_config(config: Dict[str, Any]) -> bool:
     if not JSONSCHEMA_AVAILABLE:
         # Basic validation without jsonschema
         for module_name, module_config in config.items():
-            required_fields = ["name", "description", "source"]
+            required_fields = ["description", "source"] # name is optional
             for field in required_fields:
                 if field not in module_config:
                     raise ValueError(f"Missing required field '{field}' in module '{module_name}'")
@@ -147,14 +148,11 @@ def validate_config(config: Dict[str, Any]) -> bool:
 def get_module_configs() -> Dict[str, Any]:
     """Get Terraform module configurations."""
     try:
-        config_path = Path(__file__).parent / 'configs' / 'module_configs.json'
-        if not config_path.exists():
-            logger.warning(f"No module configurations found at {config_path}")
-            return {}
-
-        with open(config_path) as f:
-            configs = json.load(f)
-
+        configs = tool_registry.dynamic_config or {}
+        if not configs:
+            logger.warning("No module configurations found")
+            raise ValueError("No module configurations found - please provide Terraform modules to convert to tools")
+        
         # Validate configuration
         validate_config(configs)
         
@@ -170,4 +168,4 @@ def get_module_configs() -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Failed to load module configurations: {str(e)}")
-        return {} 
+        raise ValueError(f"Failed to load module configurations: {str(e)}")

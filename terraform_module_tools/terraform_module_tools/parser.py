@@ -2,7 +2,7 @@ import os
 import json
 import tempfile
 import subprocess
-from typing import Dict, Any, List, Optional, Tuple, Set
+from typing import Dict, Any, List, Optional, Tuple, Set, Union
 import logging
 import re
 import glob
@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from kubiya_sdk.tools.models import FileSpec
 from urllib.parse import urlparse, unquote
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,33 @@ class ModuleSource:
     def __init__(self, source: str, version: Optional[str] = None):
         self.original_source = source
         self.version = version
-        self.source_type = self._detect_source_type()
-        self.parsed_source = self._parse_source()
+        self._source_type = None
+        self._parsed_source = None
+    
+    @property
+    @lru_cache(maxsize=1)
+    def source_type(self) -> str:
+        """Cached source type detection."""
+        if self._source_type is None:
+            self._source_type = self._detect_source_type()
+        return self._source_type
+    
+    @property
+    @lru_cache(maxsize=1)
+    def parsed_source(self) -> Dict[str, Any]:
+        """Cached source parsing."""
+        if self._parsed_source is None:
+            self._parsed_source = self._parse_source()
+        return self._parsed_source
+
+    @lru_cache(maxsize=1)
+    def get_clone_url(self) -> str:
+        """Cached clone URL generation."""
+        if self.source_type == 'registry':
+            return self.parsed_source['clone_url']
+        elif self.source_type in ('github', 'git'):
+            return self.parsed_source['clone_url']
+        raise ValueError(f"Source type {self.source_type} does not support cloning")
     
     def _detect_source_type(self) -> str:
         """Detect the type of module source."""
@@ -164,20 +190,16 @@ class ModuleSource:
             else:
                 raise ValueError(f"Invalid registry format: {self.original_source}")
         
-        # Handle version constraints
-        version = self.version
-        if '//' in provider:  # Handle subpaths
-            provider, subpath = provider.split('//', 1)
-        else:
-            subpath = None
-            
+        # Construct GitHub URL for the module
+        github_url = f"https://github.com/terraform-aws-modules/terraform-{provider}-{name}"
+        
         return {
             'namespace': namespace,
             'name': name,
             'provider': provider,
-            'version': version,
-            'subpath': subpath,
-            'url': f"https://{self.REGISTRY_DOMAIN}/{namespace}/{name}/{provider}"
+            'version': self.version,
+            'url': github_url,
+            'clone_url': f"{github_url}.git"
         }
     
     def _parse_git_source(self) -> Dict[str, Any]:
@@ -229,25 +251,6 @@ class ModuleSource:
             'path': os.path.abspath(self.original_source),
             'version': self.version
         }
-    
-    def get_clone_url(self) -> str:
-        """Get the URL to clone the repository."""
-        if self.source_type == 'github':
-            return self.parsed_source['clone_url']
-        elif self.source_type == 'git':
-            return self.parsed_source['clone_url']
-        elif self.source_type == 'registry':
-            # For registry modules, we need to get the source from the registry
-            registry_client = TerraformRegistryClient()
-            module_source = registry_client.get_module_source(
-                self.parsed_source['namespace'],
-                self.parsed_source['name'],
-                self.parsed_source['provider'],
-                self.parsed_source['version']
-            )
-            return module_source
-        
-        raise ValueError(f"Source type {self.source_type} does not support cloning")
     
     def get_ref(self) -> Optional[str]:
         """Get the reference (branch, tag, commit) to checkout."""
@@ -332,12 +335,32 @@ class TerraformModuleParser:
         }
     }
 
+    # Add class-level cache for git installation check
+    _git_installed = False
+
+    # Add class-level thread pool for reuse
+    _executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+
+    @classmethod
+    def _ensure_git(cls):
+        """Ensure git is installed (cached)."""
+        if cls._git_installed:
+            return
+        
+        try:
+            subprocess.run(['git', '--version'], check=True, capture_output=True)
+            cls._git_installed = True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            logger.info("Installing git and required packages...")
+            subprocess.run(['apk', 'add', '--no-cache', 'git', 'git-remote-https'], check=True)
+            cls._git_installed = True
+
     def __init__(
         self,
         source_url: str,
         ref: Optional[str] = None,
         path: Optional[str] = None,
-        max_workers: int = 4
+        module_config: Optional[Dict[str, Any]] = None
     ):
         self.source = ModuleSource(source_url, version=ref)
         self.path = path or self.source.get_path()
@@ -345,85 +368,76 @@ class TerraformModuleParser:
         self.errors = []
         self.readme_url = None
         self.module_dir = None
-        self.max_workers = max_workers
         self.providers: Set[str] = set()
-        self._clone_repository()
-        ensure_hcl2json()
+        self.module_config = module_config
+        
+        # Clone and initialize in parallel
+        future_clone = self._executor.submit(self._clone_repository)
+        future_hcl = self._executor.submit(ensure_hcl2json) if not module_config or module_config.get('auto_discover', True) else None
+
+        # Wait for initialization
+        try:
+            future_clone.result()
+            if future_hcl:
+                future_hcl.result()
+        except Exception as e:
+            raise ValueError(f"Failed to initialize: {str(e)}")
 
     def _clone_repository(self) -> None:
-        """Clone the repository with optimized git operations."""
+        """Optimized repository cloning."""
         temp_dir = tempfile.mkdtemp()
 
         try:
-            logger.info(f"Cloning repository from {self.source.get_clone_url()}")
+            # Ensure git is installed (cached)
+            self._ensure_git()
+
+            # Get clone URL from source
+            clone_url = self.source.get_clone_url()
+            logger.info(f"Using clone URL: {clone_url}")
             
+            # Prepare command list efficiently
             clone_cmd = ['git', 'clone', '--depth', '1', '--single-branch']
-            
             if ref := self.source.get_ref():
                 clone_cmd.extend(['--branch', ref])
-            
-            clone_url = self.source.get_clone_url()
-            
-            # Handle GitHub authentication tokens
+
+            # Handle auth token once
             if 'github.com' in clone_url:
-                # Try GH_TOKEN first, then TOOLS_GH_TOKEN
                 github_token = os.environ.get('GH_TOKEN') or os.environ.get('TOOLS_GH_TOKEN')
                 if github_token:
-                    logger.debug("Using GitHub token for authentication")
-                    auth_url = clone_url.replace(
+                    clone_url = clone_url.replace(
                         "https://github.com",
                         f"https://{github_token}@github.com"
                     )
-                    clone_cmd.append(auth_url)
-                else:
-                    logger.debug("No GitHub token found, using unauthenticated access")
-                    clone_cmd.append(clone_url)
-            else:
-                clone_cmd.append(clone_url)
+
+            clone_cmd.extend([clone_url, str(temp_dir)])
             
-            clone_cmd.append(str(temp_dir))
-            
-            # Run git clone command
+            # Single subprocess call with prepared command
             try:
                 result = subprocess.run(
                     clone_cmd, 
                     check=True, 
                     capture_output=True,
                     text=True,
-                    env={**os.environ, 'GIT_TERMINAL_PROMPT': '0'}  # Prevent git from prompting for credentials
+                    env={'GIT_TERMINAL_PROMPT': '0', **os.environ}
                 )
             except subprocess.CalledProcessError as e:
-                error_msg = f"Git clone failed: {e.stderr}"
-                if 'Authentication failed' in e.stderr:
-                    error_msg = "GitHub authentication failed. Please ensure either GH_TOKEN or TOOLS_GH_TOKEN is set with valid credentials."
-                logger.error(error_msg)
-                raise ValueError(error_msg)
-            
-            # Set the module directory
+                raise ValueError(f"Git clone failed: {e.stderr}")
+
+            # Set module directory efficiently
             self.module_dir = os.path.join(temp_dir, self.path or '')
             if self.path and not os.path.exists(self.module_dir):
                 raise ValueError(f"Specified path '{self.path}' does not exist")
 
             # Set README URL for GitHub repositories
-            if self.source.source_type == 'github':
-                base_url = self.source.parsed_source['url']
+            if self.source.source_type in ('github', 'registry'):
+                base_url = clone_url.rstrip('.git')
                 ref = self.source.get_ref() or 'master'
                 path = self.source.get_path() or ''
                 self.readme_url = f"{base_url}/blob/{ref}/{path}/README.md".rstrip('/')
 
-        except subprocess.CalledProcessError as e:
-            error_msg = f"Failed to clone repository: {e.stderr}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
         except Exception as e:
-            error_msg = f"Failed to clone repository: {str(e)}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-        finally:
-            # Ensure we don't leave the token in the error messages
-            if 'github_token' in locals():
-                for handler in logger.handlers:
-                    handler.formatter._fmt = handler.formatter._fmt.replace(github_token, '***')
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise ValueError(f"Failed to clone repository: {str(e)}")
 
     def _parse_variables_file(self, file_path: str) -> Dict[str, Any]:
         """Parse variables from a Terraform file with error handling."""
@@ -570,60 +584,177 @@ class TerraformModuleParser:
         return variables
 
     def get_variables(self) -> Tuple[Dict[str, Any], List[str], List[str]]:
-        """Get variables from module with support for manual configuration."""
+        """Optimized parallel variable parsing."""
         try:
-            # Check if we should auto-discover variables
-            if hasattr(self, 'module_config') and not self.module_config.get('auto_discover', True):
-                # Use manually configured variables
+            if not self.module_dir:
+                raise ValueError("Module directory not set. Module may not exist or failed to clone.")
+
+            # Fast path for manual configuration
+            if self.module_config and not self.module_config.get('auto_discover', True):
+                # Quick validation of module existence
+                if not any(Path(self.module_dir).glob('*.tf')):
+                    self.errors.append("No .tf files found in module - module may not be valid")
+                    return {}, self.warnings, self.errors
+
                 variables = self.get_variables_from_config(self.module_config)
+                self._set_providers_from_config()
                 return variables, [], []
 
-            # Existing auto-discovery logic...
-            # Rest of the method remains unchanged
+            # Collect files in parallel
+            tf_files = list(Path(self.module_dir).rglob('*.tf'))
+            if not tf_files:
+                self.errors.append("No .tf files found in module")
+                return {}, self.warnings, self.errors
+
+            # Process files in parallel batches
+            batch_size = 10
+            variables = {}
+            providers = set()
+            
+            for i in range(0, len(tf_files), batch_size):
+                batch = tf_files[i:i + batch_size]
+                futures = {
+                    self._executor.submit(self._parse_file, tf_file): tf_file
+                    for tf_file in batch
+                }
+                
+                for future in as_completed(futures):
+                    try:
+                        file_vars, file_providers = future.result()
+                        variables.update(file_vars)
+                        providers.update(file_providers)
+                    except Exception as e:
+                        logger.error(f"Failed to process file: {str(e)}")
+
+            self.providers = providers
+            return variables, self.warnings, self.errors
 
         except Exception as e:
-            logger.error(f"Failed to get variables and providers: {str(e)}", exc_info=True)
-            self.errors.append(f"Failed to get variables and providers: {str(e)}")
-        finally:
-            # Clean up the cloned repository
-            if self.module_dir and os.path.exists(os.path.dirname(self.module_dir)):
-                shutil.rmtree(os.path.dirname(self.module_dir))
-                logger.info(f"Cleaned up temporary directory: {self.module_dir}")
+            logger.error(f"Failed to get variables: {str(e)}", exc_info=True)
+            self.errors.append(f"Failed to get variables: {str(e)}")
+            return {}, self.warnings, self.errors
 
-        if not variables:
-            self.errors.append("No variables found in module")
-
-        return variables, self.warnings, self.errors
-
-    def _process_variable(self, var_name: str, var_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Process individual variable configuration."""
+    @lru_cache(maxsize=100)
+    def _parse_file(self, file_path: str) -> Tuple[Dict[str, Any], Set[str]]:
+        """Parse both variables and providers from a file with caching."""
         try:
-            # Extract type, default, and description
-            var_type = var_config.get('type', 'string')
-            default = var_config.get('default')
-            description = var_config.get('description', '')
+            result = subprocess.run(
+                ['/usr/local/bin/hcl2json', str(file_path)],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=10
+            )
+            
+            tf_json = json.loads(result.stdout)
+            variables = {}
+            providers = set()
 
-            # Clean up type string (remove interpolation syntax if any)
-            if isinstance(var_type, str):
-                var_type = re.sub(r'^\${(.*)}$', r'\1', var_type)
-                var_type = var_type.strip()
+            # Process variables
+            if 'variable' in tf_json:
+                try:
+                    variables = self._process_variables(tf_json['variable'])
+                except Exception as e:
+                    logger.error(f"Failed to process variables in {file_path}: {str(e)}")
 
-            # Handle complex types by defaulting to 'string'
-            if var_type not in ['string', 'str', 'number', 'bool']:
-                logger.warning(f"Complex type '{var_type}' for variable '{var_name}' will be handled as 'string'")
-                var_type = 'str'
+            # Process providers
+            if 'provider' in tf_json:
+                try:
+                    providers.update(self._process_providers(tf_json['provider']))
+                except Exception as e:
+                    logger.error(f"Failed to process providers in {file_path}: {str(e)}")
 
-            # Determine if variable is required
-            required = 'default' not in var_config
+            # Process required providers
+            if 'terraform' in tf_json:
+                try:
+                    providers.update(self._process_required_providers(tf_json['terraform']))
+                except Exception as e:
+                    logger.error(f"Failed to process required providers in {file_path}: {str(e)}")
 
-            processed_var = {
-                'type': var_type,
-                'description': description,
-                'default': default if default is not None else None,
-                'required': required
-            }
-            return processed_var
+            return variables, providers
 
         except Exception as e:
-            logger.warning(f"Failed to process variable {var_name}: {str(e)}")
-            return None
+            logger.error(f"Failed to parse {file_path}: {str(e)}")
+            return {}, set()
+
+    def _process_variables(self, var_blocks: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Dict[str, Any]:
+        """Process variables with proper type handling."""
+        variables = {}
+        
+        # Convert list format to dict format
+        if isinstance(var_blocks, list):
+            var_dict = {}
+            for block in var_blocks:
+                if isinstance(block, dict):
+                    var_dict.update(block)
+            var_blocks = var_dict
+
+        # Process each variable
+        for var_name, var_config in var_blocks.items():
+            # Handle list format from HCL2JSON
+            if isinstance(var_config, list):
+                var_config = var_config[0] if var_config else {}
+            
+            # Skip if not a dict
+            if not isinstance(var_config, dict):
+                logger.warning(f"Skipping invalid variable config for {var_name}: {var_config}")
+                continue
+
+            try:
+                # Extract type, default, and description
+                var_type = var_config.get('type', 'string')
+                if isinstance(var_type, (dict, list)):
+                    # Handle complex types
+                    var_type = json.dumps(var_type)
+                
+                description = var_config.get('description', '')
+                if isinstance(description, (dict, list)):
+                    description = json.dumps(description)
+
+                # Handle default value
+                default = var_config.get('default')
+                if isinstance(default, (dict, list)):
+                    default = json.dumps(default)
+
+                variables[var_name] = {
+                    'type': str(var_type),
+                    'description': str(description),
+                    'default': default,
+                    'required': default is None
+                }
+
+            except Exception as e:
+                logger.warning(f"Failed to process variable {var_name}: {str(e)}")
+                continue
+
+        return variables
+
+    def _process_providers(self, provider_blocks: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Set[str]:
+        """Process provider blocks with proper type handling."""
+        providers = set()
+        
+        # Handle both list and dict formats
+        if isinstance(provider_blocks, list):
+            for block in provider_blocks:
+                if isinstance(block, dict):
+                    providers.update(block.keys())
+        elif isinstance(provider_blocks, dict):
+            providers.update(provider_blocks.keys())
+        
+        return providers
+
+    def _process_required_providers(self, terraform_block: Dict[str, Any]) -> Set[str]:
+        """Process required_providers block with proper type handling."""
+        providers = set()
+        
+        try:
+            required_providers = terraform_block.get('required_providers', {})
+            if isinstance(required_providers, list):
+                required_providers = required_providers[0] if required_providers else {}
+                
+            if isinstance(required_providers, dict):
+                providers.update(required_providers.keys())
+        except Exception as e:
+            logger.error(f"Failed to process required providers: {str(e)}")
+        
+        return providers

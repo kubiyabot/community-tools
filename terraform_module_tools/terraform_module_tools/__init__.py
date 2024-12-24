@@ -1,5 +1,6 @@
 import logging
 from .tools import initialize_tools
+from kubiya_sdk.tools.registry import tool_registry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -9,25 +10,31 @@ def initialize():
     """Initialize Terraform module tools using dynamic configuration."""
     try:
         logger.info("Starting Terraform module tools initialization...")
-        initialized_tools = initialize_tools()
-        if not initialized_tools:
-            error_msg = "No tools were initialized"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
-            
-        logger.info(f"Successfully initialized {len(initialized_tools)} Terraform tools")
-        return initialized_tools
+        
+        # Get dynamic configuration from tool registry
+        dynamic_config = getattr(tool_registry, 'dynamic_config', None)
+        if not dynamic_config:
+            logger.warning("No dynamic configuration found in tool registry")
+            return []
+
+        # Check if we have tf_modules in the config
+        tf_modules = dynamic_config.get('tf_modules') or dynamic_config.get('terraform_modules')
+        if not tf_modules:
+            logger.warning("No terraform modules found in dynamic configuration")
+            return []
+
+        # Initialize tools with module configurations
+        initialized_tools = initialize_tools(tf_modules)
+        if initialized_tools:
+            logger.info(f"Successfully initialized {len(initialized_tools)} Terraform tools")
+            return initialized_tools
+        else:
+            logger.warning("No tools were initialized")
+            return []
     except Exception as e:
         error_msg = f"Failed to initialize Terraform tools: {str(e)}"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-# Initialize tools when module is imported and store them
-try:
-    tools = initialize()
-except Exception as e:
-    logger.error(f"Failed to initialize tools: {str(e)}")
-    tools = []
-
-# Export the tools and initialization function
-__all__ = ['tools', 'initialize']
+# Export the initialization function
+__all__ = ['initialize']
