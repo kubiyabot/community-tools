@@ -299,9 +299,10 @@ fi
         "step": "Run Tests",
         "error": "Test failed: expected 200 but got 404",
         "file": "tests/api_test.go",
-        "line": "42"
+        "line": "42",
+        "source_code": "assert.Equal(t, http.StatusOK, response.StatusCode)"
     }
-]""",
+]"""
             required=True
         ),
         Arg(

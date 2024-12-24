@@ -107,6 +107,46 @@ def find_template_file() -> Path:
             
     raise FileNotFoundError("Could not find workflow_failure.jinja2 template in any expected location")
 
+def combine_failures_and_fixes(failures, fixes):
+    """
+    Combine failures and suggested fixes into a list of dictionaries.
+    Each dictionary contains:
+    - step
+    - error (failure)
+    - fix_description
+    - fix_code_sample
+    """
+    combined = []
+    for failure, fix in zip(failures, fixes):
+        combined.append({
+            'step': failure['step'],
+            'error': failure['error'],
+            'fix_description': fix['description'],
+            'fix_code_sample': fix['code_sample']
+        })
+    return combined
+
+def process_error_logs_in_context(context):
+    """
+    Recursively processes all values in the dictionary context to replace
+    escape sequences (\t and \n) with actual tabs and newlines.
+    """
+    for key, value in context.items():
+        if isinstance(value, str):
+            # Replace the escape sequences with actual tabs and newlines
+            context[key] = value.replace(r'\t', '\t').replace(r'\n', '\n')
+        elif isinstance(value, dict):
+            # Recursively process nested dictionaries
+            process_error_logs_in_context(value)
+        elif isinstance(value, list):
+            # Process lists (apply to each element in the list if it's a string)
+            for i, item in enumerate(value):
+                if isinstance(item, str):
+                    value[i] = item.replace(r'\t', '\t').replace(r'\n', '\n')
+                elif isinstance(item, dict):
+                    process_error_logs_in_context(item)
+    return context
+
 def generate_comment(variables: dict) -> str:
     """Generate a comment using the workflow failure template."""
     try:
@@ -115,19 +155,24 @@ def generate_comment(variables: dict) -> str:
         failures = parse_failures(variables['failures'])
         fixes = parse_fixes(variables['fixes'])
         run_details = parse_run_details(variables['run_details'])
-
+        
         # Create template context
         context = {
             'workflow_name': run_details.get('name', 'Unknown Workflow'),
             'failed_steps': [failure['step'] for failure in failures],
             'failures': failures,  # Pass the full failures list directly
             'fixes': fixes,  # Pass the full fixes list directly 
+            'failures_and_fixes': combine_failures_and_fixes(failures, fixes),
             'workflow_steps': [step['name'] for step in workflow_steps],
             'error_logs': variables['error_logs'],
             'run_details': json.dumps(run_details),  # Pass as JSON string
             'number': variables['pr_number'],
             'repo': variables['repo']
         }
+        # Process the context dictionary to replace escape sequences
+        context = process_error_logs_in_context(context)
+
+        # Now the processed_context contains the updated values with actual tabs and newlines
         logger.info(f"context: {context}")
 
         # Initialize template handler
