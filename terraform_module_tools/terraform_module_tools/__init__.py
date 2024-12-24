@@ -1,7 +1,7 @@
 import logging
 from .tools import initialize_tools
 from .parser import TerraformModuleParser, ModuleSource
-from .scripts.config_loader import load_config, get_module_configs, ConfigurationError
+from .scripts.config_loader import load_config, ConfigurationError
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ def initialize_terraform_tools(input_config=None):
             
         # Load and validate configuration
         try:
+            # Load and validate configuration
             config = load_config(input_config=input_config)
             logger.info(f"Loaded configuration: {config}")
             

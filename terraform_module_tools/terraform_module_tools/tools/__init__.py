@@ -211,30 +211,28 @@ def create_terraform_module_tool(module_config: Dict[str, Any], action: str, wit
         logger.error(f"Failed to create tool for {module_config['url']}: {str(e)}")
         return None
 
-def initialize_tools(config=None):
+def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
     """Initialize all Terraform tools from configuration."""
     tools = []
     try:
         if not config:
             raise ConfigurationError("No configuration provided")
 
-        # Get validated module configurations
-        module_configs = get_module_configs(config)
-        if module_configs:
-            logger.info("Initializing Terraform module tools")
-            module_tools = _initialize_module_tools(module_configs)
-            if not module_tools:
-                raise ConfigurationError("Failed to initialize any module tools")
-            tools.extend(module_tools)
+        terraform_config = config.get('terraform', {})
 
-        # Get reverse terraform configuration
-        reverse_config = get_reverse_terraform_config(config)
-        if reverse_config['enabled']:
+        # Initialize module tools if modules are configured
+        if terraform_config.get('modules'):
+            logger.info("Initializing Terraform module tools")
+            module_tools = _initialize_module_tools(terraform_config['modules'])
+            if module_tools:
+                tools.extend(module_tools)
+
+        # Initialize reverse terraform tools if enabled
+        if terraform_config.get('enable_reverse_terraform'):
             logger.info("Initializing reverse Terraform engineering tools")
             reverse_tools = _initialize_reverse_terraform_tools(config)
-            if not reverse_tools:
-                raise ConfigurationError("Failed to initialize any reverse engineering tools")
-            tools.extend(reverse_tools)
+            if reverse_tools:
+                tools.extend(reverse_tools)
 
         if not tools:
             raise ConfigurationError("No tools were created from configuration")

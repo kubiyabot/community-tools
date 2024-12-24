@@ -290,6 +290,73 @@ def get_reverse_terraform_config(config: Dict[str, Any]) -> Dict[str, Any]:
         logger.error(error_msg)
         raise ConfigurationError(error_msg)
 
+def validate_config(config: Dict[str, Any]) -> None:
+    """Validate the complete configuration structure."""
+    # Validate terraform section
+    if 'terraform' not in config:
+        raise ConfigurationError(
+            "Missing 'terraform' section in configuration",
+            expected_structure={
+                "terraform": {
+                    "modules": {
+                        "module_name": {
+                            "source": "module-source",
+                            "version": "module-version",
+                            "description": "module-description",
+                            "variables": {}
+                        }
+                    },
+                    "enable_reverse_terraform": True,
+                    "reverse_terraform_providers": ["aws", "gcp", "azure"]
+                }
+            }
+        )
+        
+    terraform_config = config['terraform']
+    
+    # Validate modules if present
+    if 'modules' in terraform_config:
+        modules = terraform_config['modules']
+        if not isinstance(modules, dict):
+            raise ConfigurationError(
+                "'modules' must be a dictionary",
+                expected_structure={
+                    "terraform": {
+                        "modules": {
+                            "module_name": {
+                                "source": "module-source",
+                                "version": "module-version"
+                            }
+                        }
+                    }
+                }
+            )
+            
+        # Validate each module
+        for module_name, module_config in modules.items():
+            validate_module_config(module_name, module_config)
+    
+    # Validate reverse terraform configuration
+    validate_reverse_terraform_config(terraform_config)
+    
+    # Ensure at least one feature is enabled
+    if not terraform_config.get('modules') and not terraform_config.get('enable_reverse_terraform'):
+        raise ConfigurationError(
+            "Configuration must include at least one module or enable reverse terraform",
+            expected_structure={
+                "terraform": {
+                    "modules": {
+                        "module_name": {
+                            "source": "module-source"
+                        }
+                    },
+                    # OR
+                    "enable_reverse_terraform": True,
+                    "reverse_terraform_providers": ["aws"]
+                }
+            }
+        )
+
 __all__ = [
     'load_config',
     'ConfigurationError',
