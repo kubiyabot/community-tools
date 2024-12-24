@@ -105,6 +105,131 @@ class TerraformerTool(Tool):
                         'content': wrapper_script,
                     }
                 ],
+                content=f"""#!/bin/bash
+set -e
+
+# Function to convert argument names to environment variables
+to_env_var() {{
+    echo "$1" | tr '[:lower:]' '[:upper:]' | tr '-' '_'
+}}
+
+# Initialize argument counter
+arg_count=0
+
+# Export tool name for command detection
+export TOOL_NAME="{config.name}"
+
+# First pass: Handle known arguments and their values
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --resource-type=*|--resource_type=*)
+            export RESOURCE_TYPE="${{1#*=}}"
+            ;;
+        --resource-id=*|--resource_id=*)
+            export RESOURCE_ID="${{1#*=}}"
+            ;;
+        --output-dir=*|--output_dir=*)
+            export OUTPUT_DIR="${{1#*=}}"
+            ;;
+        --resource-types=*|--resource_types=*)
+            export RESOURCE_TYPES="${{1#*=}}"
+            ;;
+        --output-format=*|--output_format=*)
+            export OUTPUT_FORMAT="${{1#*=}}"
+            ;;
+        *)
+            # Store other arguments for second pass
+            OTHER_ARGS+=("$1")
+            ;;
+    esac
+    shift
+done
+
+# Second pass: Handle remaining arguments
+for arg in "${{OTHER_ARGS[@]}}"; do
+    if [[ "$arg" == *"="* ]]; then
+        # Handle key=value pairs
+        key=$(echo "$arg" | cut -d'=' -f1)
+        value=$(echo "$arg" | cut -d'=' -f2)
+        env_key=$(to_env_var "$key")
+        export "$env_key"="$value"
+    else
+        # Handle positional arguments
+        case "$arg" in
+            scan|import)
+                export COMMAND_TYPE="$arg"
+                ;;
+            aws|gcp|azure)
+                export PROVIDER="$arg"
+                ;;
+            *)
+                # Convert argument name to environment variable
+                env_key=$(to_env_var "$arg")
+                if [[ -n "${{!env_key}}" ]]; then
+                    # Variable already exists, store as numbered argument
+                    env_key="ARG_$((arg_count++))"
+                fi
+                export "$env_key"="$arg"
+                ;;
+        esac
+    fi
+done
+
+# Determine command type and provider from environment if not set
+if [[ -z "$COMMAND_TYPE" ]]; then
+    if [[ "$TOOL_NAME" == *"_import_"* ]]; then
+        export COMMAND_TYPE="import"
+    else
+        export COMMAND_TYPE="scan"
+    fi
+fi
+
+if [[ -z "$PROVIDER" ]]; then
+    for p in aws gcp azure; do
+        if [[ "$TOOL_NAME" == *"_$p" ]]; then
+            export PROVIDER="$p"
+            break
+        fi
+    done
+fi
+
+# Set default values for optional arguments
+: "${{RESOURCE_TYPES:=all}}"
+: "${{OUTPUT_FORMAT:=hcl}}"
+: "${{OUTPUT_DIR:=terraform_imported}}"
+
+# Debug output
+if [[ "$DEBUG" == "true" ]]; then
+    echo "Environment variables:"
+    env | sort
+    echo "Command: $COMMAND_TYPE"
+    echo "Provider: $PROVIDER"
+fi
+
+# Make scripts executable
+chmod +x /usr/local/bin/terraformer.sh
+chmod +x /usr/local/bin/terraformer_commands.py
+chmod +x /usr/local/bin/wrapper.sh
+
+# Execute wrapper script with proper arguments
+case "$COMMAND_TYPE" in
+    import)
+        exec /usr/local/bin/wrapper.sh import "$PROVIDER" \\
+            "${{RESOURCE_TYPE:-vpc}}" \\
+            "${{RESOURCE_ID:-}}" \\
+            "${{OUTPUT_DIR}}"
+        ;;
+    scan)
+        exec /usr/local/bin/wrapper.sh scan "$PROVIDER" \\
+            "${{RESOURCE_TYPES}}" \\
+            "${{OUTPUT_FORMAT}}"
+        ;;
+    *)
+        echo "Unknown command type: $COMMAND_TYPE"
+        exit 1
+        ;;
+esac
+""",
                 mermaid=mermaid
             )
 
