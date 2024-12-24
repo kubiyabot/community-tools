@@ -50,6 +50,31 @@ class TerraformerTool(Tool):
                 # Add provider's required env vars to the list
                 env.extend(self.SUPPORTED_PROVIDERS[provider]['env_vars'])
             
+            # Create mermaid diagram based on tool type
+            if 'import' in name:
+                mermaid = {
+                    'graph': """
+                        graph TD
+                            A[Start] --> B[Validate Provider]
+                            B --> C[Check Environment]
+                            C --> D[Import Resources]
+                            D --> E[Generate Terraform Code]
+                            E --> F[Save to Directory]
+                            F --> G[End]
+                    """
+                }
+            else:  # scan
+                mermaid = {
+                    'graph': """
+                        graph TD
+                            A[Start] --> B[Validate Provider]
+                            B --> C[Check Environment]
+                            C --> D[Scan Infrastructure]
+                            D --> E[Generate Report]
+                            E --> F[End]
+                    """
+                }
+            
             super().__init__(
                 name=name or "terraform_tool",
                 description=description or "Terraform infrastructure tool",
@@ -63,7 +88,8 @@ class TerraformerTool(Tool):
                         'source': 'scripts/terraformer.sh',
                         'mode': '0755'
                     }
-                }
+                },
+                mermaid=mermaid
             )
         except Exception as e:
             logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
