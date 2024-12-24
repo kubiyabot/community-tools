@@ -3,7 +3,7 @@ import json
 from typing import Dict, Any, List
 from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
-from terraform_module_tools.tools.module_tools import create_terraform_module_tool
+from .module_tools import create_terraform_module_tool
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -101,19 +101,11 @@ def _process_module(module_name: str, module_config: Dict[str, Any]) -> List[Too
         # Validate module configuration
         validate_module_config(module_name, module_config)
         
-        # Normalize source configuration
-        source_config = module_config['source']
-        if isinstance(source_config, str):
-            source_config = {
-                'location': source_config,
-                'version': module_config.get('version')
-            }
-        
         # Create module configuration
         config = {
             'name': module_name,
             'description': module_config.get('description', f"Terraform module for {module_name}"),
-            'source': source_config,
+            'source': module_config['source'],
             'auto_discover': module_config.get('auto_discover', True),
             'instructions': module_config.get('instructions'),
             'variables': module_config.get('variables', {})

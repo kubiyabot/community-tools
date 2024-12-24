@@ -111,3 +111,12 @@ class TerraformerTool(Tool):
                 logger.warning(f"Unsupported provider: {provider}. Supported providers: {list(cls.SUPPORTED_PROVIDERS.keys())}")
                 
         return valid_providers
+
+# Export all necessary components
+__all__ = [
+    'initialize_tools',
+    'create_terraform_module_tool',
+    'initialize_module_tools',
+    'TerraformModuleTool',
+    'TerraformerTool'
+]
