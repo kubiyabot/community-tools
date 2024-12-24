@@ -3,11 +3,15 @@ from typing import List, Dict, Any, Optional, ClassVar, TypedDict, Literal
 from pydantic import BaseModel, Field
 import logging
 from pathlib import Path
+from ..scripts.error_handler import handle_script_error, ScriptError
 import os
 import subprocess
 import uuid
 import re
 from ..scripts.conversion_runtime import convert_former2_to_terraform
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # Type definitions
 class ProviderConfig(TypedDict):
