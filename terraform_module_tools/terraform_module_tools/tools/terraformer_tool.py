@@ -32,6 +32,17 @@ class TerraformerTool(Tool):
         }
     }
 
+    def __init__(self, name: str, description: str, args: List[Arg], env: List[str]):
+        """Initialize the tool with proper base class initialization."""
+        super().__init__(
+            name=name,
+            description=description,
+            args=args,
+            env=env,
+            type="docker",
+            image="hashicorp/terraform:latest"
+        )
+
     class Config:
         arbitrary_types_allowed = True
 
@@ -60,8 +71,9 @@ class TerraformerTool(Tool):
         for provider in providers:
             if provider in cls.SUPPORTED_PROVIDERS:
                 valid_providers.append(provider)
+                logger.info(f"✅ Validated provider: {provider}")
             else:
-                logger.warning(f"Unsupported provider: {provider}. Supported providers: {list(cls.SUPPORTED_PROVIDERS.keys())}")
+                logger.warning(f"⚠️ Unsupported provider: {provider}. Supported providers: {list(cls.SUPPORTED_PROVIDERS.keys())}")
                 
         return valid_providers
 
@@ -74,6 +86,7 @@ def _initialize_provider_tools(provider: str, tool_registry) -> List[Tool]:
             return tools
 
         provider_config = TerraformerTool.SUPPORTED_PROVIDERS[provider]
+        logger.info(f"Initializing tools for provider: {provider}")
         
         # Create import tool
         import_tool = TerraformerTool(
@@ -101,6 +114,7 @@ def _initialize_provider_tools(provider: str, tool_registry) -> List[Tool]:
             env=provider_config['env_vars']
         )
         tools.append(import_tool)
+        logger.info(f"✅ Created import tool for {provider}")
         
         # Create scan tool
         scan_tool = TerraformerTool(
@@ -125,12 +139,18 @@ def _initialize_provider_tools(provider: str, tool_registry) -> List[Tool]:
             env=provider_config['env_vars']
         )
         tools.append(scan_tool)
+        logger.info(f"✅ Created scan tool for {provider}")
         
-        logger.info(f"Created tools for provider: {provider}")
+        # Register tools
+        for tool in tools:
+            tool_registry.register("terraform", tool)
+            logger.info(f"✅ Registered tool: {tool.name}")
+        
+        logger.info(f"✅ Successfully initialized all tools for provider: {provider}")
         return tools
         
     except Exception as e:
-        logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
+        logger.error(f"❌ Failed to initialize tools for provider {provider}: {str(e)}")
         return []
 
 __all__ = ['TerraformerTool', '_initialize_provider_tools'] 

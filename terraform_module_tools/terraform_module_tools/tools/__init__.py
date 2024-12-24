@@ -28,24 +28,24 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
             ]
         ):
             config = {'terraform': config}
+            logger.info("Wrapped configuration under 'terraform' key")
 
         terraform_config = config.get('terraform', {})
+        logger.info(f"Processing terraform configuration: {terraform_config}")
         
         # Initialize reverse terraform tools if enabled
         if terraform_config.get('enable_reverse_terraform'):
-            logger.info("Initializing reverse Terraform engineering tools")
+            logger.info("🔄 Initializing reverse Terraform engineering tools")
             providers = terraform_config.get('reverse_terraform_providers', [])
             if not providers:
-                logger.error("No providers specified for reverse Terraform engineering")
+                logger.error("❌ No providers specified for reverse Terraform engineering")
             else:
-                logger.info(f"Initializing tools for providers: {providers}")
+                logger.info(f"Found providers: {providers}")
                 for provider in providers:
                     try:
                         provider_tools = _initialize_provider_tools(provider, tool_registry)
                         if provider_tools:
                             tools.extend(provider_tools)
-                            for tool in provider_tools:
-                                tool_registry.register("terraform", tool)
                             logger.info(f"✅ Successfully initialized tools for provider: {provider}")
                         else:
                             logger.warning(f"⚠️ No tools created for provider: {provider}")
@@ -54,7 +54,7 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
 
         # Initialize module tools if modules are configured
         if terraform_config.get('modules'):
-            logger.info("Initializing Terraform module tools")
+            logger.info("📦 Initializing Terraform module tools")
             module_tools = initialize_module_tools(config)
             if module_tools:
                 tools.extend(module_tools.values())
