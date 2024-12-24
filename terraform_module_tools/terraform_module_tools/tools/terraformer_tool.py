@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Tool, Arg, Volume
-from typing import List, Dict, Any, Optional, ClassVar
+from typing import List, Dict, Any, Optional, ClassVar, TypedDict
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field
 import logging
@@ -47,10 +47,18 @@ def sanitize_email(email: str) -> str:
     # Replace @ and dots with underscores, remove any other special characters
     return re.sub(r'[^a-zA-Z0-9_-]', '_', email.replace('@', '_').replace('.', '_'))
 
+class ScriptConfig(TypedDict):
+    main: str
+    commands: Optional[str]
+    wrapper: Optional[str]
+
+class ConverterConfig(TypedDict):
+    scripts: Dict[str, str]
+
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    SUPPORTED_CONVERTERS = {
+    SUPPORTED_CONVERTERS: ClassVar[Dict[str, ConverterConfig]] = {
         'terraformer': {
             'scripts': {
                 'main': 'terraformer.sh',
