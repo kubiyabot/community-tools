@@ -45,14 +45,13 @@ request_access_tool = JustInTimeAccessTool(
         Arg(
             name="ttl",
             description=(
-                "How long you need the access for. The approver may adjust this duration.\n"
+                "How long you need the access for. Try to get it from the context of the conversation, before asking for it(you might find it in ISO8601 format)\n"
                 "Examples:\n"
                 "- '1h' for one hour access\n" 
                 "- '30m' for 30 minutes access\n"
                 "- '2h' for two hours access"
             ),
-            required=False,
-            default="1h",
+            required=True,
         ),
     ],
     env=[
