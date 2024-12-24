@@ -39,6 +39,9 @@ class TerraformerTool(Tool):
     def __init__(self, name: str, description: str, args: List[Arg], env: List[str] = None):
         """Initialize the tool with proper base class initialization."""
         try:
+            # Store name for use in script generation
+            self._tool_name = name
+            
             # Ensure env is a list
             env = env or []
             if isinstance(env, str):
@@ -68,6 +71,11 @@ class TerraformerTool(Tool):
                         E --> F[End]
                 """
 
+            # Generate scripts before initialization
+            wrapper_script = self._generate_wrapper_script(provider)
+            terraformer_script = self._get_script_content('terraformer.sh')
+            commands_script = self._get_script_content('terraformer_commands.py')
+
             # Initialize base tool with proper schema
             super().__init__(
                 name=name,
@@ -79,15 +87,15 @@ class TerraformerTool(Tool):
                 handler=self.handle_terraform_command,
                 with_files={
                     '/usr/local/bin/terraformer.sh': {
-                        'content': self._get_script_content('terraformer.sh'),
+                        'content': terraformer_script,
                         'mode': '0755'
                     },
                     '/usr/local/bin/terraformer_commands.py': {
-                        'content': self._get_script_content('terraformer_commands.py'),
+                        'content': commands_script,
                         'mode': '0755'
                     },
                     '/usr/local/bin/wrapper.sh': {
-                        'content': self._generate_wrapper_script(),
+                        'content': wrapper_script,
                         'mode': '0755'
                     }
                 },
@@ -108,13 +116,19 @@ class TerraformerTool(Tool):
             logger.error(f"Failed to read script {script_name}: {str(e)}")
             raise ValueError(f"Failed to read script {script_name}")
 
-    def _generate_wrapper_script(self) -> str:
+    def _generate_wrapper_script(self, provider: str) -> str:
         """Generate the wrapper script content."""
+        if not provider or provider not in self.SUPPORTED_PROVIDERS:
+            env_exports = ""
+        else:
+            env_vars = self.SUPPORTED_PROVIDERS[provider]['env_vars']
+            env_exports = '\n'.join(f'export {var}="${{{var}}}"' for var in env_vars)
+
         return f"""#!/bin/bash
 set -e
 
 # Export environment variables from args
-{self._generate_env_exports()}
+{env_exports}
 
 # Make scripts executable
 chmod +x /usr/local/bin/terraformer.sh
@@ -123,19 +137,6 @@ chmod +x /usr/local/bin/terraformer_commands.py
 # Execute terraformer script
 /usr/local/bin/terraformer.sh "$@"
 """
-
-    def _generate_env_exports(self) -> str:
-        """Generate environment variable export statements based on provider."""
-        provider = self.name.split('_')[-1] if self.name else None
-        if not provider or provider not in self.SUPPORTED_PROVIDERS:
-            return ""
-        
-        env_vars = self.SUPPORTED_PROVIDERS[provider]['env_vars']
-        exports = []
-        for var in env_vars:
-            exports.append(f'export {var}="${{{var}}}"')
-        
-        return '\n'.join(exports)
 
     @handle_script_error
     async def handle_terraform_command(self, **kwargs) -> Dict[str, Any]:
