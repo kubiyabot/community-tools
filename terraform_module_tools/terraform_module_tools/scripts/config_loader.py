@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List, Tuple, Union
 import json
 import os
 from kubiya_sdk.tools.registry import tool_registry
@@ -8,10 +8,34 @@ logger = logging.getLogger(__name__)
 
 class ConfigurationError(Exception):
     """Exception raised for configuration errors."""
-    pass
+    def __init__(self, message: str, expected_structure: Optional[Dict[str, Any]] = None):
+        self.message = message
+        self.expected_structure = expected_structure
+        super().__init__(self.get_formatted_message())
+        
+    def get_formatted_message(self) -> str:
+        """Format error message with expected structure if available."""
+        msg = f"Configuration Error: {self.message}"
+        if self.expected_structure:
+            msg += "\n\nExpected structure:"
+            msg += json.dumps(self.expected_structure, indent=2)
+        return msg
 
-def validate_module_config(module_name: str, config: Dict[str, Any]) -> None:
+def validate_module_config(module_name: str, config: Union[Dict[str, Any], Any]) -> None:
     """Validate module configuration."""
+    # First check if config is a dictionary
+    if not isinstance(config, dict):
+        raise ConfigurationError(
+            f"Module '{module_name}' configuration must be a dictionary, got {type(config)}",
+            expected_structure={
+                "source": "module-source",  # Required
+                "version": "module-version",  # Optional
+                "description": "module-description",  # Optional
+                "variables": {},  # Optional
+                "auto_discover": True  # Optional
+            }
+        )
+    
     required_fields = ['source']
     optional_fields = ['version', 'description', 'variables', 'auto_discover']
     
@@ -19,7 +43,22 @@ def validate_module_config(module_name: str, config: Dict[str, Any]) -> None:
     missing_fields = [field for field in required_fields if field not in config]
     if missing_fields:
         raise ConfigurationError(
-            f"Module '{module_name}' is missing required fields: {', '.join(missing_fields)}"
+            f"Module '{module_name}' is missing required fields: {', '.join(missing_fields)}",
+            expected_structure={
+                field: "required" for field in missing_fields
+            }
+        )
+    
+    # Validate variables if present
+    if 'variables' in config and not isinstance(config['variables'], dict):
+        raise ConfigurationError(
+            f"Module '{module_name}': 'variables' must be a dictionary",
+            expected_structure={
+                "variables": {
+                    "variable_name": "variable_value",
+                    "another_variable": "another_value"
+                }
+            }
         )
     
     # Add default description if not provided
@@ -33,11 +72,23 @@ def validate_reverse_terraform_config(config: Dict[str, Any]) -> None:
         providers = config.get('reverse_terraform_providers')
         if not providers:
             raise ConfigurationError(
-                "When enable_reverse_terraform is true, reverse_terraform_providers must be specified"
+                "When enable_reverse_terraform is true, reverse_terraform_providers must be specified",
+                expected_structure={
+                    "terraform": {
+                        "enable_reverse_terraform": True,
+                        "reverse_terraform_providers": ["aws", "gcp", "azure"]
+                    }
+                }
             )
         if not isinstance(providers, (list, str)):
             raise ConfigurationError(
-                "reverse_terraform_providers must be a string or list of strings"
+                "reverse_terraform_providers must be a string or list of strings",
+                expected_structure={
+                    "terraform": {
+                        "enable_reverse_terraform": True,
+                        "reverse_terraform_providers": ["aws", "gcp", "azure"]
+                    }
+                }
             )
 
 def merge_configs(file_config: Optional[Dict[str, Any]], 
@@ -99,7 +150,23 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         
         # Validate terraform section
         if 'terraform' not in config:
-            raise ConfigurationError("Missing 'terraform' section in configuration")
+            raise ConfigurationError(
+                "Missing 'terraform' section in configuration",
+                expected_structure={
+                    "terraform": {
+                        "modules": {
+                            "module_name": {
+                                "source": "module-source",
+                                "version": "module-version",
+                                "description": "module-description",
+                                "variables": {}
+                            }
+                        },
+                        "enable_reverse_terraform": True,
+                        "reverse_terraform_providers": ["aws", "gcp", "azure"]
+                    }
+                }
+            )
             
         terraform_config = config['terraform']
         
@@ -107,14 +174,26 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         if 'modules' in terraform_config:
             modules = terraform_config['modules']
             if not isinstance(modules, dict):
-                raise ConfigurationError("'modules' must be a dictionary")
+                raise ConfigurationError(
+                    "'modules' must be a dictionary",
+                    expected_structure={
+                        "terraform": {
+                            "modules": {
+                                "module_name": {
+                                    "source": "module-source",
+                                    "version": "module-version"
+                                }
+                            }
+                        }
+                    }
+                )
                 
             # Validate each module
             for module_name, module_config in modules.items():
                 try:
                     validate_module_config(module_name, module_config)
                 except ConfigurationError as e:
-                    logger.error(f"Invalid configuration for module '{module_name}': {str(e)}")
+                    logger.error(f"Invalid configuration for module '{module_name}': {e.get_formatted_message()}")
                     raise
         
         # Validate reverse terraform configuration
@@ -123,17 +202,38 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
         # Ensure at least one feature is enabled
         if not terraform_config.get('modules') and not terraform_config.get('enable_reverse_terraform'):
             raise ConfigurationError(
-                "Configuration must include at least one module or enable reverse terraform"
+                "Configuration must include at least one module or enable reverse terraform",
+                expected_structure={
+                    "terraform": {
+                        "modules": {
+                            "module_name": {
+                                "source": "module-source"
+                            }
+                        },
+                        # OR
+                        "enable_reverse_terraform": True,
+                        "reverse_terraform_providers": ["aws"]
+                    }
+                }
             )
                 
         return config
         
     except json.JSONDecodeError as e:
-        error_msg = f"Failed to parse configuration file: {str(e)}"
-        logger.error(error_msg)
-        raise ConfigurationError(error_msg)
+        raise ConfigurationError(
+            f"Failed to parse configuration file: {str(e)}. File must be valid JSON.",
+            expected_structure={
+                "terraform": {
+                    "modules": {},
+                    "enable_reverse_terraform": False,
+                    "reverse_terraform_providers": []
+                }
+            }
+        )
         
     except Exception as e:
+        if isinstance(e, ConfigurationError):
+            raise
         error_msg = f"Failed to load module configurations: {str(e)}"
         logger.error(error_msg)
         raise ConfigurationError(error_msg)
