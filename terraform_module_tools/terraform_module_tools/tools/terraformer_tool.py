@@ -420,17 +420,18 @@ fi"""
             return "anonymous"
         return re.sub(r'[^a-zA-Z0-9_-]', '_', email.replace('@', '_').replace('.', '_'))
 
-def _initialize_provider_tools(provider: str) -> List[Tool]:
-    """Initialize tools for a specific provider."""
+def _initialize_provider_tools(provider: Optional[str] = None) -> List[Tool]:
+    """Initialize tools for a specific provider or default tools."""
     tools = []
     try:
+        # If no provider specified, use default (aws)
         if not provider:
-            logger.warning("No provider specified")
-            return tools
+            provider = 'aws'
+            logger.info(f"No provider specified, using default: {provider}")
 
         if provider not in TerraformerTool.SUPPORTED_PROVIDERS:
-            logger.warning(f"Unsupported provider: {provider}")
-            return tools
+            logger.warning(f"Unsupported provider: {provider}, falling back to aws")
+            provider = 'aws'
 
         provider_config = TerraformerTool.SUPPORTED_PROVIDERS[provider]
         logger.info(f"Initializing tools for provider: {provider}")
