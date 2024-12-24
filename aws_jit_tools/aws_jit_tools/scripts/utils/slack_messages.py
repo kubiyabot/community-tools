@@ -30,7 +30,7 @@ def create_access_granted_blocks(account_id: str, permission_set: str, duration_
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Duration:*\n{duration_hours:.1f} hours"
+                    "text": f"*Duration:*\n{duration_seconds / 3600:.1f} hours" if duration_seconds >= 3600 else f"*Duration:*\n{duration_seconds // 60} minutes"
                 },
                 {
                     "type": "mrkdwn",
