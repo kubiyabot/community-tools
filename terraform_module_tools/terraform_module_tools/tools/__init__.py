@@ -43,9 +43,12 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
                 logger.info(f"Found providers: {providers}")
                 for provider in providers:
                     try:
-                        provider_tools = _initialize_provider_tools(provider, tool_registry)
+                        provider_tools = _initialize_provider_tools(provider)
                         if provider_tools:
                             tools.extend(provider_tools)
+                            for tool in provider_tools:
+                                tool_registry.register("terraform", tool)
+                                logger.info(f"✅ Registered tool: {tool.name}")
                             logger.info(f"✅ Successfully initialized tools for provider: {provider}")
                         else:
                             logger.warning(f"⚠️ No tools created for provider: {provider}")
@@ -57,7 +60,10 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
             logger.info("📦 Initializing Terraform module tools")
             module_tools = initialize_module_tools(config)
             if module_tools:
-                tools.extend(module_tools.values())
+                for tool in module_tools.values():
+                    tools.append(tool)
+                    tool_registry.register("terraform", tool)
+                    logger.info(f"✅ Registered module tool: {tool.name}")
                 logger.info(f"✅ Successfully initialized {len(module_tools)} module tools")
             else:
                 logger.warning("⚠️ No module tools were created")
@@ -80,39 +86,7 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
         logger.error(error_msg)
         raise ConfigurationError(error_msg)
 
-# Update TerraformerTool to better handle provider validation
-class TerraformerTool(Tool):
-    @classmethod
-    def get_enabled_providers(cls, config: Dict[str, Any]) -> List[str]:
-        """Get list of enabled providers from configuration."""
-        if 'terraform' not in config and any(
-            key in config for key in ['enable_reverse_terraform', 'reverse_terraform_providers']
-        ):
-            config = {'terraform': config}
-            
-        terraform_config = config.get('terraform', {})
-        if not terraform_config.get('enable_reverse_terraform'):
-            return []
-            
-        providers = terraform_config.get('reverse_terraform_providers', [])
-        if isinstance(providers, str):
-            providers = [providers]
-            
-        if not providers:
-            logger.warning("Reverse Terraform engineering is enabled but no providers specified")
-            return []
-            
-        # Validate providers
-        valid_providers = []
-        for provider in providers:
-            if provider in cls.SUPPORTED_PROVIDERS:
-                valid_providers.append(provider)
-            else:
-                logger.warning(f"Unsupported provider: {provider}. Supported providers: {list(cls.SUPPORTED_PROVIDERS.keys())}")
-                
-        return valid_providers
-
-# Make sure to re-export these components
+# Export all necessary components
 __all__ = [
     'initialize_tools',
     'create_terraform_module_tool',

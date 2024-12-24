@@ -77,7 +77,7 @@ class TerraformerTool(Tool):
                 
         return valid_providers
 
-def _initialize_provider_tools(provider: str, tool_registry) -> List[Tool]:
+def _initialize_provider_tools(provider: str) -> List[Tool]:
     """Initialize tools for a specific provider."""
     tools = []
     try:
@@ -141,12 +141,6 @@ def _initialize_provider_tools(provider: str, tool_registry) -> List[Tool]:
         tools.append(scan_tool)
         logger.info(f"✅ Created scan tool for {provider}")
         
-        # Register tools
-        for tool in tools:
-            tool_registry.register("terraform", tool)
-            logger.info(f"✅ Registered tool: {tool.name}")
-        
-        logger.info(f"✅ Successfully initialized all tools for provider: {provider}")
         return tools
         
     except Exception as e:
