@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Tool, Arg
 from kubiya_sdk.tools.models import FileSpec
-from typing import List, Dict, Any, Set, ClassVar
+from typing import List, Dict, Any, Set, ClassVar, Optional, Tuple
 import os
 import logging
 from dataclasses import dataclass
@@ -107,16 +107,100 @@ class TerraformerTool(Tool):
             long_running=long_running
         )
 
-def initialize_terraformer_tools(config: Dict[str, Any]) -> None:
+def _initialize_provider_tools(provider: str, tool_registry) -> Optional[Tuple[Tool, Tool]]:
+    """Initialize tools for a specific provider."""
+    try:
+        # Provider-specific configurations
+        PROVIDER_CONFIGS = {
+            'aws': {
+                'import_cmd': 'terraformer import aws',
+                'list_cmd': 'terraformer import aws --list',
+                'resource_examples': {
+                    'vpc,subnet,ec2': 'networking and compute resources',
+                    'rds,elasticache': 'database resources',
+                    'iam': 'IAM roles and policies',
+                    'lambda,apigateway': 'serverless resources'
+                }
+            },
+            'gcp': {
+                'import_cmd': 'terraformer import google',
+                'list_cmd': 'terraformer import google --list',
+                'resource_examples': {
+                    'compute_instances,compute_disks': 'compute resources',
+                    'cloudsql,redis': 'database resources',
+                    'iam': 'IAM resources',
+                    'cloud_functions': 'serverless resources'
+                }
+            },
+            'azure': {
+                'import_cmd': 'terraformer import azure',
+                'list_cmd': 'terraformer import azure --list',
+                'resource_examples': {
+                    'virtual_network,subnet': 'networking resources',
+                    'virtual_machine': 'compute resources',
+                    'mysql,redis': 'database resources',
+                    'function_app': 'serverless resources'
+                }
+            }
+        }
+
+        provider_config = PROVIDER_CONFIGS.get(provider)
+        if not provider_config:
+            raise ValueError(f"Unsupported provider: {provider}")
+
+        # Create import tool
+        import_tool = TerraformerTool(
+            name=f"reverse_terraform_import_{provider}",
+            description=f"""Generate Terraform configurations from existing {provider.upper()} infrastructure.
+            
+This tool analyzes your existing {provider.upper()} resources and automatically generates Terraform code that matches your current infrastructure. Perfect for:
+- Converting existing cloud resources into Infrastructure as Code
+- Documenting your current infrastructure setup
+- Creating a starting point for infrastructure management
+- Migrating manual configurations to Terraform""",
+            content=_generate_import_script(provider_config['import_cmd']),
+            args=_get_provider_args(provider, provider_config['resource_examples']),
+            provider=provider,
+            long_running=True
+        )
+
+        # Create list tool
+        list_tool = TerraformerTool(
+            name=f"list_supported_resources_{provider}",
+            description=f"""List all {provider.upper()} resource types that can be converted to Terraform code.
+            
+Shows what types of {provider.upper()} resources can be automatically analyzed and converted into Terraform configurations.""",
+            content=f"""
+#!/bin/bash
+set -e
+
+echo "📋 {provider.upper()} resources that can be converted to Terraform code:"
+{provider_config['list_cmd']}
+""",
+            args=[],
+            provider=provider,
+            long_running=False
+        )
+
+        # Return both tools
+        return (import_tool, list_tool)
+
+    except Exception as e:
+        logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
+        return None
+
+def initialize_terraformer_tools(config: Dict[str, Any]) -> List[Tool]:
     """Initialize reverse engineering tools if enabled in config."""
+    tools: List[Tool] = []
+    
     if not TerraformerTool.is_enabled(config):
         logger.info("Reverse Terraform engineering tools are not enabled in configuration")
-        return
+        return tools
 
     enabled_providers = TerraformerTool.get_enabled_providers(config)
     if not enabled_providers:
         logger.info("No providers enabled for reverse Terraform engineering")
-        return
+        return tools
 
     logger.info(f"Initializing reverse Terraform engineering tools for providers: {enabled_providers}")
     
@@ -124,91 +208,17 @@ def initialize_terraformer_tools(config: Dict[str, Any]) -> None:
 
     for provider in enabled_providers:
         try:
-            _initialize_provider_tools(provider, tool_registry)
+            provider_tools = _initialize_provider_tools(provider, tool_registry)
+            if provider_tools:
+                tools.extend(provider_tools)
+                for tool in provider_tools:
+                    tool_registry.register("terraform", tool)
         except Exception as e:
             logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
             continue
 
     logger.info("Successfully initialized reverse Terraform engineering tools")
-
-def _initialize_provider_tools(provider: str, tool_registry) -> None:
-    """Initialize tools for a specific provider."""
-    
-    # Provider-specific configurations
-    PROVIDER_CONFIGS = {
-        'aws': {
-            'import_cmd': 'terraformer import aws',
-            'list_cmd': 'terraformer import aws --list',
-            'resource_examples': {
-                'vpc,subnet,ec2': 'networking and compute resources',
-                'rds,elasticache': 'database resources',
-                'iam': 'IAM roles and policies',
-                'lambda,apigateway': 'serverless resources'
-            }
-        },
-        'gcp': {
-            'import_cmd': 'terraformer import google',
-            'list_cmd': 'terraformer import google --list',
-            'resource_examples': {
-                'compute_instances,compute_disks': 'compute resources',
-                'cloudsql,redis': 'database resources',
-                'iam': 'IAM resources',
-                'cloud_functions': 'serverless resources'
-            }
-        },
-        'azure': {
-            'import_cmd': 'terraformer import azure',
-            'list_cmd': 'terraformer import azure --list',
-            'resource_examples': {
-                'virtual_network,subnet': 'networking resources',
-                'virtual_machine': 'compute resources',
-                'mysql,redis': 'database resources',
-                'function_app': 'serverless resources'
-            }
-        }
-    }
-
-    provider_config = PROVIDER_CONFIGS.get(provider)
-    if not provider_config:
-        raise ValueError(f"Unsupported provider: {provider}")
-
-    # Create import tool
-    import_tool = TerraformerTool(
-        name=f"reverse_terraform_import_{provider}",
-        description=f"""Generate Terraform configurations from existing {provider.upper()} infrastructure.
-        
-This tool analyzes your existing {provider.upper()} resources and automatically generates Terraform code that matches your current infrastructure. Perfect for:
-- Converting existing cloud resources into Infrastructure as Code
-- Documenting your current infrastructure setup
-- Creating a starting point for infrastructure management
-- Migrating manual configurations to Terraform""",
-        content=_generate_import_script(provider_config['import_cmd']),
-        args=_get_provider_args(provider, provider_config['resource_examples']),
-        provider=provider,
-        long_running=True
-    )
-
-    # Create list tool
-    list_tool = TerraformerTool(
-        name=f"list_supported_resources_{provider}",
-        description=f"""List all {provider.upper()} resource types that can be converted to Terraform code.
-        
-Shows what types of {provider.upper()} resources can be automatically analyzed and converted into Terraform configurations.""",
-        content=f"""
-#!/bin/bash
-set -e
-
-echo "📋 {provider.upper()} resources that can be converted to Terraform code:"
-{provider_config['list_cmd']}
-""",
-        args=[],
-        provider=provider,
-        long_running=False
-    )
-
-    # Register tools
-    tool_registry.register("terraform", import_tool)
-    tool_registry.register("terraform", list_tool)
+    return tools
 
 def _generate_import_script(import_cmd: str) -> str:
     """Generate the import script for a provider."""
@@ -311,4 +321,4 @@ Examples:
     
     return args
 
-__all__ = ['TerraformerTool', 'initialize_terraformer_tools'] 
+__all__ = ['TerraformerTool', 'initialize_terraformer_tools', '_initialize_provider_tools'] 

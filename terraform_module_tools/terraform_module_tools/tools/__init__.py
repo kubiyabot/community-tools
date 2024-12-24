@@ -1,8 +1,10 @@
 import logging
 from typing import List, Any, Dict, Optional
+from kubiya_sdk.tools import Tool
 from kubiya_sdk.tools.registry import tool_registry
 from .terraform_module_tool import TerraformModuleTool
-from .terraformer_tool import TerraformerTool
+from .terraformer_tool import TerraformerTool, _initialize_provider_tools
+from ..parser import TerraformModuleParser
 import re
 
 logger = logging.getLogger(__name__)
@@ -274,15 +276,14 @@ def _initialize_module_tools(module_config: Dict[str, Any]) -> List[TerraformMod
 
 def _initialize_reverse_terraform_tools(config: Dict[str, Any]) -> List[Tool]:
     """Initialize reverse Terraform engineering tools."""
-    tools = []
+    tools: List[Tool] = []
     enabled_providers = TerraformerTool.get_enabled_providers(config)
     
     for provider in enabled_providers:
         try:
-            provider_tools = _initialize_provider_tools(provider)
-            tools.extend(provider_tools)
-            for tool in provider_tools:
-                tool_registry.register("terraform", tool)
+            provider_tools = _initialize_provider_tools(provider, tool_registry)
+            if provider_tools:
+                tools.extend(provider_tools)
         except Exception as e:
             logger.error(f"Failed to initialize tools for provider {provider}: {str(e)}")
             continue
