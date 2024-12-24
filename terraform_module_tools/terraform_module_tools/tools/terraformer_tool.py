@@ -17,7 +17,7 @@ class ProviderConfig(TypedDict):
 class TerraformerTool(Tool):
     """Tool for reverse engineering existing infrastructure into Terraform code."""
     
-    # Define supported providers and their configurations using proper type annotation
+    # Define supported providers and their configurations
     SUPPORTED_PROVIDERS: ClassVar[Dict[str, ProviderConfig]] = {
         'aws': {
             'name': 'AWS',
@@ -46,9 +46,6 @@ class TerraformerTool(Tool):
             
             # Get provider from name
             provider = name.split('_')[-1] if '_' in name else None
-            if provider and provider in self.SUPPORTED_PROVIDERS:
-                # Add provider's required env vars to the list
-                env.extend(self.SUPPORTED_PROVIDERS[provider]['env_vars'])
             
             # Create mermaid diagram based on tool type
             if 'import' in name:
@@ -74,12 +71,13 @@ class TerraformerTool(Tool):
                             E --> F[End]
                     """
                 }
-            
+
+            # Initialize base tool
             super().__init__(
-                name=name or "terraform_tool",
-                description=description or "Terraform infrastructure tool",
-                args=args or [],
-                env=list(set(env)),  # Remove duplicates
+                name=name,
+                description=description,
+                args=args,
+                env=env,
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
@@ -91,21 +89,10 @@ class TerraformerTool(Tool):
                 },
                 mermaid=mermaid
             )
+
         except Exception as e:
             logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
-            # Provide fallback initialization
-            super().__init__(
-                name=name or "terraform_tool",
-                description="Terraform infrastructure tool (fallback)",
-                args=[],
-                env=[],
-                type="docker",
-                image="hashicorp/terraform:latest",
-                handler=self.handle_terraform_command
-            )
-
-    class Config:
-        arbitrary_types_allowed = True
+            raise ValueError(f"Tool initialization failed: {str(e)}")
 
     @handle_script_error
     async def handle_terraform_command(self, **kwargs) -> Dict[str, Any]:
@@ -132,78 +119,28 @@ class TerraformerTool(Tool):
                 ])
 
             # Execute the script
-            try:
-                result = subprocess.run(
-                    cmd_args,
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                return {
-                    'success': True,
-                    'output': result.stdout,
-                    'command': ' '.join(cmd_args),
-                    'output_dir': kwargs.get('output_dir') if command_type == 'import' else None
-                }
-            except subprocess.CalledProcessError as e:
-                return {
-                    'success': False,
-                    'error': e.stderr,
-                    'command': ' '.join(cmd_args)
-                }
+            result = subprocess.run(
+                cmd_args,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            return {
+                'success': True,
+                'output': result.stdout,
+                'command': ' '.join(cmd_args),
+                'output_dir': kwargs.get('output_dir') if command_type == 'import' else None
+            }
             
+        except subprocess.CalledProcessError as e:
+            raise ScriptError(f"Command failed: {e.stderr}")
         except Exception as e:
             logger.error(f"Failed to handle terraform command: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
+            raise ScriptError(str(e))
 
-    @classmethod
-    def get_enabled_providers(cls, config: Dict[str, Any]) -> List[str]:
-        """Get list of enabled providers from configuration."""
-        try:
-            if not config:
-                logger.warning("No configuration provided")
-                return []
-
-            # Handle config wrapper
-            if 'terraform' not in config and any(
-                key in config for key in ['enable_reverse_terraform', 'reverse_terraform_providers']
-            ):
-                config = {'terraform': config}
-            
-            terraform_config = config.get('terraform', {})
-            if not terraform_config:
-                logger.warning("No terraform configuration found")
-                return []
-
-            if not terraform_config.get('enable_reverse_terraform'):
-                logger.info("Reverse terraform engineering is not enabled")
-                return []
-            
-            providers = terraform_config.get('reverse_terraform_providers', [])
-            if isinstance(providers, str):
-                providers = [providers]
-            
-            if not providers:
-                logger.warning("No providers specified")
-                return []
-            
-            # Validate providers
-            valid_providers = []
-            for provider in providers:
-                if provider in cls.SUPPORTED_PROVIDERS:
-                    valid_providers.append(provider)
-                    logger.info(f"✅ Validated provider: {provider}")
-                else:
-                    logger.warning(f"⚠️ Unsupported provider: {provider}. Supported providers: {list(cls.SUPPORTED_PROVIDERS.keys())}")
-            
-            return valid_providers
-            
-        except Exception as e:
-            logger.error(f"Error getting enabled providers: {str(e)}")
-            return []
+    class Config:
+        arbitrary_types_allowed = True
 
 def _initialize_provider_tools(provider: str) -> List[Tool]:
     """Initialize tools for a specific provider."""
