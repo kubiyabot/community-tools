@@ -47,7 +47,7 @@ class TerraformerTool(Tool):
             # Get provider from name
             provider = name.split('_')[-1] if '_' in name else None
             
-            # Create mermaid diagram string based on tool type
+            # Create mermaid diagram string
             if 'import' in name:
                 mermaid = """
                     graph TD
@@ -68,6 +68,11 @@ class TerraformerTool(Tool):
                         E --> F[End]
                 """
 
+            # Read shell script content
+            script_path = Path(__file__).parent.parent / 'scripts' / 'terraformer.sh'
+            with open(script_path, 'r') as f:
+                script_content = f.read()
+
             # Initialize base tool with proper schema
             super().__init__(
                 name=name,
@@ -77,33 +82,67 @@ class TerraformerTool(Tool):
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
-                files=[{  # Changed from with_files to files and made it a list
+                files=[{
                     'path': '/usr/local/bin/terraformer.sh',
                     'source': 'scripts/terraformer.sh',
                     'mode': '0755'
                 }],
-                mermaid=mermaid  # Now passing string instead of dict
+                with_files={
+                    '/usr/local/bin/terraformer.sh': {
+                        'destination': '/usr/local/bin/terraformer.sh',
+                        'content': script_content,
+                        'mode': '0755'
+                    }
+                },
+                content=f"""#!/bin/bash
+set -e
+
+# Export environment variables from args
+{self._generate_env_exports()}
+
+# Execute terraformer script
+/usr/local/bin/terraformer.sh "$@"
+""",
+                mermaid=mermaid
             )
 
         except Exception as e:
             logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
             raise ValueError(f"Tool initialization failed: {str(e)}")
 
+    def _generate_env_exports(self) -> str:
+        """Generate environment variable export statements based on provider."""
+        provider = self.name.split('_')[-1] if '_' in name else None
+        if not provider or provider not in self.SUPPORTED_PROVIDERS:
+            return ""
+        
+        env_vars = self.SUPPORTED_PROVIDERS[provider]['env_vars']
+        exports = []
+        for var in env_vars:
+            exports.append(f'export {var}="${{{var}}}"')
+        
+        return '\n'.join(exports)
+
     @handle_script_error
     async def handle_terraform_command(self, **kwargs) -> Dict[str, Any]:
         """Handle terraform commands by delegating to the shell script."""
         try:
-            # Extract command type and provider from tool name with fallbacks
+            # Extract command type and provider from tool name
             parts = self.name.split('_')
             command_type = parts[1] if len(parts) > 1 else "scan"
-            provider = parts[2] if len(parts) > 2 else "aws"  # Default to AWS if not specified
+            provider = parts[2] if len(parts) > 2 else "aws"
+
+            # Convert kwargs to environment variables
+            env = os.environ.copy()
+            for key, value in kwargs.items():
+                env[key.upper()] = str(value)
 
             # Build command arguments
             cmd_args = ['/usr/local/bin/terraformer.sh', command_type, provider]
             
             if command_type == 'import':
                 cmd_args.extend([
-                    kwargs.get('resource_type', 'vpc'),  # Default to VPC if not specified
+                    kwargs.get('resource_type', 'vpc'),
                     kwargs.get('resource_id', ''),
                     kwargs.get('output_dir', 'terraform_imported')
                 ])
@@ -113,9 +152,10 @@ class TerraformerTool(Tool):
                     kwargs.get('output_format', 'hcl')
                 ])
 
-            # Execute the script
+            # Execute the script with environment variables
             result = subprocess.run(
                 cmd_args,
+                env=env,
                 capture_output=True,
                 text=True,
                 check=True

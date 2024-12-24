@@ -22,19 +22,19 @@ validate_env_vars() {
     local provider=$1
     case $provider in
         aws)
-            [[ -z "$AWS_ACCESS_KEY_ID" ]] && echo "Missing AWS_ACCESS_KEY_ID" && exit 1
-            [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && echo "Missing AWS_SECRET_ACCESS_KEY" && exit 1
-            [[ -z "$AWS_REGION" ]] && echo "Missing AWS_REGION" && exit 1
+            [[ -z "$AWS_ACCESS_KEY_ID" ]] && echo "AWS_ACCESS_KEY_ID is required" && exit 1
+            [[ -z "$AWS_SECRET_ACCESS_KEY" ]] && echo "AWS_SECRET_ACCESS_KEY is required" && exit 1
+            [[ -z "$AWS_REGION" ]] && echo "AWS_REGION is required" && exit 1
             ;;
         gcp)
-            [[ -z "$GOOGLE_CREDENTIALS" ]] && echo "Missing GOOGLE_CREDENTIALS" && exit 1
-            [[ -z "$GOOGLE_PROJECT" ]] && echo "Missing GOOGLE_PROJECT" && exit 1
+            [[ -z "$GOOGLE_CREDENTIALS" ]] && echo "GOOGLE_CREDENTIALS is required" && exit 1
+            [[ -z "$GOOGLE_PROJECT" ]] && echo "GOOGLE_PROJECT is required" && exit 1
             ;;
         azure)
-            [[ -z "$AZURE_SUBSCRIPTION_ID" ]] && echo "Missing AZURE_SUBSCRIPTION_ID" && exit 1
-            [[ -z "$AZURE_CLIENT_ID" ]] && echo "Missing AZURE_CLIENT_ID" && exit 1
-            [[ -z "$AZURE_CLIENT_SECRET" ]] && echo "Missing AZURE_CLIENT_SECRET" && exit 1
-            [[ -z "$AZURE_TENANT_ID" ]] && echo "Missing AZURE_TENANT_ID" && exit 1
+            [[ -z "$AZURE_SUBSCRIPTION_ID" ]] && echo "AZURE_SUBSCRIPTION_ID is required" && exit 1
+            [[ -z "$AZURE_CLIENT_ID" ]] && echo "AZURE_CLIENT_ID is required" && exit 1
+            [[ -z "$AZURE_CLIENT_SECRET" ]] && echo "AZURE_CLIENT_SECRET is required" && exit 1
+            [[ -z "$AZURE_TENANT_ID" ]] && echo "AZURE_TENANT_ID is required" && exit 1
             ;;
         *)
             echo "Unsupported provider: $provider"
@@ -51,29 +51,21 @@ fi
 # Validate environment variables
 validate_env_vars "$PROVIDER"
 
+# Execute command based on type
 case $COMMAND_TYPE in
     import)
-        # Parse import arguments
-        RESOURCE_TYPE=$1
-        RESOURCE_ID=$2
+        RESOURCE_TYPE=${1:-vpc}
+        RESOURCE_ID=${2:-}
         OUTPUT_DIR=${3:-terraform_imported}
-
-        # Validate required arguments
-        [[ -z "$RESOURCE_TYPE" ]] && echo "resource_type is required for import" && exit 1
-        [[ -z "$RESOURCE_ID" ]] && echo "resource_id is required for import" && exit 1
-
-        # Create output directory
-        mkdir -p "$OUTPUT_DIR"
 
         # Run import command
         terraformer import "$PROVIDER" \
             --resources "$RESOURCE_TYPE" \
             --filter "$RESOURCE_ID" \
-            --path-output "$OUTPUT_DIR"
+            --path-pattern "$OUTPUT_DIR"
         ;;
 
     scan)
-        # Parse scan arguments
         RESOURCE_TYPES=${1:-all}
         OUTPUT_FORMAT=${2:-hcl}
 
