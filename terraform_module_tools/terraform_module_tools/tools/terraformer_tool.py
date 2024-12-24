@@ -3,7 +3,6 @@ from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
 import logging
 from pathlib import Path
-from ..scripts.error_handler import handle_script_error, ScriptError, logger
 import os
 import subprocess
 
@@ -68,30 +67,6 @@ class TerraformerTool(Tool):
                         E --> F[End]
                 """
 
-            # Read all required scripts
-            scripts_dir = Path(__file__).parent.parent / 'scripts'
-            script_files = {
-                'terraformer.sh': scripts_dir / 'terraformer.sh',
-                'terraformer_commands.py': scripts_dir / 'terraformer_commands.py'
-            }
-
-            # Read script contents
-            script_contents = {}
-            for script_name, script_path in script_files.items():
-                with open(script_path, 'r') as f:
-                    script_contents[script_name] = f.read()
-
-            # Create wrapper script content
-            wrapper_script = f"""#!/bin/bash
-set -e
-
-# Export environment variables from args
-{self._generate_env_exports()}
-
-# Execute terraformer script with proper environment
-/usr/local/bin/terraformer.sh "$@"
-"""
-
             # Initialize base tool with proper schema
             super().__init__(
                 name=name,
@@ -101,34 +76,52 @@ set -e
                 type="docker",
                 image="hashicorp/terraform:latest",
                 handler=self.handle_terraform_command,
-                files=[{
-                    'path': '/usr/local/bin/terraformer.sh',
-                    'source': 'scripts/terraformer.sh',
-                    'mode': '0755'
-                }, {
-                    'path': '/usr/local/bin/terraformer_commands.py',
-                    'source': 'scripts/terraformer_commands.py',
-                    'mode': '0644'
-                }],
                 with_files={
                     '/usr/local/bin/terraformer.sh': {
-                        'destination': '/usr/local/bin/terraformer.sh',
-                        'content': script_contents['terraformer.sh'],
+                        'content': self._get_script_content('terraformer.sh'),
                         'mode': '0755'
                     },
                     '/usr/local/bin/terraformer_commands.py': {
-                        'destination': '/usr/local/bin/terraformer_commands.py',
-                        'content': script_contents['terraformer_commands.py'],
-                        'mode': '0644'
+                        'content': self._get_script_content('terraformer_commands.py'),
+                        'mode': '0755'
+                    },
+                    '/usr/local/bin/wrapper.sh': {
+                        'content': self._generate_wrapper_script(),
+                        'mode': '0755'
                     }
                 },
-                content=wrapper_script,
                 mermaid=mermaid
             )
 
         except Exception as e:
             logger.error(f"Failed to initialize TerraformerTool: {str(e)}")
             raise ValueError(f"Tool initialization failed: {str(e)}")
+
+    def _get_script_content(self, script_name: str) -> str:
+        """Get the content of a script file."""
+        try:
+            script_path = Path(__file__).parent.parent / 'scripts' / script_name
+            with open(script_path, 'r') as f:
+                return f.read()
+        except Exception as e:
+            logger.error(f"Failed to read script {script_name}: {str(e)}")
+            raise ValueError(f"Failed to read script {script_name}")
+
+    def _generate_wrapper_script(self) -> str:
+        """Generate the wrapper script content."""
+        return f"""#!/bin/bash
+set -e
+
+# Export environment variables from args
+{self._generate_env_exports()}
+
+# Make scripts executable
+chmod +x /usr/local/bin/terraformer.sh
+chmod +x /usr/local/bin/terraformer_commands.py
+
+# Execute terraformer script
+/usr/local/bin/terraformer.sh "$@"
+"""
 
     def _generate_env_exports(self) -> str:
         """Generate environment variable export statements based on provider."""
