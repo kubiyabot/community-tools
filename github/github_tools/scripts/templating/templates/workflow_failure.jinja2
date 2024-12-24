@@ -1,17 +1,14 @@
-# 🔍 Workflow Analysis Report
+# 🔍 Workflow Status
+{% set details = run_details | from_json %}
+**{{ workflow_name }}** {{ "✅" if details.status == "success" else "❌" }} 
+> {{ details.status | title }} • {{ details.conclusion | title }} • @{{ details.actor }}
 
-## 🚨 Summary of Findings
-
-### Failed Steps:
+{% if failed_steps %}
+**Failed Steps:**
 {% for step in failed_steps %}
-- ❌ `{{ step }}`
+- `{{ step }}`
 {% endfor %}
-
-### 📊 Workflow Details:
-- **Name**: {{ workflow_name }}
-- **Status**: {{ run_details.status }}
-- **Conclusion**: {{ run_details.conclusion }}
-- **Triggered By**: {{ run_details.actor }}
+{% endif %}
 
 ## 🔬 Detailed Analysis
 
@@ -36,7 +33,7 @@
 
 ### 📊 Workflow Steps:
 ```mermaid
-graph TD;
+graph LR;
 {% for step in workflow_steps %}
     {{ loop.index }}["{{ step }}{{ ' ❌' if step in failed_steps else ' ✅' }}"];
     {% if not loop.first %}
