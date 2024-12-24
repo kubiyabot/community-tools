@@ -1,5 +1,6 @@
 from kubiya_sdk.tools.registry import tool_registry
 from pathlib import Path
+from typing import Dict, Any, Optional
 from .terraform_module_tool import TerraformModuleTool
 from ..scripts.config_loader import get_module_configs, ConfigurationError
 import logging
@@ -51,8 +52,17 @@ def create_terraform_module_tool(config: dict, action: str, with_pr: bool = Fals
         with_pr=with_pr
     )
 
-def initialize_module_tools(config: Dict[str, Any] = None):
-    """Initialize all Terraform module tools."""
+def initialize_module_tools(config: Optional[Dict[str, Any]] = None):
+    """
+    Initialize all Terraform module tools.
+    
+    Args:
+        config: Optional configuration dictionary. If not provided, will try to use
+               tool_registry.dynamic_config
+               
+    Returns:
+        Dict of initialized tools
+    """
     tools = {}
     try:
         if config is None:
