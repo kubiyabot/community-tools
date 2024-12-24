@@ -2,6 +2,10 @@ from kubiya_sdk.tools import Tool, Arg
 from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
 import logging
+from pathlib import Path
+from ..scripts.error_handler import handle_script_error, ScriptError, logger
+import os
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +44,62 @@ class TerraformerTool(Tool):
             args=args,
             env=env,
             type="docker",
-            image="hashicorp/terraform:latest"
+            image="hashicorp/terraform:latest",
+            handler=self.handle_terraform_command,
+            with_files={
+                '/usr/local/bin/terraformer.sh': {
+                    'source': 'scripts/terraformer.sh',
+                    'mode': '0755'
+                }
+            }
         )
 
     class Config:
         arbitrary_types_allowed = True
+
+    @handle_script_error
+    async def handle_terraform_command(self, **kwargs) -> Dict[str, Any]:
+        """Handle terraform commands by delegating to the shell script."""
+        try:
+            # Extract command type and provider from tool name
+            command_type = self.name.split('_')[1]  # import or scan
+            provider = self.name.split('_')[2]  # aws, gcp, or azure
+
+            # Build command arguments
+            cmd_args = ['/usr/local/bin/terraformer.sh', command_type, provider]
+            
+            if command_type == 'import':
+                cmd_args.extend([
+                    kwargs.get('resource_type', ''),
+                    kwargs.get('resource_id', ''),
+                    kwargs.get('output_dir', 'terraform_imported')
+                ])
+            else:  # scan
+                cmd_args.extend([
+                    kwargs.get('resource_types', 'all'),
+                    kwargs.get('output_format', 'hcl')
+                ])
+
+            # Execute the script
+            result = subprocess.run(
+                cmd_args,
+                capture_output=True,
+                text=True,
+                check=True
+            )
+
+            return {
+                'success': True,
+                'output': result.stdout,
+                'command': ' '.join(cmd_args),
+                'output_dir': kwargs.get('output_dir') if command_type == 'import' else None
+            }
+            
+        except subprocess.CalledProcessError as e:
+            raise ScriptError(f"Command failed: {e.stderr}")
+        except Exception as e:
+            logger.error(f"Failed to handle terraform command: {str(e)}")
+            raise ScriptError(str(e))
 
     @classmethod
     def get_enabled_providers(cls, config: Dict[str, Any]) -> List[str]:
