@@ -12,25 +12,43 @@ def initialize_tools(config: Dict[str, Any]) -> List[Tool]:
     """Initialize all Terraform tools from configuration."""
     tools = []
     try:
+        terraform_config = config.get('terraform', {})
+        if not terraform_config:
+            logger.warning("No terraform configuration found")
+            return tools
+
         # Initialize terraformer tools if enabled
-        if config.get('terraform', {}).get('enable_reverse_terraform'):
-            providers = TerraformerTool.get_enabled_providers(config)
-            for provider in providers:
-                provider_tools = _initialize_provider_tools(provider)
-                if provider_tools:
-                    tools.extend(provider_tools)
-                    for tool in provider_tools:
-                        tool_registry.register("terraform", tool)
-                        logger.info(f"✅ Registered tool: {tool.name}")
+        if terraform_config.get('enable_reverse_terraform'):
+            logger.info("🔄 Loading reverse terraform tools...")
+            providers = terraform_config.get('reverse_terraform_providers', [])
+            if not providers:
+                logger.warning("No providers specified for reverse terraform")
+            else:
+                for provider in providers:
+                    if provider not in TerraformerTool.SUPPORTED_PROVIDERS:
+                        logger.warning(f"⚠️ Unsupported provider: {provider}")
+                        continue
+                    
+                    provider_tools = _initialize_provider_tools(provider)
+                    if provider_tools:
+                        tools.extend(provider_tools)
+                        for tool in provider_tools:
+                            tool_registry.register("terraform", tool)
+                            logger.info(f"✅ Registered reverse terraform tool: {tool.name}")
+                    else:
+                        logger.warning(f"No tools initialized for provider: {provider}")
 
         # Initialize module tools if configured
-        if config.get('terraform', {}).get('modules'):
+        if terraform_config.get('modules'):
+            logger.info("📦 Loading module tools...")
             module_tools = initialize_module_tools(config)
             if module_tools:
                 for tool in module_tools.values():
                     tools.append(tool)
                     tool_registry.register("terraform", tool)
                     logger.info(f"✅ Registered module tool: {tool.name}")
+            else:
+                logger.warning("No module tools were initialized")
 
         return tools
     except Exception as e:
@@ -50,11 +68,15 @@ __all__ = [
 logger.info("🚀 Initializing Terraform tools...")
 config = tool_registry.dynamic_config
 if not config:
-    logger.error("❌ No configuration found in tool registry")
-    raise ValueError("No configuration found in tool registry")
+    logger.error("❌ No configuration found, please check your configuration and try again")
+    raise ValueError("No configuration found, please check your configuration and try again")
 
-tools = initialize_tools(config)
-if not tools:
-    logger.error("❌ No tools were initialized")
-    raise ValueError("No tools were initialized")
-logger.info(f"✅ Successfully initialized {len(tools)} tools")
+try:
+    tools = initialize_tools(config)
+    if not tools:
+        logger.error("❌ No tools were initialized")
+        raise ValueError("Could not initialize tools from the given configuration, please check your configuration and try again")
+    logger.info(f"✅ Successfully initialized {len(tools)} tools")
+except Exception as e:
+    logger.error(f"Failed to initialize tools: {str(e)}")
+    raise ValueError(f"Failed to initialize tools from the given configuration: {str(e)}")
