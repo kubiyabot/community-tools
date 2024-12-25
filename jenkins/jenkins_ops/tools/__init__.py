@@ -49,27 +49,41 @@ def initialize_tools():
         logger.info("Initializing Jenkins tools...")
         
         # Get configuration from dynamic config
-        config = get_jenkins_config()
+        try:
+            config = get_jenkins_config()
+        except ValueError as config_error:
+            raise ValueError(f"Failed to get Jenkins configuration: {str(config_error)}")
+            
         logger.info(f"Using Jenkins server at {config['jenkins_url']}")
         
+        # Validate auth configuration
+        if not config['auth'].get('password'):
+            raise ValueError("Jenkins authentication password is required but not provided in configuration")
+        
         # Create parser
-        parser = JenkinsJobParser(
-            jenkins_url=config['jenkins_url'],
-            username=config['auth']['username'],
-            api_token="${" + config['auth']['password_env'] + "}"
-        )
+        try:
+            parser = JenkinsJobParser(
+                jenkins_url=config['jenkins_url'],
+                username=config['auth']['username'],
+                api_token=config['auth']['password']
+            )
+        except Exception as parser_error:
+            raise ValueError(f"Failed to create Jenkins parser: {str(parser_error)}")
 
         # Get jobs from Jenkins server
         logger.info("Fetching Jenkins jobs...")
-        job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
-        jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
+        try:
+            job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
+            jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
+        except Exception as jobs_error:
+            raise ValueError(f"Failed to fetch Jenkins jobs: {str(jobs_error)}")
 
         # Handle errors and warnings
         if errors:
             error_msg = "\n- ".join(errors)
             logger.error(f"Errors during job discovery:\n- {error_msg}")
             if not jobs_info:
-                raise ValueError(f"Failed to fetch any jobs. Errors:\n- {error_msg}")
+                raise ValueError(f"Failed to fetch any jobs from Jenkins server. Errors encountered:\n- {error_msg}")
 
         if warnings:
             warning_msg = "\n- ".join(warnings)
@@ -77,6 +91,7 @@ def initialize_tools():
 
         # Create and register tools
         tools = []
+        failed_jobs = []
         for job_name, job_info in jobs_info.items():
             try:
                 tool = create_jenkins_tool(job_name, job_info, config)
@@ -85,17 +100,27 @@ def initialize_tools():
                     tools.append(tool)
                     logger.info(f"Registered tool for job: {job_name}")
             except Exception as e:
-                logger.error(f"Failed to create tool for job {job_name}: {str(e)}")
+                error_msg = f"Failed to create tool for job {job_name}: {str(e)}"
+                logger.error(error_msg)
+                failed_jobs.append({"job": job_name, "error": str(e)})
 
         if not tools:
-            raise ValueError("No tools were created from Jenkins jobs")
+            if failed_jobs:
+                error_details = "\n- ".join([f"{job['job']}: {job['error']}" for job in failed_jobs])
+                raise ValueError(f"Failed to create any Jenkins tools. Errors for each job:\n- {error_details}")
+            else:
+                raise ValueError("No Jenkins jobs were found to create tools from")
 
-        logger.info(f"Successfully initialized {len(tools)} Jenkins tools")
+        if failed_jobs:
+            logger.warning(f"Successfully created {len(tools)} tools, but {len(failed_jobs)} jobs failed")
+        else:
+            logger.info(f"Successfully initialized all {len(tools)} Jenkins tools")
+            
         return tools
 
     except Exception as e:
         logger.error(f"Failed to initialize Jenkins tools: {str(e)}")
-        raise
+        raise ValueError(f"Jenkins tools initialization failed: {str(e)}")
 
 def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[str, Any]) -> JenkinsJobTool:
     """Create a Jenkins tool for a specific job."""
