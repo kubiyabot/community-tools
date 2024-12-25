@@ -2,6 +2,7 @@ import logging
 from kubiya_sdk.tools.registry import tool_registry
 from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
+from .config import DEFAULT_JENKINS_CONFIG
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
