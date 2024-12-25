@@ -1,12 +1,25 @@
 from typing import Dict, Any, Optional
 import json
 
+def format_duration(seconds: int) -> str:
+    """
+    Format duration in seconds to a human-readable string
+    """
+    if seconds >= 3600:
+        hours = seconds / 3600
+        return f"{hours:.1f} hours"
+    elif seconds >= 60:
+        minutes = seconds / 60
+        return f"{int(minutes)} minutes"
+    else:
+        return f"{seconds} seconds"
+
 def create_access_granted_blocks(account_id: str, permission_set: str, duration_seconds: int, 
                                user_email: str, account_alias: Optional[str] = None,
                                permission_set_details: Optional[dict] = None) -> Dict[str, Any]:
     """Create engaging Slack Block Kit message for access grant notification."""
     
-    duration_hours = duration_seconds / 3600
+    duration_display = format_duration(duration_seconds)
     account_name = account_alias or account_id
     
     blocks = [
@@ -30,7 +43,7 @@ def create_access_granted_blocks(account_id: str, permission_set: str, duration_
             "fields": [
                 {
                     "type": "mrkdwn",
-                    "text": f"*Duration:*\n{duration_seconds / 3600:.1f} hours" if duration_seconds >= 3600 else f"*Duration:*\n{duration_seconds // 60} minutes"
+                    "text": f"*Duration:*\n{duration_display}"
                 },
                 {
                     "type": "mrkdwn",
@@ -89,13 +102,12 @@ def create_access_granted_blocks(account_id: str, permission_set: str, duration_
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": f"⏰ Access will expire in {duration_hours:.1f} hours"
+                    "text": f"⏰ Access will expire in {duration_display}"
                 }
             ]
         }
     ])
 
-    # Return blocks wrapped in a dictionary
     return {"blocks": blocks}
 
 def create_access_expired_blocks(account_id: str, permission_set: str) -> Dict[str, Any]:
@@ -236,4 +248,4 @@ def create_s3_access_revoked_blocks(user_email: str, bucket_name: str) -> Dict[s
                 }
             }
         ]
-    } 
+    }
