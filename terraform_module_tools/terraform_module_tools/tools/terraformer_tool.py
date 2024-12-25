@@ -140,7 +140,7 @@ class TerraformerTool(Tool):
                 args=config.args,
                 env=config.env,
                 type="docker",
-                image="hashicorp/terraform:latest",
+                image="python:3.12-alpine",
                 handler=self.handle_terraform_command,
                 with_files=[
                     {
