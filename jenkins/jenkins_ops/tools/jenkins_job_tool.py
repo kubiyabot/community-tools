@@ -122,12 +122,19 @@ python3 /opt/scripts/jenkins_job_runner.py
 
             # Set up script content
             self.content = self._generate_script_content()
+
+            self.image = "python:3.12"
+
+            # Read the script content from the file
+            script_path = Path(__file__).parent.parent / 'scripts' / 'jenkins_job_runner.py'
+            with open(script_path, 'r') as file:
+                jenkins_runner_script = file.read()
             
             # Add required files
             self.with_files = [
                 FileSpec(
                     destination="/opt/scripts/jenkins_job_runner.py",
-                    source=str(Path(__file__).parent.parent / 'scripts' / 'jenkins_job_runner.py')
+                    content=jenkins_runner_script
                 ),
                 FileSpec(
                     destination="/tmp/jenkins_config.json",
