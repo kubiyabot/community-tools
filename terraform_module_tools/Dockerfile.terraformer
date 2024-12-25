@@ -1,0 +1,21 @@
+FROM alpine:3.14
+
+# Install required packages
+RUN apk add --no-cache \
+    bash \
+    curl \
+    aws-cli \
+    jq \
+    git \
+    terraform
+
+# Install Terraformer
+RUN curl -LO https://github.com/GoogleCloudPlatform/terraformer/releases/download/$(curl -s https://api.github.com/repos/GoogleCloudPlatform/terraformer/releases/latest | grep tag_name | cut -d '"' -f 4)/terraformer-aws-linux-amd64 && \
+    chmod +x terraformer-aws-linux-amd64 && \
+    mv terraformer-aws-linux-amd64 /usr/local/bin/terraformer
+
+# Set working directory
+WORKDIR /terraform
+
+# Default command
+CMD ["/bin/bash"] 
