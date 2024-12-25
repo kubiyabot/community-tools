@@ -26,11 +26,22 @@ def get_jenkins_config() -> Dict[str, Any]:
             "password": "your-jenkins-api-token",  # Required: Jenkins API token or password
             "sync_all": True,  # Optional: set to False to use include/exclude lists
             "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
-            "exclude_jobs": ["test-job"]  # Optional: list of jobs to exclude
+            "exclude_jobs": ["test-job"],  # Optional: list of jobs to exclude
+            "defaults": {  # Optional: default settings for all jobs
+                "stream_logs": True,
+                "poll_interval": 10
+            }
         }
     }
 
-    config = tool_registry.dynamic_config
+    try:
+        config = tool_registry.dynamic_config
+    except Exception as e:
+        raise ValueError(
+            f"Failed to get dynamic configuration: {str(e)}\nExpected configuration structure:\n"
+            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+        )
+
     if not config:
         raise ValueError(
             "No dynamic configuration provided. Expected configuration structure:\n"
@@ -55,7 +66,7 @@ def get_jenkins_config() -> Dict[str, Any]:
             f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
         )
 
-    # Build configuration with defaults only for job filtering
+    # Build configuration with defaults
     return {
         "jenkins_url": jenkins_config['url'],
         "auth": {
@@ -63,9 +74,13 @@ def get_jenkins_config() -> Dict[str, Any]:
             "password": jenkins_config['password']
         },
         "jobs": {
-            "sync_all": jenkins_config.get('sync_all', True),  # Default to syncing all jobs
-            "include": jenkins_config.get('include_jobs', []),  # Empty list by default
-            "exclude": jenkins_config.get('exclude_jobs', [])   # Empty list by default
+            "sync_all": jenkins_config.get('sync_all', True),
+            "include": jenkins_config.get('include_jobs', []),
+            "exclude": jenkins_config.get('exclude_jobs', [])
+        },
+        "defaults": {
+            "stream_logs": jenkins_config.get('defaults', {}).get('stream_logs', DEFAULT_CONFIG['stream_logs']),
+            "poll_interval": jenkins_config.get('defaults', {}).get('poll_interval', DEFAULT_CONFIG['poll_interval'])
         }
     }
 
@@ -175,16 +190,6 @@ def initialize_tools():
 
 def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[str, Any]) -> JenkinsJobTool:
     """Create a Jenkins tool for a specific job."""
-    # Ensure we have default values
-    defaults = {
-        "stream_logs": DEFAULT_CONFIG["stream_logs"],
-        "poll_interval": DEFAULT_CONFIG["poll_interval"]
-    }
-    
-    # Update defaults from config if available
-    if 'defaults' in config:
-        defaults.update(config['defaults'])
-
     tool_config = {
         "name": f"jenkins_job_{job_name.lower().replace('-', '_')}",
         "description": job_info.get('description', f"Execute Jenkins job: {job_name}"),
@@ -194,8 +199,8 @@ def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[st
             "auth": config['auth']
         },
         "long_running": True,
-        "stream_logs": defaults['stream_logs'],
-        "poll_interval": defaults['poll_interval']
+        "stream_logs": config.get('defaults', DEFAULT_CONFIG)['stream_logs'],
+        "poll_interval": config.get('defaults', DEFAULT_CONFIG)['poll_interval']
     }
 
     tool = JenkinsJobTool(**tool_config)
