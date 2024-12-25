@@ -4,25 +4,50 @@ from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
 from .config import DEFAULT_JENKINS_CONFIG
 from typing import Dict, Any
+import json
 
 logger = logging.getLogger(__name__)
 
 def get_jenkins_config() -> Dict[str, Any]:
     """Get Jenkins configuration from dynamic config."""
+    EXAMPLE_CONFIG = {
+        "jenkins": {
+            "url": "http://jenkins.example.com:8080",
+            "username": "admin",
+            "password": "your-jenkins-api-token",
+            "sync_all": True,  # Optional: set to False to use include/exclude lists
+            "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include
+            "exclude_jobs": ["test-job"],  # Optional: list of jobs to exclude
+            "stream_logs": True,  # Optional
+            "poll_interval": 30,  # Optional: seconds between status checks
+            "long_running_threshold": 300  # Optional: seconds before job is considered long-running
+        }
+    }
+
     config = tool_registry.dynamic_config
     if not config:
-        raise ValueError("No dynamic configuration provided")
+        raise ValueError(
+            "No dynamic configuration provided. Expected configuration structure:\n"
+            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+        )
 
     # Get Jenkins configuration
     jenkins_config = config.get('jenkins', {})
     if not jenkins_config:
-        raise ValueError("No Jenkins configuration found in dynamic config")
+        raise ValueError(
+            "No Jenkins configuration found in dynamic config. Expected configuration structure:\n"
+            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+        )
 
     # Required fields
     required_fields = ['url']
     missing_fields = [field for field in required_fields if field not in jenkins_config]
     if missing_fields:
-        raise ValueError(f"Missing required Jenkins configuration fields: {', '.join(missing_fields)}")
+        raise ValueError(
+            f"Missing required Jenkins configuration fields: {', '.join(missing_fields)}\n"
+            "Example of a valid configuration:\n"
+            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+        )
 
     # Build configuration with defaults
     return {
@@ -58,7 +83,18 @@ def initialize_tools():
         
         # Validate auth configuration
         if not config['auth'].get('password'):
-            raise ValueError("Jenkins authentication password is required but not provided in configuration")
+            example_config = {
+                "jenkins": {
+                    "url": "http://jenkins.example.com:8080",
+                    "username": "admin",
+                    "password": "your-jenkins-api-token",  # Required
+                }
+            }
+            raise ValueError(
+                "Jenkins authentication password is required but not provided in configuration.\n"
+                "Example of a valid configuration:\n"
+                f"{json.dumps(example_config, indent=2)}"
+            )
         
         # Create parser
         try:
@@ -76,7 +112,18 @@ def initialize_tools():
             job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
             jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
         except Exception as jobs_error:
-            raise ValueError(f"Failed to fetch Jenkins jobs: {str(jobs_error)}")
+            example_config = {
+                "jenkins": {
+                    "sync_all": False,  # Set to false to use include/exclude lists
+                    "include_jobs": ["job1", "job2"],  # List of jobs to include
+                    "exclude_jobs": ["test-job"]  # List of jobs to exclude
+                }
+            }
+            raise ValueError(
+                f"Failed to fetch Jenkins jobs: {str(jobs_error)}\n"
+                "If you're trying to filter specific jobs, ensure your configuration includes job filters like this:\n"
+                f"{json.dumps(example_config, indent=2)}"
+            )
 
         # Handle errors and warnings
         if errors:
