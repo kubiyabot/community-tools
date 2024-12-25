@@ -1,0 +1,10 @@
+{
+  "terraform": {
+    "enable_reverse_terraform": true,
+    "reverse_terraform_providers": [
+      "aws",
+      "gcp",
+      "azure"
+    ]
+  }
+}

@@ -8,6 +8,15 @@ import json
 
 logger = logging.getLogger(__name__)
 
+# Default configuration values
+DEFAULT_CONFIG = {
+    "stream_logs": True,
+    "poll_interval": 10,  # seconds
+    "sync_all": True,
+    "include_jobs": [],
+    "exclude_jobs": []
+}
+
 def get_jenkins_config() -> Dict[str, Any]:
     """Get Jenkins configuration from dynamic config."""
     EXAMPLE_CONFIG = {
@@ -166,6 +175,16 @@ def initialize_tools():
 
 def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[str, Any]) -> JenkinsJobTool:
     """Create a Jenkins tool for a specific job."""
+    # Ensure we have default values
+    defaults = {
+        "stream_logs": DEFAULT_CONFIG["stream_logs"],
+        "poll_interval": DEFAULT_CONFIG["poll_interval"]
+    }
+    
+    # Update defaults from config if available
+    if 'defaults' in config:
+        defaults.update(config['defaults'])
+
     tool_config = {
         "name": f"jenkins_job_{job_name.lower().replace('-', '_')}",
         "description": job_info.get('description', f"Execute Jenkins job: {job_name}"),
@@ -175,8 +194,8 @@ def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[st
             "auth": config['auth']
         },
         "long_running": True,
-        "stream_logs": config['defaults']['stream_logs'],
-        "poll_interval": config['defaults']['poll_interval']
+        "stream_logs": defaults['stream_logs'],
+        "poll_interval": defaults['poll_interval']
     }
 
     tool = JenkinsJobTool(**tool_config)
