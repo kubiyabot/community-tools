@@ -29,7 +29,7 @@ def get_jenkins_config() -> Dict[str, Any]:
         "jenkins_url": jenkins_config.get('url'),
         "auth": {
             "username": jenkins_config.get('username', 'admin'),
-            "password_env": jenkins_config.get('token_env', 'JENKINS_API_TOKEN')
+            "password": jenkins_config.get('password')
         },
         "jobs": {
             "sync_all": jenkins_config.get('sync_all', True),
@@ -61,11 +61,8 @@ def initialize_tools():
 
         # Get jobs from Jenkins server
         logger.info("Fetching Jenkins jobs...")
-        jobs_info, warnings, errors = parser.get_jobs(
-            include_jobs=config['jobs'].get('include'),
-            exclude_jobs=config['jobs'].get('exclude'),
-            sync_all=config['jobs'].get('sync_all', True)
-        )
+        job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
+        jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
 
         # Handle errors and warnings
         if errors:
