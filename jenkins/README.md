@@ -62,7 +62,44 @@ graph TD
 
 ## Installation
 
-To install the Jenkins Operations module, run:
+### Option 1: Using the Installation Script
+
+We provide a convenient installation script that sets up Jenkins in your Kubernetes cluster using Helm. The script:
+
+- Creates a new Jenkins namespace
+- Installs Jenkins using the official Helm chart
+- Sets up port forwarding
+- Creates example pipeline jobs
+- Generates secure credentials
+- Provides access URLs and instructions
+
+To use the script:
+
+```bash
+# Make the script executable
+chmod +x scripts/install_jenkins.sh
+
+# Run the installation script
+./scripts/install_jenkins.sh
+```
+
+The script will:
+1. Check for prerequisites (kubectl, helm)
+2. Install Jenkins with recommended settings
+3. Create example pipeline jobs
+4. Set up port forwarding to localhost:8080
+5. Generate and save credentials
+6. Provide access URLs and instructions
+
+Requirements:
+- Kubernetes cluster with kubectl access
+- Helm installed
+- At least 2GB of available memory
+- 1 CPU core available
+
+### Option 2: Manual Installation
+
+To install the Jenkins Operations module manually, run:
 
 ```bash
 pip install jenkins-ops
