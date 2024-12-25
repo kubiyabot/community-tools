@@ -1,10 +1,17 @@
 {
-  "terraform": {
-    "enable_reverse_terraform": true,
-    "reverse_terraform_providers": [
-      "aws",
-      "gcp",
-      "azure"
-    ]
-  }
+    "jenkins": {
+        "url": "http://jenkins.jenkins",
+        "username": "admin",
+        "password": "JENKINS_API_TOKEN",
+        "jobs": {
+            "sync_all": false,
+            "include": [
+                "deploy-to-production",
+                "run-integration-tests"
+            ],
+            "exclude": [
+                "internal-builds"
+            ]
+        }
+    }
 }
