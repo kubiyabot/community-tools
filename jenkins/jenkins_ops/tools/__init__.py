@@ -12,15 +12,12 @@ def get_jenkins_config() -> Dict[str, Any]:
     """Get Jenkins configuration from dynamic config."""
     EXAMPLE_CONFIG = {
         "jenkins": {
-            "url": "http://jenkins.example.com:8080",
-            "username": "admin",
-            "password": "your-jenkins-api-token",
+            "url": "http://jenkins.example.com:8080",  # Required: Jenkins server URL
+            "username": "admin",  # Required: Jenkins username
+            "password": "your-jenkins-api-token",  # Required: Jenkins API token or password
             "sync_all": True,  # Optional: set to False to use include/exclude lists
-            "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include
-            "exclude_jobs": ["test-job"],  # Optional: list of jobs to exclude
-            "stream_logs": True,  # Optional
-            "poll_interval": 30,  # Optional: seconds between status checks
-            "long_running_threshold": 300  # Optional: seconds before job is considered long-running
+            "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
+            "exclude_jobs": ["test-job"]  # Optional: list of jobs to exclude
         }
     }
 
@@ -40,8 +37,8 @@ def get_jenkins_config() -> Dict[str, Any]:
         )
 
     # Required fields
-    required_fields = ['url']
-    missing_fields = [field for field in required_fields if field not in jenkins_config]
+    required_fields = ['url', 'username', 'password']
+    missing_fields = [field for field in required_fields if not jenkins_config.get(field)]
     if missing_fields:
         raise ValueError(
             f"Missing required Jenkins configuration fields: {', '.join(missing_fields)}\n"
@@ -49,22 +46,17 @@ def get_jenkins_config() -> Dict[str, Any]:
             f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
         )
 
-    # Build configuration with defaults
+    # Build configuration with defaults only for job filtering
     return {
-        "jenkins_url": jenkins_config.get('url'),
+        "jenkins_url": jenkins_config['url'],
         "auth": {
-            "username": jenkins_config.get('username', 'admin'),
-            "password": jenkins_config.get('password')
+            "username": jenkins_config['username'],
+            "password": jenkins_config['password']
         },
         "jobs": {
-            "sync_all": jenkins_config.get('sync_all', True),
-            "include": jenkins_config.get('include_jobs', []),
-            "exclude": jenkins_config.get('exclude_jobs', [])
-        },
-        "defaults": {
-            "stream_logs": jenkins_config.get('stream_logs', True),
-            "poll_interval": jenkins_config.get('poll_interval', 30),
-            "long_running_threshold": jenkins_config.get('long_running_threshold', 300)
+            "sync_all": jenkins_config.get('sync_all', True),  # Default to syncing all jobs
+            "include": jenkins_config.get('include_jobs', []),  # Empty list by default
+            "exclude": jenkins_config.get('exclude_jobs', [])   # Empty list by default
         }
     }
 
@@ -87,7 +79,7 @@ def initialize_tools():
                 "jenkins": {
                     "url": "http://jenkins.example.com:8080",
                     "username": "admin",
-                    "password": "your-jenkins-api-token",  # Required
+                    "password": "your-jenkins-api-token"
                 }
             }
             raise ValueError(
@@ -114,6 +106,9 @@ def initialize_tools():
         except Exception as jobs_error:
             example_config = {
                 "jenkins": {
+                    "url": "http://jenkins.example.com:8080",
+                    "username": "admin",
+                    "password": "your-jenkins-api-token",
                     "sync_all": False,  # Set to false to use include/exclude lists
                     "include_jobs": ["job1", "job2"],  # List of jobs to include
                     "exclude_jobs": ["test-job"]  # List of jobs to exclude
