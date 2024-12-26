@@ -531,10 +531,14 @@ class JenkinsJobParser:
             logger.info(f"Found {len(all_jobs)} total jobs")
             
             # Filter jobs if needed
-            jobs_to_process = [
+            jobs_to_process = all_jobs
+            
+            if job_include_filter:
+                jobs_to_process = [
                 job for job in all_jobs
-                if job_include_filter and job['full_name'] in job_include_filter
+                if job['full_name'] in job_include_filter
             ]
+            
             if job_exclude_filter:
                 jobs_to_process = [
                     job for job in jobs_to_process
