@@ -67,22 +67,24 @@ def get_jenkins_config() -> Dict[str, Any]:
         )
 
     # Build configuration with defaults
-    return {
+    ret = {
         "jenkins_url": jenkins_config['url'],
         "auth": {
             "username": jenkins_config['username'],
             "password": jenkins_config['password']
         },
         "jobs": {
-            "sync_all": jenkins_config.get('sync_all', True),
-            "include": jenkins_config.get('include_jobs', []),
-            "exclude": jenkins_config.get('exclude_jobs', [])
+            "sync_all": jenkins_config.get('jobs', {}).get('sync_all', True),
+            "include": jenkins_config.get('jobs', {}).get('include', []),
+            "exclude": jenkins_config.get('jobs', {}).get('exclude', []),
         },
         "defaults": {
             "stream_logs": jenkins_config.get('defaults', {}).get('stream_logs', DEFAULT_CONFIG['stream_logs']),
             "poll_interval": jenkins_config.get('defaults', {}).get('poll_interval', DEFAULT_CONFIG['poll_interval'])
         }
     }
+    print("used_config=", ret)
+    return ret
 
 def initialize_tools():
     """Initialize and register Jenkins tools."""
@@ -125,8 +127,9 @@ def initialize_tools():
         # Get jobs from Jenkins server
         logger.info("Fetching Jenkins jobs...")
         try:
-            job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
-            jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
+            job_include_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
+            job_exclude_filter = config['jobs'].get('exclude') if not config['jobs'].get('sync_all') else None
+            jobs_info, warnings, errors = parser.get_jobs(job_include_filter=job_include_filter, job_exclude_filter=job_exclude_filter)
         except Exception as jobs_error:
             example_config = {
                 "jenkins": {
