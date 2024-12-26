@@ -77,7 +77,8 @@ def get_jenkins_config() -> Dict[str, Any]:
         "jobs": {
             "sync_all": jenkins_config.get('jobs', {}).get('sync_all', True),
             "include": jenkins_config.get('jobs', {}).get('include', []),
-            "exclude": jenkins_config.get('jobs', {}).get('exclude', [])
+            "exclude": jenkins_config.get('jobs', {}).get('exclude', []),
+            "debug": jenkins_config.get('jobs', {}),
         },
         "defaults": {
             "stream_logs": jenkins_config.get('defaults', {}).get('stream_logs', DEFAULT_CONFIG['stream_logs']),
