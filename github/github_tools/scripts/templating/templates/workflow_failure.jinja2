@@ -3,6 +3,7 @@
 ## 🔍 Workflow Details:
 {% set details = run_details | from_json %}
 - **Workflow Name:** {{ workflow_name }}
+- **Comment Added At (UTC):** {{ details.processed_at }}
 - **Status:** {{ details.status | title }}
 - **Conclusion:** {{ details.conclusion | title }}
 - **Pull Request**: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})

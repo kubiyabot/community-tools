@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from datetime import datetime
 import jinja2
 import os
 import sys
@@ -84,7 +85,9 @@ def parse_fixes(fixes_json: str) -> list:
 def parse_run_details(details_json: str) -> dict:
     """Parse workflow run details from JSON string."""
     try:
-        return json.loads(details_json)
+        _detailes_json = json.loads(details_json)
+        _detailes_json['processed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return _detailes_json
     except json.JSONDecodeError as e:
         logger.error(f"Invalid run details JSON: {e}")
         sys.exit(1)
