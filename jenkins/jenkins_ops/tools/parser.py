@@ -509,6 +509,12 @@ class JenkinsJobParser:
             return []
 
     def get_jobs(self, job_include_filter: Optional[List[str]] = None, job_exclude_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
+        
+        if job_include_filter is None:
+            job_include_filter = []
+        if job_exclude_filter is None:
+            job_exclude_filter = []
+            
         """Get all Jenkins jobs and their parameters."""
         jobs_info = {}
         
