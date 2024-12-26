@@ -490,7 +490,7 @@ class JenkinsJobParser:
                         
                     elif any(folder_type in item_class for folder_type in ['Folder', 'WorkflowMultiBranch', 'OrganizationFolder']):
                         # Folder or similar container - recurse into it
-                        logger.debug(f"Recursing into folder: {item_name}")
+                        logger.info(f"Recursing into folder: {item_name}")
                         sub_jobs = self._get_all_jobs_recursive(f"{item_url}api/json")
                         jobs.extend(sub_jobs)
                         
