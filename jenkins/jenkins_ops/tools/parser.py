@@ -528,8 +528,7 @@ class JenkinsJobParser:
                 self.warnings.append("No jobs were found in Jenkins server")
                 return {}, self.warnings, self.errors
 
-            logger.info(f"Found {len(all_jobs)} total jobs")
-            logger.info(all_jobs)
+            logger.info(f"Found {len(all_jobs)} total jobs: ", all_jobs)
             
             # Filter jobs if needed
             jobs_to_process = all_jobs
