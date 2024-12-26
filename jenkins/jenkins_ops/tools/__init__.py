@@ -4,7 +4,6 @@ from .jenkins_job_tool import JenkinsJobTool
 from .parser import JenkinsJobParser
 from .config import DEFAULT_JENKINS_CONFIG
 from typing import Dict, Any
-from pprint import pprint
 import json
 
 logger = logging.getLogger(__name__)
@@ -67,7 +66,7 @@ def get_jenkins_config() -> Dict[str, Any]:
             f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
         )
 
-    pprint("jenking config=", jenkins_config)
+    print("jenking config=", jenkins_config)
     # Build configuration with defaults
     ret = {
         "jenkins_url": jenkins_config['url'],
@@ -85,7 +84,7 @@ def get_jenkins_config() -> Dict[str, Any]:
             "poll_interval": jenkins_config.get('defaults', {}).get('poll_interval', DEFAULT_CONFIG['poll_interval'])
         }
     }
-    pprint("used_config=", ret)
+    print("used_config=", ret)
     return ret
 
 def initialize_tools():
