@@ -193,4 +193,4 @@ def initialize_tools() -> List:
             "Failed to initialize Jenkins tools. See logs for details.\n"
             f"Error: {str(e)}"
         )
-    
+     

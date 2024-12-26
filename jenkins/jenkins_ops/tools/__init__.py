@@ -128,8 +128,9 @@ def initialize_tools():
         # Get jobs from Jenkins server
         logger.info("Fetching Jenkins jobs...")
         try:
-            job_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
-            jobs_info, warnings, errors = parser.get_jobs(job_filter=job_filter)
+            job_include_filter = config['jobs'].get('include') if not config['jobs'].get('sync_all') else None
+            job_exclude_filter = config['jobs'].get('exclude') if not config['jobs'].get('sync_all') else None
+            jobs_info, warnings, errors = parser.get_jobs(job_include_filter=job_include_filter, job_exclude_filter=job_exclude_filter)
         except Exception as jobs_error:
             example_config = {
                 "jenkins": {

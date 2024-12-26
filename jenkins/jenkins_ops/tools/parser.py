@@ -508,7 +508,7 @@ class JenkinsJobParser:
             self.errors.append(error_msg)
             return []
 
-    def get_jobs(self, job_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
+    def get_jobs(self, job_include_filter: Optional[List[str]] = None, job_exclude_filter: Optional[List[str]] = None) -> Tuple[Dict[str, Any], List[str], List[str]]:
         """Get all Jenkins jobs and their parameters."""
         jobs_info = {}
         
@@ -527,11 +527,11 @@ class JenkinsJobParser:
             # Filter jobs if needed
             jobs_to_process = [
                 job for job in all_jobs
-                if not job_filter or job['full_name'] in job_filter
+                if job['full_name'] in job_include_filter and job['full_name'] not in job_exclude_filter
             ]
             
-            if job_filter and not jobs_to_process:
-                warning_msg = f"No jobs matched the filter: {job_filter}"
+            if job_include_filter and not jobs_to_process:
+                warning_msg = f"No jobs matched the filter: {job_include_filter}"
                 logger.warning(warning_msg)
                 self.warnings.append(warning_msg)
                 return {}, self.warnings, self.errors
