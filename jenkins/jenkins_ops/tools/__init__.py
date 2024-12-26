@@ -66,7 +66,6 @@ def get_jenkins_config() -> Dict[str, Any]:
             f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
         )
 
-    print("jenking config=", jenkins_config)
     # Build configuration with defaults
     ret = {
         "jenkins_url": jenkins_config['url'],
