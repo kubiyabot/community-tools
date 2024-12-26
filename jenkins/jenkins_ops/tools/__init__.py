@@ -66,8 +66,9 @@ def get_jenkins_config() -> Dict[str, Any]:
             f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
         )
 
+    pprint("jenking config=", jenkins_config)
     # Build configuration with defaults
-    return {
+    ret = {
         "jenkins_url": jenkins_config['url'],
         "auth": {
             "username": jenkins_config['username'],
@@ -83,6 +84,8 @@ def get_jenkins_config() -> Dict[str, Any]:
             "poll_interval": jenkins_config.get('defaults', {}).get('poll_interval', DEFAULT_CONFIG['poll_interval'])
         }
     }
+    pprint("used_config=", ret)
+    return ret
 
 def initialize_tools():
     """Initialize and register Jenkins tools."""
