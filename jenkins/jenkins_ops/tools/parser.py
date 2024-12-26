@@ -533,8 +533,13 @@ class JenkinsJobParser:
             # Filter jobs if needed
             jobs_to_process = [
                 job for job in all_jobs
-                if job['full_name'] in job_include_filter and job['full_name'] not in job_exclude_filter
+                if job_include_filter and job['full_name'] in job_include_filter
             ]
+            if job_exclude_filter:
+                jobs_to_process = [
+                    job for job in jobs_to_process
+                    if job['full_name'] not in job_exclude_filter
+                ]
             
             if job_include_filter and not jobs_to_process:
                 warning_msg = f"No jobs matched the filter: {job_include_filter}"
