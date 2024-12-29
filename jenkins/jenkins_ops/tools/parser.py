@@ -146,11 +146,11 @@ class JenkinsJobParser:
             logger.warning(f"Error extracting default value: {str(e)}")
             return None
 
-    def _process_single_job(self, job_name: str) -> Optional[Dict[str, Any]]:
+    def _process_single_job(self, job_name: str, job_url: str) -> Optional[Dict[str, Any]]:
         """Process a single Jenkins job."""
         try:
             # Get job info from API
-            info_endpoint = f'job/{job_name}/api/json?tree=description,url,buildable,property[parameterDefinitions[*]],actions[parameterDefinitions[*]]'
+            info_endpoint = f'{job_url}/api/json?tree=description,url,buildable,property[parameterDefinitions[*]],actions[parameterDefinitions[*]]'
             job_info = self._make_request(info_endpoint)
             
             if not job_info:
@@ -490,7 +490,7 @@ class JenkinsJobParser:
                         
                     elif any(folder_type in item_class for folder_type in ['Folder', 'WorkflowMultiBranch', 'OrganizationFolder']):
                         # Folder or similar container - recurse into it
-                        logger.debug(f"Recursing into folder: {item_name}")
+                        logger.info(f"Recursing into folder: {item_name}")
                         sub_jobs = self._get_all_jobs_recursive(f"{item_url}api/json")
                         jobs.extend(sub_jobs)
                         
@@ -528,7 +528,7 @@ class JenkinsJobParser:
                 self.warnings.append("No jobs were found in Jenkins server")
                 return {}, self.warnings, self.errors
 
-            logger.info(f"Found {len(all_jobs)} total jobs")
+            logger.info(f"Found {len(all_jobs)} total jobs: {all_jobs}")
             
             # Filter jobs if needed
             jobs_to_process = all_jobs
@@ -556,7 +556,7 @@ class JenkinsJobParser:
             # Process jobs in parallel
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 future_to_job = {
-                    executor.submit(self._process_single_job, job['full_name']): job
+                    executor.submit(self._process_single_job, job['full_name'], job['url']): job
                     for job in jobs_to_process
                 }
 

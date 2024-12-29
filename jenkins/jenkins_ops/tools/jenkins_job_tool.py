@@ -13,7 +13,7 @@ class JenkinsJobTool(Tool):
     """Tool for executing and monitoring Jenkins jobs."""
     
     job_config: Dict[str, Any]
-    long_running: bool = False
+    long_running: bool = True
     poll_interval: int = Field(default=30, description="Interval in seconds to poll job status")
     stream_logs: bool = Field(default=True, description="Stream job logs while running")
     

@@ -13,47 +13,46 @@ DEFAULT_CONFIG = {
     "stream_logs": True,
     "poll_interval": 10,  # seconds
     "sync_all": True,
-    "include_jobs": [],
-    "exclude_jobs": []
+    "include": [],
+    "exclude": [],
 }
 
 def get_jenkins_config() -> Dict[str, Any]:
     """Get Jenkins configuration from dynamic config."""
-    EXAMPLE_CONFIG = {
+    EXAMPLE_CONFIG = """{
         "jenkins": {
             "url": "http://jenkins.example.com:8080",  # Required: Jenkins server URL
             "username": "admin",  # Required: Jenkins username
             "password": "your-jenkins-api-token",  # Required: Jenkins API token or password
-            "sync_all": True,  # Optional: set to False to use include/exclude lists
-            "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
-            "exclude_jobs": ["test-job"],  # Optional: list of jobs to exclude
+            "jobs": {
+                "sync_all": True,  # Optional: set to False to use include/exclude lists
+                "include": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
+                "exclude": ["test-job"] # Optional: list of jobs to exclude
+            },
             "defaults": {  # Optional: default settings for all jobs
                 "stream_logs": True,
                 "poll_interval": 10
             }
         }
-    }
+    }"""
 
     try:
         config = tool_registry.dynamic_config
     except Exception as e:
         raise ValueError(
-            f"Failed to get dynamic configuration: {str(e)}\nExpected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            f"Failed to get dynamic configuration: {str(e)}\nExpected configuration structure:\n"  + EXAMPLE_CONFIG
         )
 
     if not config:
         raise ValueError(
-            "No dynamic configuration provided. Expected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            "No dynamic configuration provided. Expected configuration structure:\n" + EXAMPLE_CONFIG
         )
 
     # Get Jenkins configuration
     jenkins_config = config.get('jenkins', {})
     if not jenkins_config:
         raise ValueError(
-            "No Jenkins configuration found in dynamic config. Expected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            "No Jenkins configuration found in dynamic config. Expected configuration structure:\n" + EXAMPLE_CONFIG
         )
 
     # Required fields
@@ -137,8 +136,12 @@ def initialize_tools():
                     "username": "admin",
                     "password": "your-jenkins-api-token",
                     "sync_all": False,  # Set to false to use include/exclude lists
-                    "include_jobs": ["job1", "job2"],  # List of jobs to include
-                    "exclude_jobs": ["test-job"]  # List of jobs to exclude
+                    "include": ["job1", "job2"],  # List of jobs to include
+                    "exclude": ["test-job"],  # List of jobs to exclude
+                    "defaults": {  # Optional: default settings for all jobs
+                        "stream_logs": True,
+                        "poll_interval": 10
+                    }
                 }
             }
             raise ValueError(
@@ -194,7 +197,7 @@ def initialize_tools():
 def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[str, Any]) -> JenkinsJobTool:
     """Create a Jenkins tool for a specific job."""
     tool_config = {
-        "name": f"jenkins_job_{job_name.lower().replace('-', '_')}",
+        "name": job_name.lower().replace('-', '_').replace(' ', '_'),
         "description": job_info.get('description', f"Execute Jenkins job: {job_name}"),
         "job_config": {
             "name": job_name,
