@@ -19,41 +19,40 @@ DEFAULT_CONFIG = {
 
 def get_jenkins_config() -> Dict[str, Any]:
     """Get Jenkins configuration from dynamic config."""
-    EXAMPLE_CONFIG = {
+    EXAMPLE_CONFIG = """{
         "jenkins": {
             "url": "http://jenkins.example.com:8080",  # Required: Jenkins server URL
             "username": "admin",  # Required: Jenkins username
             "password": "your-jenkins-api-token",  # Required: Jenkins API token or password
-            "sync_all": True,  # Optional: set to False to use include/exclude lists
-            "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
-            "exclude_jobs": ["test-job"],  # Optional: list of jobs to exclude
+            "jobs": {
+                "sync_all": True,  # Optional: set to False to use include/exclude lists
+                "include_jobs": ["job1", "job2"],  # Optional: list of jobs to include if sync_all is False
+                "exclude_jobs": ["test-job"] # Optional: list of jobs to exclude
+            },
             "defaults": {  # Optional: default settings for all jobs
                 "stream_logs": True,
                 "poll_interval": 10
             }
         }
-    }
+    }"""
 
     try:
         config = tool_registry.dynamic_config
     except Exception as e:
         raise ValueError(
-            f"Failed to get dynamic configuration: {str(e)}\nExpected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            f"Failed to get dynamic configuration: {str(e)}\nExpected configuration structure:\n"  + EXAMPLE_CONFIG
         )
 
     if not config:
         raise ValueError(
-            "No dynamic configuration provided. Expected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            "No dynamic configuration provided. Expected configuration structure:\n" + EXAMPLE_CONFIG
         )
 
     # Get Jenkins configuration
     jenkins_config = config.get('jenkins', {})
     if not jenkins_config:
         raise ValueError(
-            "No Jenkins configuration found in dynamic config. Expected configuration structure:\n"
-            f"{json.dumps(EXAMPLE_CONFIG, indent=2)}"
+            "No Jenkins configuration found in dynamic config. Expected configuration structure:\n" + EXAMPLE_CONFIG
         )
 
     # Required fields
