@@ -50,6 +50,7 @@ from scripts.utils.notifications import NotificationManager
 from scripts.utils.aws_utils import get_account_alias, get_permission_set_details
 from scripts.utils.slack_messages import create_access_revoked_blocks
 from scripts.utils.webhook_handler import WebhookHandler
+from .config_loader import get_access_configs, get_s3_configs
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""
@@ -267,66 +268,93 @@ class AWSAccessHandler:
         except Exception as e:
             self._handle_error("Failed to grant access", e)
 
-    def grant_s3_access(self, user_email: str, bucket_name: str, policy_template: str, duration: str):
-        """Grant S3 access to the user by updating the bucket policy."""
+    def grant_s3_access(self, config_name, user_email, bucket_name, duration=None):
+        """Grant S3 bucket access to user"""
         try:
-            print_progress(f"Granting S3 access for {user_email} to bucket {bucket_name}...", "🔄")
+            configs = get_s3_configs()
+            if config_name not in configs:
+                raise ValueError(f"Configuration '{config_name}' not found")
             
-            # Parse duration and get formatted display
-            duration_seconds = self.parse_iso8601_duration(duration)
-            duration_display = format_duration(duration_seconds)
+            config = configs[config_name]
             
-            # Find user by email
-            user = self.get_user_by_email(user_email)
-            if not user:
-                raise ValueError(f"User not found: {user_email}")
+            if duration:
+                self.validate_duration(duration, config['session_duration'])
             
-            # Validate that the bucket exists
-            s3 = self.session.client('s3')
-            try:
-                s3.head_bucket(Bucket=bucket_name)
-            except s3.exceptions.NoSuchBucket:
-                raise ValueError(f"S3 bucket {bucket_name} does not exist")
-
-            # Update bucket policy
-            success = self.update_bucket_policy(
-                bucket_name=bucket_name,
-                user_arn=user['Arn'],
-                grant_access=True
+            policy = self.generate_s3_policy(config, user_email)
+            
+            s3_client = self.session.client('s3')
+            s3_client.put_bucket_policy(
+                Bucket=bucket_name,
+                Policy=json.dumps(policy)
             )
-            if not success:
-                raise ValueError("Failed to update bucket policy")
-
-            # Schedule revocation webhook
-            self._schedule_revocation_webhook(
-                user_email=user_email,
-                duration_seconds=duration_seconds,
-                account_id=os.environ['AWS_ACCOUNT_ID'],
-                buckets=[bucket_name],
-                policy_details={
-                    "name": bucket_name,
-                    "type": "s3",
-                    "template": policy_template,
-                }
+            
+            self.notifications.send_notification(
+                f"S3 access granted for {user_email}",
+                f"Access granted to bucket: {bucket_name}"
             )
-
-            # Print success message
-            print_progress(f"S3 access granted successfully!", "✅")
-            print(f"   ├─ User: {user_email}")
-            print(f"   ├─ Bucket: {bucket_name}")
-            print(f"   └─ Duration: {duration_display}")
-
-            # Send notifications
-            self.notifications.send_s3_access_granted(
-                account_id=os.environ['AWS_ACCOUNT_ID'],
-                user_email=user_email,
-                policy_template=policy_template,
-                duration_seconds=duration_seconds,
-                bucket_name=bucket_name
-            )
-
+            
+            return {
+                'status': 'success',
+                'message': 'S3 access granted successfully',
+                'bucket': bucket_name
+            }
+            
         except Exception as e:
             self._handle_error("Failed to grant S3 access", e)
+
+    def generate_s3_policy(self, config, user_id):
+        """Generate S3 bucket policy from template"""
+        policy = config['policy_template']
+        
+        resources = []
+        for bucket in config['buckets']:
+            bucket_arn = f"arn:aws:s3:::{bucket}"
+            resources.extend([bucket_arn, f"{bucket_arn}/*"])
+        
+        policy['Statement'][0]['Resource'] = resources
+        policy['Statement'][0]['Principal']['AWS'] = user_id
+        
+        return policy
+
+    def revoke_s3_access(self, config_name, user_email, bucket_name):
+        """Revoke S3 bucket access from user"""
+        try:
+            configs = get_s3_configs()
+            if config_name not in configs:
+                raise ValueError(f"Configuration '{config_name}' not found")
+            
+            config = configs[config_name]
+            s3_client = self.session.client('s3')
+            
+            try:
+                current_policy = s3_client.get_bucket_policy(Bucket=bucket_name)
+                policy_doc = json.loads(current_policy['Policy'])
+                
+                policy_doc['Statement'] = [
+                    stmt for stmt in policy_doc['Statement']
+                    if stmt.get('Principal', {}).get('AWS') != user_email
+                ]
+                
+                s3_client.put_bucket_policy(
+                    Bucket=bucket_name,
+                    Policy=json.dumps(policy_doc)
+                )
+            except Exception as e:
+                logger.error(f"Error updating bucket {bucket_name} policy: {e}")
+                raise
+            
+            self.notifications.send_notification(
+                f"S3 access revoked for {user_email}",
+                f"Access revoked from bucket: {bucket_name}"
+            )
+            
+            return {
+                'status': 'success',
+                'message': 'S3 access revoked successfully'
+            }
+            
+        except Exception as e:
+            self._handle_error("Failed to revoke S3 access", e)
 
     def _schedule_revocation_webhook(self, 
                                    user_email: str,
@@ -474,53 +502,36 @@ class AWSAccessHandler:
 
 def main():
     """Main function to handle command line arguments and execute actions."""
-    parser = argparse.ArgumentParser(description='AWS Access Handler')
+    parser = argparse.ArgumentParser(description='Handle AWS access')
     parser.add_argument('action', choices=['grant', 'revoke'], help='Action to perform')
-    parser.add_argument('--user-email', required=True, help='Email of the user')
-    parser.add_argument('--duration', default='PT1H', help='Duration for access (ISO8601 format, e.g., PT1H)')
-    parser.add_argument('--bucket-name', required=False, help='Name of the S3 bucket')
+    parser.add_argument('--config', required=True, help='Configuration name')
+    parser.add_argument('--user-email', required=True, help='User email')
+    parser.add_argument('--duration', help='Access duration (ISO8601 format)')
+    parser.add_argument('--type', choices=['aws', 's3'], required=True, help='Access type')
+    parser.add_argument('--bucket-name', help='S3 bucket name (required for S3 access)')
     
     args = parser.parse_args()
     
-    print_progress("Starting AWS Access Handler...", "🚀")
-    
     try:
         handler = AWSAccessHandler()
+        if args.type == 'aws':
+            if args.action == 'grant':
+                result = handler.grant_aws_access(args.config, args.user_email, args.duration)
+            else:
+                result = handler.revoke_aws_access(args.config, args.user_email)
+        else:  # s3
+            if not args.bucket_name:
+                raise ValueError("Bucket name is required for S3 access")
+            if args.action == 'grant':
+                result = handler.grant_s3_access(args.config, args.user_email, args.bucket_name, args.duration)
+            else:
+                result = handler.revoke_s3_access(args.config, args.user_email, args.bucket_name)
         
-        if args.action == 'grant':
-            if args.bucket_name:
-                # Handle S3 access
-                handler.grant_s3_access(
-                    user_email=args.user_email,
-                    bucket_name=args.bucket_name,
-                    policy_template=os.environ.get('POLICY_TEMPLATE', 'default'),
-                    duration=args.duration
-                )
-            else:
-                # Handle SSO access
-                handler.grant_access(
-                    user_email=args.user_email,
-                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
-                    requested_duration=args.duration,
-                    max_duration=os.environ.get('MAX_DURATION', 'PT1H')
-                )
-        else:  # revoke
-            if args.bucket_name:
-                # Handle S3 access revocation
-                handler.revoke_s3_access(
-                    user_email=args.user_email,
-                    bucket_name=args.bucket_name
-                )
-            else:
-                # Handle SSO access revocation
-                handler.revoke_access(
-                    user_email=args.user_email,
-                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
-                )
-                
+        print(json.dumps(result, indent=2))
+        
     except Exception as e:
-        print_progress(f"Error: {str(e)}", "❌")
-        sys.exit(1)
+        logger.error(f"Error: {str(e)}")
+        raise
 
 if __name__ == '__main__':
     main()
