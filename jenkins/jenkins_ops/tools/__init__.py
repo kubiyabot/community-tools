@@ -194,7 +194,7 @@ def initialize_tools():
 def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[str, Any]) -> JenkinsJobTool:
     """Create a Jenkins tool for a specific job."""
     tool_config = {
-        "name": f"jenkins_job_{job_name.lower().replace('-', '_')}",
+        "name": {job_name.lower().replace('-', '_') m,
         "description": job_info.get('description', f"Execute Jenkins job: {job_name}"),
         "job_config": {
             "name": job_name,
