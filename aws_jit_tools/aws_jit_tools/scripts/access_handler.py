@@ -288,9 +288,10 @@ class AWSAccessHandler:
                 Policy=json.dumps(policy)
             )
             
-            self.notifications.send_notification(
-                f"S3 access granted for {user_email}",
-                f"Access granted to bucket: {bucket_name}"
+            self.notifications.send_s3_access_granted(
+                user_email=user_email,
+                buckets=[bucket_name],
+                duration=duration
             )
             
             return {
@@ -307,8 +308,9 @@ class AWSAccessHandler:
         policy = config['policy_template']
         
         resources = []
-        for bucket in config['buckets']:
-            bucket_arn = f"arn:aws:s3:::{bucket}"
+        for bucket_dict in config['buckets']:
+            bucket_name = bucket_dict['name']  # Extract name from bucket dictionary
+            bucket_arn = f"arn:aws:s3:::{bucket_name}"
             resources.extend([bucket_arn, f"{bucket_arn}/*"])
         
         policy['Statement'][0]['Resource'] = resources
@@ -343,9 +345,9 @@ class AWSAccessHandler:
                 logger.error(f"Error updating bucket {bucket_name} policy: {e}")
                 raise
             
-            self.notifications.send_notification(
-                f"S3 access revoked for {user_email}",
-                f"Access revoked from bucket: {bucket_name}"
+            self.notifications.send_s3_access_revoked(
+                user_email=user_email,
+                buckets=[bucket_name]
             )
             
             return {
@@ -445,7 +447,7 @@ class AWSAccessHandler:
             # Notify user
             self.notifications.send_s3_access_revoked(
                 user_email=user_email,
-                bucket_name=bucket_name
+                buckets=[bucket_name]
             )
 
         except Exception as e:

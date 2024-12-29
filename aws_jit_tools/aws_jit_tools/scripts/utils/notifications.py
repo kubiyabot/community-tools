@@ -112,65 +112,34 @@ class NotificationManager:
             logger.error(f"Failed to send access revoked notification: {e}")
             return False
 
-    def send_s3_access_granted(self, account_id: str, user_email: str, 
-                               policy_template: str, duration_seconds: int,
-                               bucket_name: str) -> bool:
-        """Send S3 access granted notification."""
-        try:
-            blocks = create_s3_access_granted_blocks(
-                account_id=account_id,
-                user_email=user_email,
-                policy_template=policy_template,
-                duration_seconds=duration_seconds,
-                bucket_name=bucket_name
-            )
-            success = self.slack.send_message(
-                message=f"S3 access granted to bucket {bucket_name} for {user_email}",
-                blocks=blocks
-            )
-            return success
-        except Exception as e:
-            logger.error(f"Failed to send S3 access granted notification: {e}")
-            return False
+    def send_s3_access_granted(self, user_email, buckets, duration=None):
+        """Send notification for S3 access grant"""
+        # Convert bucket dictionaries to names if needed
+        bucket_names = [b['name'] if isinstance(b, dict) else b for b in buckets]
+        buckets_list = ", ".join(bucket_names)
+        
+        title = f"S3 Access Granted 🎉"
+        message = (
+            f"Access has been granted to the following S3 buckets:\n"
+            f"• Buckets: {buckets_list}\n"
+            f"• User: {user_email}\n"
+        )
+        if duration:
+            message += f"• Duration: {duration}\n"
+        
+        self.send_notification(title, message)
 
-    def send_s3_access_revoked(self, user_email: str, bucket_name: str) -> bool:
-        """Send S3 access revoked notification directly to the user."""
-        try:
-            # Look up Slack user ID by email
-            slack_user_id = self.slack.lookup_user_by_email(user_email)
-            if not slack_user_id:
-                logger.error(f"Could not find Slack user ID for email: {user_email}")
-                return False
-
-            # Create message blocks
-            blocks = create_s3_access_revoked_blocks(
-                user_email=user_email,
-                bucket_name=bucket_name
-            )
-
-            # Store original channel and thread
-            original_channel = self.slack.channel_id
-            original_thread = self.slack.thread_ts
-
-            try:
-                # Set channel to user's ID for direct message
-                self.slack.channel_id = slack_user_id
-                # Clear thread_ts to send to main thread
-                self.slack.thread_ts = None
-
-                # Send the message
-                success = self.slack.send_message(
-                    message="Your S3 access has been revoked.",
-                    blocks=blocks
-                )
-
-                return success
-
-            finally:
-                # Restore original channel and thread
-                self.slack.channel_id = original_channel
-                self.slack.thread_ts = original_thread
-
-        except Exception as e:
-            logger.error(f"Failed to send S3 access revoked notification: {e}")
-            return False
+    def send_s3_access_revoked(self, user_email, buckets):
+        """Send notification for S3 access revocation"""
+        # Convert bucket dictionaries to names if needed
+        bucket_names = [b['name'] if isinstance(b, dict) else b for b in buckets]
+        buckets_list = ", ".join(bucket_names)
+        
+        title = f"S3 Access Revoked 🔒"
+        message = (
+            f"Access has been revoked from the following S3 buckets:\n"
+            f"• Buckets: {buckets_list}\n"
+            f"• User: {user_email}"
+        )
+        
+        self.send_notification(title, message)
