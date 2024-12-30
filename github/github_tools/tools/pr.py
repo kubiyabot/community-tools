@@ -3,7 +3,7 @@ from .base import GitHubCliTool
 from kubiya_sdk.tools.models import FileSpec
 from pathlib import Path
 
-pr_create = GitHubCliTool(
+github_pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository",
     content=f"""
@@ -47,7 +47,7 @@ echo "📋 Details: $PR_URL"
     ],
 ).register("github")
 
-pr_list = GitHubCliTool(
+github_pr_list = GitHubCliTool(
     name="github_pr_list", 
     description="List pull requests in a GitHub repository.",
     content="""
@@ -83,7 +83,7 @@ echo "$RESULT"
     ],
 ).register("github")
 
-pr_view = GitHubCliTool(
+github_pr_view = GitHubCliTool(
     name="github_pr_view",
     description="View details of a specific pull request.",
     content="""
@@ -97,7 +97,7 @@ gh pr view --repo $repo $number
     ],
 ).register("github")
 
-pr_merge = GitHubCliTool(
+github_pr_merge = GitHubCliTool(
     name="github_pr_merge",
     description="Merge a pull request.",
     content="""
@@ -117,7 +117,7 @@ echo "✅ Pull request merged successfully!"
     ],
 ).register("github")
 
-pr_close = GitHubCliTool(
+github_pr_close = GitHubCliTool(
     name="github_pr_close",
     description="Close a pull request without merging.",
     content="""
@@ -133,7 +133,7 @@ echo "✅ Pull request closed successfully!"
     ],
 ).register("github")
 
-pr_comment = GitHubCliTool(
+github_pr_comment = GitHubCliTool(
     name="github_pr_comment",
     description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
     content="""
@@ -150,43 +150,45 @@ for input in "$workflow_steps" "$failures" "$fixes" "$run_details"; do
     fi
 done
 
-# Get PR file changes
-echo "📂 Fetching PR file changes..."
-PR_FILES=$(gh api "repos/$repo/pulls/$number/files" --jq '[.[] | {
-    filename: .filename,
-    status: .status,
-    additions: .additions,
-    deletions: .deletions,
-    changes: .changes,
-    patch: .patch,
-    previous_filename: .previous_filename
-}]' 2>/dev/null) || {
-    echo "❌ Failed to fetch PR files"
-    exit 1
-}
+# # Get PR file changes
+# echo "📂 Fetching PR file changes..."
+# PR_FILES=$(gh api "repos/$repo/pulls/$number/files" --jq '[.[] | {
+#     filename: .filename,
+#     status: .status,
+#     additions: .additions,
+#     deletions: .deletions,
+#     changes: .changes,
+#     patch: .patch,
+#     previous_filename: .previous_filename
+# }]' 2>/dev/null) || {
+#     echo "❌ Failed to fetch PR files"
+#     exit 1
+# }
 
-# Get PR details
-echo "ℹ️ Fetching PR details..."
-PR_DETAILS=$(gh api "repos/$repo/pulls/$number" --jq '{
-    title: .title,
-    description: .body,
-    author: .user.login,
-    created_at: .created_at,
-    updated_at: .updated_at,
-    changed_files: '"$PR_FILES"',
-    commits_count: .commits,
-    additions: .additions,
-    deletions: .deletions,
-    labels: [.labels[].name],
-    base_branch: .base.ref,
-    head_branch: .head.ref
-}' 2>/dev/null) || {
-    echo "❌ Failed to fetch PR details"
-    exit 1
-}
+# # Get PR details
+# echo "ℹ️ Fetching PR details..."
+# PR_DETAILS=$(gh api "repos/$repo/pulls/$number" --jq '{
+#     title: .title,
+#     description: .body,
+#     author: .user.login,
+#     created_at: .created_at,
+#     updated_at: .updated_at,
+#     changed_files: '"$PR_FILES"',
+#     commits_count: .commits,
+#     additions: .additions,
+#     deletions: .deletions,
+#     labels: [.labels[].name],
+#     base_branch: .base.ref,
+#     head_branch: .head.ref
+# }' 2>/dev/null) || {
+#     echo "❌ Failed to fetch PR details"
+#     exit 1
+# }
 
-# Update run details with PR context
-RUN_DETAILS=$(printf '%s' "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
+# # Update run details with PR context
+# RUN_DETAILS=$(printf '%s' "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
+
+echo $run_details
 
 # Export variables for the Python script
 export REPO="$repo"
@@ -195,7 +197,7 @@ export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES="$failures"
 export FIXES="$fixes"
 export ERROR_LOGS="$error_logs"
-export RUN_DETAILS="$RUN_DETAILS"
+export RUN_DETAILS="$run_details"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
@@ -213,7 +215,9 @@ GITHUB_ACTOR=$(gh api user --jq '.login') || {
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-    --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
+  | sed -n 1p)
+
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
     # Update existing comment
@@ -223,13 +227,14 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
     
     # Count existing edits
-    EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
-    EDIT_COUNT=$((EDIT_COUNT + 1))
+    # echo "Calculating edit count... "
+    # EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
+    # EDIT_COUNT=$((EDIT_COUNT + 1))
+    # EDIT_COUNT="0"
     
     # Create updated comment with edit history
-    UPDATED_COMMENT="### Last Update (Edit #$EDIT_COUNT)
-
-$GENERATED_COMMENT
+    echo "🔨 Creating updated comment..."
+    UPDATED_COMMENT="$GENERATED_COMMENT
 
 ---
 
@@ -242,6 +247,7 @@ $CURRENT_CONTENT
 </details>"
 
     # Update the comment
+    echo "🔨 Updating comment in $repo..."
     if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
         -X PATCH \
         -f body="$UPDATED_COMMENT"; then
@@ -295,7 +301,7 @@ fi
         "step": "Run Tests",
         "error": "Test failed: expected 200 but got 404",
         "file": "tests/api_test.go",
-        "line": "42"
+        "line": "42",
     }
 ]""",
             required=True
@@ -347,7 +353,7 @@ fi
     ],
 ).register("github")
 
-pr_review = GitHubCliTool(
+github_pr_review = GitHubCliTool(
     name="github_pr_review",
     description="Add a review to a pull request.",
     content="""
@@ -366,7 +372,7 @@ echo "✅ Review submitted successfully!"
     ],
 ).register("github")
 
-pr_diff = GitHubCliTool(
+github_pr_diff = GitHubCliTool(
     name="github_pr_diff",
     description="View the diff of a pull request.",
     content="""
@@ -380,7 +386,7 @@ gh pr diff --repo $repo $number
     ],
 ).register("github")
 
-pr_ready = GitHubCliTool(
+github_pr_ready = GitHubCliTool(
     name="github_pr_ready",
     description="Mark a pull request as ready for review.",
     content="""
@@ -395,7 +401,7 @@ echo "✅ Pull request is now ready for review!"
     ],
 ).register("github")
 
-pr_checks = GitHubCliTool(
+github_pr_checks = GitHubCliTool(
     name="github_pr_checks",
     description="View status checks for a pull request.",
     content="""
@@ -409,7 +415,7 @@ gh pr checks --repo $repo $number
     ],
 ).register("github")
 
-pr_files = GitHubCliTool(
+github_pr_files = GitHubCliTool(
     name="github_pr_files",
     description="List files changed in a pull request.",
     content="""
@@ -423,7 +429,7 @@ gh pr diff --repo $repo $number --name-only
     ],
 ).register("github")
 
-pr_assign = GitHubCliTool(
+github_pr_assign = GitHubCliTool(
     name="github_pr_assign",
     description="Assign a pull request to a github user",
     content="""
@@ -440,7 +446,7 @@ echo "✅ Pull request assigned successfully!"
     ],
 ).register("github")
 
-pr_add_reviewer = GitHubCliTool(
+github_pr_add_reviewer = GitHubCliTool(
     name="github_add_reviewer",
     description="Add a reviewer to a pull request",
     content="""
@@ -458,4 +464,4 @@ echo "✅ Reviewer added successfully!"
 ).register("github")
 
 # Export all PR tools
-__all__ = ['pr_comment', 'pr_create', 'pr_review', 'pr_diff', 'pr_ready']
+__all__ = ['github_pr_comment', 'github_pr_create', 'github_pr_review', 'github_pr_diff', 'github_pr_ready']
