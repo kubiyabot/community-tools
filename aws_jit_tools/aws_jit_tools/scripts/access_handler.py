@@ -50,7 +50,7 @@ from scripts.utils.notifications import NotificationManager
 from scripts.utils.aws_utils import get_account_alias, get_permission_set_details
 from scripts.utils.slack_messages import create_access_revoked_blocks
 from scripts.utils.webhook_handler import WebhookHandler
-from .config_loader import get_access_configs, get_s3_configs
+from scripts.config_loader import get_access_configs, get_s3_configs
 
 def print_progress(message: str, emoji: str) -> None:
     """Print progress messages with emoji."""

@@ -158,13 +158,22 @@ export BUCKETS="{','.join(bucket['name'] for bucket in config['buckets'])}"
 export POLICY_TEMPLATE="{config['policy_template']}"
 export MAX_DURATION="{config['session_duration']}"
 
+# Create python package structure
+mkdir -p /opt/scripts/utils
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
+
+# Set PYTHONPATH to include the scripts directory
+export PYTHONPATH="/opt:$PYTHONPATH"
 
 # Run access handler for each bucket in the configuration
 for bucket in {' '.join(bucket['name'] for bucket in config['buckets'])}; do
     echo "Processing bucket: $bucket"
-    python /opt/scripts/access_handler.py {action} --user-email {"$KUBIYA_USER_EMAIL" if action == "grant" else "{{.user_email}}"} --bucket-name "$bucket" {"--duration {{.duration}}" if action == "grant" else ""}
+    python /opt/scripts/access_handler.py {action} \\
+        --user-email {"$KUBIYA_USER_EMAIL" if action == "grant" else "{{.user_email}}"} \\
+        --bucket-name "$bucket" \\
+        --type s3 \\
+        {"--duration {{.duration}}" if action == "grant" else ""}
 done
 """,
         with_files=file_specs,
