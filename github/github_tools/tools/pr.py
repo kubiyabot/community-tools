@@ -188,6 +188,8 @@ done
 # # Update run details with PR context
 # RUN_DETAILS=$(printf '%s' "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
 
+echo $run_details
+
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
