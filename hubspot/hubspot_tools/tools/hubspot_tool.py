@@ -67,11 +67,16 @@ if [ -z "$HUBSPOT_ACCESS_TOKEN" ]; then
     exit 1
 fi
 
+# Create and activate virtual environment
+echo "📦 Creating virtual environment..."
+python -m venv /tmp/venv
+. /tmp/venv/bin/activate
+
 echo "📦 Installing dependencies..."
-pip install -q hubspot-api-client>=8.1.0
+pip install hubspot-api-client>=8.1.0
 
 echo "🚀 Running HubSpot operation..."
-python3 /opt/scripts/hubspot_runner.py
+python /opt/scripts/hubspot_runner.py
 """
 
     def prepare(self) -> None:

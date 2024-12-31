@@ -37,17 +37,24 @@ class ContactsTool(Tool):
         return """#!/bin/sh
 set -e
 
+echo "🔧 Setting up HubSpot operation environment..."
+
 # Validate environment
 if [ -z "$HUBSPOT_ACCESS_TOKEN" ]; then
     echo "❌ HUBSPOT_ACCESS_TOKEN environment variable is required"
     exit 1
 fi
 
-# Install dependencies
-pip install -q hubspot-api-client>=8.1.0
+# Create and activate virtual environment
+echo "📦 Creating virtual environment..."
+python -m venv /tmp/venv
+. /tmp/venv/bin/activate
 
-# Run operation
-python3 /opt/scripts/hubspot_runner.py
+echo "📦 Installing dependencies..."
+pip install --no-cache-dir hubspot-api-client>=8.1.0
+
+echo "🚀 Running HubSpot operation..."
+python /opt/scripts/hubspot_runner.py
 """
 
     def _get_operations_script(self) -> str:
