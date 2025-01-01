@@ -49,7 +49,7 @@ class InstEnvAPI:
 
     def analyze_failure(self, failed_run: Dict) -> str:
         """Analyze failure using OpenAI."""
-        openai.api_key = os.environ["OPENAI_API_KEY"]
+        openai.api_key = os.environ["OPENAI_AI_API_KEY_1"]
         if os.environ.get("OPENAI_API_BASE"):
             openai.api_base = os.environ["OPENAI_API_BASE"]
 

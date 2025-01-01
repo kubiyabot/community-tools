@@ -35,7 +35,7 @@ def create_failure_analysis_tool():
 
     secrets = [
         "INSTENV_API_KEY",
-        "OPENAI_API_KEY",
+        "OPENAI_AI_API_KEY_1",
         "SLACK_API_TOKEN"  # Required for Slack notifications
     ]
 
