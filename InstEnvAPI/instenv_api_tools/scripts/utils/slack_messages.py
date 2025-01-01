@@ -1,101 +1,84 @@
 import os
 import logging
 import requests
+from typing import List, Dict
+
+logger = logging.getLogger(__name__)
 
 class SlackMessage:
-    def __init__(self, channel, thread_ts=None):
+    def __init__(self, channel: str = None):
+        """Initialize Slack message handler."""
         self.channel = channel or os.getenv('SLACK_CHANNEL_ID')
-        self.thread_ts = os.getenv('SLACK_THREAD_TS') or thread_ts
-        self.blocks = []
-        self.api_key = os.getenv('SLACK_API_TOKEN')
-        self.message_ts = None  # To store the timestamp of the message
+        self.api_token = os.getenv('SLACK_API_TOKEN')
+        self.thread_ts = os.getenv('SLACK_THREAD_TS')
 
-    def send_initial_message(self, blocks):
-        self.blocks = blocks
-        response = self.send_message()
-        if response and 'ts' in response:
-            self.message_ts = response['ts']
-        else:
-            print(f"Failed to send message. Response: {response}")
+    def send_message(self, blocks: List[Dict]) -> bool:
+        """Send a Slack message with blocks."""
+        if not self.api_token:
+            logger.warning("No SLACK_API_TOKEN set. Slack messages will not be sent.")
+            return False
 
-    def update_message(self):
-        self.send_message(update=True)
-
-    def send_message(self, update=False):
-        if not self.api_key:
-            if os.getenv('KUBIYA_DEBUG'):
-                print("No SLACK_API_TOKEN set. Slack messages will not be sent.")
-            return None
-
-        payload = {
-            "channel": self.channel,
-            "blocks": self.blocks
-        }
-        if self.thread_ts:
-            payload["thread_ts"] = self.thread_ts
-
-        url = "https://slack.com/api/chat.postMessage"
-        if update and self.message_ts:
-            payload["ts"] = self.message_ts
-            url = "https://slack.com/api/chat.update"
-
-        response = requests.post(
-            url,
-            headers={
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {self.api_key}'
-            },
-            json=payload
-        )
-        if response.status_code >= 300:
-            if os.getenv('KUBIYA_DEBUG'):
-                print(f"Error sending Slack message: {response.status_code} - {response.text}")
-            return None
-        else:
-            return response.json()
-    
-    def search_messages(self, query, channel=None, max_pages=None):
-        if not query:
-            return None  # Return None immediately if no query is provided
-
-        url = "https://slack.com/api/search.messages"
-        results = []
-        page = 1
-
-        while True:
-            params = {
-                "query": query,
-                "token": self.api_key,
-                "page": page
-            }
-            if channel:
-                params["channel"] = channel
-
-            response = requests.get(
-                url,
-                headers={'Authorization': f'Bearer {self.api_key}'},
-                params=params
+        try:
+            response = requests.post(
+                "https://slack.com/api/chat.postMessage",
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {self.api_token}'
+                },
+                json={
+                    "channel": self.channel,
+                    "thread_ts": self.thread_ts,
+                    "blocks": blocks
+                }
             )
-            data = response.json()
+            
+            if response.status_code >= 300:
+                logger.error(f"Error sending Slack message: {response.status_code} - {response.text}")
+                return False
 
-            if not data.get('ok', False):  # Check if response is not OK
-                if os.getenv('KUBIYA_DEBUG'):
-                    print(f"Error from Slack API: {data.get('error', 'Unknown error')}")
-                return None  # Return None to indicate an error
+            return True
 
-            results.extend(data['messages']['matches'])
-            page_count = data['messages']['pagination']['page_count']
-            if page >= page_count or (max_pages and page >= max_pages):
-                break
-            page += 1
+        except Exception as e:
+            logger.error(f"Failed to send Slack message: {e}")
+            return False
 
-        return results
+    def send_analysis_results(self, analysis_results: List[Dict]) -> bool:
+        """Send analysis results to Slack."""
+        blocks = [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "🔍 Environment Failure Analysis",
+                    "emoji": True
+                }
+            }
+        ]
 
-    def extract_texts(self, query, channel=None, max_pages=None):
-        search_results = self.search_messages(query, channel, max_pages)
-        
-        if search_results is None:
-            return []  # Return an empty list if there's an error in search or no results
-        
-        texts = [result['text'] for result in search_results if 'text' in result]
-        return texts 
+        for result in analysis_results:
+            blocks.extend([
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Reason:*\n{result.reason}"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*How to Fix:*\n{result.how_to_fix}"
+                    }
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"*Suggested Changes:*\n{result.suggested_payload_changes}"
+                    }
+                },
+                {"type": "divider"}
+            ])
+
+        return self.send_message(blocks) 

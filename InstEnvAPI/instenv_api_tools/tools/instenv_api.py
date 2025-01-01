@@ -1,12 +1,22 @@
 from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import FileSpec, Arg
+from kubiya_sdk.tools.models import Tool, FileSpec, Arg
 from pathlib import Path
-from .base import InstEnvTool
 
-# Get script contents
+# Tool icon and constants
+INSTENV_ICON = "https://www.appnovation.com/sites/default/files/2019-06/partnerlogo_Atlassian.svg"
+
+# Script paths
 SCRIPT_DIR = Path(__file__).parent.parent / 'scripts'
-with open(SCRIPT_DIR / 'api_client.py') as f:
-    API_CLIENT_CODE = f.read()
+
+# Load script contents
+def load_script(name: str) -> str:
+    with open(SCRIPT_DIR / name) as f:
+        return f.read()
+
+# Load all required scripts
+API_CLIENT = load_script('api_client.py')
+SLACK_MESSAGES = load_script('utils/slack_messages.py')
+LOG_ANALYZER = load_script('utils/log_analyzer.py')
 
 def create_failure_analysis_tool():
     """Create a tool to analyze environment failure logs."""
@@ -17,26 +27,23 @@ def create_failure_analysis_tool():
             required=True)
     ]
 
-    # Define required environment variables
     env = [
-        "OPENAI_API_BASE",      # API base for OpenAI
-        "SLACK_CHANNEL_ID",     # Slack channel ID
-        "SLACK_THREAD_TS"       # Slack thread timestamp (optional)
+        "OPENAI_API_BASE",
+        "SLACK_CHANNEL_ID",
+        "SLACK_THREAD_TS",
+        "KUBIYA_USER_EMAIL"
     ]
 
-    # Define secrets
     secrets = [
-        "INSTENV_API_KEY",      # API key for InstEnv
-        "OPENAI_API_KEY",       # API key for OpenAI
-        "SLACK_API_TOKEN",      # API token for Slack
+        "INSTENV_API_KEY",
+        "OPENAI_API_KEY",
+        "SLACK_API_TOKEN"
     ]
 
     file_specs = [
-        FileSpec(destination="/opt/scripts/api_client.py", content=API_CLIENT_CODE),
-        FileSpec(destination="/opt/scripts/utils/slack_messages.py", 
-                content=open(SCRIPT_DIR / 'utils' / 'slack_messages.py').read()),
-        FileSpec(destination="/opt/scripts/utils/log_analyzer.py",
-                content=open(SCRIPT_DIR / 'utils' / 'log_analyzer.py').read()),
+        FileSpec(destination="/opt/scripts/api_client.py", content=API_CLIENT),
+        FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=SLACK_MESSAGES),
+        FileSpec(destination="/opt/scripts/utils/log_analyzer.py", content=LOG_ANALYZER)
     ]
 
     mermaid_diagram = """
@@ -59,12 +66,12 @@ def create_failure_analysis_tool():
         T-->>-U: Analysis Complete
     """
 
-    return InstEnvTool(
+    return Tool(
         name="analyze_env_failure_logs",
         description="Analyzes environment failure logs and provides suggestions to fix issues",
-        args=args,
-        env=env,
-        secrets=secrets,  # Add secrets definition
+        icon_url=INSTENV_ICON,
+        type="docker",
+        image="python:3.11",
         content="""#!/bin/bash
 set -e
 echo ">> Processing request... ⏳"
@@ -72,23 +79,22 @@ echo ">> Processing request... ⏳"
 # Install dependencies
 pip install -q requests openai slack_sdk litellm pydantic
 
-# Create python package structure
-mkdir -p /opt/scripts/utils
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
 
 # Run the script
 python /opt/scripts/api_client.py --env_id {{.environment_id}}
 """,
+        args=args,
+        env=env,
+        secrets=secrets,
         with_files=file_specs,
-        mermaid=mermaid_diagram,
-        image="python:3.11"
+        mermaid=mermaid_diagram
     )
 
-# Create and register tools
-try:
-    tool = create_failure_analysis_tool()
-    tool_registry.register("instenv_api", tool)
-except Exception as e:
-    print(f"Error creating tools: {e}")
-    raise 
+# Create and register tool
+analyze_env_failure_logs = create_failure_analysis_tool()
+tool_registry.register("instenv_api", analyze_env_failure_logs)
+
+# Export only the tool instance
+__all__ = ['analyze_env_failure_logs'] 
