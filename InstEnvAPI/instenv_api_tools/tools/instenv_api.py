@@ -30,14 +30,13 @@ def create_failure_analysis_tool():
     env = [
         "OPENAI_API_BASE",
         "SLACK_CHANNEL_ID",
-        "SLACK_THREAD_TS",
-        "KUBIYA_USER_EMAIL"
+        "INSTENV_API_BASE"  # Base URL for InstEnv API (e.g., https://dev.instenv-ui.internal.atlassian.com/api/v1)
     ]
 
     secrets = [
         "INSTENV_API_KEY",
         "OPENAI_API_KEY",
-        "SLACK_API_TOKEN"
+        "SLACK_API_TOKEN"  # Required for Slack notifications
     ]
 
     file_specs = [

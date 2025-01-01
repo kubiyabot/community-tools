@@ -7,16 +7,17 @@ from typing import Dict, Optional
 from utils.slack_messages import SlackMessage
 from utils.log_analyzer import analyze_logs_with_llm
 
-INSTENV_API_BASE_DEFAULT_ENDPOINT = "https://dev.instenv-ui.internal.atlassian.com/api/v1"
 INSTENV_LOG_TAIL_LINES = 200
 
 class InstEnvAPI:
     __env_cached_response: Optional[Dict] = None
 
-    def __init__(self, env_id, api_key, api_base_endpoint=None):
+    def __init__(self, env_id, api_key):
         self.env_id = env_id
         self.api_key = api_key
-        self.api_base_endpoint = api_base_endpoint or INSTENV_API_BASE_DEFAULT_ENDPOINT
+        self.api_base_endpoint = os.getenv('INSTENV_API_BASE')
+        if not self.api_base_endpoint:
+            raise ValueError("INSTENV_API_BASE environment variable is required")
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
