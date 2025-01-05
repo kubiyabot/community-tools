@@ -17,32 +17,25 @@ class EnforcerConfigBuilder:
     @staticmethod
     def parse_config(config: Optional[Dict[str, Any]] = None):
         """Parse configuration settings for Enforcer"""
-        
-        settings = type("EnforcerSettings", (), {})()
-        settings.idp_provider = "kubiya"  # Default IDP provider
-        group_name = os.getenv("KUBIYA_GROUP_NAME")
-        settings.org = os.getenv("KUBIYA_USER_ORG")
-        settings.runner = os.getenv("KUBIYA_RUNNER_NAME", "")
-        
-        print("====================================\n")
-        print(f"KUBIYA_USER_ORG: ${os.getenv("KUBIYA_USER_ORG")}\n")
-        print(f"KUBIYA_GROUP_NAME: ${os.getenv("KUBIYA_GROUP_NAME")}\n")
-        print(f"KUBIYA_RUNNER_NAME: ${os.getenv("KUBIYA_RUNNER_NAME")}\n")
-        print("====================================\n")
-
-        if settings.runner == "":
-            items = str.split(group_name, ".")
-            if len(items) >= 2:
-                settings.runner = items[1]
-
-        settings.policy = config.get("opa_default_policy")
-        if not settings.policy:
-            raise ConfigurationError(f"Missing required field: opa_default_policy")
 
         if not config:
             raise ConfigurationError(
-                "No configuration provided. opa_default_policy is required."
+                "No configuration provided. enfrocer dynamic config is required."
             )
+
+        settings = type("EnforcerSettings", (), {})()
+        
+        settings.idp_provider = "kubiya"  # Default IDP provider
+        settings.runner = config.get("runner")
+        settings.org = os.getenv("KUBIYA_USER_ORG")
+        settings.policy = config.get("opa_default_policy")
+        
+        
+        if not settings.runner:
+            raise ConfigurationError(f"Missing required field: runner")
+
+        if not settings.policy:
+            raise ConfigurationError(f"Missing required field: opa_default_policy")
 
         # Try to load the config as a JSON object if it's a string
         if isinstance(config, str):

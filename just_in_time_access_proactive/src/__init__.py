@@ -14,4 +14,6 @@ print("Loading JIT tools module...")
 initialize()
 
 # Import tools after initialization
-from .tools import *
+from . import tools
+
+__all__ = ['tools']

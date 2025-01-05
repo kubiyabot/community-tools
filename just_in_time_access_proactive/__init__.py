@@ -1,4 +1,4 @@
-from .jit_tools.tools import (
+from .src.tools import (
     approve_access_tool,
     request_access_tool,
     describe_access_request_tool,
