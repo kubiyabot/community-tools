@@ -40,5 +40,5 @@ view_user_requests_tool = JustInTimeAccessTool(
     ],
 )
 
-tool_registry.register("just_in_time_access", view_user_requests_tool)
-__all__ = ['view_user_requests_tool'] 
+# tool_registry.register("just_in_time_access", view_user_requests_tool)
+# __all__ = ['view_user_requests_tool'] 

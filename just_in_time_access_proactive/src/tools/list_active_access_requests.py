@@ -32,6 +32,6 @@ list_active_access_requests_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-tool_registry.register("just_in_time_access", list_active_access_requests_tool)
+# tool_registry.register("just_in_time_access", list_active_access_requests_tool)
 
-__all__ = ["list_active_access_requests_tool"]
+# __all__ = ["list_active_access_requests_tool"]

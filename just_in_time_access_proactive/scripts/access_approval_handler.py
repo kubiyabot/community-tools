@@ -322,6 +322,5 @@ if __name__ == "__main__":
     request_id = sys.argv[1]
     approval_action = sys.argv[2]
     ttl = sys.argv[3] if len(sys.argv) > 3 else None
-    print(f"id: {request_id}, action: {approval_action}, ttl: {ttl}")
-
-    # approve_access(request_id, approval_action, ttl)
+    
+    approve_access(request_id, approval_action, ttl)

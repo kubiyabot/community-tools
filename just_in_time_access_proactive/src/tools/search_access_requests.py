@@ -45,5 +45,5 @@ search_access_requests_tool = JustInTimeAccessTool(
     ],
 )
 
-tool_registry.register("just_in_time_access", search_access_requests_tool)
-__all__ = ['search_access_requests_tool'] 
+# tool_registry.register("just_in_time_access", search_access_requests_tool)
+# __all__ = ['search_access_requests_tool'] 

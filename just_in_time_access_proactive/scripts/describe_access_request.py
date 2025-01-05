@@ -23,5 +23,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     request_id = sys.argv[1]
-    print(f"id: {request_id}")
-    # describe_access_request(request_id)
+    describe_access_request(request_id)

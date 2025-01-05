@@ -45,5 +45,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     user_email = sys.argv[1]
-    # view_user_requests(user_email)
-    print(f"user_email: {user_email}")
+    view_user_requests(user_email)
