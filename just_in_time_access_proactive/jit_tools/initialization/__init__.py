@@ -16,23 +16,15 @@ class EnforcerConfigBuilder:
         """Parse configuration settings for Enforcer"""
         settings = type('EnforcerSettings', (), {})()
         settings.idp_provider = 'kubiya'  # Default IDP provider
+        settings.org = os.getenv("KUBIYA_USER_ORG", "")
+        settings.runner = os.getenv("KUBIYA_RUNNER_NAME", "")
         
-        
-        settings.org = config.get('org')
-        if not settings.org:
-            raise ConfigurationError(f"Missing required field: org")
-        
-        settings.policy = config.get('policy')
+        settings.policy = config.get('opa_default_policy')
         if not settings.policy:
-            raise ConfigurationError(f"Missing required field: policy")
+            raise ConfigurationError(f"Missing required field: opa_default_policy")
         
-        settings.runner = config.get('runner')
-        if not settings.runner:
-            raise ConfigurationError(f"Missing required field: runner")
-        
-
         if not config:
-            raise ConfigurationError("No configuration provided. opal_policy_url is required.")
+            raise ConfigurationError("No configuration provided. opa_default_policy is required.")
 
         # Try to load the config as a JSON object if it's a string
         if isinstance(config, str):
@@ -43,11 +35,6 @@ class EnforcerConfigBuilder:
                 raise ConfigurationError("Invalid configuration format")
 
         print(f"📝 Processing configuration: {config}")
-
-        # Optional: Git deploy key
-        settings.git_deploy_key = config.get('git_deploy_key')
-        if settings.git_deploy_key:
-            print("✅ Git deploy key configuration detected")
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint', 
@@ -113,8 +100,8 @@ def initialize():
         # Set environment variables for shell script
         # Required settings
         os.environ['BS64_ORG_NAME'] = base64.b64encode(settings.org).decode()
-        os.environ['BS64_OPA_POLICY'] = base64.b64encode(settings.policy).decode()
         os.environ['BS64_RUNNER_NAME'] = base64.b64encode(settings.runner).decode()
+        os.environ['BS64_OPA_DEFAULT_POLICY'] = base64.b64encode(settings.opa_default_policy).decode()
 
         # DataBricks API Key (optional)
         if settings.dd_api_key:
