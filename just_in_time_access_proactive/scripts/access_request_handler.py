@@ -53,5 +53,6 @@ def send_approval_request(request_id: str, ttl: str):
 if __name__ == "__main__":
     request_id = sys.argv[1]
     ttl = sys.argv[2] if len(sys.argv) > 2 else "1h"
+    print(f"id: {request_id}, ttl: {ttl}")
 
-    send_approval_request(request_id=request_id, ttl=ttl)
+    # send_approval_request(request_id=request_id, ttl=ttl)

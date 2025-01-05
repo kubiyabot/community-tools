@@ -101,10 +101,10 @@ approve_access_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-tool_registry.register("just_in_time_access", approve_access_tool)
+# tool_registry.register("just_in_time_access", approve_access_tool)
 
 # Export the tool
-__all__ = ["approve_access_tool"]
+# __all__ = ["approve_access_tool"]
 
 # Make sure the tool is available at module level
-globals()["approve_access_tool"] = approve_access_tool
+# globals()["approve_access_tool"] = approve_access_tool

@@ -81,6 +81,6 @@ request_access_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-tool_registry.register("just_in_time_access", request_access_tool)
+# tool_registry.register("just_in_time_access", request_access_tool)
 
-__all__ = ["request_access_tool"]
+# __all__ = ["request_access_tool"]

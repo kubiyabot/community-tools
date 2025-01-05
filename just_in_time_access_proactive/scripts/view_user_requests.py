@@ -5,16 +5,21 @@ try:
 except ImportError:
     # During discovery phase, sqlite3 might not be available
     pass
+
+
 def view_user_requests(user_email):
-    conn = sqlite3.connect('/var/lib/database/access_requests.db')
+    conn = sqlite3.connect("/var/lib/database/access_requests.db")
     cursor = conn.cursor()
 
-    cursor.execute('''
+    cursor.execute(
+        """
         SELECT request_id, tool_name, tool_params, ttl, status
         FROM requests 
         WHERE user_email=?
         ORDER BY request_id DESC
-    ''', (user_email,))
+    """,
+        (user_email,),
+    )
     rows = cursor.fetchall()
 
     if not rows:
@@ -33,10 +38,12 @@ def view_user_requests(user_email):
 
     conn.close()
 
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: view_user_requests.py <user_email>")
         sys.exit(1)
 
     user_email = sys.argv[1]
-    view_user_requests(user_email) 
+    # view_user_requests(user_email)
+    print(f"user_email: {user_email}")
