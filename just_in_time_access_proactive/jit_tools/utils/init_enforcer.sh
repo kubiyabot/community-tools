@@ -71,35 +71,33 @@ if kubectl get deployment enforcer -n kubiya &> /dev/null; then
     kubectl delete deployment enforcer -n kubiya
     check_command "Failed to remove existing deployment" "Existing deployment removed"
 fi
-if kubectl get secret opawatchdog-secrets -n kubiya &> /dev/null; then
-    kubectl delete secret opawatchdog-secrets -n kubiya
+if kubectl get secret enforcer -n kubiya &> /dev/null; then
+    kubectl delete secret enforcer -n kubiya
 fi
 
 # Build base secret data
 SECRET_DATA=$(cat <<EOF
-  POSTGRES_DB: cG9zdGdyZXM=
-  POSTGRES_USER: cG9zdGdyZXM=
-  POSTGRES_PASSWORD: cG9zdGdyZXM=
-  OPAL_POLICY_REPO_URL: $OPAL_POLICY_REPO_URL_B64
-  OPAL_POLICY_REPO_MAIN_BRANCH: $OPAL_POLICY_REPO_MAIN_BRANCH_B64
+  ORG_NAME: $BS64_ORG_NAME
+  RUNNER_NAME: $BS64_RUNNER_NAME
+  OPA_DEFAULT_POLICY: $BS64_OPA_POLICY
 EOF
 )
 
 # Add DataDog API key if provided
-if [ ! -z "$DATA_DOG_API_KEY_BASE64" ]; then
+if [ ! -z "$BS64_DATA_DOG_API_KEY" ]; then
     SECRET_DATA+=$(cat <<EOF
 
-  DD_API_KEY: $DATA_DOG_API_KEY_BASE64
+  DD_API_KEY: $BS64_DATA_DOG_API_KEY
 EOF
 )
     log "✅ Added DD_API_KEY to configuration"
 fi
 
 # Add DataDog site if provided
-if [ ! -z "$DATA_DOG_SITE_BASE64" ]; then
+if [ ! -z "$BS64_DATA_DOG_SITE" ]; then
     SECRET_DATA+=$(cat <<EOF
 
-  DD_SITE: $DATA_DOG_SITE_BASE64
+  DD_SITE: $BS64_DATA_DOG_SITE
 EOF
 )
     log "✅ Added DD_SITE to configuration"
@@ -109,10 +107,10 @@ fi
 if [ "$IDP_PROVIDER" = "okta" ]; then
     SECRET_DATA+=$(cat <<EOF
 
-  OKTA_BASE_URL: $OKTA_BASE_URL_B64
-  OKTA_TOKEN_ENDPOINT: $OKTA_TOKEN_ENDPOINT_B64
-  OKTA_CLIENT_ID: $OKTA_CLIENT_ID_B64
-  private.pem: $PRIVATE_KEY_B64
+  OKTA_BASE_URL: $BS64_OKTA_BASE_URL
+  OKTA_TOKEN_ENDPOINT: $BS64_OKTA_TOKEN_ENDPOINT
+  OKTA_CLIENT_ID: $BS64_OKTA_CLIENT_ID
+  OKTA_PRIVATE_KEY: $BS64_PRIVATE_KEY
 EOF
 )
     log "✅ Added Okta configuration"
@@ -121,17 +119,17 @@ EOF
             - name: OKTA_BASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: OKTA_BASE_URL
             - name: OKTA_TOKEN_ENDPOINT
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: OKTA_TOKEN_ENDPOINT
             - name: OKTA_CLIENT_ID
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: OKTA_CLIENT_ID
             - name: OKTA_PRIVATE_KEY
               value: /etc/okta/private.pem
@@ -143,7 +141,7 @@ EOF
             - name: DD_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: DD_API_KEY"
     fi
     
@@ -152,7 +150,7 @@ EOF
             - name: DD_SITE
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: DD_SITE"
     fi
     
@@ -164,7 +162,7 @@ EOF
     ENFORCER_VOLUMES="      volumes:
         - name: private-key-volume
           secret:
-            secretName: opawatchdog-secrets"
+            secretName: enforcer"
 else
     ENFORCER_ENV="          env:
             - name: IDP_PROVIDER_NAME
@@ -175,7 +173,7 @@ else
             - name: DD_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: DD_API_KEY"
     fi
     
@@ -184,56 +182,13 @@ else
             - name: DD_SITE
               valueFrom:
                 secretKeyRef:
-                  name: opawatchdog-secrets
+                  name: enforcer
                   key: DD_SITE"
     fi
     
     ENFORCER_VOLUME_MOUNTS=""
     ENFORCER_VOLUMES=""
 fi
-
-# Build OPA server environment variables
-OPA_ENV="            - name: OPAL_BROADCAST_URI
-              value: postgres://postgres:postgres@localhost:5432/postgres
-            - name: UVICORN_NUM_WORKERS
-              value: \"4\"
-            - name: OPAL_OPA_HEALTH_CHECK_POLICY_ENABLED
-              value: \"true\"
-            - name: OPAL_POLICY_REPO_URL
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: OPAL_POLICY_REPO_URL
-            - name: OPAL_POLICY_REPO_MAIN_BRANCH
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: OPAL_POLICY_REPO_MAIN_BRANCH"
-
-# Add Git deploy key to OPA server if provided
-if [ ! -z "$GIT_DEPLOY_KEY_BS64" ]; then
-    SECRET_DATA+=$(cat <<EOF
-
-  GIT_DEPLOY_KEY: $GIT_DEPLOY_KEY_BS64
-EOF
-)
-    OPA_ENV+="
-            - name: OPAL_POLICY_REPO_SSH_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: GIT_DEPLOY_KEY"
-    log "✅ Added Git deploy key to OPA configuration"
-fi
-
-# Add remaining OPA configuration
-OPA_ENV+="
-            - name: OPAL_POLICY_REPO_POLLING_INTERVAL
-              value: \"30\"
-            - name: OPAL_DATA_CONFIG_SOURCES
-              value: '{\"config\":{\"entries\":[{\"url\":\"http://localhost:7002/policy-data\",\"topics\":[\"policy_data\"],\"dst_path\":\"/static\"}]}}'
-            - name: OPAL_LOG_FORMAT_INCLUDE_PID
-              value: \"true\""
 
 # Deploy configuration
 log "Deploying Enforcer components..."
@@ -242,7 +197,7 @@ cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Secret
 metadata:
-  name: opawatchdog-secrets
+  name: enforcer
   namespace: kubiya
 type: Opaque
 data:
@@ -264,47 +219,8 @@ spec:
         app: enforcer
     spec:
       containers:
-        - name: broadcast-kubiya
-          image: postgres:alpine
-          env:
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: opawatchdog-secrets
-                  key: POSTGRES_PASSWORD
-          ports:
-            - containerPort: 5432
-        - name: opa-server-kubiya
-          image: permitio/opal-server:latest
-          env:
-$OPA_ENV
-          ports:
-            - containerPort: 7002
-        - name: opal-client-kubiya
-          image: permitio/opal-client:latest
-          env:
-            - name: OPAL_SERVER_URL
-              value: http://localhost:7002
-            - name: OPAL_LOG_FORMAT_INCLUDE_PID
-              value: "true"
-            - name: OPAL_INLINE_OPA_LOG_FORMAT
-              value: http
-          ports:
-            - containerPort: 7000
-            - containerPort: 8181
-          command: ["sh", "-c", "./wait-for.sh localhost:7002 --timeout=20 -- ./start.sh"]
         - name: enforcer
-          image: ghcr.io/kubiyabot/opawatchdog
+          image: ghcr.io/kubiyabot/opawatchdog:3139ef77bbd3fb71a1fcc60bacc8eab79fb52d70
 $ENFORCER_ENV
           ports:
             - containerPort: 5001

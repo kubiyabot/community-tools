@@ -16,6 +16,20 @@ class EnforcerConfigBuilder:
         """Parse configuration settings for Enforcer"""
         settings = type('EnforcerSettings', (), {})()
         settings.idp_provider = 'kubiya'  # Default IDP provider
+        
+        
+        settings.org = config.get('org')
+        if not settings.org:
+            raise ConfigurationError(f"Missing required field: org")
+        
+        settings.policy = config.get('policy')
+        if not settings.policy:
+            raise ConfigurationError(f"Missing required field: policy")
+        
+        settings.runner = config.get('runner')
+        if not settings.runner:
+            raise ConfigurationError(f"Missing required field: runner")
+        
 
         if not config:
             raise ConfigurationError("No configuration provided. opal_policy_url is required.")
@@ -29,15 +43,6 @@ class EnforcerConfigBuilder:
                 raise ConfigurationError("Invalid configuration format")
 
         print(f"📝 Processing configuration: {config}")
-
-        # Required: Get policy repo url
-        settings.opal_policy_url = config.get('opal_policy_url')
-        if not settings.opal_policy_url:
-            raise ConfigurationError(f"Missing required field: opal_policy_url")
-
-        # Optional with default: policy branch
-        settings.opal_policy_branch = config.get('opal_policy_branch', 'main')
-        print(f"Using branch: {settings.opal_policy_branch} {'(default)' if 'opal_policy_branch' not in config else ''}")
 
         # Optional: Git deploy key
         settings.git_deploy_key = config.get('git_deploy_key')
@@ -107,28 +112,25 @@ def initialize():
 
         # Set environment variables for shell script
         # Required settings
-        os.environ['OPAL_POLICY_REPO_URL_B64'] = base64.b64encode(settings.opal_policy_url.encode()).decode()
-        os.environ['OPAL_POLICY_REPO_MAIN_BRANCH_B64'] = base64.b64encode(settings.opal_policy_branch.encode()).decode()
-
-        # Git deploy key (optional)
-        if settings.git_deploy_key:
-            os.environ['GIT_DEPLOY_KEY_BS64'] = base64.b64encode(settings.git_deploy_key.encode()).decode()
+        os.environ['BS64_ORG_NAME'] = base64.b64encode(settings.org).decode()
+        os.environ['BS64_OPA_POLICY'] = base64.b64encode(settings.policy).decode()
+        os.environ['BS64_RUNNER_NAME'] = base64.b64encode(settings.runner).decode()
 
         # DataBricks API Key (optional)
         if settings.dd_api_key:
-            os.environ['DATA_DOG_API_KEY_BASE64'] = base64.b64encode(settings.dd_api_key.encode()).decode()
+            os.environ['BS64_DATA_DOG_API_KEY'] = base64.b64encode(settings.dd_api_key.encode()).decode()
 
         # DataBricks API Key (optional)
         if settings.dd_site:
-            os.environ['DATA_DOG_SITE_BASE64'] = base64.b64encode(settings.dd_site.encode()).decode()    
+            os.environ['BS64_DATA_DOG_SITE'] = base64.b64encode(settings.dd_site.encode()).decode()    
 
         # Okta settings (optional)
         os.environ['IDP_PROVIDER'] = settings.idp_provider
         if settings.idp_provider == 'okta':
-            os.environ['OKTA_BASE_URL_B64'] = base64.b64encode(settings.okta_settings['okta_base_url'].encode()).decode()
-            os.environ['OKTA_TOKEN_ENDPOINT_B64'] = base64.b64encode(settings.okta_settings['okta_token_endpoint'].encode()).decode()
-            os.environ['OKTA_CLIENT_ID_B64'] = base64.b64encode(settings.okta_settings['okta_client_id'].encode()).decode()
-            os.environ['PRIVATE_KEY_B64'] = base64.b64encode(settings.okta_settings['okta_private_key'].encode()).decode()
+            os.environ['BS64_OKTA_BASE_URL'] = base64.b64encode(settings.okta_settings['okta_base_url'].encode()).decode()
+            os.environ['BS64_OKTA_TOKEN_ENDPOINT'] = base64.b64encode(settings.okta_settings['okta_token_endpoint'].encode()).decode()
+            os.environ['BS64_OKTA_CLIENT_ID'] = base64.b64encode(settings.okta_settings['okta_client_id'].encode()).decode()
+            os.environ['BS64_PRIVATE_KEY'] = base64.b64encode(settings.okta_settings['okta_private_key'].encode()).decode()
         
         # Apply configuration using init script
         init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_enforcer.sh')
