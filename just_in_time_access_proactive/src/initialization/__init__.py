@@ -25,9 +25,9 @@ class EnforcerConfigBuilder:
 
         settings = type("EnforcerSettings", (), {})()
         
-        settings.idp_provider = "kubiya"  # Default IDP provider
-        settings.runner = config.get("runner")
+        settings.idp_provider = "kubiya"
         settings.org = os.getenv("KUBIYA_USER_ORG")
+        settings.runner = config.get("opa_runner_name")
         settings.policy = config.get("opa_default_policy")
         
         
