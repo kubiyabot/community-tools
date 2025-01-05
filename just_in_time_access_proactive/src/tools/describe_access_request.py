@@ -11,7 +11,7 @@ from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from scripts import describe_access_request as describe_access_request_script
+from scripts import describe_access_request_handler as describe_access_request_script
 
 describe_access_request_tool = JustInTimeAccessTool(
     name="describe_access_request",
@@ -33,12 +33,12 @@ describe_access_request_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/describe_access_request.py",
-            content=inspect.getsource(describe_access_request_script),
+            content=inspect.getsource(describe_access_request_script).encode('utf-8'),
         ),
     ],
 )
 
 # Register the tool
-# tool_registry.register("just_in_time_access", describe_access_request_tool)
+tool_registry.register("just_in_time_access", describe_access_request_tool)
 
-# __all__ = ["describe_access_request_tool"]
+__all__ = ["describe_access_request_tool"]

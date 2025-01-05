@@ -10,7 +10,7 @@ from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from scripts import view_user_requests as view_user_requests_script
+from scripts import view_user_requests_handler as view_user_requests_script
 
 view_user_requests_tool = JustInTimeAccessTool(
     name="view_user_requests",
@@ -29,7 +29,7 @@ view_user_requests_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/view_user_requests.py",
-            content=inspect.getsource(view_user_requests_script),
+            content=inspect.getsource(view_user_requests_script).encode('utf-8'),
         ),
     ],
     with_volumes=[
@@ -40,5 +40,5 @@ view_user_requests_tool = JustInTimeAccessTool(
     ],
 )
 
-# tool_registry.register("just_in_time_access", view_user_requests_tool)
-# __all__ = ['view_user_requests_tool'] 
+tool_registry.register("just_in_time_access", view_user_requests_tool)
+__all__ = ['view_user_requests_tool'] 

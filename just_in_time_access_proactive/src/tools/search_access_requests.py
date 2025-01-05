@@ -10,7 +10,7 @@ from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from scripts import search_access_requests as search_requests_script
+from scripts import search_access_requests_handler as search_access_requests_script
 
 search_access_requests_tool = JustInTimeAccessTool(
     name="search_access_requests",
@@ -34,7 +34,7 @@ search_access_requests_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/search_access_requests.py",
-            content=inspect.getsource(search_requests_script),
+            content=inspect.getsource(search_access_requests_script).encode('utf-8'),
         ),
     ],
     with_volumes=[
@@ -45,5 +45,5 @@ search_access_requests_tool = JustInTimeAccessTool(
     ],
 )
 
-# tool_registry.register("just_in_time_access", search_access_requests_tool)
-# __all__ = ['search_access_requests_tool'] 
+tool_registry.register("just_in_time_access", search_access_requests_tool)
+__all__ = ['search_access_requests_tool'] 

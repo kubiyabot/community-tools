@@ -11,11 +11,7 @@ from kubiya_sdk.tools.models import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-
-# Read the approval handler script content directly from file
-scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
-with open(scripts_dir / "access_approval_handler.py", "r") as f:
-    approval_handler_content = f.read()
+from scripts import access_approval_handler as access_approval_script
 
 # Define the tool before any potential imports can occur
 approve_access_tool = JustInTimeAccessTool(
@@ -83,7 +79,7 @@ approve_access_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/access_approval_handler.py",
-            content=approval_handler_content,
+            content=inspect.getsource(access_approval_script).encode("utf-8"),
         ),
     ],
     with_volumes=[Volume(name="db_data", path="/var/lib/database")],
@@ -101,10 +97,10 @@ approve_access_tool = JustInTimeAccessTool(
 )
 
 # Register the tool
-# tool_registry.register("just_in_time_access", approve_access_tool)
+tool_registry.register("just_in_time_access", approve_access_tool)
 
 # Export the tool
-# __all__ = ["approve_access_tool"]
+__all__ = ["approve_access_tool"]
 
 # Make sure the tool is available at module level
-# globals()["approve_access_tool"] = approve_access_tool
+globals()["approve_access_tool"] = approve_access_tool
