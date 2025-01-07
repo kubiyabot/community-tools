@@ -98,6 +98,10 @@ def initialize():
         settings = EnforcerConfigBuilder.parse_config(config)
         print(f"✅ Using configuration settings: {settings.__dict__}")
 
+        os.environ['BS64_ORG_NAME'] = base64.b64encode(settings.org.encode()).decode()
+        os.environ['BS64_RUNNER_NAME'] = base64.b64encode(settings.runner.encode()).decode()
+        os.environ['BS64_OPA_DEFAULT_POLICY'] = base64.b64encode(settings.policy.encode()).decode()
+
         # DataBricks API Key (optional)
         if settings.dd_api_key:
             os.environ['BS64_DATA_DOG_API_KEY'] = base64.b64encode(settings.dd_api_key.encode()).decode()
