@@ -114,7 +114,7 @@ if [ "$IDP_PROVIDER" = "okta" ]; then
 EOF
 )
     log "✅ Added Okta configuration"
-    
+
     ENFORCER_ENV="          env:
             - name: OKTA_BASE_URL
               valueFrom:
@@ -131,11 +131,30 @@ EOF
                 secretKeyRef:
                   name: enforcer
                   key: OKTA_CLIENT_ID
+            - name: ORG_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: ORG_NAME
+            - name: RUNNER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: RUNNER_NAME
+            - name: OPA_DEFAULT_POLICY
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: OPA_DEFAULT_POLICY
             - name: OKTA_PRIVATE_KEY
               value: /etc/okta/private.pem
             - name: IDP_PROVIDER_NAME
-              value: okta"
-              
+              value: okta
+            - name: NATS_CREDS_FILE
+              value: /etc/nats/nats.creds
+            - name: NATS_ENDPOINT
+              value: tls://connect.ngs.global"
+
     if [ ! -z "$DATA_DOG_API_KEY_BASE64" ]; then
         ENFORCER_ENV+="
             - name: DD_API_KEY
@@ -144,7 +163,7 @@ EOF
                   name: enforcer
                   key: DD_API_KEY"
     fi
-    
+
     if [ ! -z "$DATA_DOG_SITE_BASE64" ]; then
         ENFORCER_ENV+="
             - name: DD_SITE
@@ -153,21 +172,49 @@ EOF
                   name: enforcer
                   key: DD_SITE"
     fi
-    
+
     ENFORCER_VOLUME_MOUNTS="          volumeMounts:
             - name: private-key-volume
               mountPath: /etc/okta/private.pem
-              subPath: private.pem"
-              
+              subPath: private.pem
+            - name: nats-creds
+              readOnly: true
+              mountPath: /etc/nats"
+
     ENFORCER_VOLUMES="      volumes:
         - name: private-key-volume
           secret:
-            secretName: enforcer"
+            secretName: enforcer
+        - name: nats-creds
+          secret:
+            secretName: nats-creds-runner
+            items:
+              - key: nats.creds
+                path: nats.creds"
 else
     ENFORCER_ENV="          env:
             - name: IDP_PROVIDER_NAME
-              value: kubiya"
-              
+              value: kubiya
+            - name: NATS_CREDS_FILE
+              value: /etc/nats/nats.creds
+            - name: NATS_ENDPOINT
+              value: tls://connect.ngs.global
+            - name: ORG_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: ORG_NAME
+            - name: RUNNER_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: RUNNER_NAME
+            - name: OPA_DEFAULT_POLICY
+              valueFrom:
+                secretKeyRef:
+                  name: enforcer
+                  key: OPA_DEFAULT_POLICY"
+
     if [ ! -z "$DATA_DOG_API_KEY_BASE64" ]; then
         ENFORCER_ENV+="
             - name: DD_API_KEY
@@ -176,7 +223,7 @@ else
                   name: enforcer
                   key: DD_API_KEY"
     fi
-    
+
     if [ ! -z "$DATA_DOG_SITE_BASE64" ]; then
         ENFORCER_ENV+="
             - name: DD_SITE
@@ -185,9 +232,18 @@ else
                   name: enforcer
                   key: DD_SITE"
     fi
-    
-    ENFORCER_VOLUME_MOUNTS=""
-    ENFORCER_VOLUMES=""
+
+    ENFORCER_VOLUME_MOUNTS="          volumeMounts:
+            - name: nats-creds
+              readOnly: true
+              mountPath: /etc/nats"
+    ENFORCER_VOLUMES="      volumes:
+        - name: nats-creds
+          secret:
+            secretName: nats-creds-runner
+            items:
+              - key: nats.creds
+                path: nats.creds"
 fi
 
 # Deploy configuration
