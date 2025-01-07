@@ -1,6 +1,6 @@
 # Kubiya Tools: Empowering AI Teammates with Extensible Functionality
 
-![image](https://gist.github.com/user-attachments/assets/89d45a18-8349-4623-871c-06ad9c481bf2)
+![image](https://github.com/user-attachments/assets/3dbc98b7-faa7-4cc5-8f5b-1b3da7866f63)
 
 Welcome to the world of Kubiya Tools! This repository contains real world tool sources which can be used with Kubiya teammates. This README will walk you through the essentials of Kubiya Tools, how they extend the capabilities of your AI Teammates, and the best practices for developing tools in the Kubiya ecosystem.
 
