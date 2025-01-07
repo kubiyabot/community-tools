@@ -11,7 +11,7 @@ from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from scripts import list_active_access_requests_handler as list_active_access_requests_script
+from scripts import list_active_access_requests as list_requests_script
 
 list_active_access_requests_tool = JustInTimeAccessTool(
     name="list_active_access_requests",
@@ -26,7 +26,7 @@ list_active_access_requests_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/list_active_access_requests.py",
-            content=inspect.getsource(list_active_access_requests_script).encode('utf-8'),
+            content=inspect.getsource(list_requests_script),
         ),
     ],
 )

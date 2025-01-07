@@ -9,7 +9,6 @@ from kubiya_sdk.tools.registry import tool_registry
 
 class ConfigurationError(Exception):
     """Custom exception for configuration related errors"""
-
     pass
 
 
@@ -17,25 +16,11 @@ class EnforcerConfigBuilder:
     @staticmethod
     def parse_config(config: Optional[Dict[str, Any]] = None):
         """Parse configuration settings for Enforcer"""
+        settings = type('EnforcerSettings', (), {})()
+        settings.idp_provider = 'kubiya'  # Default IDP provider
 
         if not config:
-            raise ConfigurationError(
-                "No configuration provided. enfrocer dynamic config is required."
-            )
-
-        settings = type("EnforcerSettings", (), {})()
-        
-        settings.idp_provider = "kubiya"
-        settings.org = os.getenv("KUBIYA_USER_ORG")
-        settings.runner = config.get("opa_runner_name")
-        settings.policy = config.get("opa_default_policy")
-        
-        
-        if not settings.runner:
-            raise ConfigurationError(f"Missing required field: runner")
-
-        if not settings.policy:
-            raise ConfigurationError(f"Missing required field: opa_default_policy")
+            raise ConfigurationError("No configuration provided is required.")
 
         # Try to load the config as a JSON object if it's a string
         if isinstance(config, str):
@@ -47,18 +32,21 @@ class EnforcerConfigBuilder:
 
         print(f"📝 Processing configuration: {config}")
 
+        settings.org = os.getenv("KUBIYA_USER_ORG")
+        settings.runner = config.get('opa_runner_name')
+        settings.policy = config.get('opa_default_policy')
+
         # Check for Okta configuration
-        okta_fields = [
-            "okta_base_url",
-            "okta_token_endpoint",
-            "okta_client_id",
-            "okta_private_key",
-        ]
-        okta_values = {field: config.get(field) for field in okta_fields}
+        okta_fields = ['okta_base_url', 'okta_token_endpoint',
+                       'okta_client_id', 'okta_private_key']
+        okta_values = {
+            field: config.get(field)
+            for field in okta_fields
+        }
 
         # If all Okta fields are present, use Okta as IDP
         if all(okta_values.values()):
-            settings.idp_provider = "okta"
+            settings.idp_provider = 'okta'
             settings.okta_settings = okta_values
             print("✅ Okta configuration detected - using Okta as IDP provider")
         elif any(okta_values.values()):
@@ -71,11 +59,11 @@ class EnforcerConfigBuilder:
             print("✅ Using kubiya IDP")
             settings.okta_settings = None
 
-        settings.dd_site = config.get("dd_site")
+        settings.dd_site = config.get('dd_site')
         if settings.dd_site:
             print("✅ DataDog site detected")
 
-        settings.dd_api_key = config.get("dd_api_key")
+        settings.dd_api_key = config.get('dd_api_key')
         if settings.dd_api_key:
             print("✅ DataDog API Key detected")
 
@@ -110,46 +98,28 @@ def initialize():
         settings = EnforcerConfigBuilder.parse_config(config)
         print(f"✅ Using configuration settings: {settings.__dict__}")
 
-        # Set environment variables for shell script
-        # Required settings
-        os.environ["BS64_ORG_NAME"] = base64.b64encode(settings.org).decode()
-        os.environ["BS64_RUNNER_NAME"] = base64.b64encode(settings.runner).decode()
-        os.environ["BS64_OPA_DEFAULT_POLICY"] = base64.b64encode(
-            settings.opa_default_policy
-        ).decode()
-
         # DataBricks API Key (optional)
         if settings.dd_api_key:
-            os.environ["BS64_DATA_DOG_API_KEY"] = base64.b64encode(
-                settings.dd_api_key.encode()
-            ).decode()
+            os.environ['BS64_DATA_DOG_API_KEY'] = base64.b64encode(settings.dd_api_key.encode()).decode()
 
         # DataBricks API Key (optional)
         if settings.dd_site:
-            os.environ["BS64_DATA_DOG_SITE"] = base64.b64encode(
-                settings.dd_site.encode()
-            ).decode()
+            os.environ['BS64_DATA_DOG_SITE'] = base64.b64encode(settings.dd_site.encode()).decode()
 
-        # Okta settings (optional)
-        os.environ["IDP_PROVIDER"] = settings.idp_provider
-        if settings.idp_provider == "okta":
-            os.environ["BS64_OKTA_BASE_URL"] = base64.b64encode(
-                settings.okta_settings["okta_base_url"].encode()
-            ).decode()
-            os.environ["BS64_OKTA_TOKEN_ENDPOINT"] = base64.b64encode(
-                settings.okta_settings["okta_token_endpoint"].encode()
-            ).decode()
-            os.environ["BS64_OKTA_CLIENT_ID"] = base64.b64encode(
-                settings.okta_settings["okta_client_id"].encode()
-            ).decode()
-            os.environ["BS64_PRIVATE_KEY"] = base64.b64encode(
-                settings.okta_settings["okta_private_key"].encode()
-            ).decode()
+            # Okta settings (optional)
+        os.environ['IDP_PROVIDER'] = settings.idp_provider
+        if settings.idp_provider == 'okta':
+            os.environ['BS64_OKTA_BASE_URL'] = base64.b64encode(
+                settings.okta_settings['okta_base_url'].encode()).decode()
+            os.environ['BS64_OKTA_TOKEN_ENDPOINT'] = base64.b64encode(
+                settings.okta_settings['okta_token_endpoint'].encode()).decode()
+            os.environ['BS64_OKTA_CLIENT_ID'] = base64.b64encode(
+                settings.okta_settings['okta_client_id'].encode()).decode()
+            os.environ['BS64_PRIVATE_KEY'] = base64.b64encode(
+                settings.okta_settings['okta_private_key'].encode()).decode()
 
         # Apply configuration using init script
-        init_script = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "utils", "init_enforcer.sh"
-        )
+        init_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils', 'init_enforcer.sh')
         print(f"🔄 Running initialization script: {init_script}")
 
         try:
