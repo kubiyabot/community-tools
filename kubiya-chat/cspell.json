@@ -1,0 +1,12 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [
+    "kubiya",
+    "tailwindcss",
+    "geist"
+  ],
+  "ignorePaths": [
+    "node_modules/**"
+  ]
+} 

@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0A0F1E;
+  --foreground: #FFFFFF;
+  --primary: #7C3AED;
+  --primary-hover: #6D28D9;
+  --border: #1E293B;
+  --muted: #94A3B8;
+  --input-bg: #1E293B;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0A0F1E] text-white antialiased;
+  }
+}
+
+/* Assistant UI overrides */
+.assistant-thread {
+  @apply h-full flex flex-col;
+}
+
+.assistant-message-list {
+  @apply flex-1 space-y-6 overflow-y-auto;
+}
+
+.assistant-message {
+  @apply max-w-4xl mx-auto px-4 py-4 rounded-lg;
+}
+
+.assistant-message-user {
+  @apply bg-[#1E293B]/50;
+}
+
+.assistant-message-assistant {
+  @apply bg-[#1E293B]/20;
+}
+
+.assistant-input-wrapper {
+  @apply px-4 py-4 border-t border-[#1E293B];
+}
+
+.assistant-input {
+  @apply w-full bg-white/5 border-0 rounded-lg px-4 py-3 text-white placeholder-[#64748B] 
+  focus:ring-1 focus:ring-[#7C3AED] focus:border-transparent;
+}
+
+.assistant-send-button {
+  @apply text-[#7C3AED] hover:text-[#6D28D9] transition-colors;
+}
+
+/* Button styles */
+.btn {
+  @apply inline-flex items-center justify-center rounded-lg transition-colors;
+}
+
+.btn-primary {
+  @apply bg-[#7C3AED] text-white hover:bg-[#6D28D9] px-3 py-1 text-xs font-medium;
+}
+
+.btn-icon {
+  @apply p-1.5 text-[#94A3B8] hover:text-white hover:bg-white/5 rounded;
+}
+
+/* Teammate styles */
+.teammate-list {
+  @apply flex-1 overflow-y-auto py-1;
+}
+
+.teammate-item {
+  @apply w-full text-left p-3 flex items-start space-x-3 hover:bg-[#1E293B] transition-colors;
+}
+
+.teammate-item-active {
+  @apply bg-[#1E293B];
+}
+
+.teammate-avatar {
+  @apply w-6 h-6 rounded bg-[#7C3AED]/20 flex items-center justify-center;
+}
+
+.teammate-initial {
+  @apply text-[#7C3AED] text-sm font-medium uppercase;
+}
+
+.teammate-info {
+  @apply flex-1 min-w-0;
+}
+
+.teammate-name {
+  @apply text-sm font-medium text-white truncate;
+}
+
+.teammate-description {
+  @apply text-xs text-[#94A3B8] truncate mt-0.5;
+}
+
+.teammate-active-indicator {
+  @apply w-1.5 h-1.5 mt-1.5 rounded-full bg-[#7C3AED];
+}
+
+/* Scrollbar Styles */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 3px;
+}
+
+/* Tool UI Styles */
+.tool-preview {
+  @apply bg-[#1E293B]/10 rounded-lg p-4 my-2 border border-[#1E293B];
+}
+
+.tool-preview-running {
+  @apply border-[#7C3AED];
+}
+
+.tool-output {
+  @apply bg-[#1E293B]/10 rounded-lg p-4 my-2 border;
+}
+
+.tool-output-success {
+  @apply border-green-500/20;
+}
+
+.tool-output-error {
+  @apply border-red-500/20;
+}
