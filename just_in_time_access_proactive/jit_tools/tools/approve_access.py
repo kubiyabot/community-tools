@@ -11,7 +11,6 @@ from kubiya_sdk.tools.models import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from ...scripts import access_request_handler as access_request_handler_script
 
 # Read the access_approval_handler script content directly from file
 scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
@@ -84,7 +83,7 @@ approve_access_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/access_approval_handler.py",
-            content=inspect.getsource(access_request_handler_script),
+            content=script_content,
         ),
     ],
     long_running=False,
