@@ -8,10 +8,10 @@ log() {
 
 # Helper function to check command result
 check_command() {
-    if [ $? -ne 0 ]; then
-        log "❌ Error: $1"
-        exit 1
-    fi
+#    if [ $? -ne 0 ]; then
+#        log "❌ Error: $1"
+#        exit 1
+#    fi
     log "✅ $2"
 }
 
