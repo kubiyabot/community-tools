@@ -178,7 +178,7 @@ def notify_user(request_id, status, user_email, approver_email):
     # Prepare the Block Kit message
     approval_status = "approved" if status == "approved" else "rejected"
     emoji = ":white_check_mark:" if status == "approved" else ":x:"
-    
+
     message = {
         "channel": user_id,
         "blocks": [
