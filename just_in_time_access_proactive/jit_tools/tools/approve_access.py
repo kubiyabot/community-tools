@@ -86,7 +86,6 @@ approve_access_tool = JustInTimeAccessTool(
             content=script_content,
         ),
     ],
-    with_volumes=[Volume(name="db_data", path="/var/lib/database")],
     long_running=False,
     mermaid="""
     sequenceDiagram
