@@ -11,7 +11,7 @@ def initialize():
 
 # Run initialization when module is imported
 print("Loading JIT tools module...")
-# initialize()
+initialize()
 
 # Import tools after initialization
 from .tools import *
