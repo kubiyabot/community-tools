@@ -68,8 +68,8 @@ fi
 # Clean up existing deployment
 log "Cleaning up existing deployment..."
 if kubectl get deployment enforcer -n kubiya &> /dev/null; then
-    kubectl delete deployment enforcer -n kubiya
     check_command "Failed to remove existing deployment" "Existing deployment removed"
+    return
 fi
 if kubectl get secret enforcer -n kubiya &> /dev/null; then
     kubectl delete secret enforcer -n kubiya
