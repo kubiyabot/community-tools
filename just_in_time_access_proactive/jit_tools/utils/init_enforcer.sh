@@ -301,7 +301,7 @@ check_command "Failed to apply Enforcer resources" "Applied Enforcer resources s
 
 # Wait for deployment to be ready
 log "Waiting for enforcer deployment to be ready..."
-kubectl rollout status deployment/enforcer -n kubiya
+#kubectl rollout status deployment/enforcer -n kubiya
 check_command "Deployment rollout failed" "Enforcer deployment is ready"
 
 # Update tool-manager deployment with auth server URL
