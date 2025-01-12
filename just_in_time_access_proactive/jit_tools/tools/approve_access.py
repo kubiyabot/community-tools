@@ -12,10 +12,10 @@ from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
 
-# Read the approval handler script content directly from file
+# Read the access_approval_handler script content directly from file
 scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
 with open(scripts_dir / "access_approval_handler.py", "r") as f:
-    approval_handler_content = f.read()
+    script_content = f.read()
 
 # Define the tool before any potential imports can occur
 approve_access_tool = JustInTimeAccessTool(
@@ -83,7 +83,7 @@ approve_access_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/access_approval_handler.py",
-            content=approval_handler_content,
+            content=script_content,
         ),
     ],
     with_volumes=[Volume(name="db_data", path="/var/lib/database")],
