@@ -8,7 +8,7 @@ import {
   ThreadPrimitive,
   type TextContentPart
 } from "@assistant-ui/react";
-import type { FC } from "react";
+import { type FC, useState, useEffect } from "react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,25 @@ import {
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
 import { cn } from "@/lib/utils";
+import { ApiKeySetup } from "@/components/ApiKeySetup";
+import Cookies from "js-cookie";
 
 export const MyThread: FC = () => {
+  const [hasApiKey, setHasApiKey] = useState(false);
+
+  useEffect(() => {
+    const apiKey = Cookies.get("kubiya_api_key");
+    setHasApiKey(!!apiKey);
+  }, []);
+
+  if (!hasApiKey) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <ApiKeySetup />
+      </div>
+    );
+  }
+
   return (
     <ThreadPrimitive.Root className="bg-background h-full">
       <ThreadPrimitive.Viewport className="flex h-full flex-col items-center overflow-y-scroll scroll-smooth bg-inherit px-4 pt-8">
@@ -91,6 +108,7 @@ const MyThreadWelcome: FC = () => {
         </div>
         
         <div className="flex gap-4 p-4 bg-card/50 rounded-lg">
+          <ApiKeySetup />
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-yellow-500/10 text-yellow-500">
             <SlackIcon className="h-4 w-4" />
             <span className="text-xs font-medium">Slack Disconnected</span>
