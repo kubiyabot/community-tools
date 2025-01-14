@@ -4,13 +4,13 @@
         "description": "Grants access to all staging RDS databases",
         "account_id": "***1775",
         "permission_set": "ECRReadOnly",
-        "session_duration": "PT1H"
+        "session_duration": "1h"
     },
     "Power User to SandBox": {
         "name": "Database Access to SandBox",
         "description": "Grants poweruser permissions on Sandbox",
         "account_id": *****29",
         "permission_set": "PowerUserAccess",
-        "session_duration": "PT1H"
+        "session_duration": "1h"
     }
 } 
