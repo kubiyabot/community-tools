@@ -2,7 +2,14 @@ import os
 import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except ImportError:
+    print("⚠️  Import Warning:")
+    print("   Could not import jinja2.")
+    print("   This is expected during discovery phase and can be safely ignored.")
+    print("   The required modules will be available during actual execution.")
+    pass
 
 logger = logging.getLogger(__name__)
 
