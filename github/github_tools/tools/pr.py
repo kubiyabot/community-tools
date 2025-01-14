@@ -196,10 +196,6 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     echo "🔨 Creating updated comment..."
     UPDATED_COMMENT="$GENERATED_COMMENT
 
----
-
-*Note: To reduce noise, this comment was edited rather than creating a new one.*
-
 <details><summary>Previous Comment</summary>
 
 $CURRENT_CONTENT

@@ -1,8 +1,9 @@
 # Workflow Status
 
-## 🔍 Workflow Details:
 {% set r_details = run_details | from_json %}
-**Workflow:** {{ workflow_name }} failed at {{ r_details.processed_at }} (UTC). **Status:** {{ r_details.status | title }}, **Conclusion:** {{ r_details.conclusion | title }}. **PR:** [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }}), **Run:** [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }}). **Author:** {{ r_details.actor }}.
+The Workflow **{{ workflow_name }}** finished at {{ r_details.processed_at }} (UTC) with status {{ r_details.status | title }}. 
+PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
+Run: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
 
 ## 🔬 Detailed Analysis
 {% for item in failures_and_fixes %}
