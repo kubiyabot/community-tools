@@ -150,46 +150,6 @@ for input in "$workflow_steps" "$failures" "$fixes" "$run_details"; do
     fi
 done
 
-# # Get PR file changes
-# echo "📂 Fetching PR file changes..."
-# PR_FILES=$(gh api "repos/$repo/pulls/$number/files" --jq '[.[] | {
-#     filename: .filename,
-#     status: .status,
-#     additions: .additions,
-#     deletions: .deletions,
-#     changes: .changes,
-#     patch: .patch,
-#     previous_filename: .previous_filename
-# }]' 2>/dev/null) || {
-#     echo "❌ Failed to fetch PR files"
-#     exit 1
-# }
-
-# # Get PR details
-# echo "ℹ️ Fetching PR details..."
-# PR_DETAILS=$(gh api "repos/$repo/pulls/$number" --jq '{
-#     title: .title,
-#     description: .body,
-#     author: .user.login,
-#     created_at: .created_at,
-#     updated_at: .updated_at,
-#     changed_files: '"$PR_FILES"',
-#     commits_count: .commits,
-#     additions: .additions,
-#     deletions: .deletions,
-#     labels: [.labels[].name],
-#     base_branch: .base.ref,
-#     head_branch: .head.ref
-# }' 2>/dev/null) || {
-#     echo "❌ Failed to fetch PR details"
-#     exit 1
-# }
-
-# # Update run details with PR context
-# RUN_DETAILS=$(printf '%s' "$run_details" | jq '. + {pr_details: '"$PR_DETAILS"'}')
-
-echo $run_details
-
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
