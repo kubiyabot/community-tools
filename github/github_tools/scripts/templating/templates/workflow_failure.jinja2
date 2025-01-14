@@ -1,14 +1,14 @@
 # Workflow Status
 
 ## 🔍 Workflow Details:
-{% set details = run_details | from_json %}
+{% set r_details = run_details | from_json %}
 - **Workflow Name:** {{ workflow_name }}
-- **Comment Added At (UTC):** {{ details.processed_at }}
-- **Status:** {{ details.status | title }}
-- **Conclusion:** {{ details.conclusion | title }}
+- **Comment Added At (UTC):** {{ r_details.processed_at }}
+- **Status:** {{ r_details.status | title }}
+- **Conclusion:** {{ r_details.conclusion | title }}
 - **Pull Request**: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
-- **Workflow Run**: [View Run](https://github.com/{{ repo }}/actions/runs/{{ details.id }})
-- **Author:** {{ details.actor }}
+- **Workflow Run**: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
+- **Author:** {{ r_details.actor }}
 - **Failed Steps:**
     {% for step in failed_steps %}
     - {{ step }}
