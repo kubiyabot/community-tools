@@ -14,6 +14,8 @@ import { ApiKeySetup } from "@/components/ApiKeySetup";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { getKubiyaConfig } from "../lib/config";
 import { TeammateSelector } from "./components/TeammateSelector";
+import { UserProfile } from "./components/UserProfile";
+import { UserProfileButton } from './components/UserProfileButton';
 
 interface TeammateConfig extends ModelConfig {
   teammate: string;
@@ -423,7 +425,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
   if (isAuthLoading || isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0F172A] to-[#1E293B]">
-        <div className="animate-spin rounded-full h-12 w-12 border-3 border-[#7C3AED] border-t-transparent mb-6"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent mb-6"></div>
         <p className="text-white text-lg font-medium">Loading your workspace...</p>
       </div>
     );
@@ -441,39 +443,94 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
       setSelectedTeammate: handleTeammateSelect,
       isLoading
     }}>
-      <div className="flex h-screen">
+      <div className="flex h-screen bg-[#0A0F1E] overflow-hidden">
         {/* Sidebar */}
-        <div className="w-72 flex-shrink-0 flex flex-col bg-[#0A0F1E] border-r border-[#1E293B]">
-          <div className="p-4 border-b border-[#1E293B]">
-            <TeammateSelector />
+        <div className="w-72 flex-shrink-0 flex flex-col bg-[#1E293B] border-r border-[#2D3B4E] shadow-xl">
+          {/* Logo Header */}
+          <div className="flex-shrink-0 p-3 border-b border-[#2D3B4E] bg-[#1A1F2E]">
+            <div className="flex items-center gap-2.5">
+              <img
+                src="https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
+                alt="Kubiya Logo"
+                className="w-8 h-8 rounded-md"
+              />
+              <h1 className="text-white font-semibold text-sm tracking-wide">Kubiya Chat</h1>
+            </div>
           </div>
-          {/* Add session list here if needed */}
+
+          {/* Scrollable Content */}
+          <div className="flex-1 flex flex-col min-h-0">
+            {/* Teammate Selector */}
+            <TeammateSelector />
+
+            {/* Sessions List */}
+            <div className="flex-shrink-0 border-t border-[#2D3B4E] bg-[#1A1F2E]">
+              <div className="p-2">
+                <div className="space-y-1">
+                  {sessions.map((session) => (
+                    <button
+                      key={session.id}
+                      onClick={() => {
+                        localStorage.setItem(`chat_session_${selectedTeammate}`, session.id);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-md transition-all duration-200 ${
+                        localStorage.getItem(`chat_session_${selectedTeammate}`) === session.id
+                          ? 'bg-[#7C3AED] text-white shadow-lg'
+                          : 'text-[#94A3B8] hover:bg-[#2D3B4E] hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M8 12h8M12 8v8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-sm">{session.title || 'New Chat'}</p>
+                          <p className="text-[10px] opacity-75 truncate mt-0.5">
+                            {new Date(parseInt(session.id)).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div className="h-16 border-b border-[#1E293B] flex items-center justify-between px-6">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-white font-medium">Kubiya Chat</h1>
+          <div className="h-14 border-b border-[#2D3B4E] bg-[#1A1F2E] flex items-center justify-between px-4 flex-shrink-0 shadow-md">
+            <div className="flex items-center space-x-3">
+              <h2 className="text-white font-medium text-sm">
+                {teammates.find(t => t.uuid === selectedTeammate)?.name || 'Select a Teammate'}
+              </h2>
             </div>
-            {user && (
-              <div className="flex items-center space-x-4">
-                <img
-                  src={user.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || '')}`}
-                  alt={user.name || 'User'}
-                  className="w-8 h-8 rounded-full"
-                />
-                <span className="text-white">{user.name}</span>
-              </div>
-            )}
+            <div className="flex items-center space-x-3">
+              <UserProfileButton 
+                onLogout={() => {
+                  memoizedClearApiKey();
+                  window.location.href = '/api/auth/logout';
+                }}
+              />
+            </div>
           </div>
 
           {/* Chat area */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 min-h-0 relative">
             <AssistantRuntimeProvider runtime={runtime}>
               {children}
             </AssistantRuntimeProvider>
+
+            {/* Footer Logo */}
+            <div className="absolute bottom-3 right-3 opacity-20 transition-opacity duration-200 hover:opacity-40">
+              <img
+                src="https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
+                alt="Kubiya Logo"
+                className="w-10 h-10"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -1,11 +1,11 @@
 "use client";
 
-import { Thread } from "@assistant-ui/react";
+import MyAssistant from "@/components/MyAssistant";
 
 export default function Home() {
   return (
     <main className="flex-1 flex flex-col">
-      <Thread />
+      <MyAssistant />
     </main>
   );
 }

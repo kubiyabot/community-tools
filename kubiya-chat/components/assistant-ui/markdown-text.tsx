@@ -1,10 +1,13 @@
 "use client";
 
 import { makeMarkdownText } from "@assistant-ui/react-markdown";
-import { ToolExecution } from "@/components/MyAssistant";
+import { ToolExecution } from "@/components/assistant-ui/ToolExecution";
 
 export const MarkdownText = makeMarkdownText({
   components: {
+    p: ({ children }) => (
+      <p className="whitespace-pre-wrap">{children}</p>
+    ),
     pre: ({ children }) => {
       try {
         const text = children?.toString() || '';
@@ -119,10 +122,10 @@ export const MarkdownText = makeMarkdownText({
         }
         
         // Not a valid tool message format, render as normal pre
-        return <pre className="bg-[#1E293B]/20 rounded-md p-3 text-sm font-mono text-white overflow-x-auto">{text}</pre>;
+        return <pre className="bg-black/30 rounded-md p-3 text-sm font-mono text-white/90 overflow-x-auto ring-1 ring-white/10">{text}</pre>;
       } catch {
         // Fallback for any parsing errors
-        return <pre className="bg-[#1E293B]/20 rounded-md p-3 text-sm font-mono text-white overflow-x-auto">{children}</pre>;
+        return <pre className="bg-black/30 rounded-md p-3 text-sm font-mono text-white/90 overflow-x-auto ring-1 ring-white/10">{children}</pre>;
       }
     }
   }
