@@ -1,19 +1,19 @@
 # Workflow Status
 
 {% set r_details = run_details | from_json %}
-The Workflow **{{ workflow_name }}** finished at {{ r_details.processed_at }} (UTC) with status {{ r_details.status | title }}. 
+Workflow **{{ workflow_name }}** finished at {{ r_details.processed_at }} (UTC) with status {{ r_details.status | title }}. 
 PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
 Run: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
 
 ## 🔬 Detailed Analysis
 {% for item in failures_and_fixes %}
 ### Step: {{ item.step }}
-- **Error:** {{ item.error }}
+- **Error:** {{ item.error }} in {{ item.file }} at line {{ item.line }}
 - **Suggested Fix:** 
-    - {{ item.fix_description }}
+    - {{ item.detailed_suggested_fix }}
     - **Code Sample:** 
 ```
-{{ item.fix_code_sample }}
+{{ item.suggested_fix_code_sample }}
 ```
 {% endfor %}
 
@@ -22,15 +22,16 @@ Run: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
 ```mermaid
 graph LR;
 {% for step in workflow_steps %}
-    {{ loop.index }}["{{ step }}{{ ' ❌' if step in failed_steps else ' ✅' }}"];
+    {{ loop.index }}["{{ step.name }}{{ ' ❌' if step.status == 'failure' else ' ✅' }}"];
     {% if not loop.first %}
     {{ loop.index - 1 }} --> {{ loop.index }};
     {% endif %}
-    {% if step in failed_steps %}
+    {% if step.status == 'failure' %}
     style {{ loop.index }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
     {% else %}
     style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
     {% endif %}
+    {{ loop.index }} --> {{ loop.index }}["{{ step.conclusion }}"];
 {% endfor %}
 ```
 

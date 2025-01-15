@@ -143,7 +143,7 @@ set -euo pipefail
 echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
-for input in "$workflow_steps" "$failures" "$fixes" "$run_details"; do
+for input in "$workflow_steps" "$failures_and_fixes" "$error_logs" "$run_details"; do
     if ! printf '%s' "$input" | jq empty; then
         echo "❌ Invalid JSON input provided"
         exit 1
@@ -154,8 +154,7 @@ done
 export REPO="$repo"
 export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
-export FAILURES="$failures"
-export FIXES="$fixes"
+export FAILURES_AND_FIXES="$failures_and_fixes"
 export ERROR_LOGS="$error_logs"
 export RUN_DETAILS="$run_details"
 
@@ -244,33 +243,28 @@ fi
         "status": "success",
         "conclusion": "success",
         "number": 1
+    },
+    {
+        "name": "Run Tests",
+        "status": "failure",
+        "conclusion": "Summary of the failure",
+        "number": 2
     }
 ]""",
             required=True
         ),
         Arg(
-            name="failures",
+            name="failures_and_fixes",
             type="str",
-            description="""JSON array of workflow failures. Example:
+            description="""JSON array of workflow failures and suggested fixes. Example:
 [
     {
         "step": "Run Tests",
         "error": "Test failed: expected 200 but got 404",
         "file": "tests/api_test.go",
         "line": "42",
-    }
-]""",
-            required=True
-        ),
-        Arg(
-            name="fixes",
-            type="str",
-            description="""JSON array of suggested fixes. Example:
-[
-    {
-        "step": "Run Tests",
-        "description": "Update the expected status code in the API test",
-        "code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
+        "detailed_suggested_fix": "Update API test expected status code from 200 to 404.",
+        "suggested_fix_code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
     }
 ]""",
             required=True
@@ -288,11 +282,10 @@ fi
 {
     "id": "12345678",
     "name": "CI Pipeline",
-    "started_at": "2024-01-20T10:00:00Z",
-    "status": "completed",
-    "conclusion": "failure",
-    "actor": "octocat",
-    "trigger_event": "pull_request"
+    "status": "completed/failed",
+    "conclusion": "summary of the result of the workflow run",
+    "actor": "pr author",
+    "processed_at": "2024-01-20T10:00:00Z",
 }""",
             required=True
         ),
