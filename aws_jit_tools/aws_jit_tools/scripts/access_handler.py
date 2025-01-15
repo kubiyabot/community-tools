@@ -149,7 +149,7 @@ class AWSAccessHandler:
             return requested_iso
         except Exception as e:
             print_progress(f"Invalid duration format. Using default duration of {max_duration}", "⚠️")
-            
+            return max_iso
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Find user by email in either IAM Identity Center or IAM."""
