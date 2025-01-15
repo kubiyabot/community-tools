@@ -39,10 +39,13 @@ export function ApiKeySetup() {
       // Use production Auth0 settings
       const auth0Domain = 'kubiya.us.auth0.com';
       const clientId = 'SxpP9OU7VSvvPivHFQY5Get3uC1Bx4Jf';
-      const audience = 'https://kubiya.ai/api';
+      const audience = 'api.kubiya.ai';
       
-      // Store state in localStorage for validation
-      const state = Math.random().toString(36).substring(7);
+      // Generate a random state using crypto
+      const state = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      
       console.log('Starting SSO login:', {
         state,
         origin: window.location.origin
@@ -63,7 +66,7 @@ export function ApiKeySetup() {
       auth0Url.searchParams.append('client_id', clientId);
       auth0Url.searchParams.append('response_type', 'code');
       auth0Url.searchParams.append('redirect_uri', `${window.location.origin}/auth/callback`);
-      auth0Url.searchParams.append('scope', 'openid profile email');
+      auth0Url.searchParams.append('scope', 'openid profile email offline_access');
       auth0Url.searchParams.append('state', state);
       auth0Url.searchParams.append('audience', audience);
       auth0Url.searchParams.append('connection', 'google-oauth2');
@@ -105,7 +108,7 @@ export function ApiKeySetup() {
       }
 
       // API key is valid
-      setApiKey(tempKey.trim(), 'apikey');
+      setApiKey(tempKey.trim())
       setIsEditing(false);
     } catch (err) {
       console.error('API key validation error:', err);

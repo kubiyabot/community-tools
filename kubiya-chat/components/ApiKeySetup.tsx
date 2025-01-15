@@ -1,14 +1,58 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyIcon, SaveIcon, EditIcon, AlertCircleIcon, ExternalLinkIcon, CheckCircleIcon, ShieldCheckIcon, LockIcon } from "lucide-react";
+import { KeyIcon, SaveIcon, EditIcon, AlertCircleIcon, ExternalLinkIcon, CheckCircleIcon, ShieldCheckIcon, LockIcon, GithubIcon, SlackIcon } from "lucide-react";
 import { useConfig } from "@/lib/config-context";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { SVGProps } from 'react';
 
 const BANNER_IMAGES = [
   "https://cdn.prod.website-files.com/66ac05ef155399c0a0aee1f3/66b62ccedc841cf9bfcf9547_bento-card-1_img.avif",
   "https://cdn.prod.website-files.com/66b2390d7d5386cb599d0345/675eaf99c38fb687722187bf_article%20banner%20.png"
+];
+
+const SSO_OPTIONS = [
+  {
+    id: 'google',
+    name: 'Google',
+    icon: (props: SVGProps<SVGSVGElement>) => (
+      <svg viewBox="0 0 24 24" {...props}>
+        <path
+          fill="currentColor"
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        />
+        <path
+          fill="currentColor"
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        />
+        <path
+          fill="currentColor"
+          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        />
+        <path
+          fill="currentColor"
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        />
+      </svg>
+    ),
+    path: '/api/auth/login-google',
+    color: 'bg-white text-gray-900 hover:bg-gray-50'
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    icon: GithubIcon,
+    path: '/api/auth/login-github',
+    color: 'bg-[#24292F] hover:bg-[#24292F]/90 text-white'
+  },
+  {
+    id: 'slack',
+    name: 'Slack',
+    icon: SlackIcon,
+    path: '/api/auth/login-slack',
+    color: 'bg-[#4A154B] hover:bg-[#4A154B]/90 text-white'
+  }
 ];
 
 export function ApiKeySetup() {
@@ -34,30 +78,14 @@ export function ApiKeySetup() {
     setTempKey("");
   };
 
-  const handleSsoLogin = async () => {
+  const handleSsoLogin = async (provider: string) => {
     setIsLoading(true);
     try {
-      // Use production Auth0 settings
-      const auth0Domain = 'kubiya.us.auth0.com';
-      const clientId = 'SxpP9OU7VSvvPivHFQY5Get3uC1Bx4Jf';
-      const audience = 'https://kubiya.ai/api';
+      // Extract the connection from the provider path
+      const connection = provider.replace('/api/auth/login-', '');
       
-      // Store state in localStorage for validation
-      const state = Math.random().toString(36).substring(7);
-      localStorage.setItem('auth_state', state);
-      
-      // Construct Auth0 URL with proper parameters
-      const auth0Url = new URL(`https://${auth0Domain}/authorize`);
-      auth0Url.searchParams.append('client_id', clientId);
-      auth0Url.searchParams.append('response_type', 'code');
-      auth0Url.searchParams.append('redirect_uri', `${window.location.origin}/auth/callback`);
-      auth0Url.searchParams.append('scope', 'openid profile email');
-      auth0Url.searchParams.append('state', state);
-      auth0Url.searchParams.append('audience', audience);
-      auth0Url.searchParams.append('connection', 'google-oauth2');
-      auth0Url.searchParams.append('prompt', 'login');
-
-      window.location.href = auth0Url.toString();
+      // Redirect to the login endpoint with the connection parameter
+      window.location.href = `/api/auth/login?connection=${connection}`;
     } catch (err) {
       setError(`Failed to redirect to SSO provider: ${err instanceof Error ? err.message : String(err)}`);
       setIsLoading(false);
@@ -102,7 +130,7 @@ export function ApiKeySetup() {
         throw new Error("Invalid response from server");
       }
 
-      setApiKey(tempKey, 'apikey');
+      setApiKey(tempKey);
       setIsEditing(false);
       setTempKey("");
       setError(null);
@@ -285,30 +313,28 @@ export function ApiKeySetup() {
               </div>
             </>
           ) : (
-            <div className="space-y-4">
-              <Button
-                onClick={handleSsoLogin}
-                disabled={isLoading}
-                className={cn(
-                  "w-full transition-all duration-200",
-                  isLoading 
-                    ? 'bg-[#7C3AED]/70'
-                    : 'bg-[#7C3AED] hover:bg-[#6D28D9] hover:shadow-lg hover:transform hover:scale-[1.02]',
-                  'text-white'
-                )}
-              >
-                {isLoading ? (
-                  <>
-                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
-                    Redirecting...
-                  </>
-                ) : (
-                  <>
-                    <LockIcon className="mr-2 h-4 w-4" />
-                    Continue with SSO
-                  </>
-                )}
-              </Button>
+            <div className="space-y-3">
+              {SSO_OPTIONS.map((option) => (
+                <Button
+                  key={option.id}
+                  onClick={() => handleSsoLogin(option.path)}
+                  disabled={isLoading}
+                  className={cn(
+                    "w-full h-11 font-medium transition-all duration-200",
+                    option.color
+                  )}
+                >
+                  <option.icon className="w-5 h-5 mr-2" />
+                  Continue with {option.name}
+                </Button>
+              ))}
+
+              {error && (
+                <div className="flex items-center gap-1.5 text-red-400 text-sm mt-2">
+                  <AlertCircleIcon className="h-4 w-4" />
+                  <span>{error}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
