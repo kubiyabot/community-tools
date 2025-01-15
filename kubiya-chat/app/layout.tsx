@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { GeistSans } from 'geist/font';
-import { Providers } from "./components/Providers";
+import { UserProvider } from '@auth0/nextjs-auth0/client';
+import { ConfigProvider } from "@/lib/config-context";
+import MyRuntimeProvider from "@/app/MyRuntimeProvider";
 import "./globals.css";
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: "Kubiya Chat",
@@ -10,13 +13,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" className="h-full" suppressHydrationWarning>
-      <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`} suppressHydrationWarning>
-        <Providers>{children}</Providers>
+    <html lang="en">
+      <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`}>
+        <ErrorBoundary>
+          <UserProvider>
+            <ConfigProvider>
+              <MyRuntimeProvider>
+                {children}
+              </MyRuntimeProvider>
+            </ConfigProvider>
+          </UserProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

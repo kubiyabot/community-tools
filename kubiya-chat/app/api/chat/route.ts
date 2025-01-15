@@ -23,7 +23,7 @@ export const POST = async (request: Request) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${config.apiKey}`,
+      "Authorization": `UserKey ${config.apiKey}`,
     },
     body: JSON.stringify({ messages }),
   });

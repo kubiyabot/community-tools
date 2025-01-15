@@ -1,6 +1,11 @@
 import { type ChatModelAdapter, type ChatModelRunOptions } from '@assistant-ui/react';
+import { type AuthType } from './config-context';
 
-export function createAuthenticatedRuntime(token?: string): ChatModelAdapter {
+interface AuthenticatedRuntimeOptions {
+  authType: AuthType;
+}
+
+export function createAuthenticatedRuntime(token?: string, options?: AuthenticatedRuntimeOptions): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions) {
       const lastMessage = messages[messages.length - 1];
@@ -12,11 +17,15 @@ export function createAuthenticatedRuntime(token?: string): ChatModelAdapter {
             )?.text || ''
           : '';
 
+      const authHeader = token && options?.authType 
+        ? (options.authType === 'sso' ? `Bearer ${token}` : `userkey ${token}`) 
+        : '';
+
       const response = await fetch('/api/converse', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` })
+          ...(authHeader && { Authorization: authHeader })
         },
         body: JSON.stringify({ message: messageContent }),
         signal: abortSignal
