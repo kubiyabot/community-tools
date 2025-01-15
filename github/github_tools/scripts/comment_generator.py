@@ -177,12 +177,13 @@ def main():
         # Get variables from environment
         required_vars = [
             'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS', 
-            'FAILURES', 'FIXES', 'ERROR_LOGS', 'RUN_DETAILS'
+            'FAILURES_AND_FIXES', 'ERROR_LOGS', 'RUN_DETAILS'
         ]
         
         variables = {}
         for var in required_vars:
             if var not in os.environ:
+                print(f"Missing required environment variable: {var}")
                 raise KeyError(f"Missing required environment variable: {var}")
             variables[var.lower()] = os.environ[var]
         
