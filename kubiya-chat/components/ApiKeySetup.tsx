@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { KeyIcon, SaveIcon, EditIcon, AlertCircleIcon, ExternalLinkIcon, CheckCircleIcon, ShieldCheckIcon, LockIcon, GithubIcon, SlackIcon } from "lucide-react";
+import { KeyIcon, SaveIcon, EditIcon, AlertCircleIcon, ExternalLinkIcon, CheckCircleIcon, ShieldCheckIcon, LockIcon, SlackIcon } from "lucide-react";
 import { useConfig } from "@/lib/config-context";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -36,24 +36,17 @@ const SSO_OPTIONS = [
         />
       </svg>
     ),
-    path: '/api/auth/login-google',
+    path: '/api/auth/auth0/login-google' as const,
     color: 'bg-white text-gray-900 hover:bg-gray-50'
-  },
-  {
-    id: 'github',
-    name: 'GitHub',
-    icon: GithubIcon,
-    path: '/api/auth/login-github',
-    color: 'bg-[#24292F] hover:bg-[#24292F]/90 text-white'
   },
   {
     id: 'slack',
     name: 'Slack',
     icon: SlackIcon,
-    path: '/api/auth/login-slack',
+    path: '/api/auth/auth0/login-slack' as const,
     color: 'bg-[#4A154B] hover:bg-[#4A154B]/90 text-white'
   }
-];
+] as const;
 
 export function ApiKeySetup() {
   const { apiKey, setApiKey, clearApiKey } = useConfig();
@@ -78,14 +71,22 @@ export function ApiKeySetup() {
     setTempKey("");
   };
 
-  const handleSsoLogin = async (provider: string) => {
+  const handleSsoLogin = async (provider: '/api/auth/auth0/login-google' | '/api/auth/auth0/login-slack') => {
     setIsLoading(true);
     try {
-      // Extract the connection from the provider path
-      const connection = provider.replace('/api/auth/login-', '');
+      // Map the provider path to the correct connection ID
+      const connectionMap = {
+        '/api/auth/auth0/login-google': 'google-oauth2',
+        '/api/auth/auth0/login-slack': 'slack'
+      } as const;
+      
+      const connection = connectionMap[provider];
+      if (!connection) {
+        throw new Error('Invalid provider');
+      }
       
       // Redirect to the login endpoint with the connection parameter
-      window.location.href = `/api/auth/login?connection=${connection}`;
+      window.location.href = `/api/auth/auth0/login?connection=${connection}`;
     } catch (err) {
       setError(`Failed to redirect to SSO provider: ${err instanceof Error ? err.message : String(err)}`);
       setIsLoading(false);

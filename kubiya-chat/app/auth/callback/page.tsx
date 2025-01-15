@@ -24,7 +24,7 @@ export default function AuthCallback() {
     }
 
     // Let Auth0's handleCallback handle the token exchange
-    router.replace('/api/auth/callback');
+    router.replace('/api/auth/auth0/callback' + window.location.search);
   }, [searchParams, router]);
 
   return (

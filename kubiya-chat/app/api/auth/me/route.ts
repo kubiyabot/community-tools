@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       method: req.method,
       headers: {
         ...requestHeaders,
-        cookie: requestHeaders.cookie ? 'present' : 'missing' // Don't log actual cookies
+        cookie: requestHeaders.cookie ? 'present' : 'missing'
       }
     });
 
@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         hasSession: !!session,
         hasUser: !!session?.user,
         hasAccessToken: !!session?.accessToken,
+        hasIdToken: !!session?.idToken,
         userEmail: session?.user?.email,
         sub: session?.user?.sub,
         provider: session?.user?.sub?.split('|')[0],
@@ -70,12 +71,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    if (!session.accessToken) {
-      console.log('/api/auth/me - No access token in session');
+    // Use ID token instead of access token
+    const idToken = session.idToken?.trim();
+    if (!idToken) {
+      console.log('/api/auth/me - No ID token in session');
       return NextResponse.json({ 
         isAuthenticated: false,
         error: 'Not authenticated',
-        details: 'No access token in session'
+        details: 'No ID token in session'
       }, { 
         status: 401,
         headers: {
@@ -86,11 +89,11 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Return user profile information and access token
+    // Return user profile information and ID token
     const response = NextResponse.json({
       isAuthenticated: true,
       user: session.user,
-      accessToken: session.accessToken
+      accessToken: idToken // Using ID token as the access token
     }, {
       headers: {
         'Content-Type': 'application/json',
@@ -114,7 +117,10 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    console.log('/api/auth/me - Successfully authenticated user');
+    console.log('/api/auth/me - Successfully authenticated user:', {
+      hasAccessToken: true,
+      tokenPrefix: idToken.substring(0, 20) + '...'
+    });
     return response;
 
   } catch (error) {
