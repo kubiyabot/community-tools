@@ -82,7 +82,7 @@
 
 ### 📊 Workflow Steps:
 ```mermaid
-graph TD;
+graph LR;
     {% for step in workflow_steps %}
     {{ step.number }}["{{ step.name }}{{ ' ✅' if step.status == 'success' else ' ❌' if step.status == 'failure' else ' ⏭️' }}"];
     {% if not loop.first %}

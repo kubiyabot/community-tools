@@ -1,12 +1,69 @@
 #!/usr/bin/env python
+from datetime import datetime
+try:
+    import jinja2
+except ImportError:
+    print("⚠️  Import Warning:")
+    print("   Could not import jinja2.")
+    print("   This is expected during discovery phase and can be safely ignored.")
+    print("   The required modules will be available during actual execution.")
+    pass
 import os
 import sys
 import json
 import logging
 from pathlib import Path
+from typing import Dict, Any, Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+try:
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+except ImportError:
+    print("⚠️  Import Warning:")
+    print("   Could not import jinja2.")
+    print("   This is expected during discovery phase and can be safely ignored.")
+    print("   The required modules will be available during actual execution.")
+    pass
+
+class TemplateHandler:
+    def __init__(self):
+        self.template_dir = Path(__file__).parent / 'templating' / 'templates'
+        self.env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            autoescape=select_autoescape(['html', 'xml']),
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
+        # Add JSON filter
+        self.env.filters['from_json'] = json.loads
+
+    def render_template(self, template_name: str, variables: Dict[str, Any]) -> Optional[str]:
+        """Render a template with given variables."""
+        try:
+            template = self.env.get_template(f"{template_name}.jinja2")
+            logger.info(f"Template '{template_name}' found and loaded")
+            try:
+                result = template.render(**variables)
+                logger.info("Template rendered successfully")
+                return result
+            except Exception as e:
+                logger.error(f"Template rendering failed: {str(e)}")
+                logger.error(f"Template variables: {variables}")
+                raise
+        except Exception as e:
+            logger.error(f"Failed to load template {template_name}: {str(e)}")
+            return None
+
+    def get_available_templates(self) -> list:
+        """Get list of available templates."""
+        try:
+            return [f.stem for f in self.template_dir.glob('*.jinja2')]
+        except Exception as e:
+            logger.error(f"Failed to list templates: {str(e)}")
+            return [] 
+
 
 def parse_workflow_steps(steps_json: str) -> list:
     """Parse workflow steps from JSON string."""
@@ -16,26 +73,20 @@ def parse_workflow_steps(steps_json: str) -> list:
         logger.error(f"Invalid workflow steps JSON: {e}")
         sys.exit(1)
 
-def parse_failures(failures_json: str) -> list:
-    """Parse workflow failures from JSON string."""
+def parse_failures_and_fixes(failures_and_fixes_json: str) -> list:
+    """Parse workflow failures and fixes from JSON string."""
     try:
-        return json.loads(failures_json)
+        return json.loads(failures_and_fixes_json)
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid failures JSON: {e}")
-        sys.exit(1)
-
-def parse_fixes(fixes_json: str) -> list:
-    """Parse workflow fixes from JSON string."""
-    try:
-        return json.loads(fixes_json)
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid fixes JSON: {e}")
+        logger.error(f"Invalid failures and fixes JSON: {e}")
         sys.exit(1)
 
 def parse_run_details(details_json: str) -> dict:
     """Parse workflow run details from JSON string."""
     try:
-        return json.loads(details_json)
+        _detailes_json = json.loads(details_json)
+        _detailes_json['processed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return _detailes_json
     except json.JSONDecodeError as e:
         logger.error(f"Invalid run details JSON: {e}")
         sys.exit(1)
@@ -58,48 +109,58 @@ def find_template_file() -> Path:
             
     raise FileNotFoundError("Could not find workflow_failure.jinja2 template in any expected location")
 
+def process_error_logs_in_context(context):
+    """
+    Recursively processes all values in the dictionary context to replace
+    escape sequences (\t and \n) with actual tabs and newlines.
+    """
+    for key, value in context.items():
+        if isinstance(value, str):
+            # Replace the escape sequences with actual tabs and newlines
+            context[key] = value.replace(r'\t', '\t').replace(r'\n', '\n')
+        elif isinstance(value, dict):
+            # Recursively process nested dictionaries
+            process_error_logs_in_context(value)
+        elif isinstance(value, list):
+            # Process lists (apply to each element in the list if it's a string)
+            for i, item in enumerate(value):
+                if isinstance(item, str):
+                    value[i] = item.replace(r'\t', '\t').replace(r'\n', '\n')
+                elif isinstance(item, dict):
+                    process_error_logs_in_context(item)
+    return context
+
 def generate_comment(variables: dict) -> str:
     """Generate a comment using the workflow failure template."""
     try:
         # Parse JSON inputs
         workflow_steps = parse_workflow_steps(variables['workflow_steps'])
-        failures = parse_failures(variables['failures'])
-        fixes = parse_fixes(variables['fixes'])
         run_details = parse_run_details(variables['run_details'])
-
+        failures_and_fixes = parse_failures_and_fixes(variables['failures_and_fixes'])
+        
         # Create template context
         context = {
-            'workflow_name': run_details.get('name', 'Unknown Workflow'),
-            'failed_steps': ','.join(failure['step'] for failure in failures),
-            'failures': '|'.join(f"{failure['step']}:{failure['error']}" for failure in failures),
-            'fixes': '|'.join(f"{fix['step']}:{fix['description']}" for fix in fixes),
-            'workflow_steps': ','.join(step['name'] for step in workflow_steps),
+            'workflow_steps': workflow_steps,
+            'failures_and_fixes': failures_and_fixes,
             'error_logs': variables['error_logs'],
-            'run_details': '|'.join(f"{k}:{v}" for k, v in run_details.items()),
+            'run_details': json.dumps(run_details),  # Pass as JSON string
             'number': variables['pr_number'],
             'repo': variables['repo']
         }
+        # Process the context dictionary to replace escape sequences
+        context = process_error_logs_in_context(context)
 
-        # Find and load template
-        template_path = find_template_file()
-        with open(template_path) as f:
-            template_content = f.read()
+        # Now the processed_context contains the updated values with actual tabs and newlines
+        logger.info(f"context: {context}")
 
-        # Simple template rendering
-        comment = template_content
-        for key, value in context.items():
-            comment = comment.replace('{{ ' + key + ' }}', str(value))
-            comment = comment.replace('{{' + key + '}}', str(value))
-            # Also replace filter expressions with empty string
-            comment = comment.replace('| selectattr', '')
-            comment = comment.replace('| first', '')
-            comment = comment.replace('| replace', '')
+        # Initialize template handler
+        template_handler = TemplateHandler()
 
-        # Clean up any remaining template syntax
-        comment = comment.replace('{%', '').replace('%}', '')
-        comment = comment.replace('{#', '').replace('#}', '')
-        comment = comment.replace('endfor', '')
-        
+        logger.info(f"Available templates: {template_handler.get_available_templates()}")
+
+        # Render the template
+        comment = template_handler.render_template('workflow_failure', context)
+
         if not comment:
             raise ValueError("Failed to generate comment from template")
             
@@ -116,12 +177,13 @@ def main():
         # Get variables from environment
         required_vars = [
             'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS', 
-            'FAILURES', 'FIXES', 'ERROR_LOGS', 'RUN_DETAILS'
+            'FAILURES_AND_FIXES', 'ERROR_LOGS', 'RUN_DETAILS'
         ]
         
         variables = {}
         for var in required_vars:
             if var not in os.environ:
+                print(f"Missing required environment variable: {var}")
                 raise KeyError(f"Missing required environment variable: {var}")
             variables[var.lower()] = os.environ[var]
         

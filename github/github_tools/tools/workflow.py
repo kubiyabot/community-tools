@@ -483,7 +483,7 @@ workflow_discover_files = GitHubCliTool(
     ],
 )
 
-workflow_run_logs_failed_by_id = GitHubCliTool(
+github_workflow_run_logs_failed_by_id = GitHubCliTool(
     name="github_workflow_run_logs_failed_by_id",
     description="Get error logs from a specific failed workflow run",
     content=f'''
@@ -605,7 +605,7 @@ echo "\\n✨ Log analysis complete!"
 WORKFLOW_TOOLS = [
     workflow_list, workflow_view, workflow_run, workflow_logs,
     workflow_enable, workflow_disable, workflow_run_logs_failed,
-    workflow_run_logs_failed_by_id
+    github_workflow_run_logs_failed_by_id
 ]
 
 for tool in WORKFLOW_TOOLS:
