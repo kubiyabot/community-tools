@@ -1,26 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
+import { useTeammateContext } from '../MyRuntimeProvider';
 
 interface Teammate {
-  id: string;
+  uuid: string;
   name: string;
-  description: string;
-  llmModel?: string;
-  instructionType?: string;
+  description?: string;
+  llm_model?: string;
+  instruction_type?: string;
 }
 
-interface TeammateSelectorProps {
-  teammates: Teammate[];
-  selectedTeammate?: string;
-  onSelect: (id: string) => void;
-}
-
-export function TeammateSelector({ teammates, selectedTeammate, onSelect }: TeammateSelectorProps) {
+export function TeammateSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
+  
   useOnClickOutside(ref, () => setIsOpen(false));
 
-  const selected = teammates.find(t => t.id === selectedTeammate);
+  const selected = teammates.find(t => t.uuid === selectedTeammate);
 
   return (
     <div ref={ref} className="relative">
@@ -55,13 +52,14 @@ export function TeammateSelector({ teammates, selectedTeammate, onSelect }: Team
           <div className="p-1">
             {teammates.map((teammate) => (
               <button
-                key={teammate.id}
+                key={teammate.uuid}
                 onClick={() => {
-                  onSelect(teammate.id);
+                  setSelectedTeammate(teammate.uuid);
+                  localStorage.setItem('selectedTeammate', teammate.uuid);
                   setIsOpen(false);
                 }}
                 className={`group relative flex w-full items-center gap-x-3 rounded-md p-2 text-left text-sm ${
-                  teammate.id === selectedTeammate
+                  teammate.uuid === selectedTeammate
                     ? 'bg-[#7C3AED] text-white'
                     : 'text-[#94A3B8] hover:bg-[#2D3B4E] hover:text-white'
                 }`}
@@ -77,7 +75,7 @@ export function TeammateSelector({ teammates, selectedTeammate, onSelect }: Team
                     </span>
                   )}
                 </div>
-                {teammate.id === selectedTeammate && (
+                {teammate.uuid === selectedTeammate && (
                   <svg
                     className="h-5 w-5 text-white"
                     viewBox="0 0 20 20"
