@@ -193,10 +193,10 @@ pr_file_comment = GitHubCliTool(
 echo "💬 Processing comment for file $file_path on line $line_number in pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 GITHUB_ACTOR=$(gh api user --jq '.login')
-FULL_COMMENT="$body${KUBIYA_DISCLAIMER}"
+FULL_COMMENT="$body"
 
 # Check if the file exists in the PR
-FILE_EXISTS=$(gh api "repos/$repo/pulls/$number/files" --jq ".[] | select(.filename == \\"$file_path\\") | .filename" | head -n 1)
+FILE_EXISTS=$(gh api --repo $repo "repos/$repo/pulls/$number/files" --jq ".[] | select(.filename == \\"$file_path\\") | .filename" | head -n 1)
 if [ -z "$FILE_EXISTS" ]; then
     echo "❌ File $file_path does not exist in the pull request."
     exit 1
@@ -207,7 +207,7 @@ COMMIT_ID=$(gh pr view $number --json commits --jq '.commits[-1].oid')
 
 # Add new comment on the specific file and line
 echo "➕ Adding new comment on file $file_path on line $line_number..."
-gh api "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number" --repo "$repo"
+gh api --repo $repo "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number"
 echo "✅ Comment added successfully on file $file_path on line $line_number!"
 """,
     args=[
