@@ -1,12 +1,18 @@
 {
-    "Data Lake Read Access": {
-        "name": "data_lake_read",
-        "description": "Grants read-only access to data lake buckets",
-        "buckets": [
-            "company-data-lake-prod",
-            "company-data-lake-staging"
-        ],
-        "policy_template": "S3ReadOnlyPolicy",
-        "session_duration": "PT1H"
-    }
+  "Data Lake Read Access": {
+    "name": "data_lake_read",
+    "description": "Grants read-only access to data lake buckets",
+    "buckets": [
+      "bucket-number-one",
+      "bucket-number-two"
+    ],
+    "permissions": [
+      "s3:GetObject",
+      "s3:ListBucket",
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:ListBucket"
+    ],
+    "session_duration": "PT1H"
+  }
 } 
