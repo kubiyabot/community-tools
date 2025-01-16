@@ -186,6 +186,36 @@ fi
     ],
 )
 
+pr_file_comment = GitHubCliTool(
+    name="github_pr_file_comment",
+    description="Add a comment to a specific file in a pull request on a specific line.",
+    content="""
+echo "💬 Processing comment for file $file_path on line $line_number in pull request #$number in $repo..."
+echo "🔗 PR Link: https://github.com/$repo/pull/$number"
+GITHUB_ACTOR=$(gh api user --jq '.login')
+FULL_COMMENT="$body${KUBIYA_DISCLAIMER}"
+
+# Check if the file exists in the PR
+FILE_EXISTS=$(gh api "repos/$repo/pulls/$number/files" --jq ".[] | select(.filename == \\"$file_path\\") | .filename" | head -n 1)
+if [ -z "$FILE_EXISTS" ]; then
+    echo "❌ File $file_path does not exist in the pull request."
+    exit 1
+fi
+
+# Add new comment on the specific file and line
+echo "➕ Adding new comment on file $file_path on line $line_number..."
+gh pr comment --repo $repo $number --body "$FULL_COMMENT" --line $line_number --file $file_path
+echo "✅ Comment added successfully on file $file_path on line $line_number!"
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="file_path", type="str", description="Path to the file in the repository. Example: 'path/to/your/file.txt'", required=True),
+        Arg(name="line_number", type="int", description="Line number in the file where the comment will be added. Example: 42", required=True),
+        Arg(name="body", type="str", description="Comment text. Example: 'Great work! Just a few minor suggestions.'", required=True),
+    ],
+)
+
 pr_review = GitHubCliTool(
     name="github_pr_review",
     description="Add a review to a pull request.",
