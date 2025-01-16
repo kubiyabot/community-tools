@@ -202,9 +202,12 @@ if [ -z "$FILE_EXISTS" ]; then
     exit 1
 fi
 
+# Get the commit ID of the last commit in the PR
+COMMIT_ID=$(gh pr view $number --json commits --jq '.commits[-1].oid')
+
 # Add new comment on the specific file and line
 echo "➕ Adding new comment on file $file_path on line $line_number..."
-gh pr comment --repo $repo $number --body "$FULL_COMMENT" --line $line_number --file $file_path
+gh api "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number"
 echo "✅ Comment added successfully on file $file_path on line $line_number!"
 """,
     args=[
