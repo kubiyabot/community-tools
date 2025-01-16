@@ -207,7 +207,7 @@ COMMIT_ID=$(gh pr view $number --json commits --jq '.commits[-1].oid')
 
 # Add new comment on the specific file and line
 echo "➕ Adding new comment on file $file_path on line $line_number..."
-gh api "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number"
+gh api "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number" --repo "$repo"
 echo "✅ Comment added successfully on file $file_path on line $line_number!"
 """,
     args=[
