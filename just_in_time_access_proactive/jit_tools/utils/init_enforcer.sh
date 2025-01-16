@@ -285,7 +285,7 @@ spec:
     spec:
       containers:
         - name: enforcer
-          image: ghcr.io/kubiyabot/enforcer:main
+          image: ghcr.io/kubiyabot/opawatchdog:95ee023db2d0ccdfe9b32c24a602e44d6588d6c6
 $ENFORCER_ENV
           ports:
             - containerPort: 5001
