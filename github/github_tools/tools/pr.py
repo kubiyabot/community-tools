@@ -207,7 +207,12 @@ COMMIT_ID=$(gh pr view $number --repo $repo --json commits --jq '.commits[-1].oi
 
 # Add new comment on the specific file and line
 echo "➕ Adding new comment on file $file_path on line $line_number..."
-gh api "repos/$repo/pulls/$number/comments" -X POST -f body="$FULL_COMMENT" -f commit_id="$COMMIT_ID" -f path="$file_path" -f line="$line_number"
+gh api \
+  --method POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  /repos/$repo/pulls/$number/comments \
+   -f "body=$FULL_COMMENT" -f "commit_id=$COMMIT_ID" -f "path=$file_path" -F "start_line=1" -f "start_side=RIGHT" -F "line=$line_number" -f "side=RIGHT"
 echo "✅ Comment added successfully on file $file_path on line $line_number!"
 """,
     args=[
