@@ -1,10 +1,10 @@
 'use client';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/app/components/button';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/app/components/use-toast';
 
 export function LoginButton() {
   const { user, error: userError, isLoading } = useUser();

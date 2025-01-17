@@ -4,7 +4,7 @@ import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ConfigProvider } from "@/lib/config-context";
 import MyRuntimeProvider from "@/app/MyRuntimeProvider";
 import "./globals.css";
-import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: "Kubiya Chat",

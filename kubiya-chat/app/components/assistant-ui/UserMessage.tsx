@@ -1,8 +1,8 @@
 "use client";
 
 import { MessagePrimitive } from "@assistant-ui/react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MarkdownText } from "@/components/assistant-ui/markdown-text";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/avatar";
+import { MarkdownText } from "./markdown-text";
 import { useUser } from '@auth0/nextjs-auth0/client';
 
 export const UserMessage = ({ isStreaming }: { isStreaming?: boolean }) => {

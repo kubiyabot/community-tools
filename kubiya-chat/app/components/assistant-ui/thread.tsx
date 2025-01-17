@@ -8,8 +8,8 @@ import {
   ThreadPrimitive,
   ComposerPrimitive
 } from "@assistant-ui/react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/app/components/avatar";
+import { Button } from "@/app/components/button";
 import { ArrowDownIcon, SendHorizontalIcon, StopCircleIcon } from "lucide-react";
 
 const MyThreadWelcome = () => {

@@ -1,8 +1,8 @@
 "use client";
 
 import { MessagePrimitive } from "@assistant-ui/react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MarkdownText } from "@/components/assistant-ui/markdown-text";
+import { Avatar, AvatarFallback, AvatarImage } from "@/app/components/avatar";
+import { MarkdownText } from "./markdown-text";
 import { Copy, Check } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";

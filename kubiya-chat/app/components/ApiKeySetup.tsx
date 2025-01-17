@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/app/components/button";
+import { Input } from "@/app/components/input";
 import { KeyIcon, SaveIcon, EditIcon, AlertCircleIcon, ExternalLinkIcon, CheckCircleIcon, ShieldCheckIcon, LockIcon, SlackIcon } from "lucide-react";
 import { useConfig } from "@/lib/config-context";
 import Image from "next/image";

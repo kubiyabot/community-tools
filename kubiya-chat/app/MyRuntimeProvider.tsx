@@ -10,7 +10,7 @@ import {
   type ChatModelRunOptions,
 } from "@assistant-ui/react";
 import { useConfig } from "@/lib/config-context";
-import { ApiKeySetup } from "@/components/ApiKeySetup";
+import { ApiKeySetup } from "@/app/components/ApiKeySetup";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { getKubiyaConfig } from "../lib/config";
 import { TeammateSelector } from "./components/TeammateSelector";

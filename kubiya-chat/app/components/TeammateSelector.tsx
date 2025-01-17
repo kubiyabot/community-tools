@@ -3,7 +3,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { useTeammateContext } from '../MyRuntimeProvider';
-import { TeammateCapabilities } from '@/components/TeammateCapabilities';
+import { TeammateCapabilities } from '@/app/components/TeammateCapabilities';
 import { Box, Terminal, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Teammate {

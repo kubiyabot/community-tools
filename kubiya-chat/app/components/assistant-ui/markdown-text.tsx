@@ -1,7 +1,7 @@
 "use client";
 
 import { makeMarkdownText } from "@assistant-ui/react-markdown";
-import { ToolExecution } from "@/components/assistant-ui/ToolExecution";
+import { ToolExecution } from "./ToolExecution";
 
 export const MarkdownText = makeMarkdownText({
   components: {

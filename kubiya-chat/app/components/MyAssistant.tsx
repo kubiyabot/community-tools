@@ -2,10 +2,10 @@
 
 import { Thread, useAssistantToolUI } from "@assistant-ui/react";
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { LoginButton } from '@/components/LoginButton';
-import { AssistantMessage } from '@/components/assistant-ui/AssistantMessage';
-import { UserMessage } from '@/components/assistant-ui/UserMessage';
-import { ToolExecution } from '@/components/assistant-ui/ToolExecution';
+import { LoginButton } from './LoginButton';
+import { AssistantMessage } from './assistant-ui/AssistantMessage';
+import { UserMessage } from './assistant-ui/UserMessage';
+import { ToolExecution } from './assistant-ui/ToolExecution';
 
 export default function MyAssistant() {
   const { user } = useUser();

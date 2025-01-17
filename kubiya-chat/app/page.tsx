@@ -1,6 +1,6 @@
 "use client";
 
-import MyAssistant from "@/components/MyAssistant";
+import MyAssistant from "@/app/components/MyAssistant";
 
 export default function Home() {
   return (

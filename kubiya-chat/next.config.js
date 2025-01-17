@@ -2,7 +2,9 @@
 const nextConfig = {
   transpilePackages: ['@auth0/nextjs-auth0'],
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000']
+    }
   },
   typescript: {
     // This is temporary until Auth0 fixes their types for Next.js 14
