@@ -212,7 +212,7 @@ gh api \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   /repos/$repo/pulls/$number/comments \
-   -f "body=$FULL_COMMENT" -f "commit_id=$COMMIT_ID" -f "path=$file_path" -f "position=50"
+   -f "body=$FULL_COMMENT" -f "commit_id=30ab669a7099be6b3d4d5d5a5e8da51e3c598243" -f "path=$file_path" -f "position=4" -f "side=right" -f "line=53"
 echo "✅ Comment added successfully on file $file_path on line $line_number!"
 """,
     args=[
