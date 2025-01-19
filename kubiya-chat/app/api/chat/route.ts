@@ -1,39 +1,43 @@
-import { getKubiyaConfig } from "@/app/config";
+import { NextResponse } from 'next/server';
+import { getSession } from '@auth0/nextjs-auth0';
 
-export const maxDuration = 30;
+export async function POST(req: Request) {
+  try {
+    const session = await getSession();
+    if (!session?.user) {
+      return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'WWW-Authenticate': 'Bearer',
+        },
+      });
+    }
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+    const { message } = await req.json();
+    const authHeader = req.headers.get('authorization');
 
-export const POST = async (request: Request) => {
-  const config = getKubiyaConfig();
-  const { messages, teammate }: { messages: Message[], teammate?: string } = await request.json();
-
-  if (!config.apiKey) {
-    return new Response(JSON.stringify({ error: "Kubiya API key not configured" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
+    const response = await fetch(`${process.env.NEXT_PUBLIC_KUBIYA_API_URL}/api/converse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader || `Bearer ${session.accessToken}`,
+      },
+      body: JSON.stringify({ message }),
     });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+
+  } catch (error) {
+    console.error('Error in chat API:', error);
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
-
-  // Forward the request to Kubiya API
-  const response = await fetch(`${config.baseUrl}/converse/${teammate || 'default'}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `UserKey ${config.apiKey}`,
-    },
-    body: JSON.stringify({ messages }),
-  });
-
-  // Return the streaming response directly
-  return new Response(response.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
-};
+}

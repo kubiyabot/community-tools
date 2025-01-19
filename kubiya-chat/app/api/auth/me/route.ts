@@ -6,45 +6,41 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // Create a new response to pass to getSession
     const res = new NextResponse();
-    
-    // Get the session with both request and response
     const session = await getSession(req, res);
-    
+
     if (!session?.user) {
-      // Create a new response with the error
-      const errorResponse = NextResponse.json({ 
-        isAuthenticated: false,
-        error: 'Not authenticated'
-      }, { status: 401 });
-
-      // Copy all headers from the session response
-      res.headers.forEach((value, key) => {
-        errorResponse.headers.set(key, value);
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        message: 'No session found'
+      }, { 
+        status: 401,
+        headers: {
+          'Cache-Control': 'no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
       });
-
-      return errorResponse;
     }
 
-    // Create a new response with the session data
-    const successResponse = NextResponse.json({
-      isAuthenticated: true,
-      user: session.user
-    });
+    const headers = new Headers(res.headers);
+    headers.set('Cache-Control', 'no-store, must-revalidate');
+    headers.set('Pragma', 'no-cache');
 
-    // Copy all headers from the session response
-    res.headers.forEach((value, key) => {
-      successResponse.headers.set(key, value);
-    });
-
-    return successResponse;
-
+    return NextResponse.json({
+      user: session.user,
+      accessToken: session.accessToken
+    }, { headers });
   } catch (error) {
-    console.error('Auth error:', error);
-    return NextResponse.json({ 
-      isAuthenticated: false,
-      error: 'Failed to get session'
-    }, { status: 401 });
+    console.error('Profile error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch profile' },
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      }
+    );
   }
 } 

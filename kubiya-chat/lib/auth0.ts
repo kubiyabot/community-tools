@@ -10,13 +10,14 @@ export const auth0 = initAuth0({
   secret: process.env.AUTH0_SECRET!,
   routes: {
     callback: '/api/auth/callback',
-    login: '/api/auth/auth0/login',
+    login: '/api/auth/login',
     postLogoutRedirect: '/'
   },
   authorizationParams: {
     response_type: 'code',
     scope: 'openid profile email offline_access',
-    audience: 'api.kubiya.ai',
+    audience: process.env.AUTH0_AUDIENCE || 'https://api.kubiya.ai',
+    connection: 'slack',
     redirect_uri: `${baseUrl}/api/auth/callback`
   },
   session: {

@@ -45,6 +45,17 @@ interface TeammateContextType {
   selectedTeammate?: string;
   setSelectedTeammate: (uuid: string) => void;
   isLoading: boolean;
+  error?: {
+    error: string;
+    details: string;
+    status?: number;
+    supportInfo?: {
+      message: string;
+      email: string;
+      subject: string;
+      body: string;
+    };
+  };
 }
 
 export const TeammateContext = createContext<TeammateContextType | null>(null);
@@ -223,9 +234,10 @@ function useAuth0Init(
   memoizedSetIsLoading: (loading: boolean) => void,
   setTeammates: (teammates: Teammate[]) => void,
   setSelectedTeammate: (id: string) => void,
+  setError: (error: TeammateContextType['error'] | undefined) => void
 ) {
   const { user, error: userError, isLoading: isAuthLoading } = useUser();
-  const [initializationAttempted, setInitializationAttempted] = React.useState(false);
+  const [initializationAttempted, setInitializationAttempted] = useState(false);
 
   // Handle auth errors
   useEffect(() => {
@@ -233,9 +245,19 @@ function useAuth0Init(
       console.log('Auth initialization failed:', userError instanceof Error ? userError.message : 'Unknown error');
       memoizedClearApiKey();
       memoizedSetIsLoading(false);
+      setError({
+        error: 'Authentication Failed',
+        details: userError instanceof Error ? userError.message : 'Unknown error',
+        supportInfo: {
+          message: 'Please contact the Kubiya support team for assistance.',
+          email: 'support@kubiya.ai',
+          subject: 'Authentication Issue - Chat UI',
+          body: `Hi Kubiya Support,\n\nI'm experiencing authentication issues with the Chat UI.\n\nError Details:\n${userError instanceof Error ? userError.message : 'Unknown error'}`
+        }
+      });
       setInitializationAttempted(true);
     }
-  }, [userError, isAuthLoading, memoizedClearApiKey, memoizedSetIsLoading]);
+  }, [userError, isAuthLoading, memoizedClearApiKey, memoizedSetIsLoading, setError]);
 
   // Handle auth initialization
   useEffect(() => {
@@ -269,6 +291,16 @@ function useAuth0Init(
             console.log('Session expired or invalid');
             memoizedClearApiKey();
             memoizedSetIsLoading(false);
+            setError({
+              error: 'Session Expired',
+              details: 'Your session has expired. Please sign in again.',
+              supportInfo: {
+                message: 'Please try signing in again. If the issue persists, contact support.',
+                email: 'support@kubiya.ai',
+                subject: 'Session Issue - Chat UI',
+                body: `Hi Kubiya Support,\n\nMy session expired unexpectedly in the Chat UI.`
+              }
+            });
             setInitializationAttempted(true);
             return;
           }
@@ -281,6 +313,16 @@ function useAuth0Init(
           console.log('No access token in profile');
           memoizedClearApiKey();
           memoizedSetIsLoading(false);
+          setError({
+            error: 'Missing Access Token',
+            details: 'Unable to get access token from your profile.',
+            supportInfo: {
+              message: 'Please try signing in again. If the issue persists, contact support.',
+              email: 'support@kubiya.ai',
+              subject: 'Token Issue - Chat UI',
+              body: `Hi Kubiya Support,\n\nI'm unable to get an access token in the Chat UI.`
+            }
+          });
           setInitializationAttempted(true);
           return;
         }
@@ -311,13 +353,28 @@ function useAuth0Init(
               statusText: teammatesResponse.statusText
             });
 
+            let errorData;
             try {
-              const errorData = await teammatesResponse.json();
+              errorData = await teammatesResponse.json();
               console.error('Error details:', errorData);
+              setError(errorData);
             } catch {
               console.error('Could not parse error response');
+              setError({
+                error: 'Failed to fetch teammates',
+                details: `Server returned ${teammatesResponse.status}`,
+                supportInfo: {
+                  message: 'Please contact the Kubiya support team for assistance.',
+                  email: 'support@kubiya.ai',
+                  subject: 'Teammates Issue - Chat UI',
+                  body: `Hi Kubiya Support,\n\nI'm unable to fetch teammates in the Chat UI.\n\nError Details:\nStatus: ${teammatesResponse.status}\nStatus Text: ${teammatesResponse.statusText}`
+                }
+              });
             }
 
+            if (teammatesResponse.status === 401) {
+              memoizedClearApiKey();
+            }
             throw new Error(`Failed to fetch teammates: ${teammatesResponse.status}`);
           }
 
@@ -331,6 +388,7 @@ function useAuth0Init(
           });
           
           setTeammates(teammatesData);
+          setError(undefined);
           if (teammatesData.length > 0) {
             setSelectedTeammate(teammatesData[0].uuid);
           }
@@ -345,6 +403,16 @@ function useAuth0Init(
       } catch (error) {
         console.error('Auth initialization failed:', error instanceof Error ? error.message : 'Unknown error');
         memoizedClearApiKey();
+        setError({
+          error: 'Authentication Failed',
+          details: error instanceof Error ? error.message : 'Unknown error',
+          supportInfo: {
+            message: 'Please contact the Kubiya support team for assistance.',
+            email: 'support@kubiya.ai',
+            subject: 'Authentication Issue - Chat UI',
+            body: `Hi Kubiya Support,\n\nI'm experiencing authentication issues with the Chat UI.\n\nError Details:\n${error instanceof Error ? error.message : 'Unknown error'}`
+          }
+        });
       } finally {
         memoizedSetIsLoading(false);
         setInitializationAttempted(true);
@@ -361,20 +429,22 @@ function useAuth0Init(
     memoizedClearApiKey,
     memoizedSetIsLoading,
     setTeammates,
-    setSelectedTeammate
+    setSelectedTeammate,
+    setError
   ]);
 
   return { isAuthLoading, userError };
 }
 
 export default function MyRuntimeProvider({ children }: { children: ReactNode }) {
-  const [selectedTeammate, setSelectedTeammate] = useState<string>();
   const [teammates, setTeammates] = useState<Teammate[]>([]);
+  const [selectedTeammate, setSelectedTeammate] = useState<string>();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { apiKey, authType, setApiKey, setAuthType, clearApiKey } = useConfig();
   const [mounted, setMounted] = useState(false);
   const { user } = useUser();
+  const [error, setError] = useState<TeammateContextType['error']>();
 
   // Handle initial mounting and hydration
   useEffect(() => {
@@ -406,7 +476,8 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     memoizedClearApiKey,
     memoizedSetIsLoading,
     setTeammates,
-    setSelectedTeammate
+    setSelectedTeammate,
+    setError
   );
 
   // Add teammate selection handler
@@ -441,7 +512,8 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
       teammates,
       selectedTeammate,
       setSelectedTeammate: handleTeammateSelect,
-      isLoading
+      isLoading,
+      error
     }}>
       <div className="flex h-screen bg-[#0A0F1E] overflow-hidden">
         {/* Sidebar */}

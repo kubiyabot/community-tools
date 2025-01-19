@@ -31,7 +31,7 @@ export function LoginButton() {
     try {
       setIsAuthenticating(true);
       const returnTo = window.location.pathname;
-      const loginUrl = `/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+      const loginUrl = `/api/auth/auth0/login?returnTo=${encodeURIComponent(returnTo)}&connection=slack`;
       
       // Use fetch to check if the auth endpoint is responding
       const response = await fetch(loginUrl, { method: 'HEAD' });

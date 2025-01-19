@@ -1,27 +1,30 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getSession } from '@auth0/nextjs-auth0/edge';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
-    // Get all headers for debugging
-    const headers = Object.fromEntries(req.headers.entries());
-    console.log('Teammates endpoint - All request headers:', headers);
-
-    // Get the authorization header from the request
-    const authHeader = headers.authorization || headers.Authorization;
-    console.log('Teammates endpoint - Auth header:', {
-      exists: !!authHeader,
-      type: authHeader?.split(' ')[0],
-      prefix: authHeader ? authHeader.substring(0, 20) + '...' : null
+    // Get the session and extract the access token
+    const res = NextResponse.next();
+    const session = await getSession(req, res);
+    
+    // Add detailed session logging
+    console.log('Teammates endpoint - Full session:', {
+      hasAccessToken: !!session?.accessToken,
+      hasUser: !!session?.user,
+      userFields: session?.user ? Object.keys(session.user) : [],
+      userEmail: session?.user?.email,
+      userSub: session?.user?.sub,
+      tokenPrefix: session?.accessToken ? session.accessToken.substring(0, 50) + '...' : null
     });
 
-    if (!authHeader) {
-      console.error('Teammates endpoint - No authorization header found');
+    if (!session?.idToken) {
+      console.error('Teammates endpoint - No ID token found');
       return new Response(JSON.stringify({ 
         error: 'Not authenticated',
-        details: 'No authorization header found'
+        details: 'No ID token found'
       }), { 
         status: 401,
         headers: {
@@ -31,48 +34,51 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Validate auth header format
-    const [authType, token] = authHeader.split(' ');
-    if (!authType || !token || !['Bearer', 'bearer'].includes(authType)) {
-      console.error('Teammates endpoint - Invalid authorization header format');
-      return new Response(JSON.stringify({ 
-        error: 'Invalid authorization',
-        details: 'Invalid authorization header format'
-      }), { 
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
-    }
+    // Log the token type for debugging
+    console.log('Teammates endpoint - Using token:', {
+      type: 'id_token',
+      prefix: session.idToken.substring(0, 20) + '...'
+    });
 
-    // Forward the request to Kubiya API
-    console.log('Teammates endpoint - Forwarding request to Kubiya API');
+    // Forward the request to Kubiya API with the ID token
     const kubiyaResponse = await fetch('https://api.kubiya.ai/api/v1/agents', {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${session.idToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Pragma': 'no-cache',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
       }
     });
 
-    // Log the Kubiya API response headers
-    const responseHeaders = Object.fromEntries(kubiyaResponse.headers.entries());
-    console.log('Teammates endpoint - Kubiya API response:', {
-      status: kubiyaResponse.status,
-      statusText: kubiyaResponse.statusText,
-      headers: responseHeaders
+    // Log request details for debugging
+    console.log('Teammates endpoint - Request details:', {
+      url: 'https://api.kubiya.ai/api/v1/agents',
+      method: 'GET',
+      token: {
+        prefix: session.idToken.substring(0, 20) + '...',
+        user: {
+          email: session.user?.email,
+          sub: session.user?.sub,
+          org_id: session.user?.org_id
+        }
+      }
     });
 
+    // Log response for debugging
     if (!kubiyaResponse.ok) {
       let errorData;
       try {
         errorData = await kubiyaResponse.json();
-      } catch {
+        console.error('Teammates endpoint - Full error response:', {
+          status: kubiyaResponse.status,
+          headers: Object.fromEntries(kubiyaResponse.headers.entries()),
+          body: errorData
+        });
+      } catch (e) {
         errorData = {
           error: kubiyaResponse.statusText,
           status: kubiyaResponse.status,
@@ -80,13 +86,17 @@ export async function GET(req: NextRequest) {
         };
       }
 
-      console.error('Teammates endpoint - Kubiya API error:', {
+      return new Response(JSON.stringify({
+        error: 'Authentication Failed',
         status: kubiyaResponse.status,
-        statusText: kubiyaResponse.statusText,
-        errorData
-      });
-      
-      return new Response(JSON.stringify(errorData), { 
+        details: 'Unable to authenticate with Kubiya API. This might be due to an expired session or misconfigured permissions.',
+        supportInfo: {
+          message: 'Please contact the Kubiya support team for assistance.',
+          email: 'support@kubiya.ai',
+          subject: 'Authentication Issue - Chat UI',
+          body: `Hi Kubiya Support,\n\nI'm experiencing authentication issues with the Chat UI.\n\nError Details:\nStatus: ${kubiyaResponse.status}\nMessage: ${errorData?.msg || kubiyaResponse.statusText}`
+        }
+      }), { 
         status: kubiyaResponse.status,
         headers: {
           'Content-Type': 'application/json',

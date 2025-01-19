@@ -36,14 +36,14 @@ const SSO_OPTIONS = [
         />
       </svg>
     ),
-    path: '/api/auth/auth0/login-google' as const,
+    path: '/api/auth/auth0/login?connection=google-oauth2' as const,
     color: 'bg-white text-gray-900 hover:bg-gray-50'
   },
   {
     id: 'slack',
     name: 'Slack',
     icon: SlackIcon,
-    path: '/api/auth/auth0/login-slack' as const,
+    path: '/api/auth/auth0/login?connection=slack' as const,
     color: 'bg-[#4A154B] hover:bg-[#4A154B]/90 text-white'
   }
 ] as const;
@@ -71,22 +71,10 @@ export function ApiKeySetup() {
     setTempKey("");
   };
 
-  const handleSsoLogin = async (provider: '/api/auth/auth0/login-google' | '/api/auth/auth0/login-slack') => {
+  const handleSsoLogin = async (path: string) => {
     setIsLoading(true);
     try {
-      // Map the provider path to the correct connection ID
-      const connectionMap = {
-        '/api/auth/auth0/login-google': 'google-oauth2',
-        '/api/auth/auth0/login-slack': 'slack'
-      } as const;
-      
-      const connection = connectionMap[provider];
-      if (!connection) {
-        throw new Error('Invalid provider');
-      }
-      
-      // Redirect to the login endpoint with the connection parameter
-      window.location.href = `/api/auth/auth0/login?connection=${connection}`;
+      window.location.href = path;
     } catch (err) {
       setError(`Failed to redirect to SSO provider: ${err instanceof Error ? err.message : String(err)}`);
       setIsLoading(false);

@@ -8,7 +8,7 @@ export default function AuthProvider({
   children: React.ReactNode;
 }) {
   return (
-    <UserProvider loginUrl="/api/auth/login" profileUrl="/api/auth/me">
+    <UserProvider loginUrl="/api/auth/auth0/login" profileUrl="/api/auth/me">
       {children}
     </UserProvider>
   );
