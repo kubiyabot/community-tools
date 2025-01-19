@@ -8,6 +8,8 @@ import {
   type ModelConfig,
   type LocalRuntimeOptions,
   type ChatModelRunOptions,
+  useThreadRuntime,
+  type ModelConfigProvider
 } from "@assistant-ui/react";
 import { useConfig } from "@/lib/config-context";
 import { ApiKeySetup } from "@/app/components/ApiKeySetup";
@@ -18,8 +20,19 @@ import { UserProfile } from "./components/UserProfile";
 import { UserProfileButton } from './components/UserProfileButton';
 import { Chat } from './components/assistant-ui/Chat';
 
-interface TeammateConfig extends ModelConfig {
+interface TeammateConfig {
   teammate: string;
+  threadId: string;
+  sessionId: string;
+}
+
+interface CustomModelConfig extends ModelConfig {
+  teammate: string;
+  threadId: string;
+  sessionId: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
 }
 
 interface Teammate {
@@ -30,10 +43,13 @@ interface Teammate {
   instruction_type?: string;
 }
 
-interface CustomRuntimeOptions extends LocalRuntimeOptions {
-  config: TeammateConfig;
-  sessions: Session[];
-  setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
+interface CustomRuntimeOptions {
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  teammate: string;
+  threadId: string;
+  sessionId: string;
 }
 
 interface Session {
@@ -86,30 +102,15 @@ interface ContentPart {
   text?: string;
 }
 
-const backendApi = async ({ messages, abortSignal, config }: any) => {
+const backendApi = async ({ messages, abortSignal, config }: { messages: any[], abortSignal?: AbortSignal, config: TeammateConfig }) => {
   if (!messages.length) {
     console.error('[Runtime] No messages to send');
     throw new Error('No messages to send');
   }
 
-  if (!config) {
-    console.error('[Runtime] No config provided');
-    throw new Error('No configuration provided');
-  }
-
-  if (!config.teammate || typeof config.teammate !== 'string' || !config.teammate.trim()) {
+  if (!config.teammate) {
     console.error('[Runtime] Invalid teammate:', config.teammate);
     throw new Error('Please select a teammate before sending a message');
-  }
-
-  if (!config.threadId || typeof config.threadId !== 'string' || !config.threadId.trim()) {
-    console.error('[Runtime] Invalid thread ID:', config.threadId);
-    throw new Error('Invalid thread ID');
-  }
-
-  if (!config.sessionId || typeof config.sessionId !== 'string' || !config.sessionId.trim()) {
-    console.error('[Runtime] Invalid session ID:', config.sessionId);
-    throw new Error('Invalid session ID');
   }
 
   const lastMessage = messages[messages.length - 1];
@@ -119,253 +120,175 @@ const backendApi = async ({ messages, abortSignal, config }: any) => {
       ? lastMessage.content.find((c: ContentPart) => c.type === 'text')?.text || ''
       : '';
 
-  if (!messageContent) {
-    console.error('[Runtime] Empty message content');
-    throw new Error('Empty message content');
-  }
-
   console.log('[Runtime] Sending message:', {
     content: messageContent,
-    teammate: config.teammate,
-    threadId: config.threadId,
-    sessionId: config.sessionId,
-    hasAbortSignal: !!abortSignal
+    agent_uuid: config.teammate,
+    thread_id: config.threadId,
+    session_id: config.sessionId
   });
 
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      },
-      body: JSON.stringify({
-        message: messageContent.trim(),
-        agent_uuid: config.teammate,
-        thread_id: config.threadId,
-        session_id: config.sessionId
-      }),
-      signal: abortSignal
-    });
+  const response = await fetch('/api/converse', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    },
+    body: JSON.stringify({
+      message: messageContent.trim(),
+      agent_uuid: config.teammate,
+      thread_id: config.threadId,
+      session_id: config.sessionId
+    }),
+    signal: abortSignal
+  });
 
-    if (!response.ok) {
-      let errorMessage = `Failed to fetch response: ${response.status}`;
-      let errorDetails = '';
-      
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response stream available');
+  }
+
+  return {
+    async *[Symbol.asyncIterator]() {
+      const decoder = new TextDecoder();
+      let buffer = '';
+
       try {
-        const errorData = await response.json();
-        console.error('[Runtime] Backend API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-        
-        errorMessage = errorData.error || errorData.message || errorMessage;
-        errorDetails = errorData.details || '';
-        
-        if (response.status === 401) {
-          window.location.href = '/api/auth/login';
-          return;
-        }
-      } catch (parseError) {
-        console.error('[Runtime] Failed to parse error response:', parseError);
-      }
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            console.log('[Runtime] Stream complete');
+            break;
+          }
 
-      throw new Error(`${errorMessage}${errorDetails ? `: ${errorDetails}` : ''}`);
-    }
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-    const reader = response.body?.getReader();
-    if (!reader) {
-      console.error('[Runtime] No reader available from response');
-      throw new Error('No reader available');
-    }
-
-    return {
-      async *[Symbol.asyncIterator]() {
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let lastMessage = '';
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              console.log('[Runtime] Stream complete');
-              break;
+          for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
+            
+            const data = line.slice(6);
+            console.log('[Runtime] Raw SSE data:', data);
+            
+            if (data === '[DONE]') {
+              yield { type: 'done' } as StreamEvent;
+              return;
             }
 
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              const trimmedLine = line.trim();
-              if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
+            try {
+              const event = JSON.parse(data);
+              console.log('[Runtime] Parsed event:', event);
               
-              const data = trimmedLine.slice(6);
-              if (data === '[DONE]') {
-                console.log('[Runtime] Received [DONE] event');
-                yield { type: 'done' } as StreamEvent;
-                return;
-              }
-              
-              try {
-                const event = JSON.parse(data) as KubiyaEvent;
-                console.log('[Runtime] Processing event:', {
+              if (event.type === 'msg' || event.type === 'system_message') {
+                yield {
                   type: event.type,
-                  messageId: event.id,
-                  messagePreview: event.message?.substring(0, 50)
-                });
-                
-                if (event.type === 'msg' || event.type === 'system_message') {
-                  if (event.message === lastMessage) {
-                    continue; // Skip duplicate messages
-                  }
-                  lastMessage = event.message;
-                  
-                  yield {
-                    type: event.type,
-                    text: event.message,
-                    id: event.id
-                  } as StreamEvent;
-                } else if (event.type === 'tool') {
-                  yield {
-                    type: 'tool',
-                    text: event.message,
-                    id: event.id
-                  } as StreamEvent;
-                }
-              } catch (e) {
-                console.error('[Runtime] Error parsing event:', {
-                  error: e,
-                  line: trimmedLine
-                });
-                throw e;
+                  text: event.message || event.text,
+                  id: event.id
+                } as StreamEvent;
               }
+            } catch (e) {
+              console.error('[Runtime] Failed to parse event:', e);
+              continue;
             }
           }
-        } finally {
-          console.log('[Runtime] Releasing reader lock');
-          reader.releaseLock();
         }
+      } finally {
+        console.log('[Runtime] Releasing reader lock');
+        reader.releaseLock();
       }
-    };
-  } catch (error) {
-    console.error('[Runtime] Backend API error:', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    throw error;
-  }
+    }
+  };
 };
 
 const MyModelAdapter: ChatModelAdapter = {
-  async *run({ messages, abortSignal, config }) {
-    try {
-      const stream = await backendApi({ messages, abortSignal, config });
-      
-      if (!stream) {
-        yield {
-          content: [{ 
-            type: "text", 
-            text: "Error: Failed to initialize message stream" 
-          }],
-          isComplete: true,
-          role: 'system'
-        };
-        return;
-      }
-
-      let text = "";
-      let hasError = false;
-
-      for await (const event of stream) {
-        if (event.type === 'done') {
-          if (!hasError) {
-            yield {
-              content: [{ type: "text", text }],
-              isComplete: true
-            };
-          }
-          return;
-        }
-
-        if (event.type === 'system_message') {
-          // Handle system messages as separate messages
-          yield {
-            content: [{ 
-              type: "text", 
-              text: `System: ${event.text || ''}`
-            }],
-            isComplete: true,
-            role: 'system'
-          };
-
-          // If it's an error message, mark it
-          if (event.text?.toLowerCase().includes('error')) {
-            hasError = true;
-            // Don't throw, just yield the error as a system message
-            yield {
-              content: [{ 
-                type: "text", 
-                text: `Error: ${event.text}` 
-              }],
-              isComplete: true,
-              role: 'system'
-            };
-          }
-          continue;
-        }
-
-        if (event.type === 'msg') {
-          text = event.text || '';
-          if (!hasError) {
-            yield {
-              content: [{ type: "text", text }],
-              isComplete: false
-            };
-          }
-        } else if (event.type === 'tool') {
-          text += event.text || '';
-          if (!hasError) {
-            yield {
-              content: [{ type: "text", text }],
-              isComplete: false
-            };
-          }
-        }
-      }
-    } catch (error) {
-      // Instead of throwing, yield the error as a system message
+  async *run(options: ChatModelRunOptions) {
+    const config = options.config as CustomModelConfig;
+    if (!config?.teammate) {
       yield {
-        content: [{ 
-          type: "text", 
-          text: `Error: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`
-        }],
+        content: [{ type: "text", text: "Please select a teammate before sending a message" }],
         isComplete: true,
         role: 'system'
       };
+      return;
     }
-  },
+
+    const stream = await backendApi({ 
+      messages: options.messages, 
+      abortSignal: options.abortSignal, 
+      config: {
+        teammate: config.teammate,
+        threadId: config.threadId,
+        sessionId: config.sessionId
+      }
+    });
+
+    if (!stream) {
+      yield {
+        content: [{ type: "text", text: "Failed to initialize stream" }],
+        isComplete: true,
+        role: 'system'
+      };
+      return;
+    }
+
+    let lastMessage = '';
+    for await (const event of stream) {
+      if (event.type === 'done') break;
+      
+      if (event.text && event.text !== lastMessage) {
+        lastMessage = event.text;
+        console.log('[Runtime] Processing message:', event.text);
+        
+        yield {
+          content: [{ type: "text", text: event.text }],
+          isComplete: false,
+          role: 'assistant'
+        };
+      }
+    }
+
+    yield {
+      content: [{ type: "text", text: lastMessage }],
+      isComplete: true,
+      role: 'assistant'
+    };
+  }
 };
+
+interface ThreadMetadata {
+  teammateId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ThreadState {
+  messages: any[];
+  lastMessageId?: string;
+  metadata: ThreadMetadata;
+}
 
 interface TeammateState {
   sessions: Session[];
   currentThreadId: string;
   currentSessionId: string;
   lastMessageId?: string;
-  threads: {
-    [threadId: string]: {
-      messages: any[];
-      lastMessageId?: string;
-    };
-  };
+  threads: Record<string, ThreadState>;
 }
 
 interface TeammateStates {
   [teammateId: string]: TeammateState;
+}
+
+interface RuntimeOptions {
+  model: string;
+  temperature: number;
+  maxTokens: number;
 }
 
 export default function MyRuntimeProvider({ children }: { children: ReactNode }) {
@@ -378,6 +301,44 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
   const { user, isLoading: isUserLoading } = useUser();
   const [error, setError] = useState<TeammateContextType['error']>();
 
+  const createThreadState = useCallback((teammateId: string): ThreadState => {
+    const now = new Date().toISOString();
+    return {
+      messages: [],
+      lastMessageId: undefined,
+      metadata: {
+        teammateId,
+        createdAt: now,
+        updatedAt: now
+      }
+    };
+  }, []);
+
+  const createTeammateState = useCallback((teammateId: string): TeammateState => {
+    const threadId = Date.now().toString();
+    const sessionId = Date.now().toString();
+    
+    return {
+      sessions: [],
+      currentThreadId: threadId,
+      currentSessionId: sessionId,
+      threads: {
+        [threadId]: createThreadState(teammateId)
+      }
+    };
+  }, [createThreadState]);
+
+  const updateTeammateState = useCallback((teammateId: string, newState: TeammateState) => {
+    setTeammateStates(prev => {
+      const updated: TeammateStates = {
+        ...prev,
+        [teammateId]: newState
+      };
+      return updated;
+    });
+    localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(newState));
+  }, []);
+
   // Handle initial mounting and hydration
   useEffect(() => {
     setMounted(true);
@@ -388,11 +349,14 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
       const storedState = localStorage.getItem(`teammate_state_${storedTeammate}`);
       if (storedState) {
         try {
-          const parsedState = JSON.parse(storedState);
-          setTeammateStates(prev => ({
-            ...prev,
-            [storedTeammate]: parsedState
-          }));
+          const parsedState = JSON.parse(storedState) as TeammateState;
+          setTeammateStates(prev => {
+            const updated: TeammateStates = {
+              ...prev,
+              [storedTeammate]: parsedState
+            };
+            return updated;
+          });
         } catch (e) {
           console.error(`Failed to parse stored state for teammate ${storedTeammate}:`, e);
         }
@@ -427,7 +391,8 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
           setSelectedTeammate(storedTeammate);
           // Initialize state if needed
           if (!teammateStates[storedTeammate]) {
-            initializeTeammateState(storedTeammate);
+            const newState = createTeammateState(storedTeammate);
+            updateTeammateState(storedTeammate, newState);
           }
         } else if (data.length > 0) {
           // Otherwise select the first teammate
@@ -435,7 +400,8 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
           setSelectedTeammate(firstTeammate);
           localStorage.setItem('selectedTeammate', firstTeammate);
           if (!teammateStates[firstTeammate]) {
-            initializeTeammateState(firstTeammate);
+            const newState = createTeammateState(firstTeammate);
+            updateTeammateState(firstTeammate, newState);
           }
         }
         
@@ -454,41 +420,23 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     fetchTeammates();
   }, [mounted, apiKey, user]);
 
-  const initializeTeammateState = useCallback((teammateId: string) => {
-    const threadId = Date.now().toString();
-    const sessionId = Date.now().toString();
-    const newState: TeammateState = {
-      sessions: [],
-      currentThreadId: threadId,
-      currentSessionId: sessionId,
-      threads: {
-        [threadId]: {
-          messages: [],
-          lastMessageId: undefined
-        }
-      }
-    };
-    
-    setTeammateStates(prev => ({
-      ...prev,
-      [teammateId]: newState
-    }));
-    
-    localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(newState));
-    return newState;
-  }, []);
-
   // Handle teammate selection
   const handleTeammateSelect = useCallback((id: string) => {
+    if (!id) {
+      console.warn('[Runtime] Attempted to select invalid teammate ID');
+      return;
+    }
     console.log('[Runtime] Selecting teammate:', id);
     setSelectedTeammate(id);
     localStorage.setItem('selectedTeammate', id);
     
     // Initialize state if it doesn't exist
     if (!teammateStates[id]) {
-      initializeTeammateState(id);
+      console.log('[Runtime] Initializing state for teammate:', id);
+      const newState = createTeammateState(id);
+      updateTeammateState(id, newState);
     }
-  }, [teammateStates, initializeTeammateState]);
+  }, [teammateStates, createTeammateState, updateTeammateState]);
 
   const runtime = useKubiyaRuntime(
     selectedTeammate,
@@ -499,7 +447,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
       setTeammateStates(prev => {
         const currentState = prev[selectedTeammate];
         if (!currentState) {
-          const newState = initializeTeammateState(selectedTeammate);
+          const newState = createTeammateState(selectedTeammate);
           return {
             ...prev,
             [selectedTeammate]: newState
@@ -511,14 +459,20 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
           ? newSessions(currentState.sessions || [])
           : newSessions;
 
-        const updatedState = {
+        const now = new Date().toISOString();
+        const updatedState: TeammateState = {
           ...currentState,
           sessions: updatedSessions,
           threads: {
             ...currentState.threads,
             [threadId]: {
               messages: updatedSessions,
-              lastMessageId: updatedSessions[updatedSessions.length - 1]?.id
+              lastMessageId: updatedSessions[updatedSessions.length - 1]?.id,
+              metadata: currentState.threads[threadId]?.metadata || {
+                teammateId: selectedTeammate,
+                createdAt: now,
+                updatedAt: now
+              }
             }
           }
         };
@@ -534,23 +488,11 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     apiKey,
     selectedTeammate ? teammateStates[selectedTeammate] : undefined,
     selectedTeammate ? (newState: TeammateState) => {
-      setTeammateStates(prev => {
-        const updatedState = {
-          ...newState,
-          threads: {
-            ...newState.threads,
-            [newState.currentThreadId]: newState.threads[newState.currentThreadId] || {
-              messages: [],
-              lastMessageId: undefined
-            }
-          }
-        };
-        localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(updatedState));
-        return {
-          ...prev,
-          [selectedTeammate]: updatedState
-        };
-      });
+      setTeammateStates(prev => ({
+        ...prev,
+        [selectedTeammate]: newState
+      }));
+      localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(newState));
     } : undefined
   );
 
@@ -597,7 +539,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
 
 function useAuth0Init(
   memoizedSetApiKey: (key: string) => void,
-  memoizedSetAuthType: (type: 'sso' | 'apikey') => void,
+  memoizedSetAuthType: (type: 'sso' | 'apiKey') => void,
   memoizedClearApiKey: () => void,
   memoizedSetIsLoading: (loading: boolean) => void,
   setTeammates: (teammates: Teammate[]) => void,
@@ -814,83 +756,88 @@ const dummyModelAdapter: ChatModelAdapter = {
   }
 };
 
+// Update AuthType definition
+type AuthType = 'sso' | 'apiKey' | null;
+
 const useKubiyaRuntime = (
   selectedTeammate: string | undefined,
   sessions: Session[],
   setSessions: React.Dispatch<React.SetStateAction<Session[]>>,
-  authType: 'sso' | 'apikey' | null,
+  authType: AuthType,
   token: string | null,
   teammateState?: TeammateState,
   setTeammateState?: (state: TeammateState) => void
 ) => {
-  // Always call hooks at the top level
-  const modelAdapter = React.useMemo(
-    () => selectedTeammate ? MyModelAdapter : dummyModelAdapter,
-    [selectedTeammate]
-  );
+  const config = React.useMemo<CustomModelConfig>(() => ({
+    model: 'kubiya',
+    temperature: 1,
+    maxTokens: 4096,
+    teammate: selectedTeammate || '',
+    threadId: teammateState?.currentThreadId || Date.now().toString(),
+    sessionId: teammateState?.currentSessionId || Date.now().toString()
+  }), [selectedTeammate, teammateState]);
 
-  const runtimeConfig = React.useMemo<TeammateConfig>(() => {
-    // Return a default config if no teammate is selected
-    if (!selectedTeammate) {
-      const defaultThreadId = Date.now().toString();
-      const defaultSessionId = Date.now().toString();
-      return {
-        teammate: '',
-        threadId: defaultThreadId,
-        sessionId: defaultSessionId
-      };
-    }
+  const adapter = React.useMemo<ChatModelAdapter>(() => ({
+    ...MyModelAdapter,
+    async *run(options: ChatModelRunOptions) {
+      const customConfig = {
+        ...options.config,
+        teammate: config.teammate,
+        threadId: config.threadId,
+        sessionId: config.sessionId
+      } as CustomModelConfig;
 
-    if (!teammateState) {
-      const newState = {
-        sessions: [],
-        currentThreadId: Date.now().toString(),
-        currentSessionId: Date.now().toString(),
-        threads: {}
-      };
-      setTeammateState?.(newState);
-      return {
-        teammate: selectedTeammate,
-        threadId: newState.currentThreadId,
-        sessionId: newState.currentSessionId
-      };
-    }
+      if (!customConfig.teammate) {
+        yield {
+          content: [{ type: "text", text: "Please select a teammate before sending a message" }],
+          isComplete: true,
+          role: 'system'
+        };
+        return;
+      }
 
-    const threadId = teammateState.currentThreadId;
-    const sessionId = teammateState.currentSessionId;
-
-    // If thread state doesn't exist, update it through the setter
-    if (setTeammateState && !teammateState.threads[threadId]) {
-      const updatedState = {
-        ...teammateState,
-        threads: {
-          ...teammateState.threads,
-          [threadId]: {
-            messages: [],
-            lastMessageId: undefined
-          }
+      const stream = await backendApi({ 
+        messages: options.messages, 
+        abortSignal: options.abortSignal, 
+        config: {
+          teammate: customConfig.teammate,
+          threadId: customConfig.threadId,
+          sessionId: customConfig.sessionId
         }
+      });
+
+      if (!stream) {
+        yield {
+          content: [{ type: "text", text: "Failed to initialize stream" }],
+          isComplete: true,
+          role: 'system'
+        };
+        return;
+      }
+
+      let lastMessage = '';
+      for await (const event of stream) {
+        if (event.type === 'done') break;
+        
+        if (event.text && event.text !== lastMessage) {
+          lastMessage = event.text;
+          console.log('[Runtime] Processing message:', event.text);
+          
+          yield {
+            content: [{ type: "text", text: event.text }],
+            isComplete: false,
+            role: 'assistant'
+          };
+        }
+      }
+
+      yield {
+        content: [{ type: "text", text: lastMessage }],
+        isComplete: true,
+        role: 'assistant'
       };
-      setTeammateState(updatedState);
     }
+  }), [config]);
 
-    return {
-      teammate: selectedTeammate,
-      threadId,
-      sessionId
-    };
-  }, [selectedTeammate, teammateState, setTeammateState]);
-
-  const runtimeOptions = React.useMemo<CustomRuntimeOptions>(() => ({
-    config: runtimeConfig,
-    sessions: sessions || [],
-    setSessions,
-  }), [runtimeConfig, sessions, setSessions]);
-
-  // Only use the real adapter if we have a valid teammate
-  if (!selectedTeammate) {
-    return useLocalRuntime(dummyModelAdapter, runtimeOptions);
-  }
-
-  return useLocalRuntime(modelAdapter, runtimeOptions);
+  return useLocalRuntime(adapter);
 }; 

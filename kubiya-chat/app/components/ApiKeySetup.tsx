@@ -55,7 +55,7 @@ export function ApiKeySetup() {
   const [error, setError] = useState<string | null>(null);
   const [isValidating, setIsValidating] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [authMethod, setAuthMethod] = useState<'sso' | 'apikey'>('sso');
+  const [authMethod, setAuthMethod] = useState<'sso' | 'apiKey'>('sso');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function ApiKeySetup() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleAuthMethodChange = (method: 'sso' | 'apikey') => {
+  const handleAuthMethodChange = (method: 'sso' | 'apiKey') => {
     setAuthMethod(method);
     setError(null);
     setTempKey("");
@@ -213,11 +213,11 @@ export function ApiKeySetup() {
             variant="outline"
             className={cn(
               "h-10 font-medium transition-all duration-200 border",
-              authMethod === 'apikey'
+              authMethod === 'apiKey'
                 ? 'bg-[#7C3AED] text-white border-[#7C3AED] shadow-lg transform scale-[1.02]'
                 : 'bg-transparent border-[#2D3B4E] text-white hover:bg-[#1E293B]/50'
             )}
-            onClick={() => handleAuthMethodChange('apikey')}
+            onClick={() => handleAuthMethodChange('apiKey')}
           >
             <KeyIcon className="w-4 h-4 mr-2" />
             Use API Key
@@ -228,7 +228,7 @@ export function ApiKeySetup() {
           "space-y-4 transition-all duration-300",
           error ? 'transform -translate-y-2' : ''
         )}>
-          {authMethod === 'apikey' ? (
+          {authMethod === 'apiKey' ? (
             <>
               <div className="relative">
                 <div className="flex items-center gap-2 mb-2">

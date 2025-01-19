@@ -45,25 +45,28 @@ export const Chat = () => {
     try {
       const parsedState = JSON.parse(stored);
       setStoredState(parsedState);
-    } catch (e) {
-      console.error('Failed to parse stored chat state:', e);
-    }
-  }, []); // Empty dependency array - only run on mount
-
-  // Handle teammate selection separately
-  useEffect(() => {
-    const stored = localStorage.getItem('chatState');
-    if (!stored) return;
-
-    try {
-      const parsedState = JSON.parse(stored);
+      
+      // If we have a stored teammate but none selected, restore it
       if (parsedState.lastSelectedTeammate && !selectedTeammate) {
         setSelectedTeammate(parsedState.lastSelectedTeammate);
       }
     } catch (e) {
-      console.error('Failed to restore teammate selection:', e);
+      console.error('Failed to parse stored chat state:', e);
     }
-  }, []); // Empty dependency array - only run on mount
+  }, [selectedTeammate, setSelectedTeammate]);
+
+  // Save teammate selection
+  useEffect(() => {
+    if (selectedTeammate) {
+      const stored = localStorage.getItem('chatState');
+      const parsedState = stored ? JSON.parse(stored) : { threads: [] };
+      const updatedState = {
+        ...parsedState,
+        lastSelectedTeammate: selectedTeammate
+      };
+      localStorage.setItem('chatState', JSON.stringify(updatedState));
+    }
+  }, [selectedTeammate]);
 
   // Save state changes to localStorage
   useEffect(() => {
@@ -139,6 +142,14 @@ export const Chat = () => {
         }));
       }
 
+      // Log the request details for debugging
+      console.log('[Chat] Sending message:', {
+        message,
+        teammate: selectedTeammate,
+        threadId,
+        sessionId: threadId
+      });
+
       // Append user message to thread
       await threadRuntime.append({
         role: 'user',
@@ -154,10 +165,10 @@ export const Chat = () => {
           'Connection': 'keep-alive'
         },
         body: JSON.stringify({
-          message,
+          message: message.trim(),
           agent_uuid: selectedTeammate,
-          session_id: threadId,
-          thread_id: threadId
+          thread_id: threadId,
+          session_id: threadId
         })
       });
 
@@ -263,17 +274,31 @@ export const Chat = () => {
     }));
   };
 
+  // Show loading state
   if (userLoading || teammateLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#7C3AED] border-t-transparent"></div>
       </div>
     );
   }
 
-  if (!user) {
-    router.push('/api/auth/login');
-    return null;
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-red-500">{error}</div>
+      </div>
+    );
+  }
+
+  // Show teammate selection prompt if none selected
+  if (!selectedTeammate) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full space-y-4">
+        <p className="text-lg text-gray-600">Please select a teammate to start chatting</p>
+      </div>
+    );
   }
 
   return (
@@ -285,11 +310,6 @@ export const Chat = () => {
         onNewThread={handleNewThread}
       />
       <div className="flex-1 flex flex-col h-full">
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 mx-4 mt-4" role="alert">
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
         <ChatMessages messages={thread?.messages || []} />
         <ChatInput 
           onSubmit={handleSubmit} 
