@@ -357,7 +357,7 @@ fi
             content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'workflow_failure.jinja2').read()
         ),
     ],
-).register("github")
+)
 
 
 pr_review = GitHubCliTool(
@@ -472,7 +472,7 @@ echo "✅ Reviewer added successfully!"
 )
 
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
     tool_registry.register("github", tool)
 
 # Export all PR tools

@@ -32,9 +32,12 @@ KUBIYA_DISCLAIMER_TEXT = '''
 '''
 
 class GitHubCliTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, with_volumes=None):
+    def __init__(self, name, description, content, args, long_running=False, with_volumes=None, with_files=None):
         if with_volumes is None:
             with_volumes = []
+        
+        if with_files is None:
+            with_files = []
 
         # Add disclaimer to content based on operation type
         enhanced_content = f'''
@@ -83,7 +86,8 @@ add_disclaimer() {{
             secrets=COMMON_SECRETS,
             long_running=long_running,
             with_volumes=with_volumes,
-            mermaid=mermaid_diagram
+            mermaid=mermaid_diagram,
+            with_files=with_files,
         )
 
     def _generate_mermaid_diagram(self, name, args):
