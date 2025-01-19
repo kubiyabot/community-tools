@@ -23,16 +23,6 @@ resource_exists() {
     kubectl get -n "$namespace" "$resource_type" "$resource_name" &> /dev/null
 }
 
-# Check if enforcer deployment already exists
-log "Checking if enforcer deployment exists..."
-if resource_exists "kubiya" "deployment" "enforcer"; then
-    log "⚠️ Enforcer deployment already exists in kubiya namespace - skipping installation"
-    exit 0
-fi
-log "✅ No existing enforcer deployment found - proceeding with installation"
-
-log "🚀 Initializing Enforcer tools..."
-
 
 # Install required tools if needed
 for cmd in curl kubectl; do
@@ -73,6 +63,16 @@ if ! kubectl get namespace kubiya &> /dev/null; then
 else
     log "✅ Kubiya namespace already exists"
 fi
+
+# Check if enforcer deployment already exists
+log "Checking if enforcer deployment exists..."
+if resource_exists "kubiya" "deployment" "enforcer"; then
+    log "⚠️ Enforcer deployment already exists in kubiya namespace - skipping installation"
+    exit 0
+fi
+log "✅ No existing enforcer deployment found - proceeding with installation"
+
+log "🚀 Initializing Enforcer tools..."
 
 # Clean up existing deployment
 log "Cleaning up existing deployment..."
