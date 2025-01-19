@@ -353,7 +353,7 @@ fi
             content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()
         ),
         FileSpec(
-            destination="/opt/scripts/templating/templates/workflow_failure.jinja2",
+            destination="/opt/scripts/templates/workflow_failure.jinja2",
             content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'workflow_failure.jinja2').read()
         ),
     ],
