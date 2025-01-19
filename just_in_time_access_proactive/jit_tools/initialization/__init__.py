@@ -6,8 +6,8 @@ import base64
 from typing import Dict, Any, Optional
 from kubiya_sdk.tools.registry import tool_registry
 
-# The policy template as a multiline string
-POLICY_TEMPLATE = '''package kubiya.tool_manager
+def get_opa_policy_template(config: Dict[str, Any]) -> str:
+    policy_template = '''package kubiya.tool_manager
 
 # Default deny all access
 default allow = false
@@ -21,22 +21,13 @@ tool_categories := {
         "request_access_tool",
         "view_user_requests_tool"
     },
-    "revoke": {
-        "s3_revoke_data_lake_read_4",
-        "jit_session_revoke_database_access_to_staging",
-        "jit_session_revoke_power_user_access_to_sandbox",
-        "jit_session_revoke_database_access_to_staging"
-    },
-    "restricted": {
-        "s3_grant_data_lake_read_4",
-        "jit_session_grant_database_access_to_staging",
-        "jit_session_grant_power_user_access_to_sandbox"
-    }
+    "revoke": {${revoke_tools}},
+    "restricted": {${restricted_tools}}
 }
 
 # Helper functions
 is_admin(user) {
-    user.groups[_].name == "${var.admins_group_name}"
+    user.groups[_].name == "${approves_group_name}"
 }
 
 is_tool_in_category(tool_name, category) {
@@ -78,18 +69,49 @@ metadata := {
     }
 }'''
 
-def inject_policy_vars(policy_template: str, admins_group_name: str) -> str:
-    """
-    Injects variables into the policy template string.
-    
-    Args:
-        policy_template (str): The OPA policy template string
-        admins_group_name (str): The admin group name to inject
-        
-    Returns:
-        str: The policy with injected variables
-    """
-    return policy_template.replace("${var.admins_group_name}", admins_group_name)
+    if config:
+        revoke_tools: str = ""
+        restricted_tools: str = ""
+        revoke_tools_names: [] = []
+        restricted_tools_names: [str] = []
+        cfg = json.loads(config.get('aws_jit_config'))
+        s3_config = cfg.get('s3_configs', {})
+        session_config = cfg.get('access_configs', {})
+        approves_group_name = config.get('approves_group_name')
+
+        for key in s3_config:
+            name = s3_config[key]['name'].lower().replace(' ', '_')
+            if name:
+                revoke_tools_names.append(f"s3_revoke_{name}")
+                restricted_tools_names.append(f"s3_grant_{name}")
+
+        for key in session_config:
+            name = session_config[key]['name'].lower().replace(' ', '_')
+            if name:
+                revoke_tools_names.append(f"jit_session_revoke_{name}")
+                restricted_tools_names.append(f"jit_session_grant_{name}")
+
+        for i in range(len(revoke_tools_names)):
+            if i == 0:
+                revoke_tools += f"\n\t\t\"{revoke_tools_names[i]}\""
+            elif i == len(revoke_tools_names) - 1:
+                revoke_tools += f",\n\t\t\"{revoke_tools_names[i]}\"\n\t"
+            else:
+                revoke_tools += f",\n\t\t\"{revoke_tools_names[i]}\""
+
+        for i in range(len(restricted_tools_names)):
+            if i == 0:
+                restricted_tools += f"\n\t\t\"{restricted_tools_names[i]}\""
+            elif i == len(restricted_tools_names) - 1:
+                restricted_tools += f",\n\t\t\"{restricted_tools_names[i]}\"\n\t"
+            else:
+                restricted_tools += f",\n\t\t\"{restricted_tools_names[i]}\""
+
+        policy = policy_template.replace("${revoke_tools}", revoke_tools)
+        policy = policy.replace("${restricted_tools}", restricted_tools)
+        return policy.replace("${approves_group_name}", approves_group_name)
+    else:
+        raise ConfigurationError("No configuration provided is required.")
 
 class ConfigurationError(Exception):
     """Custom exception for configuration related errors"""
@@ -118,8 +140,7 @@ class EnforcerConfigBuilder:
 
         settings.org = os.getenv("KUBIYA_USER_ORG")
         settings.runner = config.get('opa_runner_name')
-        opa_admin_group_name = config.get('opa_default_policy')
-        settings.policy = inject_policy_vars(POLICY_TEMPLATE, opa_admin_group_name)
+        settings.policy = get_opa_policy_template(config)
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint',
