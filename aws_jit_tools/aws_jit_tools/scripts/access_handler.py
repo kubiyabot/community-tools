@@ -67,6 +67,32 @@ def format_duration(seconds: int) -> str:
     else:
         return f"{seconds} seconds"
 
+def convert_to_iso8601(duration: str) -> str:
+    """Convert simple duration format to ISO8601.
+    Examples:
+    - '1h' -> 'PT1H'
+    - '30m' -> 'PT30M'
+    - '2h' -> 'PT2H'
+    - '45s' -> 'PT45S'
+    """
+    if not duration:
+        return "PT1H"  # default
+    
+    if duration.startswith('PT'):  # already in ISO8601
+        return duration
+        
+    value = duration[:-1]  # everything except last character
+    unit = duration[-1].upper()  # last character, uppercase
+    
+    if unit not in ['H', 'M', 'S']:
+        raise ValueError(f"Invalid duration unit: {unit}. Use 'h' for hours, 'm' for minutes, or 's' for seconds.")
+    
+    try:
+        int_value = int(value)
+        return f"PT{int_value}{unit}"
+    except ValueError:
+        raise ValueError(f"Invalid duration value: {value}. Must be a number.")
+
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
         """Initialize AWS access handler."""
@@ -109,16 +135,21 @@ class AWSAccessHandler:
     def validate_duration(self, requested_duration: str, max_duration: str) -> str:
         """Validate that requested duration doesn't exceed maximum duration."""
         try:
-            requested_seconds = self.parse_iso8601_duration(requested_duration)
-            max_seconds = self.parse_iso8601_duration(max_duration)
+            # Convert both durations to ISO8601 if they're not already
+            requested_iso = convert_to_iso8601(requested_duration)
+            max_iso = convert_to_iso8601(max_duration)
+            
+            requested_seconds = self.parse_iso8601_duration(requested_iso)
+            max_seconds = self.parse_iso8601_duration(max_iso)
+            
             if requested_seconds > max_seconds:
                 print_progress(f"Requested duration exceeds maximum allowed duration of {max_duration}. Using maximum duration.", "⚠️")
-                return max_duration
+                return max_iso
             
-            return requested_duration
+            return requested_iso
         except Exception as e:
             print_progress(f"Invalid duration format. Using default duration of {max_duration}", "⚠️")
-            return max_duration
+            return max_iso
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Find user by email in either IAM Identity Center or IAM."""
@@ -194,20 +225,45 @@ class AWSAccessHandler:
             logger.error(f"Error finding permission set by name: {str(e)}")
             raise
 
+    def _validate_access_request(self, user_email: str, requested_duration: str, max_duration: str = None) -> tuple[dict, int, str]:
+        """Validate common parameters for access requests.
+        
+        Args:
+            user_email: Email of the user requesting access
+            requested_duration: Requested duration in ISO8601 format
+            max_duration: Maximum allowed duration (defaults to MAX_DURATION env var)
+            
+        Returns:
+            tuple: (user_dict, duration_seconds, validated_duration)
+        """
+        try:
+            # Find user by email
+            user = self.get_user_by_email(user_email)
+            if not user:
+                raise ValueError(f"User not found: {user_email}")
+            
+            # Validate duration
+            max_duration = max_duration or os.environ.get('MAX_DURATION', 'PT1H')
+            validated_duration = self.validate_duration(requested_duration, max_duration)
+            duration_seconds = self.parse_iso8601_duration(validated_duration)
+            
+            return user, duration_seconds, validated_duration
+            
+        except Exception as e:
+            self._handle_error("Failed to validate access request", e)
+
     def grant_access(self, user_email: str, permission_set_name: str, requested_duration: str, max_duration: str):
         """Grant access for a user by email and permission set name."""
         try:
             print_progress(f"Granting access for {user_email} with permission set {permission_set_name}...", "🔄")
             
-            # Validate duration
-            validated_duration = self.validate_duration(requested_duration, max_duration)
-            duration_seconds = self.parse_iso8601_duration(validated_duration)
+            # Validate request parameters
+            user, duration_seconds, validated_duration = self._validate_access_request(
+                user_email=user_email,
+                requested_duration=requested_duration,
+                max_duration=max_duration
+            )
             duration_display = format_duration(duration_seconds)
-            
-            # Find user by email
-            user = self.get_user_by_email(user_email)
-            if not user:
-                raise ValueError(f"User not found: {user_email}")
 
             # Get permission set ARN
             permission_set_arn = self.get_permission_set_arn(permission_set_name)
@@ -272,14 +328,12 @@ class AWSAccessHandler:
         try:
             print_progress(f"Granting S3 access for {user_email} to bucket {bucket_name}...", "🔄")
             
-            # Parse duration and get formatted display
-            duration_seconds = self.parse_iso8601_duration(duration)
+            # Validate request parameters
+            user, duration_seconds, validated_duration = self._validate_access_request(
+                user_email=user_email,
+                requested_duration=duration
+            )
             duration_display = format_duration(duration_seconds)
-            
-            # Find user by email
-            user = self.get_user_by_email(user_email)
-            if not user:
-                raise ValueError(f"User not found: {user_email}")
             
             # Validate that the bucket exists
             s3 = self.session.client('s3')
