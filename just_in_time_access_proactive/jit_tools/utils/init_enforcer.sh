@@ -6,16 +6,7 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
-# Helper function to check command result
-check_command() {
-#    if [ $? -ne 0 ]; then
-#        log "❌ Error: $1"
-#        exit 1
-#    fi
-    log "✅ $2"
-}
-
-# Helper function to check if resource exists
+# Helper function to check if resource exists in kubernetes
 resource_exists() {
     local namespace=$1
     local resource_type=$2
@@ -23,108 +14,140 @@ resource_exists() {
     kubectl get -n "$namespace" "$resource_type" "$resource_name" &> /dev/null
 }
 
-# Check if enforcer deployment already exists
-log "Checking if enforcer deployment exists..."
-if resource_exists "kubiya" "deployment" "enforcer"; then
-    log "⚠️ Enforcer deployment already exists in kubiya namespace - skipping installation"
-    exit 0
-fi
-log "✅ No existing enforcer deployment found - proceeding with installation"
+# Get secret value from kubernetes
+get_secret_value() {
+    local namespace=$1
+    local secret_name=$2
+    local key=$3
+    kubectl get secret -n "$namespace" "$secret_name" -o jsonpath="{.data.$key}" 2>/dev/null || echo ""
+}
 
-log "🚀 Initializing Enforcer tools..."
+# Update secret value in kubernetes
+update_secret_value() {
+    local namespace=$1
+    local secret_name=$2
+    local key=$3
+    local value=$4
+    kubectl patch secret -n "$namespace" "$secret_name" -p="{\"data\":{\"$key\":\"$value\"}}"
+}
 
+# Restart deployment
+restart_deployment() {
+    local namespace=$1
+    local deployment=$2
+    kubectl rollout restart deployment -n "$namespace" "$deployment"
+    kubectl rollout status deployment -n "$namespace" "$deployment"
+}
 
-# Install required tools if needed
-for cmd in curl kubectl; do
-    if ! command -v $cmd &> /dev/null; then
-        log "Installing $cmd..."
-        case $cmd in
-            curl)
-                rm -rf /var/lib/apt/lists/*
-                apt-get clean
-                apt-get update -y
-                DEBIAN_FRONTEND=noninteractive apt-get install -y curl
-                ;;
-            kubectl)
-                curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-                chmod +x kubectl
-                mv kubectl /usr/local/bin/
-                ;;
-        esac
-        check_command "$cmd installation failed" "$cmd installed successfully"
-    else
-        log "✅ $cmd is already installed"
+# Check for existing enforcer deployment and handle OPA policy updates
+check_existing_enforcer() {
+    log "Checking if enforcer deployment exists..."
+    if resource_exists "kubiya" "deployment" "enforcer"; then
+        log "⚠️ Enforcer deployment exists in kubiya namespace - checking OPA policy..."
+
+        local current_policy=$(get_secret_value "kubiya" "enforcer" "OPA_DEFAULT_POLICY")
+
+        if [ -z "$current_policy" ]; then
+            log "❌ Error: Could not retrieve current OPA_DEFAULT_POLICY"
+            exit 1
+        }
+
+        if [ "$current_policy" = "$BS64_OPA_DEFAULT_POLICY" ]; then
+            log "✅ OPA_DEFAULT_POLICY is up to date - no changes needed"
+            exit 0
+        else
+            log "🔄 Updating OPA_DEFAULT_POLICY..."
+            update_secret_value "kubiya" "enforcer" "OPA_DEFAULT_POLICY" "$BS64_OPA_DEFAULT_POLICY"
+            log "🔄 Restarting enforcer deployment..."
+            restart_deployment "kubiya" "enforcer"
+            log "✅ OPA_DEFAULT_POLICY updated and enforcer restarted successfully"
+            exit 0
+        fi
     fi
-done
+    log "✅ No existing enforcer deployment found - proceeding with installation"
+}
 
-# Test cluster connection
-log "Testing cluster connection..."
-if ! kubectl cluster-info &> /dev/null; then
-    log "❌ Error: Cannot connect to cluster"
-    exit 1
-fi
-check_command "cluster connection failed" "Connected to cluster"
+# Install required system tools
+install_required_tools() {
+    log "🚀 Installing required tools..."
+    for cmd in curl kubectl; do
+        if ! command -v $cmd &> /dev/null; then
+            log "Installing $cmd..."
+            case $cmd in
+                curl)
+                    rm -rf /var/lib/apt/lists/*
+                    apt-get clean
+                    apt-get update -y
+                    DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+                    ;;
+                kubectl)
+                    curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/stable.txt)/bin/linux/amd64/kubectl"
+                    chmod +x kubectl
+                    mv kubectl /usr/local/bin/
+                    ;;
+            esac
+            log "✅ $cmd installed successfully"
+        else
+            log "✅ $cmd is already installed"
+        fi
+    done
+}
 
-# Create namespace if it doesn't exist
-log "Setting up kubiya namespace..."
-if ! kubectl get namespace kubiya &> /dev/null; then
-    kubectl create namespace kubiya
-    check_command "namespace creation failed" "Created kubiya namespace"
-else
-    log "✅ Kubiya namespace already exists"
-fi
+# Verify cluster connectivity
+verify_cluster() {
+    log "Testing cluster connection..."
+    if ! kubectl cluster-info &> /dev/null; then
+        log "❌ Error: Cannot connect to cluster"
+        exit 1
+    fi
+    log "✅ Connected to cluster"
+}
 
-# Clean up existing deployment
-log "Cleaning up existing deployment..."
-if kubectl get deployment enforcer -n kubiya &> /dev/null; then
-    kubectl delete deployment enforcer -n kubiya
-    check_command "Failed to remove existing deployment" "Existing deployment removed"
-fi
-if kubectl get secret enforcer -n kubiya &> /dev/null; then
-    kubectl delete secret enforcer -n kubiya
-fi
+# Setup kubiya namespace
+setup_namespace() {
+    log "Setting up kubiya namespace..."
+    if ! resource_exists "" "namespace" "kubiya"; then
+        kubectl create namespace kubiya
+        log "✅ Created kubiya namespace"
+    else
+        log "✅ Kubiya namespace already exists"
+    fi
+}
 
-# Build base secret data
-SECRET_DATA=$(cat <<EOF
-  ORG_NAME: $BS64_ORG_NAME
+# Build secret data based on configuration
+build_secret_data() {
+    local secret_data="  ORG_NAME: $BS64_ORG_NAME
   RUNNER_NAME: $BS64_RUNNER_NAME
-  OPA_DEFAULT_POLICY: $BS64_OPA_DEFAULT_POLICY
-EOF
-)
+  OPA_DEFAULT_POLICY: $BS64_OPA_DEFAULT_POLICY"
 
-# Add DataDog API key if provided
-if [ ! -z "$BS64_DATA_DOG_API_KEY" ]; then
-    SECRET_DATA+=$(cat <<EOF
+    # Add optional DataDog configuration
+    if [ ! -z "$BS64_DATA_DOG_API_KEY" ]; then
+        secret_data+="\n  DD_API_KEY: $BS64_DATA_DOG_API_KEY"
+        log "✅ Added DD_API_KEY to configuration"
+    fi
+    if [ ! -z "$BS64_DATA_DOG_SITE" ]; then
+        secret_data+="\n  DD_SITE: $BS64_DATA_DOG_SITE"
+        log "✅ Added DD_SITE to configuration"
+    fi
 
-  DD_API_KEY: $BS64_DATA_DOG_API_KEY
-EOF
-)
-    log "✅ Added DD_API_KEY to configuration"
-fi
-
-# Add DataDog site if provided
-if [ ! -z "$BS64_DATA_DOG_SITE" ]; then
-    SECRET_DATA+=$(cat <<EOF
-
-  DD_SITE: $BS64_DATA_DOG_SITE
-EOF
-)
-    log "✅ Added DD_SITE to configuration"
-fi
-
-# Initialize enforcer environment variables
-if [ "$IDP_PROVIDER" = "okta" ]; then
-    SECRET_DATA+=$(cat <<EOF
-
-  OKTA_BASE_URL: $BS64_OKTA_BASE_URL
+    # Add Okta configuration if needed
+    if [ "$IDP_PROVIDER" = "okta" ]; then
+        secret_data+="\n  OKTA_BASE_URL: $BS64_OKTA_BASE_URL
   OKTA_TOKEN_ENDPOINT: $BS64_OKTA_TOKEN_ENDPOINT
   OKTA_CLIENT_ID: $BS64_OKTA_CLIENT_ID
-  OKTA_PRIVATE_KEY: $BS64_PRIVATE_KEY
-EOF
-)
-    log "✅ Added Okta configuration"
+  OKTA_PRIVATE_KEY: $BS64_PRIVATE_KEY"
+        log "✅ Added Okta configuration"
+    fi
 
-    ENFORCER_ENV="          env:
+    echo -e "$secret_data"
+}
+
+# Build environment variables for deployment
+build_env_config() {
+    local env_config=""
+    if [ "$IDP_PROVIDER" = "okta" ]; then
+        env_config=$(cat <<EOF
+          env:
             - name: OKTA_BASE_URL
               valueFrom:
                 secretKeyRef:
@@ -140,71 +163,23 @@ EOF
                 secretKeyRef:
                   name: enforcer
                   key: OKTA_CLIENT_ID
-            - name: ORG_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: ORG_NAME
-            - name: RUNNER_NAME
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: RUNNER_NAME
-            - name: OPA_DEFAULT_POLICY
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: OPA_DEFAULT_POLICY
             - name: OKTA_PRIVATE_KEY
               value: /etc/okta/private.pem
             - name: IDP_PROVIDER_NAME
               value: okta
-            - name: NATS_CREDS_FILE
-              value: /etc/nats/nats.creds
-            - name: NATS_ENDPOINT
-              value: tls://connect.ngs.global"
-
-    if [ ! -z "$DATA_DOG_API_KEY_BASE64" ]; then
-        ENFORCER_ENV+="
-            - name: DD_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: DD_API_KEY"
-    fi
-
-    if [ ! -z "$DATA_DOG_SITE_BASE64" ]; then
-        ENFORCER_ENV+="
-            - name: DD_SITE
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: DD_SITE"
-    fi
-
-    ENFORCER_VOLUME_MOUNTS="          volumeMounts:
-            - name: private-key-volume
-              mountPath: /etc/okta/private.pem
-              subPath: private.pem
-            - name: nats-creds
-              readOnly: true
-              mountPath: /etc/nats"
-
-    ENFORCER_VOLUMES="      volumes:
-        - name: private-key-volume
-          secret:
-            secretName: enforcer
-        - name: nats-creds
-          secret:
-            secretName: nats-creds-runner
-            items:
-              - key: nats.creds
-                path: nats.creds"
-else
-    ENFORCER_ENV="          env:
+EOF
+        )
+    else
+        env_config=$(cat <<EOF
+          env:
             - name: IDP_PROVIDER_NAME
               value: kubiya
-            - name: NATS_CREDS_FILE
+EOF
+        )
+    fi
+
+    # Add common environment variables
+    env_config+="\n            - name: NATS_CREDS_FILE
               value: /etc/nats/nats.creds
             - name: NATS_ENDPOINT
               value: tls://connect.ngs.global
@@ -224,41 +199,61 @@ else
                   name: enforcer
                   key: OPA_DEFAULT_POLICY"
 
-    if [ ! -z "$DATA_DOG_API_KEY_BASE64" ]; then
-        ENFORCER_ENV+="
-            - name: DD_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: DD_API_KEY"
-    fi
+    echo "$env_config"
+}
 
-    if [ ! -z "$DATA_DOG_SITE_BASE64" ]; then
-        ENFORCER_ENV+="
-            - name: DD_SITE
-              valueFrom:
-                secretKeyRef:
-                  name: enforcer
-                  key: DD_SITE"
-    fi
-
-    ENFORCER_VOLUME_MOUNTS="          volumeMounts:
+# Build volume configuration
+build_volume_config() {
+    local volume_config=""
+    if [ "$IDP_PROVIDER" = "okta" ]; then
+        volume_config=$(cat <<EOF
+          volumeMounts:
+            - name: private-key-volume
+              mountPath: /etc/okta/private.pem
+              subPath: private.pem
             - name: nats-creds
               readOnly: true
-              mountPath: /etc/nats"
-    ENFORCER_VOLUMES="      volumes:
+              mountPath: /etc/nats
+      volumes:
+        - name: private-key-volume
+          secret:
+            secretName: enforcer
         - name: nats-creds
           secret:
             secretName: nats-creds-runner
             items:
               - key: nats.creds
-                path: nats.creds"
-fi
+                path: nats.creds
+EOF
+        )
+    else
+        volume_config=$(cat <<EOF
+          volumeMounts:
+            - name: nats-creds
+              readOnly: true
+              mountPath: /etc/nats
+      volumes:
+        - name: nats-creds
+          secret:
+            secretName: nats-creds-runner
+            items:
+              - key: nats.creds
+                path: nats.creds
+EOF
+        )
+    fi
+    echo "$volume_config"
+}
 
-# Deploy configuration
-log "Deploying Enforcer components..."
+# Deploy enforcer components
+deploy_enforcer() {
+    log "Deploying Enforcer components..."
 
-cat <<EOF | kubectl apply -f -
+    local secret_data=$(build_secret_data)
+    local env_config=$(build_env_config)
+    local volume_config=$(build_volume_config)
+
+    cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Secret
 metadata:
@@ -266,7 +261,7 @@ metadata:
   namespace: kubiya
 type: Opaque
 data:
-$SECRET_DATA
+$secret_data
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -286,11 +281,10 @@ spec:
       containers:
         - name: enforcer
           image: ghcr.io/kubiyabot/opawatchdog:95ee023db2d0ccdfe9b32c24a602e44d6588d6c6
-$ENFORCER_ENV
+$env_config
           ports:
             - containerPort: 5001
-$ENFORCER_VOLUME_MOUNTS
-$ENFORCER_VOLUMES
+$volume_config
 ---
 apiVersion: v1
 kind: Service
@@ -305,26 +299,43 @@ spec:
   selector:
     app: enforcer
 EOF
+    log "✅ Applied Enforcer resources successfully"
+}
 
-check_command "Failed to apply Enforcer resources" "Applied Enforcer resources successfully"
+# Update tool-manager configuration
+update_tool_manager() {
+    log "Checking tool-manager configuration..."
 
-# Wait for deployment to be ready
-log "Waiting for enforcer deployment to be ready..."
-#kubectl rollout status deployment/enforcer -n kubiya
-check_command "Deployment rollout failed" "Enforcer deployment is ready"
+    # Check if the environment variable already exists
+    local env_exists=$(kubectl get deployment tool-manager -n kubiya -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="KUBIYA_AUTH_SERVER_URL")]}')
 
-# Update tool-manager deployment with auth server URL
-log "Updating tool-manager with auth server URL..."
-kubectl patch deployment tool-manager -n kubiya --type=json -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/containers/0/env/-",
-    "value": {
-      "name": "KUBIYA_AUTH_SERVER_URL",
-      "value": "http://enforcer.kubiya:5001"
-    }
-  }
-]'
-check_command "Failed to patch tool-manager deployment" "Tool manager updated successfully"
+    if [ -n "$env_exists" ]; then
+        log "✅ KUBIYA_AUTH_SERVER_URL already configured in tool-manager"
+        return 0
+    fi
 
-log "✅ Enforcer deployment completed successfully!"
+    log "Adding KUBIYA_AUTH_SERVER_URL to tool-manager..."
+    kubectl patch deployment tool-manager -n kubiya --type=json -p='[
+      {
+        "op": "add",
+        "path": "/spec/template/spec/containers/0/env/-",
+        "value": {
+          "name": "KUBIYA_AUTH_SERVER_URL",
+          "value": "http://enforcer.kubiya:5001"
+        }
+      }
+    ]'
+    log "✅ Tool manager updated successfully"
+}
+
+main() {
+    install_required_tools
+    check_existing_enforcer
+    verify_cluster
+    setup_namespace
+    deploy_enforcer
+    update_tool_manager
+    log "✅ Enforcer deployment completed successfully!"
+}
+
+main
