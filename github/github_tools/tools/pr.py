@@ -1,6 +1,9 @@
 from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
+from kubiya_sdk.tools.models import FileSpec
+from pathlib import Path
+
 
 # Common disclaimer for automated actions
 KUBIYA_DISCLAIMER = '''
@@ -186,6 +189,177 @@ fi
     ],
 )
 
+
+github_pr_comment_workflow_failure = GitHubCliTool(
+    name="github_pr_comment_workflow_failure",
+    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
+    content="""
+#!/bin/bash
+set -euo pipefail
+
+echo "💬 Processing comment for pull request #$number in $repo..."
+
+# Validate JSON inputs
+for input in "$workflow_steps" "$failures_and_fixes" "$error_logs" "$run_details"; do
+    if ! printf '%s' "$input" | jq empty; then
+        echo "❌ Invalid JSON input provided"
+        exit 1
+    fi
+done
+
+# Export variables for the Python script
+export REPO="$repo"
+export PR_NUMBER="$number"
+export WORKFLOW_STEPS="$workflow_steps"
+export FAILURES_AND_FIXES="$failures_and_fixes"
+export ERROR_LOGS="$error_logs"
+export RUN_DETAILS="$run_details"
+
+# Generate comment using template
+echo "🔨 Generating analysis comment..."
+GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
+    echo "❌ Failed to generate comment"
+    exit 1
+}
+
+# Get GitHub actor
+GITHUB_ACTOR=$(gh api user --jq '.login') || {
+    echo "❌ Failed to get GitHub user information"
+    exit 1
+}
+
+# Get existing comments by the current user
+echo "🔍 Checking for existing comments..."
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
+  | sed -n 1p)
+
+
+if [ -n "$EXISTING_COMMENT_ID" ]; then
+    # Update existing comment
+    echo "🔄 Updating existing comment..."
+    
+    # Get current comment content
+    CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
+    
+    # Count existing edits
+    # echo "Calculating edit count... "
+    # EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
+    # EDIT_COUNT=$((EDIT_COUNT + 1))
+    # EDIT_COUNT="0"
+    
+    # Create updated comment with edit history
+    echo "🔨 Creating updated comment..."
+    UPDATED_COMMENT="$GENERATED_COMMENT
+
+<details><summary>Previous Comment</summary>
+
+$CURRENT_CONTENT
+
+</details>"
+
+    # Update the comment
+    echo "🔨 Updating comment in $repo..."
+    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
+        -X PATCH \
+        -f body="$UPDATED_COMMENT"; then
+        echo "❌ Failed to update comment"
+        exit 1
+    fi
+    echo "✅ Comment updated successfully!"
+else
+    # Add new comment
+    echo "➕ Adding new comment..."
+    if ! gh pr comment --repo "$repo" "$number" --body "$GENERATED_COMMENT"; then
+        echo "❌ Failed to add comment"
+        exit 1
+    fi
+    echo "✅ Comment added successfully!"
+fi
+""",
+    args=[
+        Arg(
+            name="repo", 
+            type="str", 
+            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            required=True
+        ),
+        Arg(
+            name="number", 
+            type="str", 
+            description="Pull request number. Example: '123'", 
+            required=True
+        ),
+        Arg(
+            name="workflow_steps",
+            type="str",
+            description="""JSON array of workflow steps. Example:
+[
+    {
+        "name": "Install Dependencies",
+        "status": "success",
+        "conclusion": "success",
+        "number": 1
+    },
+    {
+        "name": "Run Tests",
+        "status": "failure",
+        "conclusion": "Summary of the failure",
+        "number": 2
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="failures_and_fixes",
+            type="str",
+            description="""JSON array of workflow failures and suggested fixes. Example:
+[
+    {
+        "step": "Run Tests",
+        "error": "Test failed: expected 200 but got 404",
+        "file": "tests/api_test.go",
+        "line": "42",
+        "detailed_suggested_fix": "Update API test expected status code from 200 to 404.",
+        "suggested_fix_code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
+    }
+]""",
+            required=True
+        ),
+        Arg(
+            name="error_logs",
+            type="str",
+            description="Raw error logs from the workflow run",
+            required=True
+        ),
+        Arg(
+            name="run_details",
+            type="str",
+            description="""JSON object with workflow run details. Example:
+{
+    "id": "12345678",
+    "name": "CI Pipeline",
+    "status": "completed/failed",
+    "conclusion": "summary of the result of the workflow run",
+    "actor": "pr author",
+    "processed_at": "2024-01-20T10:00:00Z",
+}""",
+            required=True
+        ),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/opt/scripts/comment_generator.py", 
+            content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()
+        ),
+        FileSpec(
+            destination="/opt/scripts/templating/templates/workflow_failure.jinja2",
+            content=open(Path(__file__).parent.parent / 'scripts' / 'templating' / 'templates' / 'workflow_failure.jinja2').read()
+        ),
+    ],
+).register("github")
+
+
 pr_review = GitHubCliTool(
     name="github_pr_review",
     description="Add a review to a pull request.",
@@ -302,4 +476,4 @@ for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_rev
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']

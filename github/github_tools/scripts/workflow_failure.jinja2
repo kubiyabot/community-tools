@@ -1,0 +1,52 @@
+# Workflow Status
+
+{% set r_details = run_details | from_json %}
+Workflow **{{ workflow_name }}** finished at {{ r_details.processed_at }} (UTC) with status {{ r_details.status | title }}. 
+PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
+Run: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
+
+## 🔬 Detailed Analysis
+{% for item in failures_and_fixes %}
+### Step: {{ item.step }}
+- **Error:** {{ item.error }} in {{ item.file }} at line {{ item.line }}
+- **Suggested Fix:** 
+    - {{ item.detailed_suggested_fix }}
+    - **Code Sample:** 
+```
+{{ item.suggested_fix_code_sample }}
+```
+{% endfor %}
+
+
+### 📊 Workflow Steps:
+```mermaid
+graph LR;
+{% for step in workflow_steps %}
+    {{ loop.index }}["{{ step.name }}{{ ' ❌' if step.status == 'failure' else ' ✅' }}"];
+    {% if not loop.first %}
+    {{ loop.index - 1 }} --> {{ loop.index }};
+    {% endif %}
+    {% if step.status == 'failure' %}
+    style {{ loop.index }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
+    {% else %}
+    style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
+    {% endif %}
+    {{ loop.index }} --> {{ loop.index }}["{{ step.conclusion }}"];
+{% endfor %}
+```
+
+## 📝 Error Logs
+<details>
+<summary>Click to expand error logs</summary>
+
+```
+{{ error_logs }}
+```
+</details>
+---
+
+#### Was this comment helpful? 👍 or 👎 Please let us know your feedback!
+
+<sub align="center">
+🤖 This comment was generated automatically by Kubiya AI at {{ r_details.processed_at }} UTC
+</sub>
