@@ -29,7 +29,7 @@ except ImportError:
 
 class TemplateHandler:
     def __init__(self):
-        self.template_dir = Path(__file__).parent / 'templating' / 'templates'
+        self.template_dir = Path(__file__).parent / 'templates'
         self.env = Environment(
             loader=FileSystemLoader(str(self.template_dir)),
             autoescape=select_autoescape(['html', 'xml']),
