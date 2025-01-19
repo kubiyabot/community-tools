@@ -135,11 +135,62 @@ export async function POST(req: NextRequest) {
       throw new Error('No response body');
     }
 
-    return new Response(stream, {
+    // Transform the stream into proper SSE format
+    const transformStream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        const lines = text.split('\n');
+        
+        let lastEvent = null;
+        
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          try {
+            // Parse the JSON to get the message ID and type
+            const event = JSON.parse(line);
+            
+            // Handle system messages immediately
+            if (event.type === 'system_message') {
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                type: 'system_message',
+                message: event.message,
+                id: event.id
+              })}\n\n`));
+              continue;
+            }
+            
+            // For chat messages, only send if the message is different from the last one
+            if (event.type === 'msg' || event.type === 'assistant') {
+              if (!lastEvent || 
+                  lastEvent.id !== event.id || 
+                  lastEvent.message !== event.message) {
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                  type: event.type,
+                  message: event.message,
+                  id: event.id,
+                  shouldUpdate: lastEvent?.id === event.id
+                })}\n\n`));
+                lastEvent = event;
+              }
+            }
+          } catch (e) {
+            // If parsing fails, skip this line
+            console.error('Failed to parse line:', e);
+          }
+        }
+      }
+    });
+
+    return new Response(stream.pipeThrough(transformStream), {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'X-Accel-Buffering': 'no'
       }
     });
 

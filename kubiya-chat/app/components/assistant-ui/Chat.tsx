@@ -3,11 +3,24 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useRouter } from 'next/navigation';
-import { useAssistantRuntime, useThread, useThreadRuntime, ThreadMessage } from '@assistant-ui/react';
+import { useAssistantRuntime, useThread, useThreadRuntime, ThreadMessage, 
+  Thread, 
+  ThreadWelcome, 
+  Composer, 
+  AssistantMessage, 
+  UserMessage,
+  ThreadList,
+  ThreadListItem,
+  AssistantActionBar,
+  UserActionBar,
+  type ThreadConfig 
+} from '@assistant-ui/react';
 import { useTeammateContext } from '../../MyRuntimeProvider';
 import { ChatInput } from './ChatInput';
 import { ChatMessages } from './ChatMessages';
 import { ThreadsSidebar } from './ThreadsSidebar';
+import { SystemMessages } from './SystemMessages';
+import { ToolExecution } from './ToolExecution';
 
 interface StoredState {
   threadId?: string;
@@ -24,6 +37,86 @@ interface ThreadInfo {
   teammateId: string;
 }
 
+interface ThreadsSidebarProps {
+  threads: ThreadInfo[];
+  currentThreadId?: string;
+  onNewThread: () => void;
+  onThreadSelect: (threadId: string) => void;
+}
+
+interface ChatInputProps {
+  onSubmit: (message: string) => Promise<void>;
+  isDisabled?: boolean;
+}
+
+const MyThread: React.FC<ThreadConfig> = (config) => {
+  return (
+    <Thread.Root config={config}>
+      <Thread.Viewport>
+        <ThreadWelcome.Root>
+          <ThreadWelcome.Center>
+            <ThreadWelcome.Avatar />
+            <ThreadWelcome.Message />
+          </ThreadWelcome.Center>
+          <ThreadWelcome.Suggestions />
+        </ThreadWelcome.Root>
+        <Thread.Messages 
+          components={{
+            AssistantMessage: MyAssistantMessage,
+            UserMessage: MyUserMessage
+          }}
+        />
+        <Thread.ViewportFooter>
+          <Thread.ScrollToBottom />
+          <MyComposer />
+        </Thread.ViewportFooter>
+      </Thread.Viewport>
+    </Thread.Root>
+  );
+};
+
+const MyAssistantMessage: React.FC = () => {
+  return (
+    <AssistantMessage.Root>
+      <AssistantMessage.Avatar />
+      <AssistantMessage.Content />
+      <AssistantActionBar.Root>
+        <AssistantActionBar.Copy />
+        <AssistantActionBar.Reload />
+      </AssistantActionBar.Root>
+    </AssistantMessage.Root>
+  );
+};
+
+const MyUserMessage: React.FC = () => {
+  return (
+    <UserMessage.Root>
+      <UserMessage.Content />
+      <UserActionBar.Root>
+        <UserActionBar.Edit />
+      </UserActionBar.Root>
+    </UserMessage.Root>
+  );
+};
+
+const MyComposer: React.FC = () => {
+  return (
+    <Composer.Root>
+      <Composer.Input autoFocus />
+      <Composer.Action />
+    </Composer.Root>
+  );
+};
+
+const MyThreadList: React.FC = () => {
+  return (
+    <ThreadList.Root>
+      <ThreadList.New />
+      <ThreadList.Items />
+    </ThreadList.Root>
+  );
+};
+
 export const Chat = () => {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
@@ -36,6 +129,7 @@ export const Chat = () => {
   });
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [systemMessages, setSystemMessages] = useState<string[]>([]);
   
   // Load stored state on mount only
   useEffect(() => {
@@ -112,6 +206,22 @@ export const Chat = () => {
     });
   }, [thread?.messages, selectedTeammate, storedState.threadId]);
 
+  // Track system messages from thread
+  useEffect(() => {
+    if (!thread?.messages) return;
+    
+    const newSystemMessages = thread.messages
+      .filter(msg => msg.role === 'system')
+      .map(msg => {
+        const textContent = msg.content.find(c => 'text' in c && c.type === 'text');
+        return textContent && 'text' in textContent ? textContent.text : '';
+      })
+      .filter(Boolean);
+
+    console.log('System messages:', newSystemMessages); // Debug log
+    setSystemMessages(newSystemMessages);
+  }, [thread?.messages]);
+
   const handleSubmit = async (message: string) => {
     if (!selectedTeammate) {
       setError('Please select a teammate first');
@@ -150,100 +260,12 @@ export const Chat = () => {
         sessionId: threadId
       });
 
-      // Append user message to thread
+      // Send message through the runtime
       await threadRuntime.append({
         role: 'user',
         content: [{ type: 'text', text: message }]
       });
-      
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
-        },
-        body: JSON.stringify({
-          message: message.trim(),
-          agent_uuid: selectedTeammate,
-          thread_id: threadId,
-          session_id: threadId
-        })
-      });
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to send message';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.details || errorData.error || response.statusText;
-          console.error('Chat error:', errorData);
-
-          if (response.status === 401) {
-            router.push('/api/auth/login');
-            return;
-          }
-        } catch (e) {
-          console.error('Failed to parse error response:', e);
-        }
-        setError(errorMessage);
-        return;
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        setError('No response from assistant');
-        return;
-      }
-
-      try {
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (!line.trim() || !line.startsWith('data: ')) continue;
-            
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-            
-            try {
-              console.log('[Chat] Received event:', data);
-              const event = JSON.parse(data);
-              
-              if (event.type === 'assistant' || event.type === 'msg' || event.type === 'system_message') {
-                console.log('[Chat] Processing message:', event);
-                const messageText = event.message || event.content || '';
-                
-                // Append each chunk as a new message
-                await threadRuntime.append({
-                  role: 'assistant',
-                  content: [{ 
-                    type: 'text', 
-                    text: messageText
-                  }]
-                });
-              } else if (event.error) {
-                console.error('[Chat] Stream error:', event.error);
-                setError(event.error);
-                throw new Error(event.error);
-              }
-            } catch (e) {
-              console.error('[Chat] Failed to parse event:', e, 'Raw data:', data);
-              setError('Failed to process assistant response');
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-      }
     } catch (e) {
       console.error('Chat error:', e);
       setError(e instanceof Error ? e.message : 'An unexpected error occurred');
@@ -303,18 +325,40 @@ export const Chat = () => {
 
   return (
     <div className="flex h-full">
-      <ThreadsSidebar
+      <ThreadsSidebar 
         threads={storedState.threads}
         currentThreadId={storedState.threadId}
-        onThreadSelect={handleThreadSelect}
         onNewThread={handleNewThread}
+        onThreadSelect={handleThreadSelect}
       />
-      <div className="flex-1 flex flex-col h-full">
-        <ChatMessages messages={thread?.messages || []} />
-        <ChatInput 
-          onSubmit={handleSubmit} 
-          isDisabled={!selectedTeammate || isProcessing} 
-        />
+      
+      {/* Main content area */}
+      <div className="flex-1 flex">
+        {/* Chat area */}
+        <div className="flex-1 flex flex-col h-full">
+          <div className="flex-1 overflow-y-auto">
+            <ChatMessages messages={thread?.messages || []} />
+          </div>
+          <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
+        </div>
+
+        {/* Right sidebar for system messages and tools */}
+        <div className="w-96 border-l border-[#334155] h-full flex flex-col bg-[#1A1F2E] overflow-y-auto">
+          {/* System Messages Section */}
+          <div className="p-4">
+            <SystemMessages messages={systemMessages} />
+          </div>
+
+          {/* Tool Executions Section */}
+          <div className="p-4 space-y-4">
+            <div className="text-sm font-medium text-white mb-2">Tool Executions</div>
+            <ToolExecution toolName="find_resource" />
+            <ToolExecution toolName="get_resource" />
+            <ToolExecution toolName="create_resource" />
+            <ToolExecution toolName="delete_resource" />
+            <ToolExecution toolName="update_resource" />
+          </div>
+        </div>
       </div>
     </div>
   );

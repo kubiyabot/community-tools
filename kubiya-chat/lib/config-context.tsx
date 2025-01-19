@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type AuthType = 'sso' | 'apikey';
+export type AuthType = 'sso' | 'apiKey';
 
 interface ConfigContextType {
   apiKey: string | null;

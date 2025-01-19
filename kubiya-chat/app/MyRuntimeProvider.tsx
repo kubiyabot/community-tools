@@ -9,7 +9,9 @@ import {
   type LocalRuntimeOptions,
   type ChatModelRunOptions,
   useThreadRuntime,
-  type ModelConfigProvider
+  type ModelConfigProvider,
+  ChatModelRunResult,
+  ContentPart
 } from "@assistant-ui/react";
 import { useConfig } from "@/lib/config-context";
 import { ApiKeySetup } from "@/app/components/ApiKeySetup";
@@ -97,12 +99,38 @@ interface StreamEvent {
   id?: string;
 }
 
-interface ContentPart {
-  type: string;
-  text?: string;
+interface TextContent {
+  type: 'text';
+  text: string;
 }
 
-const backendApi = async ({ messages, abortSignal, config }: { messages: any[], abortSignal?: AbortSignal, config: TeammateConfig }) => {
+interface ToolCall {
+  type: 'tool_init' | 'tool_output';
+  id: string;
+  name?: string;
+  arguments?: any;
+  message?: string;
+  timestamp: string;
+}
+
+interface MessageContent {
+  content: TextContent[];
+  role: 'system' | 'assistant';
+  id?: string;
+  tool_calls?: ToolCall[];
+}
+
+const backendApi = async ({ 
+  messages, 
+  abortSignal, 
+  config,
+  apiKey 
+}: { 
+  messages: any[], 
+  abortSignal?: AbortSignal, 
+  config: TeammateConfig,
+  apiKey: string 
+}) => {
   if (!messages.length) {
     console.error('[Runtime] No messages to send');
     throw new Error('No messages to send');
@@ -117,24 +145,34 @@ const backendApi = async ({ messages, abortSignal, config }: { messages: any[], 
   const messageContent = typeof lastMessage.content === 'string' 
     ? lastMessage.content 
     : Array.isArray(lastMessage.content) 
-      ? lastMessage.content.find((c: ContentPart) => c.type === 'text')?.text || ''
+      ? lastMessage.content.find((c: { type: string; text?: string }) => c.type === 'text')?.text || ''
       : '';
 
-  console.log('[Runtime] Sending message:', {
-    content: messageContent,
-    agent_uuid: config.teammate,
-    thread_id: config.threadId,
-    session_id: config.sessionId
+  // First, ensure we have a valid session
+  const sessionResponse = await fetch('/api/auth/me', {
+    credentials: 'include'
   });
 
-  const response = await fetch('/api/converse', {
+  if (!sessionResponse.ok) {
+    if (sessionResponse.status === 401) {
+      window.location.href = '/api/auth/login';
+      throw new Error('Session expired, redirecting to login');
+    }
+    throw new Error(`Failed to validate session: ${sessionResponse.status}`);
+  }
+
+  const { accessToken } = await sessionResponse.json();
+
+  const response = await fetch('/api/chat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
+      'Connection': 'keep-alive',
+      'Authorization': `Bearer ${accessToken}`
     },
+    credentials: 'include',
     body: JSON.stringify({
       message: messageContent.trim(),
       agent_uuid: config.teammate,
@@ -145,6 +183,10 @@ const backendApi = async ({ messages, abortSignal, config }: { messages: any[], 
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.location.href = '/api/auth/login';
+      throw new Error('Session expired, redirecting to login');
+    }
     throw new Error(`API request failed: ${response.status}`);
   }
 
@@ -153,111 +195,144 @@ const backendApi = async ({ messages, abortSignal, config }: { messages: any[], 
     throw new Error('No response stream available');
   }
 
-  return {
-    async *[Symbol.asyncIterator]() {
-      const decoder = new TextDecoder();
-      let buffer = '';
+  return reader;
+};
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) {
-            console.log('[Runtime] Stream complete');
-            break;
+const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<Uint8Array>): AsyncGenerator<MessageContent, void, unknown> {
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let systemMessages = new Set<string>();
+  let lastMessageText = "";
+  let lastMessageType: 'system' | 'assistant' | null = null;
+  let messageId = `msg_${Date.now()}`;
+  let currentToolId = `tool_${Date.now()}`;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        
+        try {
+          // First check if it's a system message without JSON format
+          if (line.includes('WARNING:') || line.includes('ERROR:')) {
+            const text = line.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
+            if (text && !systemMessages.has(text)) {
+              systemMessages.add(text);
+              yield {
+                content: [{ type: "text", text } as TextContent],
+                role: 'system',
+                id: `system_${Date.now()}_${systemMessages.size}`
+              };
+            }
+            continue;
           }
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (!line.trim() || !line.startsWith('data: ')) continue;
-            
+          // Then try to parse JSON for lines that start with 'data: '
+          if (line.startsWith('data: ')) {
             const data = line.slice(6);
-            console.log('[Runtime] Raw SSE data:', data);
-            
-            if (data === '[DONE]') {
-              yield { type: 'done' } as StreamEvent;
-              return;
-            }
+            if (data === '[DONE]') break;
 
             try {
               const event = JSON.parse(data);
-              console.log('[Runtime] Parsed event:', event);
               
-              if (event.type === 'msg' || event.type === 'system_message') {
+              // Handle system messages in JSON format
+              if (event.type === 'system_message' && event.message) {
+                const text = event.message.trim();
+                if (text && !systemMessages.has(text)) {
+                  systemMessages.add(text);
+                  yield {
+                    content: [{ type: "text", text } as TextContent],
+                    role: 'system',
+                    id: event.id || `system_${Date.now()}_${systemMessages.size}`
+                  };
+                }
+                continue;
+              }
+
+              // Handle tool events
+              if (event.type === 'tool') {
+                const toolId = event.id || currentToolId;
+                let toolName = event.tool_name;
+                let args = event.arguments;
+
+                if (!toolName && event.message) {
+                  const toolMatch = event.message.match(/Tool:\s*(\w+)(?:\s*\n|\s+)Arguments:\s*({[\s\S]*})/i);
+                  if (toolMatch) {
+                    try {
+                      toolName = toolMatch[1];
+                      args = JSON.parse(toolMatch[2]);
+                    } catch (e) {
+                      console.warn('Failed to parse tool arguments:', e);
+                    }
+                  }
+                }
+
+                if (toolName) {
+                  yield {
+                    content: [],
+                    role: 'assistant',
+                    id: toolId,
+                    tool_calls: [{
+                      type: 'tool_init',
+                      id: toolId,
+                      name: toolName,
+                      arguments: args,
+                      timestamp: new Date().toISOString()
+                    }]
+                  };
+                }
+              } else if (event.type === 'tool_output') {
+                const toolId = event.id || currentToolId;
                 yield {
-                  type: event.type,
-                  text: event.message || event.text,
-                  id: event.id
-                } as StreamEvent;
+                  content: [],
+                  role: 'assistant',
+                  id: toolId,
+                  tool_calls: [{
+                    type: 'tool_output',
+                    id: toolId,
+                    message: event.message,
+                    timestamp: new Date().toISOString()
+                  }]
+                };
+              } else if ((event.type === 'msg' || event.type === 'assistant') && event.message) {
+                lastMessageText = event.message;
+                lastMessageType = 'assistant';
+                yield {
+                  content: [{ type: "text", text: event.message } as TextContent],
+                  role: 'assistant',
+                  id: messageId
+                };
               }
             } catch (e) {
-              console.error('[Runtime] Failed to parse event:', e);
-              continue;
+              // If JSON parsing fails, check if it contains a system message
+              const text = data.trim();
+              if (text && (text.includes('WARNING:') || text.includes('ERROR:'))) {
+                const cleanText = text.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
+                if (cleanText && !systemMessages.has(cleanText)) {
+                  systemMessages.add(cleanText);
+                  yield {
+                    content: [{ type: "text", text: cleanText } as TextContent],
+                    role: 'system',
+                    id: `system_${Date.now()}_${systemMessages.size}`
+                  };
+                }
+              }
             }
           }
+        } catch (e) {
+          console.warn('[Runtime] Error processing message:', e);
         }
-      } finally {
-        console.log('[Runtime] Releasing reader lock');
-        reader.releaseLock();
       }
     }
-  };
-};
-
-const MyModelAdapter: ChatModelAdapter = {
-  async *run(options: ChatModelRunOptions) {
-    const config = options.config as CustomModelConfig;
-    if (!config?.teammate) {
-      yield {
-        content: [{ type: "text", text: "Please select a teammate before sending a message" }],
-        isComplete: true,
-        role: 'system'
-      };
-      return;
-    }
-
-    const stream = await backendApi({ 
-      messages: options.messages, 
-      abortSignal: options.abortSignal, 
-      config: {
-        teammate: config.teammate,
-        threadId: config.threadId,
-        sessionId: config.sessionId
-      }
-    });
-
-    if (!stream) {
-      yield {
-        content: [{ type: "text", text: "Failed to initialize stream" }],
-        isComplete: true,
-        role: 'system'
-      };
-      return;
-    }
-
-    let lastMessage = '';
-    for await (const event of stream) {
-      if (event.type === 'done') break;
-      
-      if (event.text && event.text !== lastMessage) {
-        lastMessage = event.text;
-        console.log('[Runtime] Processing message:', event.text);
-        
-        yield {
-          content: [{ type: "text", text: event.text }],
-          isComplete: false,
-          role: 'assistant'
-        };
-      }
-    }
-
-    yield {
-      content: [{ type: "text", text: lastMessage }],
-      isComplete: true,
-      role: 'assistant'
-    };
+  } finally {
+    reader.releaseLock();
   }
 };
 
@@ -746,16 +821,6 @@ function useAuth0Init(
   return { isAuthLoading, userError };
 }
 
-const dummyModelAdapter: ChatModelAdapter = {
-  async *run() {
-    yield {
-      content: [{ type: "text", text: "Please select a teammate to start chatting." }],
-      isComplete: true,
-      role: 'system'
-    };
-  }
-};
-
 // Update AuthType definition
 type AuthType = 'sso' | 'apiKey' | null;
 
@@ -778,8 +843,7 @@ const useKubiyaRuntime = (
   }), [selectedTeammate, teammateState]);
 
   const adapter = React.useMemo<ChatModelAdapter>(() => ({
-    ...MyModelAdapter,
-    async *run(options: ChatModelRunOptions) {
+    async *run(options: ChatModelRunOptions): AsyncGenerator<MessageContent, void, unknown> {
       const customConfig = {
         ...options.config,
         teammate: config.teammate,
@@ -789,9 +853,9 @@ const useKubiyaRuntime = (
 
       if (!customConfig.teammate) {
         yield {
-          content: [{ type: "text", text: "Please select a teammate before sending a message" }],
-          isComplete: true,
-          role: 'system'
+          content: [{ type: "text", text: "Please select a teammate before sending a message" } as TextContent],
+          role: 'system',
+          id: `system_${Date.now()}`
         };
         return;
       }
@@ -803,41 +867,22 @@ const useKubiyaRuntime = (
           teammate: customConfig.teammate,
           threadId: customConfig.threadId,
           sessionId: customConfig.sessionId
-        }
+        },
+        apiKey: token || ''
       });
 
       if (!stream) {
         yield {
-          content: [{ type: "text", text: "Failed to initialize stream" }],
-          isComplete: true,
-          role: 'system'
+          content: [{ type: "text", text: "Failed to initialize stream" } as TextContent],
+          role: 'system',
+          id: `system_${Date.now()}`
         };
         return;
       }
 
-      let lastMessage = '';
-      for await (const event of stream) {
-        if (event.type === 'done') break;
-        
-        if (event.text && event.text !== lastMessage) {
-          lastMessage = event.text;
-          console.log('[Runtime] Processing message:', event.text);
-          
-          yield {
-            content: [{ type: "text", text: event.text }],
-            isComplete: false,
-            role: 'assistant'
-          };
-        }
-      }
-
-      yield {
-        content: [{ type: "text", text: lastMessage }],
-        isComplete: true,
-        role: 'assistant'
-      };
+      yield* handleStreamEvents(stream);
     }
-  }), [config]);
+  }), [config, token]);
 
   return useLocalRuntime(adapter);
 }; 
