@@ -354,7 +354,7 @@ fi
         ),
         FileSpec(
             destination="/opt/scripts/templating/templates/workflow_failure.jinja2",
-            content=open(Path(__file__).parent.parent / 'scripts' / 'templating' / 'templates' / 'workflow_failure.jinja2').read()
+            content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'workflow_failure.jinja2').read()
         ),
     ],
 ).register("github")
