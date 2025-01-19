@@ -803,7 +803,6 @@ def main():
     parser.add_argument('--user-email', required=True, help='Email of the user')
     parser.add_argument('--duration', default='PT1H', help='Duration for access (ISO8601 format, e.g., PT1H)')
     parser.add_argument('--bucket-name', required=False, help='Name of the S3 bucket')
-    parser.add_argument('--permissions', required=True, type=arg_list_of_strings, help="List of permissions to grant")
 
     args = parser.parse_args()
 
@@ -813,44 +812,29 @@ def main():
         handler = AWSAccessHandler()
 
         if args.action == 'grant':
-            if args.bucket_name:
-                # Handle S3 access
-                handler.grant_s3_access(
-                    user_email=args.user_email,
-                    bucket_name=args.bucket_name,
-                    policy_template=os.environ.get('POLICY_TEMPLATE', 'default'),
-                    duration=args.duration
-                )
-            else:
-                # Handle SSO access
-                handler.grant_permission_set(
-                    user_email=args.user_email,
-                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
-                    session_duration=args.duraion,
-                    inline_policy={
-                        "Version": "2012-10-17",
-                        "Statement": [
-                            {
-                                "Effect": "Allow",
-                                "Action": [args.policies],
-                                "resource": [args.bucket_name]
-                            }
-                        ]
-                    }
-                )
+            # Handle SSO access
+            actions = os.environ.get('S3_PERMISSIONS', '').split(',')
+            handler.grant_permission_set(
+                user_email=args.user_email,
+                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
+                session_duration=args.duraion,
+                inline_policy={
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": actions,
+                            "resource": [args.bucket_name]
+                        }
+                    ]
+                }
+            )
         else:  # revoke
-            if args.bucket_name:
-                # Handle S3 access revocation
-                handler.revoke_s3_access(
-                    user_email=args.user_email,
-                    bucket_name=args.bucket_name
-                )
-            else:
-                # Handle SSO access revocation
-                handler.revoke_permission_set(
-                    user_email=args.user_email,
-                    permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
-                )
+            # Handle SSO access revocation
+            handler.revoke_permission_set(
+                user_email=args.user_email,
+                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
+            )
 
     except Exception as e:
         print_progress(f"Error: {str(e)}", "❌")
