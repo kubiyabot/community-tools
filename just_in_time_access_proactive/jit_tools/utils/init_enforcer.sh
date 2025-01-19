@@ -50,7 +50,7 @@ check_existing_enforcer() {
         if [ -z "$current_policy" ]; then
             log "❌ Error: Could not retrieve current OPA_DEFAULT_POLICY"
             exit 1
-        }
+        fi
 
         if [ "$current_policy" = "$BS64_OPA_DEFAULT_POLICY" ]; then
             log "✅ OPA_DEFAULT_POLICY is up to date - no changes needed"
