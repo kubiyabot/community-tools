@@ -95,11 +95,9 @@ def find_template_file() -> Path:
     """Find the workflow failure template file."""
     possible_paths = [
         # Check relative to script location
-        Path(__file__).parent / 'templating' / 'templates' / 'workflow_failure.jinja2',
-        Path(__file__).parent / 'utils' / 'templating' / 'templates' / 'workflow_failure.jinja2',
+        Path(__file__).parent / 'templates' / 'workflow_failure.jinja2',
         # Check in /opt/scripts path (Docker container)
-        Path('/opt/scripts/templating/templates/workflow_failure.jinja2'),
-        Path('/opt/scripts/utils/templating/templates/workflow_failure.jinja2'),
+        Path('/opt/scripts/templates/workflow_failure.jinja2'),
     ]
     
     for path in possible_paths:
