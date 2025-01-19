@@ -1,93 +1,19 @@
 "use client";
 
-import { Thread, useAssistantToolUI, ThreadMessage, AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ModelConfig, type ChatModelRunOptions, type ThreadMessage as ThreadMessageType, type TextContentPart, type ChatModelRunResult, type ThreadAssistantContentPart, type LocalRuntimeOptions } from "@assistant-ui/react";
+import { useAssistantToolUI } from "@assistant-ui/react";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { LoginButton } from './LoginButton';
-import { AssistantMessage as BaseAssistantMessage } from './assistant-ui/AssistantMessage';
-import { UserMessage as BaseUserMessage } from './assistant-ui/UserMessage';
 import { ToolExecution } from './assistant-ui/ToolExecution';
-import { useState, useEffect } from 'react';
-
-// Wrap message components to match Thread's expected interface
-const AssistantMessage = (props: any) => (
-  <BaseAssistantMessage message={props.message as ThreadMessage & { role: 'assistant' | 'system' }} />
-);
-
-const UserMessage = (props: any) => (
-  <BaseUserMessage message={props.message as ThreadMessage & { role: 'user' }} />
-);
-
-const createModelAdapter = (token: string): ChatModelAdapter => {
-  if (!token) {
-    throw new Error('Access token is required');
-  }
-
-  return {
-    async *run({ messages }) {
-      const lastMessage = messages[messages.length - 1];
-      const textContent = lastMessage.content.find((c): c is TextContentPart => c.type === 'text');
-      const messageText = textContent?.text || '';
-
-      const response = await fetch('/api/converse', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-          'Connection': 'keep-alive'
-        },
-        body: JSON.stringify({ 
-          message: messageText,
-          session_id: Date.now().toString()
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.statusText}`);
-      }
-
-      try {
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('No response body');
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const event = JSON.parse(line);
-              yield {
-                content: [{ type: 'text', text: event.message || event.content || '' }]
-              };
-            } catch (e) {
-              console.error('Failed to parse event:', e);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Stream error:', error);
-        yield {
-          content: [{ type: 'text', text: 'Error: Failed to process response stream' }]
-        };
-      }
-    }
-  };
-};
+import { Chat } from './assistant-ui/Chat';
+import { useTeammateContext } from '../MyRuntimeProvider';
+import { useConfig } from '@/lib/config-context';
+import { TeammateSelector } from './TeammateSelector';
+import { UserProfileButton } from './UserProfileButton';
 
 export default function MyAssistant() {
   const { user, isLoading } = useUser();
+  const { selectedTeammate, teammates } = useTeammateContext();
+  const { clearApiKey } = useConfig();
 
   // Register tool UIs
   useAssistantToolUI({
@@ -103,7 +29,7 @@ export default function MyAssistant() {
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#0f172a]">
-        <div className="text-white">Loading...</div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
       </div>
     );
   }
@@ -124,20 +50,61 @@ export default function MyAssistant() {
     );
   }
 
-  const modelAdapter = createModelAdapter(user.sub || '');
-  const runtime = useLocalRuntime(modelAdapter);
-
   return (
-    <div className="min-h-screen bg-[#0f172a]">
-      <div className="container mx-auto px-4 py-4">
-        <AssistantRuntimeProvider runtime={runtime}>
-          <Thread
-            components={{
-              AssistantMessage,
-              UserMessage
-            }}
-          />
-        </AssistantRuntimeProvider>
+    <div className="flex h-screen bg-[#0A0F1E] overflow-hidden">
+      {/* Sidebar */}
+      <div className="w-72 flex-shrink-0 flex flex-col bg-[#1E293B] border-r border-[#2D3B4E] shadow-xl">
+        {/* Logo Header */}
+        <div className="flex-shrink-0 p-3 border-b border-[#2D3B4E] bg-[#1A1F2E]">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
+              alt="Kubiya Logo"
+              className="w-8 h-8 rounded-md"
+            />
+            <h1 className="text-white font-semibold text-sm tracking-wide">Kubiya Chat</h1>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Teammate Selector */}
+          <TeammateSelector />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="h-14 border-b border-[#2D3B4E] bg-[#1A1F2E] flex items-center justify-between px-4 flex-shrink-0 shadow-md">
+          <div className="flex items-center space-x-3">
+            <h2 className="text-white font-medium text-sm">
+              {teammates.find(t => t.uuid === selectedTeammate)?.name || 'Select a Teammate'}
+            </h2>
+          </div>
+          <div className="flex items-center space-x-3">
+            <UserProfileButton 
+              onLogout={() => {
+                clearApiKey();
+                window.location.href = '/api/auth/logout';
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Chat area */}
+        <div className="flex-1 min-h-0 relative">
+          <Chat />
+
+          {/* Footer Logo */}
+          <div className="absolute bottom-3 right-3 opacity-20 transition-opacity duration-200 hover:opacity-40">
+            <img
+              src="https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
+              alt="Kubiya Logo"
+              className="w-10 h-10"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

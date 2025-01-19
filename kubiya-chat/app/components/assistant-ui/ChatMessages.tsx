@@ -6,7 +6,7 @@ import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 
 interface ChatMessagesProps {
-  messages: ThreadMessage[];
+  messages: readonly ThreadMessage[];
 }
 
 export const ChatMessages = ({ messages }: ChatMessagesProps) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { MessageSquare, Plus, Search, X, AlertCircle } from 'lucide-react';
+import { MessageSquare, Plus, Search, X } from 'lucide-react';
 import { useTeammateContext } from '../../MyRuntimeProvider';
 
 interface ThreadInfo {
@@ -20,44 +20,31 @@ interface ThreadsSidebarProps {
   onNewThread: () => void;
 }
 
-export const ThreadsSidebar = ({ threads, currentThreadId, onThreadSelect, onNewThread }: ThreadsSidebarProps) => {
+export const ThreadsSidebar = ({
+  threads,
+  currentThreadId,
+  onThreadSelect,
+  onNewThread,
+}: ThreadsSidebarProps) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const { teammates, error } = useTeammateContext();
-
-  const filteredThreads = threads.filter(thread => {
-    const matchesSearch = thread.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         thread.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  const { teammates, selectedTeammate } = useTeammateContext();
 
   const getTeammateName = (teammateId: string) => {
-    return teammates.find(t => t.uuid === teammateId)?.name || 'Unknown Teammate';
+    const teammate = teammates.find(t => t.uuid === teammateId);
+    return teammate?.name || 'Unknown Teammate';
   };
 
-  const handleSupportClick = () => {
-    if (error?.supportInfo) {
-      const { email, subject, body } = error.supportInfo;
-      window.location.href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="w-80 h-full bg-[#1A1F2E] border-r border-[#3D4B5E] flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <h3 className="text-white font-medium mb-2">{error.error}</h3>
-          <p className="text-[#94A3B8] text-sm mb-4">{error.details}</p>
-          <button
-            onClick={handleSupportClick}
-            className="px-4 py-2 bg-[#7C3AED] hover:bg-[#6D31D0] text-white rounded-md transition-colors"
-          >
-            Contact Support
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // Filter threads by search query and selected teammate
+  const filteredThreads = threads.filter(thread => {
+    const matchesSearch = !searchQuery || 
+      thread.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      thread.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getTeammateName(thread.teammateId).toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesTeammate = thread.teammateId === selectedTeammate;
+    
+    return matchesSearch && matchesTeammate;
+  });
 
   return (
     <div className="w-80 h-full bg-[#1A1F2E] border-r border-[#3D4B5E] flex flex-col">

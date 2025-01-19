@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { GeistSans } from 'geist/font';
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ConfigProvider } from "@/lib/config-context";
-import MyRuntimeProvider from "@/app/MyRuntimeProvider";
+import ClientProvider from "@/app/components/ClientProvider";
 import "./globals.css";
 import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 
@@ -22,9 +22,9 @@ export default function RootLayout({
         <ErrorBoundary>
           <UserProvider>
             <ConfigProvider>
-              <MyRuntimeProvider>
+              <ClientProvider>
                 {children}
-              </MyRuntimeProvider>
+              </ClientProvider>
             </ConfigProvider>
           </UserProvider>
         </ErrorBoundary>

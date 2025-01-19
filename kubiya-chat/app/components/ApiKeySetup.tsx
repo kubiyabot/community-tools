@@ -36,14 +36,14 @@ const SSO_OPTIONS = [
         />
       </svg>
     ),
-    path: '/api/auth/auth0/login?connection=google-oauth2' as const,
+    path: '/api/auth/login?connection=google-oauth2' as const,
     color: 'bg-white text-gray-900 hover:bg-gray-50'
   },
   {
     id: 'slack',
     name: 'Slack',
     icon: SlackIcon,
-    path: '/api/auth/auth0/login?connection=slack' as const,
+    path: '/api/auth/login?connection=slack' as const,
     color: 'bg-[#4A154B] hover:bg-[#4A154B]/90 text-white'
   }
 ] as const;
@@ -71,13 +71,11 @@ export function ApiKeySetup() {
     setTempKey("");
   };
 
-  const handleSsoLogin = async (path: string) => {
-    setIsLoading(true);
-    try {
-      window.location.href = path;
-    } catch (err) {
-      setError(`Failed to redirect to SSO provider: ${err instanceof Error ? err.message : String(err)}`);
-      setIsLoading(false);
+  const handleSsoLogin = (connection: string) => {
+    if (typeof window !== 'undefined') {
+      window.location.href = `/api/auth/login?connection=${connection}`;
+    } else {
+      console.error('Window object not available');
     }
   };
 
@@ -306,7 +304,7 @@ export function ApiKeySetup() {
               {SSO_OPTIONS.map((option) => (
                 <Button
                   key={option.id}
-                  onClick={() => handleSsoLogin(option.path)}
+                  onClick={() => handleSsoLogin(option.id)}
                   disabled={isLoading}
                   className={cn(
                     "w-full h-11 font-medium transition-all duration-200",

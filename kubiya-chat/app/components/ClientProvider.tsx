@@ -5,6 +5,7 @@ import { useUser } from '@auth0/nextjs-auth0/client';
 import MyRuntimeProvider from '../MyRuntimeProvider';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConfig } from '@/lib/config-context';
 
 interface ClientProviderProps {
   children: ReactNode;
@@ -12,20 +13,24 @@ interface ClientProviderProps {
 
 export default function ClientProvider({ children }: ClientProviderProps): JSX.Element {
   const [mounted, setMounted] = useState(false);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const { user, isLoading: isUserLoading } = useUser();
   const router = useRouter();
+  const { setApiKey, setAuthType, apiKey } = useConfig();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     async function fetchToken() {
       console.log('[ClientProvider] State:', { 
         user: user ? 'exists' : 'null', 
-        isUserLoading, 
-        accessToken: accessToken ? 'exists' : 'null',
-        mounted
+        isUserLoading,
+        mounted,
+        hasApiKey: !!apiKey
       });
 
-      if (user && !accessToken) {
+      if (user && !apiKey && !isUserLoading) {
         console.log('[ClientProvider] Fetching token for user:', user.email);
         try {
           const response = await fetch('/api/auth/me', {
@@ -42,11 +47,7 @@ export default function ClientProvider({ children }: ClientProviderProps): JSX.E
           if (!response.ok) {
             if (response.status === 401) {
               console.log('[ClientProvider] Unauthorized, redirecting to login');
-              const form = document.createElement('form');
-              form.method = 'GET';
-              form.action = '/api/auth/auth0/login';
-              document.body.appendChild(form);
-              form.submit();
+              window.location.href = '/api/auth/auth0/login';
               return;
             }
             throw new Error(`Profile fetch failed: ${response.status}`);
@@ -60,41 +61,31 @@ export default function ClientProvider({ children }: ClientProviderProps): JSX.E
 
           if (!data.accessToken) {
             console.error('[ClientProvider] No access token in profile data');
-            const form = document.createElement('form');
-            form.method = 'GET';
-            form.action = '/api/auth/auth0/login';
-            document.body.appendChild(form);
-            form.submit();
+            window.location.href = '/api/auth/auth0/login';
             return;
           }
 
-          console.log('[ClientProvider] Setting access token and mounted state');
-          setAccessToken(data.accessToken);
-          setMounted(true);
+          console.log('[ClientProvider] Setting access token');
+          setApiKey(data.accessToken);
+          setAuthType('sso');
         } catch (error) {
           console.error('[ClientProvider] Token fetch error:', error);
-          const form = document.createElement('form');
-          form.method = 'GET';
-          form.action = '/api/auth/auth0/login';
-          document.body.appendChild(form);
-          form.submit();
+          window.location.href = '/api/auth/auth0/login';
         }
       } else if (!user && !isUserLoading) {
         console.log('[ClientProvider] No user and not loading, redirecting to login');
-        const form = document.createElement('form');
-        form.method = 'GET';
-        form.action = '/api/auth/auth0/login';
-        document.body.appendChild(form);
-        form.submit();
+        window.location.href = '/api/auth/auth0/login';
       }
     }
 
-    fetchToken();
-  }, [user, isUserLoading, accessToken, router]);
+    if (mounted) {
+      fetchToken();
+    }
+  }, [user, isUserLoading, mounted, router, setApiKey, setAuthType, apiKey]);
 
-  // Don't render anything until we're mounted and have all required data
-  if (!mounted || isUserLoading || (user && !accessToken)) {
-    console.log('[ClientProvider] Showing loading state:', { mounted, isUserLoading, hasUser: !!user, hasToken: !!accessToken });
+  // Don't render anything until we're mounted
+  if (!mounted) {
+    console.log('[ClientProvider] Not mounted yet');
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
@@ -102,10 +93,34 @@ export default function ClientProvider({ children }: ClientProviderProps): JSX.E
     );
   }
 
-  // Only render the runtime provider if we have both user and token
-  if (!user || !accessToken) {
-    console.log('[ClientProvider] Missing user or token:', { hasUser: !!user, hasToken: !!accessToken });
-    return <>{children}</>;
+  // Show loading while checking auth
+  if (isUserLoading) {
+    console.log('[ClientProvider] User loading');
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // Show loading while getting token
+  if (user && !apiKey) {
+    console.log('[ClientProvider] Waiting for token');
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // Only render the runtime provider if we have user and token
+  if (!user || !apiKey) {
+    console.log('[ClientProvider] Missing user or token:', { hasUser: !!user, hasToken: !!apiKey });
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-white">Please log in to continue</div>
+      </div>
+    );
   }
 
   console.log('[ClientProvider] Rendering MyRuntimeProvider with user and token');
