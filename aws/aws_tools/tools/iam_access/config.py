@@ -1,10 +1,37 @@
-import yaml
-import requests
-from typing import Dict, Any, List
-import os
-import boto3
-from dataclasses import dataclass
-from typing import Optional
+def try_import(module_name, install_hint=None):
+    try:
+        return __import__(module_name)
+    except ImportError:
+        print(f"⚠️  Import Warning: Could not import '{module_name}'.")
+        if install_hint:
+            print(f"   Hint: You can install it with: {install_hint}")
+        else:
+            print("   Please ensure the module is properly installed.")
+
+# Import modules with friendly error messages
+yaml = try_import("yaml", "pip install pyyaml")
+requests = try_import("requests", "pip install requests")
+typing = try_import("typing")  # Built-in module, no install hint needed
+os = try_import("os")          # Built-in module, no install hint needed
+
+# Additional imports with specific handling
+try:
+    from typing import Dict, Any, List, Optional
+except ImportError:
+    print("⚠️  Import Warning: 'typing' module could not be imported.")
+    print("   This might indicate an issue with the Python installation.")
+
+try:
+    import boto3
+except ImportError:
+    print("⚠️  Import Warning: 'boto3' module not found.")
+    print("   Please ensure Boto3 is installed: pip install boto3")
+
+try:
+    from dataclasses import dataclass
+except ImportError:
+    print("⚠️  Import Warning: 'dataclasses' module could not be imported.")
+    print("   Ensure your Python version supports dataclasses (Python 3.7+).")
 
 @dataclass
 class PolicyConfig:
