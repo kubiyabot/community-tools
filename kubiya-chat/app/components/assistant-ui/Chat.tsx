@@ -130,6 +130,8 @@ export const Chat = () => {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [systemMessages, setSystemMessages] = useState<string[]>([]);
+  const [pendingSystemMessages, setPendingSystemMessages] = useState<string[]>([]);
+  const [isCollectingSystemMessages, setIsCollectingSystemMessages] = useState(false);
   
   // Load stored state on mount only
   useEffect(() => {
@@ -211,15 +213,57 @@ export const Chat = () => {
     if (!thread?.messages) return;
     
     const newSystemMessages = thread.messages
-      .filter(msg => msg.role === 'system')
+      .filter(msg => msg.role === 'system' || msg.metadata?.custom?.isSystemMessage)
       .map(msg => {
         const textContent = msg.content.find(c => 'text' in c && c.type === 'text');
         return textContent && 'text' in textContent ? textContent.text : '';
       })
       .filter(Boolean);
 
-    setSystemMessages(newSystemMessages);
+    console.log('System Messages:', {
+      count: newSystemMessages.length,
+      messages: newSystemMessages,
+      allMessages: thread.messages.map(m => ({ role: m.role, content: m.content, metadata: m.metadata }))
+    });
+
+    // Only update if we have new system messages and they're different
+    if (newSystemMessages.length > 0 && JSON.stringify(newSystemMessages) !== JSON.stringify(systemMessages)) {
+      setSystemMessages(newSystemMessages);
+    }
   }, [thread?.messages]);
+
+  // Handle collecting system messages
+  useEffect(() => {
+    if (isCollectingSystemMessages && pendingSystemMessages.length > 0) {
+      console.log('Collecting system messages:', {
+        pending: pendingSystemMessages,
+        isCollecting: isCollectingSystemMessages
+      });
+      
+      const timer = setTimeout(() => {
+        setIsCollectingSystemMessages(false);
+        
+        // Filter out duplicates and empty messages
+        const uniqueMessages = Array.from(new Set(pendingSystemMessages))
+          .filter(msg => msg.trim());
+        
+        if (uniqueMessages.length > 0) {
+          console.log('Appending system messages:', uniqueMessages);
+          
+          // Add each system message individually to maintain proper ordering
+          uniqueMessages.forEach(message => {
+            threadRuntime.append({
+              role: 'system',
+              content: [{ type: 'text', text: message }]
+            });
+          });
+        }
+        setPendingSystemMessages([]);
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [isCollectingSystemMessages, pendingSystemMessages, threadRuntime]);
 
   const handleSubmit = async (message: string) => {
     if (!selectedTeammate) {
@@ -233,6 +277,8 @@ export const Chat = () => {
 
     setError(null);
     setIsProcessing(true);
+    setIsCollectingSystemMessages(true);
+    setPendingSystemMessages([]);
 
     try {
       // Create or get thread ID
@@ -251,24 +297,21 @@ export const Chat = () => {
         }));
       }
 
-      // Initialize thread if needed
-      if (!thread?.messages.length) {
-        await threadRuntime.append({
-          role: 'user',
-          content: [{ type: 'text', text: message }]
-        });
-      } else {
-        // Send message through the runtime
-        await threadRuntime.append({
-          role: 'user',
-          content: [{ type: 'text', text: message }]
-        });
-      }
+      // Send message through the runtime
+      await threadRuntime.append({
+        role: 'user',
+        content: [{ type: 'text', text: message }]
+      });
+
     } catch (error) {
       console.error('Error sending message:', error);
       setError('Failed to send message. Please try again.');
     } finally {
-      setIsProcessing(false);
+      // Don't set isProcessing to false immediately to allow system messages to be collected
+      setTimeout(() => {
+        setIsProcessing(false);
+        setIsCollectingSystemMessages(false);
+      }, 2000); // Increased timeout to ensure all messages are collected
     }
   };
 
@@ -331,22 +374,16 @@ export const Chat = () => {
       />
       <div className="flex-1 flex flex-col h-full relative">
         <div className="flex-1 overflow-y-auto">
-          <ChatMessages messages={thread?.messages || []} />
+          <ChatMessages 
+            messages={thread?.messages || []} 
+            isCollectingSystemMessages={isCollectingSystemMessages}
+            systemMessages={systemMessages}
+          />
         </div>
         <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
         
-        {/* System Messages Panel */}
-        <div className="absolute top-0 right-0 w-80 p-4">
-          <SystemMessages messages={systemMessages} />
-        </div>
-        
         {/* Tool Execution Panel */}
-        <div className="absolute top-0 right-80 w-80 p-4 space-y-2">
-          <ToolExecution toolName="find_resource" />
-          <ToolExecution toolName="get_resource" />
-          <ToolExecution toolName="create_resource" />
-          <ToolExecution toolName="delete_resource" />
-          <ToolExecution toolName="update_resource" />
+        <div className="absolute top-0 right-0 w-80 p-4 space-y-2">
         </div>
       </div>
     </div>

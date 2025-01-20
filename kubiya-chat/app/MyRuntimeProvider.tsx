@@ -210,10 +210,15 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
   let messageId = `msg_${Date.now()}`;
   let currentToolId = `tool_${Date.now()}`;
 
+  console.log('[SSE] Starting event stream processing');
+
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        console.log('[SSE] Stream done');
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -225,14 +230,20 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
         try {
           // Handle data: prefix
           const content = line.startsWith('data: ') ? line.slice(6) : line;
-          if (content === '[DONE]') break;
+          if (content === '[DONE]') {
+            console.log('[SSE] Received [DONE] event');
+            break;
+          }
 
           try {
             // Try to parse as JSON first
             const event = JSON.parse(content);
+            console.log('[SSE] Parsed event:', { type: event.type, id: event.id, messageLength: event.message?.length });
+
             if (event.type === 'system_message' && event.message) {
               const text = event.message.trim();
               if (text && !systemMessages.has(text)) {
+                console.log('[SSE] Processing system message:', { text });
                 systemMessages.add(text);
                 yield {
                   content: [{ type: "text", text } as TextContent],
@@ -243,11 +254,15 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
               continue;
             }
 
-            // Handle other event types
+            // Handle tool events
             if (event.type === 'tool') {
-              const toolId = event.id || currentToolId;
+              console.log('[SSE] Processing tool event:', { 
+                toolName: event.tool_name,
+                hasArgs: !!event.arguments,
+                messageLength: event.message?.length 
+              });
               
-              // Try to extract tool info from text or event
+              const toolId = event.id || currentToolId;
               let toolName = event.tool_name;
               let args = event.arguments;
               
@@ -257,8 +272,9 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                   try {
                     toolName = toolMatch[1];
                     args = JSON.parse(toolMatch[2]);
+                    console.log('[SSE] Extracted tool info from message:', { toolName, hasArgs: !!args });
                   } catch (e) {
-                    console.warn('Failed to parse tool arguments:', e);
+                    console.warn('[SSE] Failed to parse tool arguments:', e);
                   }
                 }
               }
@@ -278,6 +294,11 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                 };
               }
             } else if (event.type === 'tool_output') {
+              console.log('[SSE] Processing tool output:', { 
+                id: event.id || currentToolId,
+                messageLength: event.message?.length 
+              });
+              
               const toolId = event.id || currentToolId;
               yield {
                 content: [],
@@ -291,6 +312,12 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                 }]
               };
             } else if ((event.type === 'msg' || event.type === 'assistant') && event.message) {
+              console.log('[SSE] Processing message:', { 
+                type: event.type,
+                messageLength: event.message.length,
+                id: event.id || messageId
+              });
+              
               lastMessageText = event.message;
               lastMessageType = 'assistant';
               yield {
@@ -300,10 +327,13 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
               };
             }
           } catch (parseError) {
+            console.warn('[SSE] JSON parse error:', parseError);
+            
             // If JSON parsing fails, check for system message patterns
             if (content.includes('WARNING:') || content.includes('ERROR:')) {
               const text = content.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
               if (text && !systemMessages.has(text)) {
+                console.log('[SSE] Processing plain text system message:', { text });
                 systemMessages.add(text);
                 yield {
                   content: [{ type: "text", text } as TextContent],
@@ -312,7 +342,10 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                 };
               }
             } else if (!content.startsWith('{') && !content.startsWith('[')) {
-              // If it's not JSON and not a system message, treat as assistant message
+              console.log('[SSE] Processing plain text message:', { 
+                contentLength: content.length 
+              });
+              
               lastMessageText = content;
               lastMessageType = 'assistant';
               yield {
@@ -323,11 +356,12 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
             }
           }
         } catch (e) {
-          console.warn('[Runtime] Error processing message:', e);
+          console.error('[SSE] Error processing message:', e);
         }
       }
     }
   } finally {
+    console.log('[SSE] Stream ended, releasing reader lock');
     reader.releaseLock();
   }
 };

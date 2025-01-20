@@ -141,7 +141,9 @@ export async function POST(req: NextRequest) {
         const text = new TextDecoder().decode(chunk);
         const lines = text.split('\n');
         
+        let systemMessages: string[] = [];
         let lastEvent = null;
+        let lastSystemBatch = 0;
         
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -150,14 +152,34 @@ export async function POST(req: NextRequest) {
             // Parse the JSON to get the message ID and type
             const event = JSON.parse(line);
             
-            // Handle system messages immediately
+            // Collect system messages
             if (event.type === 'system_message') {
+              systemMessages.push(event.message);
+              
+              // Send batched system messages if we have enough or after a delay
+              const now = Date.now();
+              if (systemMessages.length >= 3 || (now - lastSystemBatch > 1000 && systemMessages.length > 0)) {
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                  type: 'system_message',
+                  messages: systemMessages,
+                  id: `system_${now}`
+                })}\n\n`));
+                systemMessages = [];
+                lastSystemBatch = now;
+              }
+              continue;
+            }
+            
+            // If we have collected system messages and we're getting a non-system message,
+            // send all system messages as a batch first
+            if (systemMessages.length > 0 && (event.type === 'msg' || event.type === 'assistant')) {
               controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                 type: 'system_message',
-                message: event.message,
-                id: event.id
+                messages: systemMessages,
+                id: `system_${Date.now()}`
               })}\n\n`));
-              continue;
+              systemMessages = [];
+              lastSystemBatch = Date.now();
             }
             
             // For chat messages, only send if the message is different from the last one
@@ -175,9 +197,17 @@ export async function POST(req: NextRequest) {
               }
             }
           } catch (e) {
-            // If parsing fails, skip this line
             console.error('Failed to parse line:', e);
           }
+        }
+        
+        // Send any remaining system messages
+        if (systemMessages.length > 0) {
+          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+            type: 'system_message',
+            messages: systemMessages,
+            id: `system_${Date.now()}`
+          })}\n\n`));
         }
       }
     });
