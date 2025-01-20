@@ -207,13 +207,6 @@ echo "💬 Processing comment for pull request #$number in $repo..."
 #     fi
 # done
 
-echo "REPO: $repo"
-echo "PR_NUMBER: $number"
-echo "WORKFLOW_STEPS: $workflow_steps"
-echo "FAILURES_AND_FIXES: $failures_and_fixes"
-echo "ERROR_LOGS: $error_logs"
-echo "RUN_DETAILS: $run_details"
-
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
