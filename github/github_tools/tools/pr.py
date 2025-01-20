@@ -199,13 +199,13 @@ set -euo pipefail
 
 echo "💬 Processing comment for pull request #$number in $repo..."
 
-# Validate JSON inputs
-for input in "$workflow_steps" "$failures_and_fixes" "$run_details"; do
-    if ! printf '%s' "$input" | jq empty; then
-        echo "❌ Invalid JSON input provided"
-        exit 1
-    fi
-done
+# # Validate JSON inputs
+# for input in "$workflow_steps" "$failures_and_fixes" "$run_details"; do
+#     if ! printf '%s' "$input" | jq empty; then
+#         echo "❌ Invalid JSON input provided"
+#         exit 1
+#     fi
+# done
 
 # Export variables for the Python script
 export REPO="$repo"
