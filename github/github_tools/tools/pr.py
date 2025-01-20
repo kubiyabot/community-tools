@@ -200,7 +200,7 @@ set -euo pipefail
 echo "💬 Processing comment for pull request #$number in $repo..."
 
 # Validate JSON inputs
-for input in "$workflow_steps" "$failures_and_fixes" "$error_logs" "$run_details"; do
+for input in "$workflow_steps" "$failures_and_fixes" "$run_details"; do
     if ! printf '%s' "$input" | jq empty; then
         echo "❌ Invalid JSON input provided"
         exit 1
