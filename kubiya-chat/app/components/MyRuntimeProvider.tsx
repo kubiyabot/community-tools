@@ -59,11 +59,25 @@ const backendApi = async ({ messages, abortSignal }: any) => {
             
             try {
               const event = JSON.parse(data) as KubiyaEvent;
-              console.log('Processing event:', event);
+              console.log('[SSE] Parsed event:', {
+                type: event.type,
+                id: event.id,
+                messageLength: event.message?.length,
+                hasToolName: 'name' in event,
+                hasArguments: 'arguments' in event,
+                message: event.message?.slice(0, 100)
+              });
               
-              if (event.type === 'msg' || event.type === 'system_message') {
+              if (event.type === 'system_message') {
                 yield {
-                  type: event.type,
+                  type: 'system_message',
+                  text: event.message,
+                  id: event.id,
+                  metadata: { custom: { isSystemMessage: true } }
+                } as StreamEvent;
+              } else if (event.type === 'msg') {
+                yield {
+                  type: 'msg',
                   text: event.message,
                   id: event.id
                 } as StreamEvent;
@@ -100,16 +114,35 @@ const MyModelAdapter: ChatModelAdapter = {
         return;
       }
 
-      if (event.type === 'msg' || event.type === 'system_message') {
+      if (event.type === 'msg') {
         text = event.text || '';
+        yield {
+          content: [{ type: "text", text }],
+          isComplete: false
+        };
+      } else if (event.type === 'system_message') {
+        const systemText = event.text || '';
+        yield {
+          role: 'system',
+          content: [{ 
+            type: "text", 
+            text: systemText 
+          }],
+          metadata: { 
+            custom: { 
+              isSystemMessage: true,
+              originalId: event.id 
+            } 
+          },
+          isComplete: true
+        };
       } else if (event.type === 'tool') {
         text += event.text || '';
+        yield {
+          content: [{ type: "text", text }],
+          isComplete: false
+        };
       }
- 
-      yield {
-        content: [{ type: "text", text }],
-        isComplete: false
-      };
     }
   },
 };
