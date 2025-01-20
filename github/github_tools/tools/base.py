@@ -57,7 +57,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if ! python3 -c "import jinja2" >/dev/null 2>&1; then
-    pip install jinja2
+    apk add --quiet py3-jinja2 >/dev/null 2>&1
 fi
 
 # Function to add disclaimer
