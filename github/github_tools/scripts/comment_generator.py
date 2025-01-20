@@ -70,7 +70,7 @@ def parse_workflow_steps(steps_json: str) -> list:
     try:
         return json.loads(steps_json)
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid workflow steps JSON: {e}")
+        logger.error(f"Invalid workflow steps JSON: {e}, value: {steps_json}")
         sys.exit(1)
 
 def parse_failures_and_fixes(failures_and_fixes_json: str) -> list:
@@ -78,7 +78,7 @@ def parse_failures_and_fixes(failures_and_fixes_json: str) -> list:
     try:
         return json.loads(failures_and_fixes_json)
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid failures and fixes JSON: {e}")
+        logger.error(f"Invalid failures and fixes JSON: {e}, value: {failures_and_fixes_json}")
         sys.exit(1)
 
 def parse_run_details(details_json: str) -> dict:
@@ -88,7 +88,7 @@ def parse_run_details(details_json: str) -> dict:
         _detailes_json['processed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         return _detailes_json
     except json.JSONDecodeError as e:
-        logger.error(f"Invalid run details JSON: {e}")
+        logger.error(f"Invalid run details JSON: {e}, value: {details_json}")
         sys.exit(1)
 
 def find_template_file() -> Path:
