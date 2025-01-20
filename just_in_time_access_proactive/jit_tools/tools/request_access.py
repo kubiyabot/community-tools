@@ -11,7 +11,11 @@ from kubiya_sdk.tools import Arg, FileSpec, Volume
 from kubiya_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
-from scripts import access_request_handler
+
+# Read the access_request_handler script content directly from file
+scripts_dir = Path(__file__).resolve().parents[2] / "scripts"
+with open(scripts_dir / "access_request_handler.py", "r") as f:
+    script_content = f.read()
 
 request_access_tool = JustInTimeAccessTool(
     name="request_tool_access",
@@ -63,7 +67,7 @@ request_access_tool = JustInTimeAccessTool(
     with_files=[
         FileSpec(
             destination="/opt/scripts/access_request_handler.py",
-            content=inspect.getsource(access_request_handler),
+            content=script_content,
         ),
     ],
     long_running=False,
