@@ -31,7 +31,6 @@ graph LR;
     {% else %}
     style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
     {% endif %}
-    {{ loop.index }} --> {{ loop.index }}["{{ step.conclusion }}"];
 {% endfor %}
 ```
 
