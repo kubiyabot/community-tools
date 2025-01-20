@@ -15,11 +15,10 @@ default allow = false
 # Tool Categories
 tool_categories := {
     "admin": {
-        "approve_access_tool",
-        "describe_access_request_tool",
-        "list_active_access_requests_tool",
-        "request_access_tool",
-        "view_user_requests_tool"
+        "list_active_access_requests",
+        "view_user_requests",
+        "approve_tool_access_request",
+        "describe_access_request"
     },
     "revoke": {${revoke_tools}},
     "restricted": {${restricted_tools}}
