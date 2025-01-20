@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, type ReactNode, createContext, useContext, SetStateAction, useCallback } from "react";
+import React, { useState, useEffect, type ReactNode, createContext, useContext, SetStateAction, useCallback, useMemo } from "react";
 import {
   AssistantRuntimeProvider,
   useLocalRuntime,
@@ -77,6 +77,9 @@ interface TeammateContextType {
     };
   };
   currentState?: TeammateState;
+  switchThread: (teammateId: string, threadId: string) => void;
+  setTeammateState: (teammateId: string, state: TeammateState) => void;
+  handleSubmit: (message: string) => Promise<void>;
 }
 
 const TeammateContext = createContext<TeammateContextType>({
@@ -84,6 +87,9 @@ const TeammateContext = createContext<TeammateContextType>({
   selectedTeammate: undefined,
   setSelectedTeammate: () => {},
   isLoading: true,
+  switchThread: () => {},
+  setTeammateState: () => {},
+  handleSubmit: async () => {}
 });
 
 export const useTeammateContext = () => useContext(TeammateContext);
@@ -323,7 +329,7 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
               yield {
                 content: [{ type: "text", text: event.message } as TextContent],
                 role: 'assistant',
-                id: messageId
+                id: event.id || messageId
               };
             }
           } catch (parseError) {
@@ -366,16 +372,16 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
   }
 };
 
-interface ThreadMetadata {
-  teammateId: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface ThreadState {
   messages: any[];
   lastMessageId?: string;
-  metadata: ThreadMetadata;
+  metadata: {
+    teammateId: string;
+    createdAt: string;
+    updatedAt: string;
+    title?: string;
+    activeTool?: string;
+  };
 }
 
 interface TeammateState {
@@ -396,213 +402,442 @@ interface RuntimeOptions {
   maxTokens: number;
 }
 
+// Initialize empty thread state
+const createEmptyThread = (teammateId: string): ThreadState => ({
+  messages: [],
+  metadata: {
+    teammateId,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }
+});
+
+// Initialize empty teammate state
+const createEmptyTeammateState = (teammateId: string): TeammateState => {
+  const threadId = Date.now().toString();
+  return {
+    sessions: [],
+    currentThreadId: threadId,
+    currentSessionId: threadId,
+    threads: {
+      [threadId]: createEmptyThread(teammateId)
+    }
+  };
+};
+
+// Create custom hook for runtime
+const useAssistantRuntime = (adapter: ChatModelAdapter) => {
+  return useLocalRuntime(adapter);
+};
+
 export default function MyRuntimeProvider({ children }: { children: ReactNode }) {
-  const [teammates, setTeammates] = useState<any[]>([]);
-  const [selectedTeammate, setSelectedTeammate] = useState<string | undefined>(undefined);
-  const [teammateStates, setTeammateStates] = useState<TeammateStates>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const { apiKey, authType, setApiKey, setAuthType, clearApiKey } = useConfig();
-  const [mounted, setMounted] = useState(false);
+  // 1. All useContext hooks first (these don't depend on state)
   const { user, isLoading: isUserLoading } = useUser();
-  const [error, setError] = useState<TeammateContextType['error']>();
+  const { apiKey, authType } = useConfig();
   const router = useRouter();
 
-  const createThreadState = useCallback((teammateId: string): ThreadState => {
-    const now = new Date().toISOString();
-    return {
-      messages: [],
-      lastMessageId: undefined,
-      metadata: {
-        teammateId,
-        createdAt: now,
-        updatedAt: now
-      }
-    };
+  // 2. All useState hooks with proper initialization
+  const [mounted, setMounted] = useState(false);
+  const [teammates, setTeammates] = useState<any[]>([]);
+  const [selectedTeammate, setSelectedTeammate] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<any>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isCollectingSystemMessages, setIsCollectingSystemMessages] = useState(false);
+  const [teammateStates, setTeammateStates] = useState<TeammateStates>({});
+
+  // 3. All callbacks with safe state access
+  const setTeammateState = useCallback((teammateId: string, state: TeammateState) => {
+    if (!teammateId) return;
+    setTeammateStates(prev => ({
+      ...prev,
+      [teammateId]: state
+    }));
+    localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(state));
   }, []);
 
-  const createTeammateState = useCallback((teammateId: string): TeammateState => {
-    const threadId = Date.now().toString();
-    const sessionId = Date.now().toString();
-    
-    return {
-      sessions: [],
-      currentThreadId: threadId,
-      currentSessionId: sessionId,
-      threads: {
-        [threadId]: createThreadState(teammateId)
-      }
-    };
-  }, [createThreadState]);
-
-  const updateTeammateState = useCallback((teammateId: string, newState: TeammateState) => {
+  const switchThread = useCallback((teammateId: string, threadId: string) => {
+    if (!teammateId || !threadId) return;
     setTeammateStates(prev => {
-      const updated: TeammateStates = {
-        ...prev,
-        [teammateId]: newState
+      const currentState = prev[teammateId] || createEmptyTeammateState(teammateId);
+      const updatedState = {
+        ...currentState,
+        currentThreadId: threadId,
+        currentSessionId: Date.now().toString(),
+        threads: {
+          ...currentState.threads,
+          [threadId]: currentState.threads[threadId] || createEmptyThread(teammateId)
+        }
       };
-      return updated;
+
+      localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(updatedState));
+      return {
+        ...prev,
+        [teammateId]: updatedState
+      };
     });
-    localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(newState));
   }, []);
 
-  // Handle initial mounting and hydration
-  useEffect(() => {
-    setMounted(true);
-    // Load stored teammate on mount
-    const storedTeammate = localStorage.getItem('selectedTeammate');
-    if (storedTeammate) {
-      setSelectedTeammate(storedTeammate);
-      const storedState = localStorage.getItem(`teammate_state_${storedTeammate}`);
-      if (storedState) {
-        try {
-          const parsedState = JSON.parse(storedState) as TeammateState;
-          setTeammateStates(prev => {
-            const updated: TeammateStates = {
-              ...prev,
-              [storedTeammate]: parsedState
-            };
-            return updated;
-          });
-        } catch (e) {
-          console.error(`Failed to parse stored state for teammate ${storedTeammate}:`, e);
+  const handleTeammateSelect = useCallback((teammateId: string) => {
+    if (!teammateId) return;
+    setSelectedTeammate(teammateId);
+    
+    setTeammateStates(prev => {
+      if (prev[teammateId]) return prev;
+      return {
+        ...prev,
+        [teammateId]: createEmptyTeammateState(teammateId)
+      };
+    });
+  }, []);
+
+  // 4. Create runtime adapter with proper state handling
+  const adapter = useMemo<ChatModelAdapter>(() => ({
+    async *run(options: ChatModelRunOptions): AsyncGenerator<MessageContent, void, unknown> {
+      const customConfig = {
+        ...options.config,
+        teammate: selectedTeammate || '',
+        threadId: teammateStates[selectedTeammate || '']?.currentThreadId || Date.now().toString(),
+        sessionId: teammateStates[selectedTeammate || '']?.currentSessionId || Date.now().toString()
+      } as CustomModelConfig;
+
+      if (!customConfig.teammate) {
+        yield {
+          content: [{ type: "text", text: "Please select a teammate before sending a message" } as TextContent],
+          role: 'system',
+          id: `system_${Date.now()}`
+        };
+        return;
+      }
+
+      try {
+        const stream = await backendApi({ 
+          messages: options.messages || [], 
+          abortSignal: options.abortSignal, 
+          config: customConfig,
+          apiKey: apiKey || '',
+          router
+        });
+
+        if (!stream) {
+          yield {
+            content: [{ type: "text", text: "Failed to initialize stream" } as TextContent],
+            role: 'system',
+            id: `system_${Date.now()}`
+          };
+          return;
         }
+
+        for await (const message of handleStreamEvents(stream)) {
+          // Get current state
+          const currentTeammateState = teammateStates[customConfig.teammate];
+          if (currentTeammateState) {
+            const currentThread = currentTeammateState.threads[customConfig.threadId] || createEmptyThread(customConfig.teammate);
+            
+            // Create updated thread with new message
+            const updatedThread = {
+              ...currentThread,
+              messages: [...(currentThread.messages || []), message],
+              lastMessageId: message.id,
+              metadata: {
+                ...currentThread.metadata,
+                updatedAt: new Date().toISOString()
+              }
+            };
+
+            // Update state atomically
+            setTeammateStates(prev => {
+              const updatedState = {
+                ...prev[customConfig.teammate],
+                threads: {
+                  ...prev[customConfig.teammate].threads,
+                  [customConfig.threadId]: updatedThread
+                }
+              };
+              
+              // Store in localStorage
+              localStorage.setItem(`teammate_state_${customConfig.teammate}`, JSON.stringify(updatedState));
+              
+              return {
+                ...prev,
+                [customConfig.teammate]: updatedState
+              };
+            });
+          }
+          yield message;
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Session expired')) {
+          throw error;
+        }
+        
+        yield {
+          content: [{ type: "text", text: error instanceof Error ? error.message : "An error occurred" } as TextContent],
+          role: 'system',
+          id: `system_${Date.now()}`
+        };
       }
     }
+  }), [selectedTeammate, teammateStates, apiKey, router, setTeammateStates]);
+
+  // 5. Create runtime using custom hook
+  const runtime = useAssistantRuntime(adapter);
+
+  // 6. Derived state with useMemo
+  const currentState = useMemo(() => {
+    if (!selectedTeammate) return undefined;
+    const state = teammateStates[selectedTeammate];
+    if (!state) {
+      const newState = createEmptyTeammateState(selectedTeammate);
+      setTeammateStates(prev => ({
+        ...prev,
+        [selectedTeammate]: newState
+      }));
+      return newState;
+    }
+    return state;
+  }, [selectedTeammate, teammateStates]);
+
+  // 7. Effects
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
-  // Fetch teammates when mounted and apiKey is available
   useEffect(() => {
-    if (!mounted || !apiKey || !user) return;
-
-    const fetchTeammates = async () => {
+    const loadTeammates = async () => {
+      if (!user) return;
       try {
-        const response = await fetch('/api/teammates', {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-        });
-        
+        const response = await fetch('/api/teammates');
         if (!response.ok) {
-          throw new Error(await response.text());
+          throw new Error('Failed to load teammates');
         }
-        
         const data = await response.json();
-        console.log('Fetched teammates:', data.length);
         setTeammates(data);
-        
-        // If there's a stored teammate, verify it exists in the fetched data
-        const storedTeammate = localStorage.getItem('selectedTeammate');
-        if (storedTeammate && data.some((t: any) => t.uuid === storedTeammate)) {
-          setSelectedTeammate(storedTeammate);
-          // Initialize state if needed
-          if (!teammateStates[storedTeammate]) {
-            const newState = createTeammateState(storedTeammate);
-            updateTeammateState(storedTeammate, newState);
-          }
-        } else if (data.length > 0) {
-          // Otherwise select the first teammate
-          const firstTeammate = data[0].uuid;
-          setSelectedTeammate(firstTeammate);
-          localStorage.setItem('selectedTeammate', firstTeammate);
-          if (!teammateStates[firstTeammate]) {
-            const newState = createTeammateState(firstTeammate);
-            updateTeammateState(firstTeammate, newState);
-          }
-        }
-        
-        setError(undefined);
       } catch (error) {
-        console.error('Error fetching teammates:', error);
-        setError({
-          error: 'Failed to fetch teammates',
-          details: error instanceof Error ? error.message : 'Unknown error'
-        });
+        console.error('Error loading teammates:', error);
+        setError(error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchTeammates();
-  }, [mounted, apiKey, user]);
+    if (user) {
+      loadTeammates();
+    }
+  }, [user]);
 
-  // Handle teammate selection
-  const handleTeammateSelect = useCallback((id: string) => {
-    if (!id) {
-      console.warn('[Runtime] Attempted to select invalid teammate ID');
+  // 8. Message submission handler with proper state preservation
+  const handleSubmit = useCallback(async (message: string) => {
+    if (!selectedTeammate || !currentState?.currentThreadId) {
+      setError('Please select a teammate first');
       return;
     }
-    console.log('[Runtime] Selecting teammate:', id);
-    setSelectedTeammate(id);
-    localStorage.setItem('selectedTeammate', id);
+
+    if (isProcessing) return;
+
+    setError(null);
+    setIsProcessing(true);
+    setIsCollectingSystemMessages(true);
     
-    // Initialize state if it doesn't exist
-    if (!teammateStates[id]) {
-      console.log('[Runtime] Initializing state for teammate:', id);
-      const newState = createTeammateState(id);
-      updateTeammateState(id, newState);
-    }
-  }, [teammateStates, createTeammateState, updateTeammateState]);
-
-  const runtime = useKubiyaRuntime(
-    selectedTeammate,
-    teammateStates[selectedTeammate || '']?.sessions || [],
-    (newSessions: SetStateAction<Session[]>) => {
-      if (!selectedTeammate) return;
+    try {
+      const threadId = currentState.currentThreadId;
       
+      // Get current thread state
+      const currentThread = currentState.threads[threadId] || createEmptyThread(selectedTeammate);
+
+      // Create user message
+      const userMessage = {
+        id: `user_${Date.now()}`,
+        role: 'user',
+        content: [{ type: 'text', text: message }],
+        createdAt: new Date()
+      };
+
+      // Update state atomically with user message
       setTeammateStates(prev => {
-        const currentState = prev[selectedTeammate];
-        if (!currentState) {
-          const newState = createTeammateState(selectedTeammate);
-          return {
-            ...prev,
-            [selectedTeammate]: newState
-          };
-        }
-
-        const threadId = currentState.currentThreadId;
-        const updatedSessions = typeof newSessions === 'function' 
-          ? newSessions(currentState.sessions || [])
-          : newSessions;
-
-        const now = new Date().toISOString();
-        const updatedState: TeammateState = {
-          ...currentState,
-          sessions: updatedSessions,
-          threads: {
-            ...currentState.threads,
-            [threadId]: {
-              messages: updatedSessions,
-              lastMessageId: updatedSessions[updatedSessions.length - 1]?.id,
-              metadata: currentState.threads[threadId]?.metadata || {
-                teammateId: selectedTeammate,
-                createdAt: now,
-                updatedAt: now
-              }
-            }
+        const updatedThread = {
+          ...currentThread,
+          messages: [...(currentThread.messages || []), userMessage],
+          metadata: {
+            ...currentThread.metadata,
+            updatedAt: new Date().toISOString()
           }
         };
 
+        const updatedState = {
+          ...prev[selectedTeammate],
+          threads: {
+            ...prev[selectedTeammate].threads,
+            [threadId]: updatedThread
+          }
+        };
+
+        // Store in localStorage
         localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(updatedState));
+
         return {
           ...prev,
           [selectedTeammate]: updatedState
         };
       });
-    },
-    authType,
-    apiKey,
-    selectedTeammate ? teammateStates[selectedTeammate] : undefined,
-    selectedTeammate ? (newState: TeammateState) => {
-      setTeammateStates(prev => ({
-        ...prev,
-        [selectedTeammate]: newState
-      }));
-      localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(newState));
-    } : undefined
-  );
+      
+      // Send message to backend
+      const response = await fetch(`/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message,
+          agent_uuid: selectedTeammate,
+          session_id: currentState.currentSessionId || threadId
+        }),
+      });
 
-  // Show loading state while initializing
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || errorData.error || 'Failed to send message');
+      }
+
+      // Handle the streaming response
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response stream available');
+      }
+
+      let collectedSystemMessages: string[] = [];
+
+      // Read the stream
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // Process the chunks
+          const text = new TextDecoder().decode(value);
+          const lines = text.split('\n');
+          
+          for (const line of lines) {
+            if (!line.trim() || !line.startsWith('data: ')) continue;
+            
+            try {
+              const eventData = JSON.parse(line.slice(6));
+              console.log('[Chat] Processing event:', eventData);
+              
+              // Update state atomically with new message
+              setTeammateStates(prev => {
+                const currentThread = prev[selectedTeammate].threads[threadId];
+                if (!currentThread) return prev;
+
+                let newMessage = null;
+
+                // Create new message based on event type
+                switch (eventData.type) {
+                  case 'system_message':
+                    if (eventData.message) {
+                      newMessage = {
+                        id: `system_${Date.now()}`,
+                        role: 'system',
+                        content: [{ type: 'text', text: eventData.message }],
+                        createdAt: new Date(),
+                        metadata: { custom: { isSystemMessage: true } }
+                      };
+                      collectedSystemMessages = [...collectedSystemMessages, eventData.message];
+                    }
+                    break;
+                  case 'msg':
+                  case 'assistant':
+                    if (eventData.message) {
+                      newMessage = {
+                        id: eventData.id || `assistant_${Date.now()}`,
+                        role: 'assistant',
+                        content: [{ type: 'text', text: eventData.message }],
+                        createdAt: new Date()
+                      };
+                    }
+                    break;
+                  case 'tool':
+                    if (eventData.tool_name) {
+                      newMessage = {
+                        id: eventData.id || `tool_${Date.now()}`,
+                        role: 'assistant',
+                        content: [],
+                        tool_calls: [{
+                          type: 'tool_init',
+                          id: eventData.id || `tool_${Date.now()}`,
+                          name: eventData.tool_name,
+                          arguments: eventData.arguments,
+                          timestamp: new Date().toISOString()
+                        }],
+                        createdAt: new Date()
+                      };
+                    }
+                    break;
+                  case 'tool_output':
+                    if (eventData.message) {
+                      newMessage = {
+                        id: eventData.id || `tool_output_${Date.now()}`,
+                        role: 'assistant',
+                        content: [],
+                        tool_calls: [{
+                          type: 'tool_output',
+                          id: eventData.id || `tool_output_${Date.now()}`,
+                          message: eventData.message,
+                          timestamp: new Date().toISOString()
+                        }],
+                        createdAt: new Date()
+                      };
+                    }
+                    break;
+                }
+
+                if (!newMessage) return prev;
+
+                const updatedThread = {
+                  ...currentThread,
+                  messages: [...(currentThread.messages || []), newMessage],
+                  metadata: {
+                    ...currentThread.metadata,
+                    updatedAt: new Date().toISOString()
+                  }
+                };
+
+                const updatedState = {
+                  ...prev[selectedTeammate],
+                  threads: {
+                    ...prev[selectedTeammate].threads,
+                    [threadId]: updatedThread
+                  }
+                };
+
+                // Store in localStorage
+                localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(updatedState));
+
+                return {
+                  ...prev,
+                  [selectedTeammate]: updatedState
+                };
+              });
+
+            } catch (e) {
+              console.error('Failed to parse SSE message:', e);
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError(error instanceof Error ? error.message : 'Failed to send message. Please try again.');
+    } finally {
+      setIsProcessing(false);
+      setIsCollectingSystemMessages(false);
+    }
+  }, [selectedTeammate, currentState, isProcessing, setTeammateStates]);
+
+  // 9. Loading states
   if (!mounted || isUserLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0F172A] to-[#1E293B]">
@@ -612,12 +847,10 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     );
   }
 
-  // Show API key setup if no key, auth type, or user
   if (!apiKey || !authType || !user) {
     return <ApiKeySetup />;
   }
 
-  // Only show loading state for teammate loading
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0F172A] to-[#1E293B]">
@@ -627,229 +860,26 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     );
   }
 
+  // 10. Context value with all required props
+  const contextValue: TeammateContextType = {
+    teammates,
+    selectedTeammate,
+    setSelectedTeammate: handleTeammateSelect,
+    isLoading,
+    error,
+    currentState,
+    switchThread,
+    setTeammateState,
+    handleSubmit
+  };
+
   return (
-    <TeammateContext.Provider value={{
-      teammates,
-      selectedTeammate,
-      setSelectedTeammate: handleTeammateSelect,
-      isLoading,
-      error,
-      currentState: selectedTeammate ? teammateStates[selectedTeammate] : undefined
-    }}>
+    <TeammateContext.Provider value={contextValue}>
       <AssistantRuntimeProvider runtime={runtime}>
         {children}
       </AssistantRuntimeProvider>
     </TeammateContext.Provider>
   );
-}
-
-function useAuth0Init(
-  memoizedSetApiKey: (key: string) => void,
-  memoizedSetAuthType: (type: 'sso' | 'apiKey') => void,
-  memoizedClearApiKey: () => void,
-  memoizedSetIsLoading: (loading: boolean) => void,
-  setTeammates: (teammates: Teammate[]) => void,
-  setSelectedTeammate: (id: string) => void,
-  setError: (error: TeammateContextType['error'] | undefined) => void
-) {
-  const { user, error: userError, isLoading: isAuthLoading } = useUser();
-  const [initializationAttempted, setInitializationAttempted] = useState(false);
-
-  // Handle auth errors
-  useEffect(() => {
-    if (!isAuthLoading && userError) {
-      console.log('Auth initialization failed:', userError instanceof Error ? userError.message : 'Unknown error');
-      memoizedClearApiKey();
-      memoizedSetIsLoading(false);
-      setError({
-        error: 'Authentication Failed',
-        details: userError instanceof Error ? userError.message : 'Unknown error',
-        supportInfo: {
-          message: 'Please contact the Kubiya support team for assistance.',
-          email: 'support@kubiya.ai',
-          subject: 'Authentication Issue - Chat UI',
-          body: `Hi Kubiya Support,\n\nI'm experiencing authentication issues with the Chat UI.\n\nError Details:\n${userError instanceof Error ? userError.message : 'Unknown error'}`
-        }
-      });
-      setInitializationAttempted(true);
-    }
-  }, [userError, isAuthLoading, memoizedClearApiKey, memoizedSetIsLoading, setError]);
-
-  // Handle auth initialization
-  useEffect(() => {
-    if (isAuthLoading || initializationAttempted) {
-      return;
-    }
-
-    const initAuth = async () => {
-      try {
-        if (!user) {
-          console.log('No user session found, clearing state');
-          memoizedClearApiKey();
-          memoizedSetIsLoading(false);
-          setInitializationAttempted(true);
-          return;
-        }
-
-        memoizedSetAuthType('sso');
-        
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            console.log('Session expired or invalid');
-            memoizedClearApiKey();
-            memoizedSetIsLoading(false);
-            setError({
-              error: 'Session Expired',
-              details: 'Your session has expired. Please sign in again.',
-              supportInfo: {
-                message: 'Please try signing in again. If the issue persists, contact support.',
-                email: 'support@kubiya.ai',
-                subject: 'Session Issue - Chat UI', 
-                body: `Hi Kubiya Support,\n\nMy session expired unexpectedly in the Chat UI.`
-              }
-            });
-            setInitializationAttempted(true);
-            return;
-          }
-          throw new Error(`Profile fetch failed: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (!data.accessToken) {
-          console.log('No access token in profile');
-          memoizedClearApiKey();
-          memoizedSetIsLoading(false);
-          setError({
-            error: 'Missing Access Token',
-            details: 'Unable to get access token from your profile.',
-            supportInfo: {
-              message: 'Please try signing in again. If the issue persists, contact support.',
-              email: 'support@kubiya.ai',
-              subject: 'Token Issue - Chat UI',
-              body: `Hi Kubiya Support,\n\nI'm unable to get an access token in the Chat UI.`
-            }
-          });
-          setInitializationAttempted(true);
-          return;
-        }
-
-        await memoizedSetApiKey(data.accessToken);
-
-        try {
-          const token = data.accessToken;
-          console.log('Fetching teammates with token:', {
-            authType: 'sso',
-            hasToken: !!token,
-            tokenPrefix: token ? token.substring(0, 10) + '...' : null
-          });
-
-          const teammatesResponse = await fetch('/api/teammates', {
-            credentials: 'include',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Accept': 'application/json',
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          });
-
-          if (!teammatesResponse.ok) {
-            console.error('Teammates fetch failed:', {
-              status: teammatesResponse.status,
-              statusText: teammatesResponse.statusText
-            });
-
-            let errorData;
-            try {
-              errorData = await teammatesResponse.json();
-              console.error('Error details:', errorData);
-              setError(errorData);
-            } catch {
-              console.error('Could not parse error response');
-              setError({
-                error: 'Failed to fetch teammates',
-                details: `Server returned ${teammatesResponse.status}`,
-                supportInfo: {
-                  message: 'Please contact the Kubiya support team for assistance.',
-                  email: 'support@kubiya.ai',
-                  subject: 'Teammates Issue - Chat UI',
-                  body: `Hi Kubiya Support,\n\nI'm unable to fetch teammates in the Chat UI.\n\nError Details:\nStatus: ${teammatesResponse.status}\nStatus Text: ${teammatesResponse.statusText}`
-                }
-              });
-            }
-
-            if (teammatesResponse.status === 401) {
-              memoizedClearApiKey();
-            }
-            throw new Error(`Failed to fetch teammates: ${teammatesResponse.status}`);
-          }
-
-          const teammatesData = await teammatesResponse.json();
-          console.log('Successfully fetched teammates:', {
-            count: teammatesData.length,
-            firstTeammate: teammatesData[0] ? {
-              uuid: teammatesData[0].uuid,
-              name: teammatesData[0].name
-            } : null
-          });
-          
-          setTeammates(teammatesData);
-          setError(undefined);
-          if (teammatesData.length > 0) {
-            setSelectedTeammate(teammatesData[0].uuid);
-          }
-        } catch (error) {
-          console.error('Error fetching teammates:', error);
-          if (error instanceof Error && error.message.includes('401')) {
-            memoizedClearApiKey();
-          }
-          throw error;
-        }
-
-      } catch (error) {
-        console.error('Auth initialization failed:', error instanceof Error ? error.message : 'Unknown error');
-        memoizedClearApiKey();
-        setError({
-          error: 'Authentication Failed',
-          details: error instanceof Error ? error.message : 'Unknown error',
-          supportInfo: {
-            message: 'Please contact the Kubiya support team for assistance.',
-            email: 'support@kubiya.ai',
-            subject: 'Authentication Issue - Chat UI',
-            body: `Hi Kubiya Support,\n\nI'm experiencing authentication issues with the Chat UI.\n\nError Details:\n${error instanceof Error ? error.message : 'Unknown error'}`
-          }
-        });
-      } finally {
-        memoizedSetIsLoading(false);
-        setInitializationAttempted(true);
-      }
-    };
-
-    initAuth();
-  }, [
-    user,
-    isAuthLoading,
-    initializationAttempted,
-    memoizedSetApiKey,
-    memoizedSetAuthType,
-    memoizedClearApiKey,
-    memoizedSetIsLoading,
-    setTeammates,
-    setSelectedTeammate,
-    setError
-  ]);
-
-  return { isAuthLoading, userError };
 }
 
 // Update AuthType definition
@@ -915,10 +945,28 @@ const useKubiyaRuntime = (
           return;
         }
 
-        yield* handleStreamEvents(stream);
+        // Update thread state with new messages
+        for await (const message of handleStreamEvents(stream)) {
+          if (setTeammateState && teammateState) {
+            setTeammateState({
+              ...teammateState,
+              threads: {
+                ...teammateState.threads,
+                [customConfig.threadId]: {
+                  messages: [...(teammateState.threads[customConfig.threadId]?.messages || []), message],
+                  lastMessageId: message.id,
+                  metadata: {
+                    ...teammateState.threads[customConfig.threadId]?.metadata,
+                    updatedAt: new Date().toISOString()
+                  }
+                }
+              }
+            });
+          }
+          yield message;
+        }
       } catch (error) {
         if (error instanceof Error && error.message.includes('Session expired')) {
-          // Let the error propagate but don't yield anything
           throw error;
         }
         
@@ -929,7 +977,15 @@ const useKubiyaRuntime = (
         };
       }
     }
-  }), [config, token, router]);
+  }), [config, token, router, setTeammateState, teammateState]);
 
   return useLocalRuntime(adapter);
+};
+
+const createRuntime = () => {
+  // Implementation of createRuntime function
+};
+
+const switchThread = (teammateId: string, threadId: string) => {
+  // Implementation of switchThread function
 }; 

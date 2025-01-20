@@ -44,20 +44,6 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
     return null;
   }
 
-  // Render tool execution content
-  if (hasToolCalls && message.tool_calls) {
-    return (
-      <div className="tool-execution">
-        {message.tool_calls.map((toolCall, index) => (
-          <div key={index} className="tool-call">
-            <span>{toolCall.name}</span>
-            <span>{toolCall.message || 'No output available'}</span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   // Enhanced logging for debugging
   console.log('[AssistantMessage] Rendering message:', {
     id: message.id,
@@ -69,12 +55,13 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
     contentTypes: message.content.map(c => c.type).join(', '),
     hasToolContent: !!toolContent,
     hasToolCalls,
-    toolCallsCount: hasToolCalls && message.tool_calls ? message.tool_calls.length : 0
+    toolCallsCount: hasToolCalls && message.tool_calls ? message.tool_calls.length : 0,
+    fullText: messageText // Log the full text for debugging
   });
 
   // Split system messages into individual warnings and filter out empty ones
   const warnings: string[] = isSystemMessage 
-    ? messageText.split(/WARNING:|ERROR:/)
+    ? messageText.split(/(?=WARNING:|ERROR:)/)
         .map((msg: string) => msg.trim())
         .filter((msg: string) => msg.length > 0)
     : [];
@@ -94,8 +81,8 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
   return (
     <div className="flex items-start gap-3">
       {isSystemMessage ? (
-        <div className="w-full bg-amber-950/50 rounded-lg p-4 my-2">
-          <div className="flex items-center gap-2 mb-2">
+        <div className="w-full bg-amber-950/50 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
             </div>
@@ -105,7 +92,7 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
             {warnings.map((warning: string, index: number) => (
               <div key={index} className="flex items-start gap-2 text-sm text-amber-100 bg-amber-950/30 p-3 rounded">
                 <span className="mt-1 text-amber-400">•</span>
-                <span className="flex-1">{warning}</span>
+                <span className="flex-1"><MarkdownText content={warning} /></span>
               </div>
             ))}
           </div>
@@ -115,27 +102,37 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2D3B4E] flex items-center justify-center">
             <Bot className="h-4 w-4 text-[#7C3AED]" />
           </div>
-          <div className="flex-1 space-y-1">
+          <div className="flex-1 space-y-2">
             <div className="text-sm font-medium text-white">Assistant</div>
-            <div className="text-sm text-[#E2E8F0] prose prose-invert prose-sm max-w-none">
-              {messageText}
+            <div className="text-sm text-[#E2E8F0] prose prose-invert prose-sm max-w-none whitespace-pre-wrap break-words">
+              {messageText && <MarkdownText content={messageText} />}
               {(toolContent || hasToolCalls) && (
-                <div className="mt-2 p-2 bg-gray-800 rounded">
+                <div className="mt-4 space-y-3">
                   {toolContent && isToolCallContent(toolContent) && (
-                    <>
-                      <p className="text-xs text-gray-400">Tool Call: {toolContent.toolName}</p>
-                      <pre className="text-xs mt-1">{JSON.stringify(toolContent.args, null, 2)}</pre>
-                    </>
+                    <div className="bg-[#1E293B] rounded-lg border border-[#2D3B4E] overflow-hidden">
+                      <div className="px-4 py-2 bg-[#2D3B4E] border-b border-[#3D4B5E]">
+                        <p className="text-xs font-medium text-[#94A3B8]">Tool Call: {toolContent.toolName}</p>
+                      </div>
+                      <pre className="p-4 text-xs overflow-x-auto">
+                        <code className="text-[#E2E8F0]">
+                          {JSON.stringify(toolContent.args, null, 2)}
+                        </code>
+                      </pre>
+                    </div>
                   )}
                   {hasToolCalls && message.tool_calls && message.tool_calls.map((tool: ToolCall, index: number) => (
-                    <div key={`${tool.id}-${index}`} className="mt-2">
-                      <p className="text-xs text-gray-400">
-                        Tool {tool.type === 'tool_init' ? 'Call' : 'Output'}: {tool.type === 'tool_init' ? tool.name : ''}
-                      </p>
-                      <pre className="text-xs mt-1">
-                        {tool.type === 'tool_init' 
-                          ? JSON.stringify(tool.arguments, null, 2)
-                          : tool.message}
+                    <div key={`${tool.id}-${index}`} className="bg-[#1E293B] rounded-lg border border-[#2D3B4E] overflow-hidden">
+                      <div className="px-4 py-2 bg-[#2D3B4E] border-b border-[#3D4B5E]">
+                        <p className="text-xs font-medium text-[#94A3B8]">
+                          {tool.type === 'tool_init' ? 'Tool Call' : 'Tool Output'}: {tool.type === 'tool_init' ? tool.name : ''}
+                        </p>
+                      </div>
+                      <pre className="p-4 text-xs overflow-x-auto">
+                        <code className="text-[#E2E8F0]">
+                          {tool.type === 'tool_init' 
+                            ? JSON.stringify(tool.arguments, null, 2)
+                            : tool.message}
+                        </code>
                       </pre>
                     </div>
                   ))}
@@ -149,10 +146,5 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
   );
 };
 
-export const AssistantMessage = memo(AssistantMessageComponent, (prevProps, nextProps) => {
-  const prevContent = prevProps.message.content.find(isTextContent);
-  const nextContent = nextProps.message.content.find(isTextContent);
-  return (prevContent && nextContent && isTextContent(prevContent) && isTextContent(nextContent)) 
-    ? prevContent.text === nextContent.text 
-    : prevContent === nextContent;
-}); 
+// Export without memoization to ensure all updates are rendered
+export const AssistantMessage = AssistantMessageComponent; 
