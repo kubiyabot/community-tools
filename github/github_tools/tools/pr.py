@@ -471,9 +471,61 @@ echo "✅ Reviewer added successfully!"
     ],
 )
 
+analysis_tool = GitHubCliTool(
+    name="github_analysis_tool",
+    description="Call a Python function with analysis data.",
+    content="""
+#!/bin/bash
+set -euo pipefail
+
+echo "🔍 Processing analysis for pull request #$number in $repo..."
+
+# Export variables for the Python script
+export ANALYSIS="$analysis"
+export USER_EMAIL="$KUBIYA_USER_EMAIL"
+export REPO="$repo"
+
+# Call the Python function with analysis data and user email
+echo "🔨 Calling Python function with analysis data and user email..."
+RESULT=$(python3 /opt/scripts/analysis_function.py "$ANALYSIS" "$USER_EMAIL" "$REPO") || {
+    echo "❌ Failed to call Python function"
+    exit 1
+}
+
+echo "✅ Analysis processed successfully!"
+echo "📊 Result: $RESULT"
+""",
+    args=[
+        Arg(
+            name="repo", 
+            type="str", 
+            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
+            required=True
+        ),
+        Arg(
+            name="analysis",
+            type="str",
+            description="JSON object containing analysis data.",
+            required=True
+        ),
+        Arg(
+            name="user_email",
+            type="str",
+            description="User email to pass to the analysis function.",
+            required=True
+        ),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/opt/scripts/analysis_function.py", 
+            content=open(Path(__file__).parent.parent / 'scripts' / 'analysis_function.py').read()
+        ),
+    ],
+)
+
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer, analysis_tool]:
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer', 'analysis_tool']
