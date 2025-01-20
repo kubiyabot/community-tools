@@ -148,9 +148,6 @@ def generate_comment(variables: dict) -> str:
         # Process the context dictionary to replace escape sequences
         context = process_error_logs_in_context(context)
 
-        # Now the processed_context contains the updated values with actual tabs and newlines
-        logger.info(f"context: {context}")
-
         # Initialize template handler
         template_handler = TemplateHandler()
 
