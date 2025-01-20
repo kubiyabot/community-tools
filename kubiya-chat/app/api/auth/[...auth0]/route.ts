@@ -12,9 +12,10 @@ const auth0Handler = handleAuth({
     getLoginState: (req: NextRequest) => {
       const url = new URL(req.url);
       const org = url.searchParams.get('organization');
+      const returnTo = url.searchParams.get('returnTo') || '/chat';
       return { 
-        returnTo: '/chat',
-        organization: org  // This will be passed to the authorization request
+        returnTo,
+        organization: org
       };
     },
     authorizationParams: {
@@ -24,40 +25,43 @@ const auth0Handler = handleAuth({
     }
   }),
   callback: handleCallback({
-    authorizationParams: {
-      scope: 'openid profile email',
-      audience: 'https://api.kubiya.ai'
-    },
     afterCallback: async (req: NextRequest, session: Session) => {
-      // Get the callback URL parameters
       const url = new URL(req.url);
       const org = url.searchParams.get('organization') || session.user?.org_id;
+      const state = url.searchParams.get('state');
+      let returnTo = '/chat';
+
+      try {
+        if (state) {
+          const decodedState = JSON.parse(Buffer.from(state, 'base64').toString());
+          returnTo = decodedState.returnTo || '/chat';
+        }
+      } catch (e) {
+        console.warn('Failed to parse state:', e);
+      }
       
-      console.log('After callback - Full session details:', {
+      console.log('After callback:', {
         hasAccessToken: !!session?.accessToken,
         hasUser: !!session?.user,
-        userFields: session?.user ? Object.keys(session.user) : [],
-        userEmail: session?.user?.email,
-        userSub: session?.user?.sub,
-        tokenPrefix: session?.accessToken ? session.accessToken.substring(0, 50) + '...' : null,
+        returnTo,
         organization: org
       });
 
-      // Add organization to session if present
       if (org && session.user) {
         session.user.org_id = org;
-        // Add the organization to the token claims
         session.accessTokenExtraParameters = {
           ...session.accessTokenExtraParameters,
           org_id: org
         };
       }
 
-      // Validate required claims
       if (!session.user?.email) {
         console.error('Missing required email claim');
         throw new Error('Missing required email claim');
       }
+
+      // Update the returnTo in the session
+      session.returnTo = returnTo;
       
       return session;
     }
@@ -67,9 +71,9 @@ const auth0Handler = handleAuth({
 export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
-    console.log('Original URL:', url.pathname);
-    console.log('Query params:', Object.fromEntries(url.searchParams));
-    console.log('Environment:', {
+    console.log('Auth request:', {
+      pathname: url.pathname,
+      params: Object.fromEntries(url.searchParams),
       baseUrl
     });
 
@@ -77,33 +81,35 @@ export async function GET(req: NextRequest) {
     const path = url.pathname.split('/').filter(Boolean);
     const authIndex = path.indexOf('auth');
     const params = path.slice(authIndex + 1);
-    console.log('Auth params:', params);
 
-    // Create the context object with state
-    const ctx = { 
-      params: { auth0: params },
-      state: { returnTo: '/chat' }
-    };
+    // Handle direct auth0 login redirects
+    if (params.includes('auth0') && params.includes('login')) {
+      const returnTo = url.searchParams.get('returnTo') || '/chat';
+      const loginUrl = new URL(`${baseUrl}/api/auth/login`);
+      loginUrl.searchParams.set('returnTo', returnTo);
+      
+      // Copy any additional parameters
+      url.searchParams.forEach((value, key) => {
+        if (key !== 'returnTo') {
+          loginUrl.searchParams.set(key, value);
+        }
+      });
 
-    // If this is a login request with a connection, add it to the URL
-    if (params.length === 2 && params[0] === 'auth0' && params[1] === 'login') {
-      const connection = url.searchParams.get('connection');
-      if (connection) {
-        const loginUrl = new URL(`${baseUrl}/api/auth/login`);
-        loginUrl.searchParams.set('connection', connection);
-        return new Response(null, {
-          status: 307,
-          headers: { Location: loginUrl.toString() }
-        });
-      }
+      return new Response(null, {
+        status: 307,
+        headers: { Location: loginUrl.toString() }
+      });
     }
 
-    return auth0Handler(req, ctx);
+    return auth0Handler(req, { 
+      params: { auth0: params }
+    });
   } catch (error) {
     console.error('Auth error:', error);
-    return new Response(JSON.stringify({ error: 'Authentication failed', details: error instanceof Error ? error.message : 'Unknown error' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
+    // Always redirect to home on error
+    return new Response(null, {
+      status: 307,
+      headers: { Location: '/' }
     });
   }
 } 

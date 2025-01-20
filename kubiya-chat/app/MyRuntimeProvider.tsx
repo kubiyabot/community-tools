@@ -21,6 +21,7 @@ import { TeammateSelector } from "./components/TeammateSelector";
 import { UserProfile } from "./components/UserProfile";
 import { UserProfileButton } from './components/UserProfileButton';
 import { Chat } from './components/assistant-ui/Chat';
+import { useRouter } from 'next/navigation';
 
 interface TeammateConfig {
   teammate: string;
@@ -124,12 +125,14 @@ const backendApi = async ({
   messages, 
   abortSignal, 
   config,
-  apiKey 
+  apiKey,
+  router
 }: { 
   messages: any[], 
   abortSignal?: AbortSignal, 
   config: TeammateConfig,
-  apiKey: string 
+  apiKey: string,
+  router: any
 }) => {
   if (!messages.length) {
     console.error('[Runtime] No messages to send');
@@ -155,8 +158,8 @@ const backendApi = async ({
 
   if (!sessionResponse.ok) {
     if (sessionResponse.status === 401) {
-      window.location.href = '/api/auth/login';
-      throw new Error('Session expired, redirecting to login');
+      router.push('/api/auth/login');
+      throw new Error('Session expired');
     }
     throw new Error(`Failed to validate session: ${sessionResponse.status}`);
   }
@@ -184,8 +187,8 @@ const backendApi = async ({
 
   if (!response.ok) {
     if (response.status === 401) {
-      window.location.href = '/api/auth/login';
-      throw new Error('Session expired, redirecting to login');
+      router.push('/api/auth/login');
+      throw new Error('Session expired');
     }
     throw new Error(`API request failed: ${response.status}`);
   }
@@ -220,110 +223,103 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
         if (!line.trim()) continue;
         
         try {
-          // First check if it's a system message without JSON format
-          if (line.includes('WARNING:') || line.includes('ERROR:')) {
-            const text = line.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
-            if (text && !systemMessages.has(text)) {
-              systemMessages.add(text);
-              yield {
-                content: [{ type: "text", text } as TextContent],
-                role: 'system',
-                id: `system_${Date.now()}_${systemMessages.size}`
-              };
-            }
-            continue;
-          }
+          // Handle data: prefix
+          const content = line.startsWith('data: ') ? line.slice(6) : line;
+          if (content === '[DONE]') break;
 
-          // Then try to parse JSON for lines that start with 'data: '
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-
-            try {
-              const event = JSON.parse(data);
-              
-              // Handle system messages in JSON format
-              if (event.type === 'system_message' && event.message) {
-                const text = event.message.trim();
-                if (text && !systemMessages.has(text)) {
-                  systemMessages.add(text);
-                  yield {
-                    content: [{ type: "text", text } as TextContent],
-                    role: 'system',
-                    id: event.id || `system_${Date.now()}_${systemMessages.size}`
-                  };
-                }
-                continue;
+          try {
+            // Try to parse as JSON first
+            const event = JSON.parse(content);
+            if (event.type === 'system_message' && event.message) {
+              const text = event.message.trim();
+              if (text && !systemMessages.has(text)) {
+                systemMessages.add(text);
+                yield {
+                  content: [{ type: "text", text } as TextContent],
+                  role: 'system',
+                  id: event.id || `system_${Date.now()}_${systemMessages.size}`
+                };
               }
+              continue;
+            }
 
-              // Handle tool events
-              if (event.type === 'tool') {
-                const toolId = event.id || currentToolId;
-                let toolName = event.tool_name;
-                let args = event.arguments;
-
-                if (!toolName && event.message) {
-                  const toolMatch = event.message.match(/Tool:\s*(\w+)(?:\s*\n|\s+)Arguments:\s*({[\s\S]*})/i);
-                  if (toolMatch) {
-                    try {
-                      toolName = toolMatch[1];
-                      args = JSON.parse(toolMatch[2]);
-                    } catch (e) {
-                      console.warn('Failed to parse tool arguments:', e);
-                    }
+            // Handle other event types
+            if (event.type === 'tool') {
+              const toolId = event.id || currentToolId;
+              
+              // Try to extract tool info from text or event
+              let toolName = event.tool_name;
+              let args = event.arguments;
+              
+              if (!toolName && event.message) {
+                const toolMatch = event.message.match(/Tool:\s*(\w+)(?:\s*\n|\s+)Arguments:\s*({[\s\S]*})/i);
+                if (toolMatch) {
+                  try {
+                    toolName = toolMatch[1];
+                    args = JSON.parse(toolMatch[2]);
+                  } catch (e) {
+                    console.warn('Failed to parse tool arguments:', e);
                   }
                 }
+              }
 
-                if (toolName) {
-                  yield {
-                    content: [],
-                    role: 'assistant',
-                    id: toolId,
-                    tool_calls: [{
-                      type: 'tool_init',
-                      id: toolId,
-                      name: toolName,
-                      arguments: args,
-                      timestamp: new Date().toISOString()
-                    }]
-                  };
-                }
-              } else if (event.type === 'tool_output') {
-                const toolId = event.id || currentToolId;
+              if (toolName) {
                 yield {
                   content: [],
                   role: 'assistant',
                   id: toolId,
                   tool_calls: [{
-                    type: 'tool_output',
+                    type: 'tool_init',
                     id: toolId,
-                    message: event.message,
+                    name: toolName,
+                    arguments: args,
                     timestamp: new Date().toISOString()
                   }]
                 };
-              } else if ((event.type === 'msg' || event.type === 'assistant') && event.message) {
-                lastMessageText = event.message;
-                lastMessageType = 'assistant';
+              }
+            } else if (event.type === 'tool_output') {
+              const toolId = event.id || currentToolId;
+              yield {
+                content: [],
+                role: 'assistant',
+                id: toolId,
+                tool_calls: [{
+                  type: 'tool_output',
+                  id: toolId,
+                  message: event.message,
+                  timestamp: new Date().toISOString()
+                }]
+              };
+            } else if ((event.type === 'msg' || event.type === 'assistant') && event.message) {
+              lastMessageText = event.message;
+              lastMessageType = 'assistant';
+              yield {
+                content: [{ type: "text", text: event.message } as TextContent],
+                role: 'assistant',
+                id: messageId
+              };
+            }
+          } catch (parseError) {
+            // If JSON parsing fails, check for system message patterns
+            if (content.includes('WARNING:') || content.includes('ERROR:')) {
+              const text = content.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
+              if (text && !systemMessages.has(text)) {
+                systemMessages.add(text);
                 yield {
-                  content: [{ type: "text", text: event.message } as TextContent],
-                  role: 'assistant',
-                  id: messageId
+                  content: [{ type: "text", text } as TextContent],
+                  role: 'system',
+                  id: `system_${Date.now()}_${systemMessages.size}`
                 };
               }
-            } catch (e) {
-              // If JSON parsing fails, check if it contains a system message
-              const text = data.trim();
-              if (text && (text.includes('WARNING:') || text.includes('ERROR:'))) {
-                const cleanText = text.replace(/^(WARNING:|ERROR:)\s*/, '').trim();
-                if (cleanText && !systemMessages.has(cleanText)) {
-                  systemMessages.add(cleanText);
-                  yield {
-                    content: [{ type: "text", text: cleanText } as TextContent],
-                    role: 'system',
-                    id: `system_${Date.now()}_${systemMessages.size}`
-                  };
-                }
-              }
+            } else if (!content.startsWith('{') && !content.startsWith('[')) {
+              // If it's not JSON and not a system message, treat as assistant message
+              lastMessageText = content;
+              lastMessageType = 'assistant';
+              yield {
+                content: [{ type: "text", text: content } as TextContent],
+                role: 'assistant',
+                id: messageId
+              };
             }
           }
         } catch (e) {
@@ -375,6 +371,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
   const [mounted, setMounted] = useState(false);
   const { user, isLoading: isUserLoading } = useUser();
   const [error, setError] = useState<TeammateContextType['error']>();
+  const router = useRouter();
 
   const createThreadState = useCallback((teammateId: string): ThreadState => {
     const now = new Date().toISOString();
@@ -833,6 +830,8 @@ const useKubiyaRuntime = (
   teammateState?: TeammateState,
   setTeammateState?: (state: TeammateState) => void
 ) => {
+  const router = useRouter();
+  
   const config = React.useMemo<CustomModelConfig>(() => ({
     model: 'kubiya',
     temperature: 1,
@@ -860,29 +859,43 @@ const useKubiyaRuntime = (
         return;
       }
 
-      const stream = await backendApi({ 
-        messages: options.messages, 
-        abortSignal: options.abortSignal, 
-        config: {
-          teammate: customConfig.teammate,
-          threadId: customConfig.threadId,
-          sessionId: customConfig.sessionId
-        },
-        apiKey: token || ''
-      });
+      try {
+        const stream = await backendApi({ 
+          messages: options.messages, 
+          abortSignal: options.abortSignal, 
+          config: {
+            teammate: customConfig.teammate,
+            threadId: customConfig.threadId,
+            sessionId: customConfig.sessionId
+          },
+          apiKey: token || '',
+          router
+        });
 
-      if (!stream) {
+        if (!stream) {
+          yield {
+            content: [{ type: "text", text: "Failed to initialize stream" } as TextContent],
+            role: 'system',
+            id: `system_${Date.now()}`
+          };
+          return;
+        }
+
+        yield* handleStreamEvents(stream);
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Session expired')) {
+          // Let the error propagate but don't yield anything
+          throw error;
+        }
+        
         yield {
-          content: [{ type: "text", text: "Failed to initialize stream" } as TextContent],
+          content: [{ type: "text", text: error instanceof Error ? error.message : "An error occurred" } as TextContent],
           role: 'system',
           id: `system_${Date.now()}`
         };
-        return;
       }
-
-      yield* handleStreamEvents(stream);
     }
-  }), [config, token]);
+  }), [config, token, router]);
 
   return useLocalRuntime(adapter);
 }; 

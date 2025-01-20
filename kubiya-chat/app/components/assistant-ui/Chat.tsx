@@ -218,7 +218,6 @@ export const Chat = () => {
       })
       .filter(Boolean);
 
-    console.log('System messages:', newSystemMessages); // Debug log
     setSystemMessages(newSystemMessages);
   }, [thread?.messages]);
 
@@ -252,23 +251,22 @@ export const Chat = () => {
         }));
       }
 
-      // Log the request details for debugging
-      console.log('[Chat] Sending message:', {
-        message,
-        teammate: selectedTeammate,
-        threadId,
-        sessionId: threadId
-      });
-
-      // Send message through the runtime
-      await threadRuntime.append({
-        role: 'user',
-        content: [{ type: 'text', text: message }]
-      });
-
-    } catch (e) {
-      console.error('Chat error:', e);
-      setError(e instanceof Error ? e.message : 'An unexpected error occurred');
+      // Initialize thread if needed
+      if (!thread?.messages.length) {
+        await threadRuntime.append({
+          role: 'user',
+          content: [{ type: 'text', text: message }]
+        });
+      } else {
+        // Send message through the runtime
+        await threadRuntime.append({
+          role: 'user',
+          content: [{ type: 'text', text: message }]
+        });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setError('Failed to send message. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -331,33 +329,24 @@ export const Chat = () => {
         onNewThread={handleNewThread}
         onThreadSelect={handleThreadSelect}
       />
-      
-      {/* Main content area */}
-      <div className="flex-1 flex">
-        {/* Chat area */}
-        <div className="flex-1 flex flex-col h-full">
-          <div className="flex-1 overflow-y-auto">
-            <ChatMessages messages={thread?.messages || []} />
-          </div>
-          <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
+      <div className="flex-1 flex flex-col h-full relative">
+        <div className="flex-1 overflow-y-auto">
+          <ChatMessages messages={thread?.messages || []} />
         </div>
-
-        {/* Right sidebar for system messages and tools */}
-        <div className="w-96 border-l border-[#334155] h-full flex flex-col bg-[#1A1F2E] overflow-y-auto">
-          {/* System Messages Section */}
-          <div className="p-4">
-            <SystemMessages messages={systemMessages} />
-          </div>
-
-          {/* Tool Executions Section */}
-          <div className="p-4 space-y-4">
-            <div className="text-sm font-medium text-white mb-2">Tool Executions</div>
-            <ToolExecution toolName="find_resource" />
-            <ToolExecution toolName="get_resource" />
-            <ToolExecution toolName="create_resource" />
-            <ToolExecution toolName="delete_resource" />
-            <ToolExecution toolName="update_resource" />
-          </div>
+        <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
+        
+        {/* System Messages Panel */}
+        <div className="absolute top-0 right-0 w-80 p-4">
+          <SystemMessages messages={systemMessages} />
+        </div>
+        
+        {/* Tool Execution Panel */}
+        <div className="absolute top-0 right-80 w-80 p-4 space-y-2">
+          <ToolExecution toolName="find_resource" />
+          <ToolExecution toolName="get_resource" />
+          <ToolExecution toolName="create_resource" />
+          <ToolExecution toolName="delete_resource" />
+          <ToolExecution toolName="update_resource" />
         </div>
       </div>
     </div>

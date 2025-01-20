@@ -31,17 +31,22 @@ export function LoginButton() {
     try {
       setIsAuthenticating(true);
       const returnTo = window.location.pathname;
-      const loginUrl = `/api/auth/auth0/login?returnTo=${encodeURIComponent(returnTo)}&connection=slack`;
+      const loginUrl = new URL('/api/auth/login', window.location.origin);
+      loginUrl.searchParams.set('returnTo', returnTo);
+      loginUrl.searchParams.set('connection', 'slack');
       
       // Use fetch to check if the auth endpoint is responding
-      const response = await fetch(loginUrl, { method: 'HEAD' });
+      const response = await fetch(loginUrl.toString(), { 
+        method: 'HEAD',
+        credentials: 'same-origin'
+      });
       
       if (!response.ok) {
         throw new Error('Authentication service is not available');
       }
       
-      // If the service is available, redirect
-      window.location.href = loginUrl;
+      // If the service is available, use router for navigation
+      router.push(loginUrl.toString());
     } catch (error) {
       console.error('Login error:', error);
       toast({
@@ -56,7 +61,21 @@ export function LoginButton() {
   const handleLogout = async () => {
     try {
       setIsAuthenticating(true);
-      window.location.href = '/api/auth/logout';
+      const logoutUrl = new URL('/api/auth/logout', window.location.origin);
+      logoutUrl.searchParams.set('returnTo', '/');
+      
+      // Use fetch to check if the logout endpoint is responding
+      const response = await fetch(logoutUrl.toString(), { 
+        method: 'HEAD',
+        credentials: 'same-origin'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Logout service is not available');
+      }
+      
+      // If the service is available, use router for navigation
+      router.push(logoutUrl.toString());
     } catch (error) {
       console.error('Logout error:', error);
       toast({
@@ -80,7 +99,7 @@ export function LoginButton() {
     return (
       <Button 
         variant="destructive" 
-        onClick={() => window.location.reload()}
+        onClick={() => router.refresh()}
         title={userError.message}
       >
         Retry Login
