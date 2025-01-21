@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { useRouter } from 'next/navigation';
+import { SupportModal } from './SupportModal';
 
 interface UserProfileButtonProps {
   onLogout: () => void;
@@ -24,6 +25,7 @@ interface UserProfile {
 export function UserProfileButton({ onLogout }: UserProfileButtonProps) {
   const [mounted, setMounted] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showSupportModal, setShowSupportModal] = useState(false);
   const [avatarError, setAvatarError] = useState(false);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -229,9 +231,12 @@ export function UserProfileButton({ onLogout }: UserProfileButtonProps) {
           </a>
 
           <a
-            href="https://support.kubiya.ai"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowSupportModal(true);
+              setShowMenu(false);
+            }}
             className="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-[#3D4B5E] text-[#94A3B8] hover:text-white transition-all duration-200 group"
           >
             <div className="w-8 h-8 rounded-lg bg-[#7C3AED]/10 flex items-center justify-center group-hover:bg-[#7C3AED]/20 transition-colors">
@@ -263,6 +268,11 @@ export function UserProfileButton({ onLogout }: UserProfileButtonProps) {
           </button>
         </div>
       </div>
+
+      <SupportModal 
+        isOpen={showSupportModal} 
+        onClose={() => setShowSupportModal(false)} 
+      />
     </div>
   );
 } 

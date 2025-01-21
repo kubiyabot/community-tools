@@ -6,7 +6,7 @@ import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { SystemMessages } from './SystemMessages';
 import { useTeammateContext } from "../../MyRuntimeProvider";
-import { Terminal, Box, Cloud, Wrench, GitBranch, Database, Code } from "lucide-react";
+import { Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, Settings, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/app/components/button";
 
 interface ToolCall {
@@ -45,13 +45,42 @@ interface Starter {
 }
 
 interface TeammateCapabilities {
-  tools: any[];
-  integrations: Array<string | Integration>;
-  starters: Array<Starter>;
-  instruction_type: string;
-  llm_model: string;
-  description: string;
+  tools?: any[];
+  integrations?: Array<string | Integration>;
+  starters?: Array<Starter>;
+  instruction_type?: string;
+  llm_model?: string;
+  description?: string;
   runner?: string;
+}
+
+interface SourceMetadata {
+  sourceId: string;
+  metadata: {
+    tools?: Array<{
+      name: string;
+      description: string;
+      type?: string;
+      icon_url?: string;
+      metadata?: {
+        git_url?: string;
+        git_branch?: string;
+        git_path?: string;
+        docker_image?: string;
+      };
+      parameters?: Array<{
+        name: string;
+        type: string;
+        description?: string;
+        required?: boolean;
+      }>;
+    }>;
+  };
+}
+
+interface Source {
+  sourceId: string;
+  name?: string;
 }
 
 interface ChatMessagesProps {
@@ -62,7 +91,10 @@ interface ChatMessagesProps {
   teammate?: {
     name?: string;
     description?: string;
+    uuid?: string;
   };
+  showTeammateDetails?: () => void;
+  onStarterCommand?: (command: string) => void;
 }
 
 interface TextContent {
@@ -129,10 +161,71 @@ export const ChatMessages = ({
   isCollectingSystemMessages, 
   systemMessages = [],
   capabilities,
-  teammate
+  teammate,
+  showTeammateDetails,
+  onStarterCommand
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { selectedTeammate, currentState } = useTeammateContext();
+  const [sourceMetadata, setSourceMetadata] = useState<SourceMetadata | null>(null);
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
+  const [toolsFilter, setToolsFilter] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSourcesAndMetadata = async () => {
+      if (!teammate?.uuid) return;
+
+      try {
+        const sourcesRes = await fetch(`/api/teammates/${teammate.uuid}/sources`);
+        if (!sourcesRes.ok) {
+          console.error('Failed to fetch teammate sources:', {
+            status: sourcesRes.status,
+            statusText: sourcesRes.statusText
+          });
+          return;
+        }
+
+        const sources = await sourcesRes.json();
+        if (!sources || !sources.length) {
+          console.log('No sources found for teammate:', teammate.uuid);
+          return;
+        }
+
+        const metadataPromises = sources.map(async (source: Source) => {
+          const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${source.sourceId}/metadata`);
+          if (!metadataRes.ok) {
+            console.error('Failed to fetch metadata:', {
+              sourceId: source.sourceId,
+              status: metadataRes.status
+            });
+            return null;
+          }
+
+          const metadata = await metadataRes.json();
+          return metadata;
+        });
+
+        const metadataResults = await Promise.all(metadataPromises);
+        const validMetadata = metadataResults.filter(result => result !== null);
+
+        if (validMetadata.length > 0) {
+          const combinedMetadata = {
+            sourceId: 'combined',
+            metadata: {
+              tools: validMetadata.flatMap(metadata => metadata?.metadata?.tools || [])
+            }
+          };
+
+          setSourceMetadata(combinedMetadata);
+        }
+      } catch (error) {
+        console.error('Error fetching source metadata:', error);
+      }
+    };
+
+    fetchSourcesAndMetadata();
+  }, [teammate?.uuid]);
 
   // Group and deduplicate system messages
   const groupedMessages = useMemo(() => {
@@ -195,73 +288,190 @@ export const ChatMessages = ({
     }
   }, [groupedMessages]);
 
+  // Group tools by category
+  const toolsByCategory = useMemo(() => {
+    if (!sourceMetadata?.metadata?.tools) return {};
+    
+    return sourceMetadata.metadata.tools.reduce((acc: Record<string, any[]>, tool) => {
+      const category = tool.type || 'Other';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(tool);
+      return acc;
+    }, {});
+  }, [sourceMetadata?.metadata?.tools]);
+
+  // Filter tools based on search and category
+  const filteredTools = useMemo(() => {
+    if (!sourceMetadata?.metadata?.tools) return [];
+    
+    return sourceMetadata.metadata.tools.filter(tool => {
+      const matchesSearch = !toolsFilter || 
+        tool.name.toLowerCase().includes(toolsFilter.toLowerCase()) ||
+        tool.description.toLowerCase().includes(toolsFilter.toLowerCase());
+      
+      const matchesCategory = !selectedCategory || tool.type === selectedCategory;
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [sourceMetadata?.metadata?.tools, toolsFilter, selectedCategory]);
+
   // Show welcome message if no messages and we have capabilities
-  if (!groupedMessages.length && capabilities) {
+  if (!groupedMessages.length && (capabilities || sourceMetadata)) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-        <div className="max-w-2xl w-full space-y-8">
+        <div className="max-w-4xl w-full space-y-8">
           {/* Teammate Info */}
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-white">
               {teammate?.name || 'Welcome'}
             </h2>
             <p className="text-slate-400">
-              {teammate?.description || capabilities.description}
+              {teammate?.description || capabilities?.description}
             </p>
           </div>
 
-          {/* Tools */}
-          {capabilities.tools?.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Available Tools</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {capabilities.tools.map((tool, index) => (
-                  <div key={index} className="bg-[#1E293B] rounded-lg p-4 flex items-center gap-3">
-                    <Wrench className="h-5 w-5 text-purple-400" />
-                    <span className="text-sm text-slate-300">{tool.name}</span>
+          {/* Tools Section */}
+          {sourceMetadata?.metadata?.tools && sourceMetadata.metadata.tools.length > 0 && (
+            <div className="bg-[#1E293B] rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Available Tools</h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    {sourceMetadata.metadata.tools.length} tools ready to use
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="bg-[#2A3347] hover:bg-[#374151] text-white"
+                  onClick={showTeammateDetails}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  View All Details
+                </Button>
+              </div>
+
+              {/* Search and Filter */}
+              <div className="flex flex-wrap gap-3 mb-4">
+                <div className="flex-1 min-w-[200px]">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search tools..."
+                      value={toolsFilter}
+                      onChange={(e) => setToolsFilter(e.target.value)}
+                      className="w-full bg-[#2A3347] text-white rounded-md pl-10 pr-4 py-2 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
                   </div>
-                ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.keys(toolsByCategory).map(category => (
+                    <button
+                      key={category}
+                      onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                      className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
+                        selectedCategory === category
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-[#2A3347] text-slate-300 hover:bg-[#374151]'
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Tools Grid */}
+              <div className="space-y-4">
+                {filteredTools.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400">
+                    No tools match your search
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(isToolsExpanded ? filteredTools : filteredTools.slice(0, 6)).map((tool, index) => (
+                      <div 
+                        key={index}
+                        onClick={showTeammateDetails}
+                        className="group bg-[#2A3347] rounded-lg p-3 hover:bg-[#374151] transition-all cursor-pointer hover:shadow-lg border border-transparent hover:border-purple-500/30"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 p-1.5 rounded-md bg-[#1A1F2E]">
+                            {tool.icon_url ? (
+                              <img src={tool.icon_url} alt={tool.name} className="h-5 w-5 object-contain" />
+                            ) : (
+                              getIcon(tool.type || 'tool')
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-medium text-white truncate">{tool.name}</h4>
+                              {tool.type && (
+                                <span className="text-xs px-2 py-0.5 rounded-md bg-[#1A1F2E] text-purple-400 flex-shrink-0">
+                                  {tool.type}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-slate-400 mt-1 line-clamp-2">{tool.description}</p>
+                            {tool.parameters && tool.parameters.length > 0 && (
+                              <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                                <Terminal className="h-3.5 w-3.5" />
+                                <span>{tool.parameters.length} parameters</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {filteredTools.length > 6 && !isToolsExpanded && (
+                  <div className="mt-6 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                      onClick={() => setIsToolsExpanded(true)}
+                    >
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Show {filteredTools.length - 6} More Tools
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Integrations */}
-          {capabilities.integrations?.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Available Integrations</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {capabilities.integrations.map((integration: string | Integration, index: number) => {
-                  const type = typeof integration === 'string' ? integration : integration.type || integration.name;
-                  const name = typeof integration === 'string' ? integration : integration.name;
-                  return (
-                    <div key={index} className="bg-[#1E293B] rounded-lg p-4 flex items-center gap-3">
-                      {getIcon(type)}
-                      <span className="text-sm text-slate-300">{name}</span>
-                    </div>
-                  );
-                })}
+          {/* Quick Start Commands */}
+          {capabilities?.starters && capabilities.starters.length > 0 && (
+            <div className="bg-[#1E293B] rounded-lg p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Quick Start Commands</h3>
+                <p className="text-sm text-slate-400 mt-1">Get started with common tasks</p>
               </div>
-            </div>
-          )}
-
-          {/* Starters */}
-          {capabilities.starters?.length > 0 && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Quick Start Commands</h3>
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {capabilities.starters.map((starter: Starter, index: number) => (
-                  <Button
+                  <button
                     key={index}
-                    variant="outline"
-                    className="w-full justify-start bg-[#1E293B] border-[#2D3B4E] hover:bg-[#2D3B4E] text-slate-300"
-                    onClick={() => {
-                      // Handle starter command
-                      console.log('Starter command:', starter.command);
-                    }}
+                    className="flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all group border border-transparent hover:border-purple-500/30"
+                    onClick={() => onStarterCommand?.(starter.command)}
                   >
-                    <Code className="h-4 w-4 text-[#7C3AED]" />
-                    <span className="truncate">{starter.display_name}</span>
-                  </Button>
+                    <div className="p-2 rounded-md bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                      {starter.icon ? (
+                        <img src={starter.icon} alt="" className="h-5 w-5" />
+                      ) : (
+                        <Terminal className="h-5 w-5 text-purple-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-white text-sm">{starter.display_name}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-1">
+                        {starter.command}
+                      </div>
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
