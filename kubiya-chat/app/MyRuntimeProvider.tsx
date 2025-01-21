@@ -444,7 +444,26 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
   const [error, setError] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isCollectingSystemMessages, setIsCollectingSystemMessages] = useState(false);
-  const [teammateStates, setTeammateStates] = useState<TeammateStates>({});
+  const [teammateStates, setTeammateStates] = useState<TeammateStates>(() => {
+    // Load all teammate states from localStorage on initialization
+    if (typeof window === 'undefined') return {};
+    
+    const states: TeammateStates = {};
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('teammate_state_')) {
+        const teammateId = key.replace('teammate_state_', '');
+        try {
+          const storedState = localStorage.getItem(key);
+          if (storedState) {
+            states[teammateId] = JSON.parse(storedState);
+          }
+        } catch (error) {
+          console.error(`Error loading state for teammate ${teammateId}:`, error);
+        }
+      }
+    }
+    return states;
+  });
 
   // 3. All callbacks with safe state access
   const setTeammateState = useCallback((teammateId: string, state: TeammateState) => {
