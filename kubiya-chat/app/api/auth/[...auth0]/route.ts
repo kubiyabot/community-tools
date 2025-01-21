@@ -20,7 +20,7 @@ const auth0Handler = handleAuth({
     },
     authorizationParams: {
       response_type: 'code',
-      scope: 'openid profile email',
+      scope: 'openid profile email read:organizations',
       audience: 'https://api.kubiya.ai'
     }
   }),
@@ -46,6 +46,11 @@ const auth0Handler = handleAuth({
         returnTo,
         organization: org
       });
+
+      // Check if user has organization membership
+      if (!org && !session.user?.org_id) {
+        throw new Error('User does not belong to any organization');
+      }
 
       if (org && session.user) {
         session.user.org_id = org;
@@ -101,15 +106,33 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return auth0Handler(req, { 
+    // Prevent callback reuse
+    if (params.includes('callback')) {
+      const code = url.searchParams.get('code');
+      if (!code) {
+        return new Response('Missing authorization code', { status: 400 });
+      }
+    }
+
+    const response = await auth0Handler(req, { 
       params: { auth0: params }
     });
+
+    // Handle auth errors by redirecting to login
+    if (response.status >= 400) {
+      return new Response(null, {
+        status: 307,
+        headers: { Location: '/api/auth/login' }
+      });
+    }
+
+    return response;
   } catch (error) {
     console.error('Auth error:', error);
-    // Always redirect to home on error
+    // Redirect to login on error
     return new Response(null, {
       status: 307,
-      headers: { Location: '/' }
+      headers: { Location: '/api/auth/login' }
     });
   }
 } 
