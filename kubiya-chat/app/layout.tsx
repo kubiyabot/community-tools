@@ -4,9 +4,8 @@ import { Metadata } from 'next';
 import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ConfigProvider } from '@/lib/config-context';
-import AuthProvider from './auth-provider';
+import ClientProvider from './components/ClientProvider';
 import { SessionHandler } from './components/SessionHandler';
-import MyRuntimeProvider from './MyRuntimeProvider';
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -29,16 +28,14 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`}>
         <ErrorBoundary>
-          <AuthProvider>
-            <UserProvider>
-              <ConfigProvider>
-                <MyRuntimeProvider>
-                  <SessionHandler />
-                  {children}
-                </MyRuntimeProvider>
-              </ConfigProvider>
-            </UserProvider>
-          </AuthProvider>
+          <UserProvider>
+            <ConfigProvider>
+              <ClientProvider>
+                <SessionHandler />
+                {children}
+              </ClientProvider>
+            </ConfigProvider>
+          </UserProvider>
         </ErrorBoundary>
       </body>
     </html>

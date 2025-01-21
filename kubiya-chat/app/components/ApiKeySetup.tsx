@@ -35,8 +35,11 @@ export function ApiKeySetup() {
   const [isHoveringHelp, setIsHoveringHelp] = useState(false);
 
   const handleLogin = () => {
+    console.log('Login button clicked');
     setIsLoading(true);
-    window.location.href = '/api/auth/login';
+    const loginUrl = new URL('/api/auth/auth0/login', window.location.origin);
+    loginUrl.searchParams.set('returnTo', '/chat');
+    window.location.assign(loginUrl.toString());
   };
 
   return (
@@ -72,9 +75,12 @@ export function ApiKeySetup() {
       <div className="flex-1 flex items-center justify-center px-4">
         <div className="max-w-sm w-full">
           {/* Sign In Card */}
-          <div className="text-center space-y-6 bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-2xl p-8 border border-white/5 shadow-xl relative group">
+          <div 
+            onClick={() => console.log('Card clicked')} 
+            className="text-center space-y-6 bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-2xl p-8 border border-white/5 shadow-xl relative group pointer-events-auto"
+          >
             {/* Animated Border Effect */}
-            <div className="absolute -inset-[1px] bg-gradient-to-r from-[#7C3AED]/0 via-[#7C3AED]/20 to-[#7C3AED]/0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <div className="absolute -inset-[1px] bg-gradient-to-r from-[#7C3AED]/0 via-[#7C3AED]/20 to-[#7C3AED]/0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
             
             {/* Logo */}
             <div className="flex justify-center mb-2">
@@ -101,7 +107,8 @@ export function ApiKeySetup() {
             </div>
 
             {/* Sign In Button */}
-            <Button
+            <button
+              type="button"
               onClick={handleLogin}
               disabled={isLoading}
               className={cn(
@@ -109,7 +116,8 @@ export function ApiKeySetup() {
                 "bg-[#7C3AED] hover:bg-[#6D28D9] text-white",
                 "rounded-xl shadow-lg hover:shadow-[#7C3AED]/25 hover:scale-[1.02]",
                 "flex items-center justify-center gap-3 group/btn",
-                "disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+                "disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100",
+                "pointer-events-auto relative z-50"
               )}
             >
               {isLoading ? (
@@ -124,7 +132,7 @@ export function ApiKeySetup() {
                   <ChevronRightIcon className="h-5 w-5 group-hover/btn:translate-x-1 transition-transform" />
                 </>
               )}
-            </Button>
+            </button>
 
             {/* Security Badge */}
             <div 
