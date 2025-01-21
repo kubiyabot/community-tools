@@ -1,4 +1,4 @@
-name: Build and push chat-ui
+name: Build and push chat-ui DEV
 
 on:
   push:
