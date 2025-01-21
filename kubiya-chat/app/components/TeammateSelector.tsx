@@ -45,25 +45,32 @@ export function TeammateSelector() {
 
   useEffect(() => {
     setMounted(true);
+    
+    // Only proceed if we have teammates
+    if (teammates.length === 0) return;
+
     const storedTeammate = localStorage.getItem('selectedTeammate');
+    
     if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
+      // If we have a valid stored teammate, select it
       setSelectedTeammate(storedTeammate);
-    } else if (teammates.length > 0 && !selectedTeammate) {
+    } else {
+      // Otherwise select the first teammate and store it
       setSelectedTeammate(teammates[0].uuid);
       localStorage.setItem('selectedTeammate', teammates[0].uuid);
     }
-  }, [teammates]);
+  }, [teammates, setSelectedTeammate]); // Add setSelectedTeammate to dependencies
+
+  const handleTeammateSelect = (uuid: string) => {
+    setSelectedTeammate(uuid);
+    localStorage.setItem('selectedTeammate', uuid);
+  };
 
   const filteredTeammates = teammates.filter(teammate => 
     !searchQuery || 
     teammate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     teammate.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleTeammateSelect = (uuid: string) => {
-    setSelectedTeammate(uuid);
-    localStorage.setItem('selectedTeammate', uuid);
-  };
 
   // Fetch teammate capabilities when modal is opened
   const handleInfoClick = async (teammate: Teammate, e: React.MouseEvent) => {
