@@ -11,7 +11,7 @@ import { TeammateSelector } from './TeammateSelector';
 import { UserProfileButton } from './UserProfileButton';
 
 export default function MyAssistant() {
-  const { user, isLoading } = useUser();
+  const { user } = useUser();
   const { selectedTeammate, teammates } = useTeammateContext();
   const { clearApiKey } = useConfig();
 
@@ -25,30 +25,6 @@ export default function MyAssistant() {
     toolName: "tool_output",
     render: ToolExecution
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#0f172a]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#0f172a]">
-        <LoginButton />
-      </div>
-    );
-  }
-
-  if (!user.accessToken) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#0f172a]">
-        <div className="text-white">No access token available</div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-screen bg-[#0A0F1E] overflow-hidden">

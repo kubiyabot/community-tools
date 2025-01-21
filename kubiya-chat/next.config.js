@@ -3,7 +3,7 @@ const nextConfig = {
   transpilePackages: ['@auth0/nextjs-auth0'],
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000']
+      allowedOrigins: ['localhost:3000', 'chat.kubiya.ai']
     }
   },
   typescript: {
