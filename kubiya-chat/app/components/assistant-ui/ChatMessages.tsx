@@ -171,11 +171,16 @@ export const ChatMessages = ({
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [toolsFilter, setToolsFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchSourcesAndMetadata = async () => {
-      if (!teammate?.uuid) return;
+      if (!teammate?.uuid) {
+        setIsLoading(false);
+        return;
+      }
 
+      setIsLoading(true);
       try {
         const sourcesRes = await fetch(`/api/teammates/${teammate.uuid}/sources`);
         if (!sourcesRes.ok) {
@@ -219,8 +224,11 @@ export const ChatMessages = ({
 
           setSourceMetadata(combinedMetadata);
         }
+
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching source metadata:', error);
+        setIsLoading(false);
       }
     };
 
@@ -319,94 +327,84 @@ export const ChatMessages = ({
   if (!groupedMessages.length && (capabilities || sourceMetadata)) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="w-[600px] mx-auto">
+        <div className="w-full max-w-4xl mx-auto space-y-6 p-4">
           {/* Teammate Info */}
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white mb-2">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-3">
               {teammate?.name || 'Welcome'}
             </h2>
-            <p className="text-slate-400">
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
               {teammate?.description || capabilities?.description}
             </p>
           </div>
 
-          {/* Tools Section */}
-          {sourceMetadata?.metadata?.tools && sourceMetadata.metadata.tools.length > 0 && (
-            <div className="bg-[#1E293B] rounded-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-purple-400" />
-                  <h3 className="text-base font-semibold text-white">Available Tools</h3>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#2A3347] text-purple-400">
-                    {sourceMetadata.metadata.tools.length}
-                  </span>
+          {isLoading ? (
+            // Loading skeleton
+            <div className="space-y-4">
+              <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
+                <div className="h-8 w-48 bg-[#2A3347] rounded mb-4"></div>
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="h-24 bg-[#2A3347] rounded"></div>
+                  ))}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-400 hover:text-white"
-                  onClick={showTeammateDetails}
-                >
-                  <Settings className="h-4 w-4 mr-1.5" />
-                  Details
-                </Button>
               </div>
-
-              {/* Search and Filter */}
-              <div className="space-y-3 mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search tools..."
-                    value={toolsFilter}
-                    onChange={(e) => setToolsFilter(e.target.value)}
-                    className="w-full bg-[#2A3347] text-white rounded-md pl-10 pr-4 py-2 text-sm placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                  />
+              <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
+                <div className="h-8 w-48 bg-[#2A3347] rounded mb-4"></div>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-12 bg-[#2A3347] rounded"></div>
+                  ))}
                 </div>
-                {Object.entries(toolsByCategory).length > 1 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {Object.entries(toolsByCategory).map(([category, tools]) => (
-                      <button
-                        key={category}
-                        onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
-                        className={`px-2 py-1 rounded-md text-xs transition-colors flex items-center gap-1.5 ${
-                          selectedCategory === category
-                            ? 'bg-purple-500 text-white'
-                            : 'bg-[#2A3347] text-slate-300 hover:bg-[#374151]'
-                        }`}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Tools Preview Section */}
+              {sourceMetadata?.metadata?.tools && sourceMetadata.metadata.tools.length > 0 && (
+                <div className={`bg-[#1E293B] rounded-xl p-4 transition-all ${isToolsExpanded ? 'h-auto' : 'h-[250px]'}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-1.5 rounded-lg bg-purple-500/10">
+                        <Wrench className="h-5 w-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Available Tools</h3>
+                        <p className="text-sm text-slate-400">
+                          {isToolsExpanded ? 'All available tools' : 'Most commonly used tools'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm px-3 py-1 rounded-full bg-[#2A3347] text-purple-400 font-medium">
+                        {sourceMetadata.metadata.tools.length} tools
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-white"
+                        onClick={() => setIsToolsExpanded(!isToolsExpanded)}
                       >
-                        {getIcon(category)}
-                        <span>{category}</span>
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#1A1F2E] text-xs">
-                          {tools.length}
-                        </span>
-                      </button>
-                    ))}
+                        <ChevronDown className={`h-4 w-4 mr-1.5 transition-transform ${isToolsExpanded ? 'rotate-180' : ''}`} />
+                        {isToolsExpanded ? 'Show Less' : 'Show More'}
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              {/* Tools List */}
-              <div className="space-y-2">
-                {filteredTools.length === 0 ? (
-                  <div className="text-center py-6 text-slate-400 text-sm">
-                    No tools match your search
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 max-h-[320px] overflow-y-auto pr-2">
-                    {(isToolsExpanded ? filteredTools : filteredTools.slice(0, 6)).map((tool, index) => (
+
+                  {/* Tools Grid with smooth height transition */}
+                  <div className={`grid grid-cols-2 gap-2 overflow-hidden transition-all duration-300 ${
+                    isToolsExpanded ? 'max-h-[600px]' : 'max-h-[180px]'
+                  }`}>
+                    {(isToolsExpanded ? filteredTools : filteredTools.slice(0, 4)).map((tool, index) => (
                       <div 
                         key={index}
-                        className="group bg-[#2A3347] rounded-md p-2 hover:bg-[#374151] transition-all cursor-pointer hover:shadow-md border border-transparent hover:border-purple-500/30"
+                        className="group bg-[#2A3347] rounded-lg p-2.5 hover:bg-[#374151] transition-all cursor-pointer hover:shadow-lg border border-transparent hover:border-purple-500/30"
+                        onClick={showTeammateDetails}
                       >
-                        <div 
-                          className="flex items-center gap-2"
-                          onClick={showTeammateDetails}
-                        >
-                          <div className="p-1.5 rounded-md bg-[#1A1F2E] flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
                             {tool.icon_url ? (
-                              <img src={tool.icon_url} alt={tool.name} className="h-4 w-4 object-contain" />
+                              <img src={tool.icon_url} alt={tool.name} className="h-5 w-5 object-contain" />
                             ) : (
                               getIcon(tool.type || 'tool')
                             )}
@@ -415,69 +413,91 @@ export const ChatMessages = ({
                             <div className="flex items-center gap-2">
                               <h4 className="text-sm font-medium text-white truncate">{tool.name}</h4>
                               {tool.type && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#1A1F2E] text-purple-400 flex-shrink-0">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1A1F2E] text-purple-400 flex-shrink-0">
                                   {tool.type}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-slate-400 truncate">{tool.description}</p>
+                            <p className="text-xs text-slate-400 line-clamp-1">{tool.description}</p>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
+                </div>
+              )}
 
-                {filteredTools.length > 6 && !isToolsExpanded && (
-                  <div
-                    className="w-full text-center py-1.5 text-xs text-purple-400 hover:text-purple-300 hover:bg-[#2A3347] rounded-md transition-colors flex items-center justify-center gap-1.5 mt-2 cursor-pointer"
-                    onClick={() => setIsToolsExpanded(true)}
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                    Show {filteredTools.length - 6} More
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Quick Start Commands */}
-          {capabilities?.starters && capabilities.starters.length > 0 && (
-            <div className="bg-[#1E293B] rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Terminal className="h-4 w-4 text-purple-400" />
-                <h3 className="text-base font-semibold text-white">Quick Start Commands</h3>
-              </div>
-              <div className="space-y-1.5">
-                {capabilities.starters.map((starter: Starter, index: number) => (
-                  <div
-                    key={index}
-                    className="w-full flex items-center gap-2 p-2 bg-[#2A3347] rounded-md text-left hover:bg-[#374151] transition-all group border border-transparent hover:border-purple-500/30 cursor-pointer"
-                    onClick={() => {
-                      if (onStarterCommand) {
-                        onStarterCommand(starter.command);
-                      } else {
-                        // Fallback if onStarterCommand is not provided
-                        console.log('Starter command:', starter.command);
-                      }
-                    }}
-                  >
-                    <div className="p-1.5 rounded-md bg-[#1A1F2E] group-hover:bg-[#2A3347]">
-                      {starter.icon ? (
-                        <img src={starter.icon} alt="" className="h-4 w-4" />
-                      ) : (
-                        <Terminal className="h-4 w-4 text-purple-400" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-white text-sm truncate">{starter.display_name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono truncate">
-                        {starter.command}
+              {/* Quick Actions Row */}
+              <div className="space-y-4">
+                {/* Quick Start Commands */}
+                {capabilities?.starters && capabilities.starters.length > 0 && (
+                  <div className="bg-[#1E293B] rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 rounded-lg bg-blue-500/10">
+                        <Terminal className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Quick Start</h3>
+                        <p className="text-sm text-slate-400">Common commands</p>
                       </div>
                     </div>
-                    <Code className="h-3.5 w-3.5 text-slate-400 group-hover:text-purple-400" />
+                    <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-2">
+                      {capabilities.starters.map((starter: Starter, index: number) => (
+                        <div
+                          key={index}
+                          className="w-full flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all group border border-transparent hover:border-blue-500/30 cursor-pointer"
+                          onClick={() => onStarterCommand?.(starter.command)}
+                        >
+                          <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                            {starter.icon ? (
+                              <img src={starter.icon} alt="" className="h-4 w-4" />
+                            ) : (
+                              <Terminal className="h-4 w-4 text-blue-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-white text-sm truncate">{starter.display_name}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Connected Platforms */}
+                {capabilities?.integrations && capabilities.integrations.length > 0 && (
+                  <div className="bg-[#1E293B] rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 rounded-lg bg-green-500/10">
+                        <Cloud className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-white">Connected Platforms</h3>
+                        <p className="text-sm text-slate-400">Active integrations</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto pr-2">
+                      {capabilities.integrations.map((integration, index) => {
+                        const integrationName = typeof integration === 'string' ? integration : integration.name;
+                        const integrationType = typeof integration === 'string' ? integration : integration.type || integration.name;
+                        
+                        return (
+                          <div
+                            key={index}
+                            className="bg-[#2A3347] rounded-lg p-2.5 flex items-center gap-2 group hover:bg-[#374151] transition-all border border-transparent hover:border-green-500/30"
+                          >
+                            <div className="p-1.5 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                              {getIcon(integrationType)}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-white truncate">{integrationName}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
