@@ -466,6 +466,8 @@ export const Chat = () => {
             systemMessages={systemMessages}
             capabilities={capabilities}
             teammate={teammate}
+            showTeammateDetails={() => setIsDetailsModalOpen(true)}
+            onStarterCommand={handleSubmit}
           />
         </div>
         <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />

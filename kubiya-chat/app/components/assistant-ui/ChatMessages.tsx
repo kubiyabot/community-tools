@@ -443,12 +443,16 @@ export const ChatMessages = ({
                     </div>
                     <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-2">
                       {capabilities.starters.map((starter: Starter, index: number) => (
-                        <div
+                        <button
                           key={index}
-                          className="w-full flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all group border border-transparent hover:border-blue-500/30 cursor-pointer"
-                          onClick={() => onStarterCommand?.(starter.command)}
+                          className="group relative w-full flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all border border-transparent hover:border-blue-500/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                          onClick={() => {
+                            if (onStarterCommand) {
+                              onStarterCommand(starter.command);
+                            }
+                          }}
                         >
-                          <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                          <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347] transition-colors">
                             {starter.icon ? (
                               <img src={starter.icon} alt="" className="h-4 w-4" />
                             ) : (
@@ -457,8 +461,18 @@ export const ChatMessages = ({
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="font-medium text-white text-sm truncate">{starter.display_name}</div>
+                            <div className="text-xs text-slate-400 font-mono truncate mt-0.5">{starter.command}</div>
                           </div>
-                        </div>
+                          
+                          {/* Hover tooltip */}
+                          <div className="absolute left-0 right-0 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                            <div className="bg-[#374151] rounded-lg p-2 shadow-lg border border-blue-500/20">
+                              <div className="text-xs text-white font-medium mb-1">{starter.display_name}</div>
+                              <div className="text-xs text-slate-300 font-mono break-all">{starter.command}</div>
+                            </div>
+                            <div className="absolute bottom-0 left-4 w-2 h-2 bg-[#374151] transform rotate-45 translate-y-1 border-r border-b border-blue-500/20"></div>
+                          </div>
+                        </button>
                       ))}
                     </div>
                   </div>
