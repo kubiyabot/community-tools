@@ -2,11 +2,15 @@ name: Build and push chat-ui
 
 on:
   push:
-    branches:
+    branches-ignore:
       - main
+      - production
+      - staging
+      - demo
+      - release-*
 
 env:
-  environment: production
+  environment: dev
 
 jobs:
   build:
@@ -60,7 +64,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KUBIYA_GITHUB_TOKEN }}
         run: |
-          yq e '.chatUi.image.tag = "${{ github.sha }}"' -i helm/kubiya-server/values.${{ env.environment }}.yaml
+          yq e '.chat-ui.image.tag = "${{ github.sha }}"' -i helm/kubiya-server/values.${{ github.actor }}.yaml
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           COMMIT_MSG="Update $GITHUB_REPOSITORY image tag to $GITHUB_SHA for $environment by $GITHUB_ACTOR"

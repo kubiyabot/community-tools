@@ -2,15 +2,11 @@ name: Build and push chat-ui
 
 on:
   push:
-    branches-ignore:
+    branches:
       - main
-      - production
-      - staging
-      - demo
-      - release-*
 
 env:
-  environment: dev
+  environment: production
 
 jobs:
   build:
@@ -47,7 +43,6 @@ jobs:
           file: ./kubiya-chat/Dockerfile
           push: true
           tags: |
-            "564407622114.dkr.ecr.eu-west-1.amazonaws.com/chat-ui:${{ github.actor }}"
             "564407622114.dkr.ecr.eu-west-1.amazonaws.com/chat-ui:${{ github.sha }}"
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
@@ -64,7 +59,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.KUBIYA_GITHUB_TOKEN }}
         run: |
-          yq e '.chat-ui.image.tag = "${{ github.sha }}"' -i helm/kubiya-server/values.${{ github.actor }}.yaml
+          yq e '.chatUi.image.tag = "${{ github.sha }}"' -i helm/kubiya-server/values.${{ env.environment }}.yaml
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           COMMIT_MSG="Update $GITHUB_REPOSITORY image tag to $GITHUB_SHA for $environment by $GITHUB_ACTOR"
