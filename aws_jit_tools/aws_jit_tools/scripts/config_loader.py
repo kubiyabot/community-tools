@@ -37,24 +37,15 @@ S3_CONFIG_SCHEMA = {
     "patternProperties": {
         ".*": {
             "type": "object",
-            "required": ["name", "description", "buckets", "policy_template", "session_duration"],
+            "required": ["name", "description", "buckets", "session_duration"],
             "properties": {
                 "name": {"type": "string"},
                 "description": {"type": "string"},
-                "buckets": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1
-                },
-                "permissions": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 1,
-                },
-                "session_duration": {
-                    "type": "string",
-                    "pattern": "^PT[0-9]+[HM]$"
-                }
+                "policy": {"type": "string", "enum": ["ReadOnly", "FullAccess"]},
+                "session_duration": {"type": "string", "pattern": "^PT[0-9]+[HM]$"},
+                "buckets": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "permissions": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+                "managed_policies": {"type": "array", "items": {"type": "string"}, "minItems": 1}
             }
         }
     }
