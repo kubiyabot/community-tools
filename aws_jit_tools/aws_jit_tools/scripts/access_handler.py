@@ -2,9 +2,7 @@ import logging
 import os
 import sys
 import json
-from http.client import responses
 from typing import Optional, Dict, Any, List
-from pathlib import Path
 import time
 import threading
 
@@ -49,12 +47,7 @@ except ImportError as e:
 # Direct imports from the scripts directory
 from scripts.utils.notifications import NotificationManager
 from scripts.utils.aws_utils import get_account_alias, get_permission_set_details
-from scripts.utils.slack_messages import create_access_revoked_blocks
 from scripts.utils.webhook_handler import WebhookHandler
-
-
-def arg_list_of_strings(arg: str):
-    return arg.split(',')
 
 
 def print_progress(message: str, emoji: str) -> None:
