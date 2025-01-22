@@ -262,7 +262,8 @@ class AWSAccessHandler:
                              session_duration: str = "PT1H",
                              description: str = None,
                              relay_state: str = None,
-                             inline_policy: Dict = None) -> Optional[str]:
+                             inline_policy: Dict = None,
+                             managed_policies: List[str] = None) -> Optional[str]:
         """
         Create a new permission set using AWS SSO Admin client and attach it to a user.
 
@@ -273,6 +274,7 @@ class AWSAccessHandler:
             description (str): Description of the permission set
             relay_state (str): URL to redirect users to after signing in
             inline_policy (Dict): Inline policy document to attach
+            managed_policies (List[str]): List of managed policy ARNs to attach
 
         Returns:
             Optional[str]: Permission set ARN if successful, None otherwise
@@ -312,6 +314,27 @@ class AWSAccessHandler:
                 InstanceArn=self.instance_arn,
                 PermissionSetArn=permission_set_arn
             )
+
+            # Attach managed policies if provided
+            if managed_policies:
+                print_progress("Attaching managed policies...", "🔄")
+                for policy_arn in managed_policies:
+                    try:
+                        self.sso_admin.attach_managed_policy_to_permission_set(
+                            InstanceArn=self.instance_arn,
+                            PermissionSetArn=permission_set_arn,
+                            ManagedPolicyArn=policy_arn
+                        )
+
+                        # Wait for policy attachment to complete
+                        self.sso_admin.get_waiter('permission_set_provisioned').wait(
+                            InstanceArn=self.instance_arn,
+                            PermissionSetArn=permission_set_arn
+                        )
+                    except self.sso_admin.exceptions.ConflictException:
+                        print_progress(f"Policy {policy_arn} already attached", "ℹ️")
+                    except Exception as e:
+                        logger.error(f"Failed to attach policy {policy_arn}: {e}")
 
             # Attach inline policy if provided
             if inline_policy:
@@ -813,22 +836,36 @@ def main():
 
         if args.action == 'grant':
             # Handle SSO access
-            actions = os.environ.get('S3_PERMISSIONS', '').split(',')
-            handler.grant_permission_set(
-                user_email=args.user_email,
-                permission_set_name=os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet'),
-                session_duration=args.duraion,
-                inline_policy={
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": actions,
-                            "resource": [args.bucket_name]
-                        }
-                    ]
-                }
-            )
+            s3_policy = os.environ.get('S3_POLICY')
+            s3_permissions = os.environ.get('S3_PERMISSIONS', '').split(',')
+            s3_managed_policies = os.environ.get('S3_MANAGED_POLICIES').split(',')
+            permission_set_name = os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
+            actions: List[str] = s3_permissions
+            if s3_policy == "ReadOnly":
+                actions.append("s3:GetObject")
+                actions.append("s3:ListBucket")
+            elif s3_policy == "FullAccess":
+                actions.append("s3:*")
+
+            inline_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [s3_permissions],
+                        "resource": [
+                            f"arn:aws:s3:::{args.bucket_name}",
+                            f"arn:aws:s3:::{args.bucket_name}/*"
+                        ]
+                    }
+                ]
+            }
+
+            handler.grant_permission_set(user_email=args.user_email,
+                                         permission_set_name=permission_set_name,
+                                         session_duration=args.duraion,
+                                         inline_policy=inline_policy,
+                                         managed_policies=s3_managed_policies)
         else:  # revoke
             # Handle SSO access revocation
             handler.revoke_permission_set(

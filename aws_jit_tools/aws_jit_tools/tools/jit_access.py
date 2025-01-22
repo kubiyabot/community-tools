@@ -166,10 +166,11 @@ echo ">> Processing request... ⏳"
 pip install -q boto3 requests jinja2 jsonschema argparse
 
 # Export bucket names and policy template from config
-export S3_PERMISSIONS="{config['permissions']}"
+export S3_POLICY="{config['policy']}"
 export BUCKETS="{','.join(config['buckets'])}"
-export POLICY_TEMPLATE="{config['policy_template']}"
+export S3_PERMISSIONS="{config['permissions']}"
 export MAX_DURATION="{config['session_duration']}"
+export S3_MANAGED_POLICIES="{config['managed_policies']}"
 
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
