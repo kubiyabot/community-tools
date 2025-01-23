@@ -6,8 +6,9 @@ import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { SystemMessages } from './SystemMessages';
 import { useTeammateContext } from "../../MyRuntimeProvider";
-import { Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, Settings, Search, ChevronDown } from "lucide-react";
+import { Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, Settings, Search, ChevronDown, Bot, Workflow, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/app/components/button";
+import { toolRegistry, CustomToolUI } from './ToolRegistry';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -16,6 +17,7 @@ interface ToolCall {
   arguments?: Record<string, unknown>;
   message?: string;
   timestamp?: string;
+  tool_description?: string;
 }
 
 type SystemMessage = ThreadMessage & { 
@@ -92,6 +94,7 @@ interface ChatMessagesProps {
     name?: string;
     description?: string;
     uuid?: string;
+    avatar_url?: string;
   };
   showTeammateDetails?: () => void;
   onStarterCommand?: (command: string) => void;
@@ -101,6 +104,27 @@ interface TextContent {
   type: 'text';
   text: string;
 }
+
+interface ToolMetadata {
+  name: string;
+  description: string;
+  icon: string | React.ComponentType<any>;
+  category?: string;
+  version?: string;
+}
+
+interface IntegrationData {
+  tools: Record<string, ToolMetadata>;
+  categories: string[];
+}
+
+const defaultIcons = {
+  kubernetes: Terminal,
+  git: GitBranch,
+  sql: Database,
+  http: Globe,
+  workflow: Workflow,
+};
 
 // Type guards with proper type assertions
 function isAssistantMessage(message: ThreadMessage): message is AssistantMessage {
@@ -172,6 +196,7 @@ export const ChatMessages = ({
   const [toolsFilter, setToolsFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [integrations, setIntegrations] = useState<IntegrationData | null>(null);
 
   useEffect(() => {
     const fetchSourcesAndMetadata = async () => {
@@ -234,6 +259,56 @@ export const ChatMessages = ({
 
     fetchSourcesAndMetadata();
   }, [teammate?.uuid]);
+
+  useEffect(() => {
+    // Load integrations and tool metadata on mount
+    const loadIntegrations = async () => {
+      try {
+        const response = await fetch('/api/integrations');
+        const data: IntegrationData = await response.json();
+        
+        // Process tool metadata and register tools
+        Object.entries(data.tools).forEach(([toolName, metadata]) => {
+          // Convert icon URL to component if it's a string URL
+          let icon = metadata.icon;
+          if (typeof icon === 'string') {
+            // If it's a URL, create an img component
+            const IconComponent = (props: any) => (
+              <img 
+                src={icon as string} 
+                alt={`${toolName} icon`}
+                className="w-4 h-4"
+                {...props}
+              />
+            );
+            icon = IconComponent;
+          } else {
+            // Use default icon based on category or name
+            icon = defaultIcons[toolName.toLowerCase() as keyof typeof defaultIcons] || Terminal;
+          }
+
+          // Register tool with processed metadata
+          const toolUI: CustomToolUI = {
+            name: metadata.name,
+            description: metadata.description,
+            icon: icon as React.ComponentType<any>,
+            metadata: {
+              category: metadata.category || 'Other',
+              version: metadata.version || '1.0'
+            }
+          };
+          
+          toolRegistry[toolName] = toolUI;
+        });
+
+        setIntegrations(data);
+      } catch (err) {
+        console.error('Failed to load integrations:', err);
+      }
+    };
+
+    loadIntegrations();
+  }, []);
 
   // Group and deduplicate system messages
   const groupedMessages = useMemo(() => {
@@ -520,43 +595,91 @@ export const ChatMessages = ({
     );
   }
 
+  // Update the message rendering to handle tool_init events
+  const renderMessage = (message: ThreadMessage) => {
+    if (isUserMessage(message)) {
+      return <UserMessage key={message.id} message={message} />;
+    }
+    
+    if (isAssistantMessage(message)) {
+      // Group tool calls by their ID to maintain execution context
+      const toolCallsById = new Map<string, ToolCall[]>();
+      
+      // Process all tool calls
+      message.tool_calls?.forEach(call => {
+        const existingCalls = toolCallsById.get(call.id) || [];
+        toolCallsById.set(call.id, [...existingCalls, call]);
+      });
+
+      // Convert the grouped calls back to a flat array, maintaining order
+      const groupedToolCalls = Array.from(toolCallsById.values()).flat();
+      
+      return (
+        <AssistantMessage 
+          key={message.id} 
+          message={{
+            ...message,
+            tool_calls: groupedToolCalls
+          }}
+          isSystem={false}
+        />
+      );
+    }
+    
+    if (isSystemMessage(message)) {
+      return (
+        <AssistantMessage 
+          key={message.id} 
+          message={message} 
+          isSystem={true}
+        />
+      );
+    }
+    
+    return null;
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {groupedMessages.map((message) => {
-          if (isUserMessage(message)) {
-            return <UserMessage key={message.id} message={message} />;
-          }
-          
-          if (isAssistantMessage(message)) {
-            return (
-              <AssistantMessage 
-                key={message.id} 
-                message={message} 
-                isSystem={false}
-              />
-            );
-          }
-          
-          if (isSystemMessage(message)) {
-            return (
-              <AssistantMessage 
-                key={message.id} 
-                message={message} 
-                isSystem={true}
-              />
-            );
-          }
-          
-          return null;
-        })}
+        {groupedMessages.map(renderMessage)}
 
         {isCollectingSystemMessages && (
-          <div className="flex justify-center py-4">
-            <div className="animate-pulse flex items-center space-x-2">
-              <div className="h-2 w-2 bg-purple-500 rounded-full"></div>
-              <div className="h-2 w-2 bg-purple-500 rounded-full animation-delay-200"></div>
-              <div className="h-2 w-2 bg-purple-500 rounded-full animation-delay-400"></div>
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2D3B4E] flex items-center justify-center relative">
+              {teammate?.avatar_url ? (
+                <img 
+                  src={teammate.avatar_url} 
+                  alt={teammate.name || 'Assistant'} 
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <Bot className="h-4 w-4 text-[#7C3AED]" />
+              )}
+              <span className="absolute -bottom-1 -right-1 h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75 animate-ping"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+              </span>
+            </div>
+            <div className="flex-1 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-medium text-white">
+                  {teammate?.name || 'Assistant'}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-purple-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>thinking</span>
+                </div>
+              </div>
+              <div className="text-sm text-[#E2E8F0] prose prose-invert prose-sm max-w-none">
+                <div className="group relative bg-[#1A1F2E]/50 rounded-lg p-3">
+                  <div className="flex items-start">
+                    <div className="flex-1">
+                      <div className="h-4 w-12 bg-purple-400/10 rounded animate-pulse"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

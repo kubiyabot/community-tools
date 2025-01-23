@@ -22,6 +22,8 @@ import { UserProfile } from "./components/UserProfile";
 import { UserProfileButton } from './components/UserProfileButton';
 import { Chat } from './components/assistant-ui/Chat';
 import { useRouter } from 'next/navigation';
+import { ToolProvider } from './components/assistant-ui/ToolRegistry';
+import { getToolMetadata } from './components/assistant-ui/ToolRegistry';
 
 interface TeammateConfig {
   teammate: string;
@@ -211,9 +213,8 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
   const decoder = new TextDecoder();
   let buffer = '';
   let systemMessages = new Set<string>();
-  let lastMessageText = "";
-  let lastMessageType: 'system' | 'assistant' | null = null;
-  let messageId = `msg_${Date.now()}`;
+  let currentMessageText = '';
+  let currentMessageId = `msg_${Date.now()}`;
   let currentToolId = `tool_${Date.now()}`;
 
   console.log('[SSE] Starting event stream processing');
@@ -236,15 +237,31 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
         try {
           // Handle data: prefix
           const content = line.startsWith('data: ') ? line.slice(6) : line;
+          console.log('[SSE] Raw event:', content);
+
           if (content === '[DONE]') {
             console.log('[SSE] Received [DONE] event');
+            // Yield any remaining message content
+            if (currentMessageText.trim()) {
+              yield {
+                content: [{ type: "text", text: currentMessageText } as TextContent],
+                role: 'assistant',
+                id: currentMessageId
+              };
+            }
             break;
           }
 
           try {
             // Try to parse as JSON first
             const event = JSON.parse(content);
-            console.log('[SSE] Parsed event:', { type: event.type, id: event.id, messageLength: event.message?.length });
+            console.log('[SSE] Parsed event:', { 
+              type: event.type, 
+              id: event.id, 
+              messageLength: event.message?.length,
+              toolName: event.tool_name,
+              hasArgs: !!event.arguments
+            });
 
             if (event.type === 'system_message' && event.message) {
               const text = event.message.trim();
@@ -265,7 +282,8 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
               console.log('[SSE] Processing tool event:', { 
                 toolName: event.tool_name,
                 hasArgs: !!event.arguments,
-                messageLength: event.message?.length 
+                messageLength: event.message?.length,
+                rawEvent: event
               });
               
               const toolId = event.id || currentToolId;
@@ -286,6 +304,17 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
               }
 
               if (toolName) {
+                // Reset current message text as we're switching to tool output
+                if (currentMessageText.trim()) {
+                  yield {
+                    content: [{ type: "text", text: currentMessageText } as TextContent],
+                    role: 'assistant',
+                    id: currentMessageId
+                  };
+                  currentMessageText = '';
+                  currentMessageId = `msg_${Date.now()}`;
+                }
+
                 yield {
                   content: [],
                   role: 'assistant',
@@ -302,9 +331,21 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
             } else if (event.type === 'tool_output') {
               console.log('[SSE] Processing tool output:', { 
                 id: event.id || currentToolId,
-                messageLength: event.message?.length 
+                messageLength: event.message?.length,
+                rawEvent: event
               });
               
+              // Reset current message text as we're switching to tool output
+              if (currentMessageText.trim()) {
+                yield {
+                  content: [{ type: "text", text: currentMessageText } as TextContent],
+                  role: 'assistant',
+                  id: currentMessageId
+                };
+                currentMessageText = '';
+                currentMessageId = `msg_${Date.now()}`;
+              }
+
               const toolId = event.id || currentToolId;
               yield {
                 content: [],
@@ -318,18 +359,29 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                 }]
               };
             } else if ((event.type === 'msg' || event.type === 'assistant') && event.message) {
-              console.log('[SSE] Processing message:', { 
+              console.log('[SSE] Processing message chunk:', { 
                 type: event.type,
                 messageLength: event.message.length,
-                id: event.id || messageId
+                id: event.id || currentMessageId
               });
               
-              lastMessageText = event.message;
-              lastMessageType = 'assistant';
+              // If we have a new message ID, yield current content and reset
+              if (event.id && event.id !== currentMessageId && currentMessageText.trim()) {
+                yield {
+                  content: [{ type: "text", text: currentMessageText } as TextContent],
+                  role: 'assistant',
+                  id: currentMessageId
+                };
+                currentMessageText = '';
+                currentMessageId = event.id;
+              }
+
+              // Append new content and yield immediately
+              currentMessageText += event.message;
               yield {
-                content: [{ type: "text", text: event.message } as TextContent],
+                content: [{ type: "text", text: currentMessageText } as TextContent],
                 role: 'assistant',
-                id: event.id || messageId
+                id: currentMessageId
               };
             }
           } catch (parseError) {
@@ -348,16 +400,17 @@ const handleStreamEvents = async function*(reader: ReadableStreamDefaultReader<U
                 };
               }
             } else if (!content.startsWith('{') && !content.startsWith('[')) {
-              console.log('[SSE] Processing plain text message:', { 
-                contentLength: content.length 
+              console.log('[SSE] Processing plain text chunk:', { 
+                contentLength: content.length,
+                content: content.substring(0, 100) + '...' // Log first 100 chars
               });
               
-              lastMessageText = content;
-              lastMessageType = 'assistant';
+              // Append and yield immediately for plain text
+              currentMessageText += content;
               yield {
-                content: [{ type: "text", text: content } as TextContent],
+                content: [{ type: "text", text: currentMessageText } as TextContent],
                 role: 'assistant',
-                id: messageId
+                id: currentMessageId
               };
             }
           }
@@ -895,6 +948,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
   return (
     <TeammateContext.Provider value={contextValue}>
       <AssistantRuntimeProvider runtime={runtime}>
+        <ToolProvider />
         {children}
       </AssistantRuntimeProvider>
     </TeammateContext.Provider>

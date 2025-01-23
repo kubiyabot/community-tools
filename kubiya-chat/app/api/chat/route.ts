@@ -149,21 +149,47 @@ export async function POST(req: NextRequest) {
           if (!line.trim()) continue;
           
           try {
+            // Log raw SSE line for debugging
+            console.log('[SSE Raw]', line);
+            
             // Parse the JSON to get the message ID and type
             const event = JSON.parse(line);
+            
+            // Log parsed event
+            console.log('[SSE Event]', {
+              type: event.type,
+              id: event.id,
+              messageLength: event.message?.length,
+              message: event.message?.substring(0, 100) + (event.message?.length > 100 ? '...' : ''),
+              toolName: event.tool_name,
+              hasArgs: !!event.arguments,
+              timestamp: new Date().toISOString()
+            });
             
             // Collect system messages
             if (event.type === 'system_message') {
               systemMessages.push(event.message);
+              console.log('[SSE System]', {
+                messageCount: systemMessages.length,
+                lastMessage: event.message,
+                batchSize: systemMessages.length
+              });
               
               // Send batched system messages if we have enough or after a delay
               const now = Date.now();
               if (systemMessages.length >= 3 || (now - lastSystemBatch > 1000 && systemMessages.length > 0)) {
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                const batchEvent = {
                   type: 'system_message',
                   messages: systemMessages,
                   id: `system_${now}`
-                })}\n\n`));
+                };
+                console.log('[SSE Batch]', {
+                  type: 'system_message',
+                  messageCount: systemMessages.length,
+                  messages: systemMessages,
+                  id: batchEvent.id
+                });
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(batchEvent)}\n\n`));
                 systemMessages = [];
                 lastSystemBatch = now;
               }
@@ -173,11 +199,18 @@ export async function POST(req: NextRequest) {
             // If we have collected system messages and we're getting a non-system message,
             // send all system messages as a batch first
             if (systemMessages.length > 0 && (event.type === 'msg' || event.type === 'assistant')) {
-              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+              const batchEvent = {
                 type: 'system_message',
                 messages: systemMessages,
                 id: `system_${Date.now()}`
-              })}\n\n`));
+              };
+              console.log('[SSE Flush]', {
+                type: 'system_message',
+                messageCount: systemMessages.length,
+                messages: systemMessages,
+                id: batchEvent.id
+              });
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(batchEvent)}\n\n`));
               systemMessages = [];
               lastSystemBatch = Date.now();
             }
@@ -187,27 +220,39 @@ export async function POST(req: NextRequest) {
               if (!lastEvent || 
                   lastEvent.id !== event.id || 
                   lastEvent.message !== event.message) {
-                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                const chatEvent = {
                   type: event.type,
                   message: event.message,
                   id: event.id,
                   shouldUpdate: lastEvent?.id === event.id
-                })}\n\n`));
+                };
+                console.log('[SSE Chat]', {
+                  type: event.type,
+                  id: event.id,
+                  messageLength: event.message?.length,
+                  preview: event.message?.substring(0, 100) + (event.message?.length > 100 ? '...' : ''),
+                  isUpdate: lastEvent?.id === event.id
+                });
+                controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chatEvent)}\n\n`));
                 lastEvent = event;
               }
+            } else if (event.type === 'tool' || event.type === 'tool_output') {
+              console.log('[SSE Tool]', {
+                type: event.type,
+                id: event.id,
+                toolName: event.tool_name,
+                hasArgs: !!event.arguments,
+                argsPreview: event.arguments ? JSON.stringify(event.arguments).substring(0, 100) + '...' : null,
+                messagePreview: event.message?.substring(0, 100) + (event.message?.length > 100 ? '...' : '')
+              });
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`));
             }
           } catch (e) {
-            console.error('Failed to parse line:', e);
+            console.error('[SSE Error] Failed to parse line:', {
+              error: e,
+              line: line.substring(0, 100) + (line.length > 100 ? '...' : '')
+            });
           }
-        }
-        
-        // Send any remaining system messages
-        if (systemMessages.length > 0) {
-          controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-            type: 'system_message',
-            messages: systemMessages,
-            id: `system_${Date.now()}`
-          })}\n\n`));
         }
       }
     });
