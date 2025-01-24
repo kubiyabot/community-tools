@@ -76,7 +76,7 @@ export default function SessionExpiredPage() {
           <span className="font-mono text-white"> 5 </span> 
           seconds...
         </p>
-      </div>
+      </div> 
     </div>
   );
 } 

@@ -13,24 +13,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ 
         error: 'Not authenticated',
         details: 'No ID token found'
-      }, { 
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
+      }, { status: 401 });
     }
 
-    // Fetch integrations from the Kubiya API
-    const baseUrl = process.env.NEXT_PUBLIC_KUBIYA_API_URL || 'https://api.kubiya.ai/api/v1';
-    const response = await fetch(`${baseUrl}/integrations`, {
+    // Use v2 endpoint with full details
+    const response = await fetch('https://api.kubiya.ai/api/v2/integrations?full=true', {
       headers: {
         'Authorization': `Bearer ${session.idToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
         'X-Organization-ID': session.user?.org_id || '',
         'X-Kubiya-Client': 'chat-ui'
       }
@@ -41,32 +32,36 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await response.json();
-
-    // Format the response to match the expected structure
-    const formattedData = {
-      tools: data.tools || {},
-      integrations: data.integrations || [],
-      metadata: data.metadata || {}
-    };
-
-    return NextResponse.json(formattedData, {
-      headers: {
-        'Cache-Control': 'no-store'
-      }
-    });
+    return NextResponse.json(data);
   } catch (error) {
     console.error('Integrations endpoint error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch integrations',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
-      { 
-        status: 500,
-        headers: {
-          'Cache-Control': 'no-store'
-        }
-      }
+      { error: 'Failed to fetch integrations' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET_v2() {
+  try {
+    const response = await fetch('https://api.kubiya.ai/api/v2/integrations?full=true', {
+      headers: {
+        'Authorization': `Bearer ${process.env.KUBIYA_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch integrations: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error fetching integrations:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch integrations' },
+      { status: 500 }
     );
   }
 } 
