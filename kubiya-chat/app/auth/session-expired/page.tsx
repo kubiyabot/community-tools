@@ -1,28 +1,82 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useUser } from '@auth0/nextjs-auth0/client';
-import { AuthRedirect } from '@/app/components/AuthRedirect';
+import { useRouter } from 'next/navigation';
 
 export default function SessionExpiredPage() {
-  const { user, isLoading } = useUser();
+  const router = useRouter();
 
-  // If user is still logged in, redirect to chat
   useEffect(() => {
-    if (!isLoading && user) {
-      window.location.href = '/chat';
-    }
-  }, [user, isLoading]);
+    // Clear any existing auth state if needed
+    // This depends on how you're managing auth state
+  }, []);
 
-  // Show loading state while checking user status
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0F1629] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#7C3AED] border-t-transparent"></div>
+  const handleLogin = () => {
+    router.push('/api/auth/login');
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-gray-900 to-gray-800">
+      <div className="mx-auto flex w-full max-w-[400px] flex-col items-center space-y-8 rounded-xl bg-white/10 p-8 backdrop-blur-lg">
+        {/* Icon */}
+        <div className="rounded-full bg-red-500/10 p-4">
+          <svg 
+            className="h-12 w-12 text-red-500" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+            />
+          </svg>
+        </div>
+        
+        {/* Text Content */}
+        <div className="flex flex-col space-y-3 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Session Expired
+          </h1>
+          <p className="text-gray-400">
+            Your session has timed out for security reasons.
+            <br />
+            Please log in again to continue.
+          </p>
+        </div>
+
+        {/* Button */}
+        <button 
+          className="group relative w-full overflow-hidden rounded-lg bg-indigo-600 px-4 py-3 text-white transition-all hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          onClick={handleLogin}
+        >
+          <span className="relative z-10 flex items-center justify-center font-medium">
+            <svg 
+              className="mr-2 h-5 w-5 transition-transform group-hover:rotate-180" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={2} 
+                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" 
+              />
+            </svg>
+            Log In Again
+          </span>
+        </button>
+
+        {/* Timer */}
+        <p className="text-sm text-gray-400">
+          Redirecting to login in 
+          <span className="font-mono text-white"> 5 </span> 
+          seconds...
+        </p>
       </div>
-    );
-  }
-
-  // Show session expired message if user is not logged in
-  return <AuthRedirect reason="session_expired" />;
+    </div>
+  );
 } 
