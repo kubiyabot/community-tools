@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { ThreadMessage, ThreadAssistantContentPart, TextContentPart, ToolCallContentPart } from '@assistant-ui/react';
-import { Bot, AlertTriangle, Copy, Check, Terminal, Loader2 } from 'lucide-react';
+import { Bot, AlertTriangle, Copy, Check, Terminal, Loader2, ChevronDown, Code } from 'lucide-react';
 import { MarkdownText } from './MarkdownText';
 import { useTeammateContext } from "../../MyRuntimeProvider";
 import { useState, useEffect, useCallback } from 'react';
@@ -17,6 +17,7 @@ interface ToolCall {
   timestamp?: string;
   tool_init?: boolean;
   tool_description?: string;
+  status?: string;
 }
 
 export interface AssistantMessageProps {
@@ -26,6 +27,17 @@ export interface AssistantMessageProps {
   };
   isSystem?: boolean;
   isTool?: boolean;
+  sourceMetadata?: {
+    sourceId: string;
+    metadata: {
+      tools?: Array<{
+        name: string;
+        description: string;
+        type?: string;
+        icon_url?: string;
+      }>;
+    };
+  };
 }
 
 function isTextContent(content: ThreadAssistantContentPart): content is TextContentPart {
@@ -72,9 +84,11 @@ const CopyButton = ({ content }: { content: string }) => {
   );
 };
 
-const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessageProps) => {
+const AssistantMessageComponent = ({ message, isSystem, isTool, sourceMetadata }: AssistantMessageProps) => {
   const { teammates, selectedTeammate } = useTeammateContext();
   const [isStreaming, setIsStreaming] = useState(false);
+  const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
+  const [jsonView, setJsonView] = useState<Record<string, boolean>>({});
   const textContent = message.content.find(isTextContent);
   const toolContent = message.content.find(isToolCallContent);
   const messageText = textContent && isTextContent(textContent) ? textContent.text : '';
@@ -82,6 +96,126 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
   const hasToolCalls = 'tool_calls' in message && Array.isArray(message.tool_calls) && message.tool_calls?.length > 0;
 
   const currentTeammate = teammates.find(t => t.uuid === selectedTeammate);
+
+  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
+
+  const handleCopy = async (content: string, type: string, toolId: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      // Set copied state for this specific button
+      setCopiedStates(prev => ({
+        ...prev,
+        [`${toolId}-${type}`]: true
+      }));
+      toast({
+        description: `${type} copied to clipboard`,
+        duration: 2000,
+      });
+      // Reset after 2 seconds
+      setTimeout(() => {
+        setCopiedStates(prev => ({
+          ...prev,
+          [`${toolId}-${type}`]: false
+        }));
+      }, 2000);
+    } catch (error) {
+      console.error(`Failed to copy ${type}:`, error);
+      toast({
+        variant: "destructive",
+        description: `Failed to copy ${type}`,
+        duration: 2000,
+      });
+    }
+  };
+
+  const toggleToolExpansion = (toolId: string) => {
+    setExpandedTools(prev => ({
+      ...prev,
+      [toolId]: !prev[toolId]
+    }));
+  };
+
+  const toggleJsonView = (toolId: string) => {
+    setJsonView(prev => ({
+      ...prev,
+      [toolId]: !prev[toolId]
+    }));
+  };
+
+  // Get tool icon based on name
+  const getToolIcon = (toolName: string) => {
+    const name = toolName?.toLowerCase() || '';
+    
+    // Try to find the tool in source metadata
+    const tool = sourceMetadata?.metadata?.tools?.find(
+      t => t.name.toLowerCase() === name || name.includes(t.name.toLowerCase())
+    );
+
+    if (tool?.icon_url) {
+      return (
+        <div className="p-1 rounded bg-[#2A3347]">
+          <img src={tool.icon_url} alt={name} className="h-4 w-4" />
+        </div>
+      );
+    }
+
+    // Default icon with purple background
+    return (
+      <div className="p-1 rounded bg-[#2A3347]">
+        <Terminal className="h-4 w-4 text-purple-400" />
+      </div>
+    );
+  };
+
+  // Format arguments for better display
+  const formatArguments = (args: Record<string, unknown>, toolId: string) => {
+    if (jsonView[toolId]) {
+      return (
+        <pre className="bg-[#1A1F2E] p-2 rounded overflow-x-auto">
+          <code className="text-slate-300/90">
+            {JSON.stringify(args, null, 2)}
+          </code>
+        </pre>
+      );
+    }
+
+    const formattedArgs = Object.entries(args).map(([key, value]) => {
+      const formattedKey = key
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+      let formattedValue = value;
+      if (typeof value === 'boolean') {
+        formattedValue = value ? '✓' : '✗';
+      } else if (Array.isArray(value)) {
+        formattedValue = value.join(', ');
+      } else if (typeof value === 'object' && value !== null) {
+        formattedValue = JSON.stringify(value, null, 2);
+      }
+
+      return { key: formattedKey, value: formattedValue };
+    });
+
+    return (
+      <div className="grid gap-2">
+        {formattedArgs.map(({ key, value }, index) => (
+          <div key={index} className="flex items-start gap-2 bg-[#1A1F2E] p-2 rounded hover:bg-[#2D3B4E]/30 transition-colors">
+            <span className="text-purple-400 font-medium min-w-[100px] flex items-center gap-1">
+              <span>{key}:</span>
+            </span>
+            <span className="text-[#E2E8F0] flex-1">
+              {typeof value === 'string' && value.includes('\n') ? (
+                <pre className="whitespace-pre-wrap"><code>{value}</code></pre>
+              ) : (
+                value?.toString()
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   useEffect(() => {
     // Set streaming if this is the last message and it's still being updated
@@ -184,35 +318,226 @@ const AssistantMessageComponent = ({ message, isSystem, isTool }: AssistantMessa
                     </div>
                   )}
                   {hasToolCalls && message.tool_calls && message.tool_calls.map((tool: ToolCall, index: number) => (
-                    <div key={`${tool.id}-${index}`} className="bg-[#1E293B] rounded-lg border border-[#2D3B4E] overflow-hidden group relative">
-                      <div className="px-4 py-2 bg-[#2D3B4E] border-b border-[#3D4B5E] flex items-center justify-between">
+                    <div key={`${tool.id}-${index}`} className="bg-[#1E293B] rounded-lg border border-[#2D3B4E] overflow-hidden group relative hover:border-purple-500/30 transition-colors">
+                      <div 
+                        className="px-4 py-3 bg-[#2D3B4E] border-b border-[#3D4B5E] flex items-center justify-between cursor-pointer hover:bg-[#3D4B5E] transition-colors"
+                        onClick={() => toggleToolExpansion(tool.id)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {getToolIcon(tool.name || '')}
+                          <div>
+                            <p className="text-sm font-medium text-white mb-0.5">
+                              {tool.name}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                              {tool.status === 'running' && (
+                                <div className="flex items-center gap-1.5 text-purple-400">
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                  <span>Running</span>
+                                </div>
+                              )}
+                              {tool.status === 'complete' && (
+                                <div className="flex items-center gap-1.5 text-green-400">
+                                  <Check className="h-3 w-3" />
+                                  <span>Complete</span>
+                                </div>
+                              )}
+                              <span>•</span>
+                              <span>{new Date(tool.timestamp || '').toLocaleTimeString()}</span>
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex items-center gap-2">
-                          <Terminal className="h-4 w-4 text-purple-400" />
-                          <p className="text-xs font-medium text-[#94A3B8]">
-                            {tool.type === 'tool_init' ? 'Tool Initialization' : 'Tool Output'}: {tool.name}
-                          </p>
-                          {tool.type === 'tool_init' && (
-                            <div className="flex items-center gap-1.5 text-xs text-purple-400">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              <span>Initializing</span>
+                          {!expandedTools[tool.id] && tool.message && (
+                            <div className="text-xs text-slate-400">
+                              {tool.message.length > 100 ? `${tool.message.slice(0, 100)}...` : tool.message}
+                            </div>
+                          )}
+                          <ChevronDown 
+                            className={`h-4 w-4 text-[#94A3B8] transition-transform ${expandedTools[tool.id] ? 'rotate-180' : ''}`} 
+                          />
+                        </div>
+                      </div>
+                      <div 
+                        className={`transition-all duration-300 ease-in-out ${
+                          expandedTools[tool.id] ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
+                        } overflow-hidden`}
+                      >
+                        <div className="relative group p-4 space-y-3">
+                          {/* Arguments Section */}
+                          {tool.arguments && Object.keys(tool.arguments).length > 0 && (
+                            <div className="bg-[#2A3347] rounded-lg p-3 group/args relative">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs font-medium text-slate-400">Arguments</p>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleJsonView(tool.id);
+                                    }}
+                                    className="p-1 rounded bg-[#1A1F2E] hover:bg-[#2D3B4E] transition-colors text-xs text-slate-400 flex items-center gap-1"
+                                    title={jsonView[tool.id] ? "Switch to formatted view" : "Switch to JSON view"}
+                                  >
+                                    {jsonView[tool.id] ? (
+                                      <>
+                                        <Terminal className="h-3 w-3" />
+                                        <span>Raw</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Code className="h-3 w-3" />
+                                        <span>JSON</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <button
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    const content = JSON.stringify(tool.arguments, null, 2);
+                                    await handleCopy(content, 'Arguments', tool.id);
+                                  }}
+                                  className="opacity-0 group-hover/args:opacity-100 transition-opacity p-1.5 rounded-md bg-[#1A1F2E] hover:bg-[#2D3B4E] text-slate-400 flex items-center gap-1.5"
+                                  title="Copy arguments"
+                                >
+                                  {copiedStates[`${tool.id}-Arguments`] ? (
+                                    <>
+                                      <Check className="h-3 w-3 text-green-400" />
+                                      <span className="text-xs text-green-400">Copied!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="h-3 w-3" />
+                                      <span className="text-xs">Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              {formatArguments(tool.arguments, tool.id)}
+                            </div>
+                          )}
+
+                          {/* Output Section */}
+                          {(tool.message || tool.status === 'running') && (
+                            <div className="bg-[#2A3347] rounded-lg p-3 group/output relative">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-medium text-slate-400">Output</p>
+                                {tool.message && (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      const cleanOutput = tool.message
+                                        ?.replace(/🔧 Executing: .*?\n/g, '')
+                                        .replace(/✅ Command executed successfully.*$/m, '')
+                                        .replace(/❌ Command failed:?.*$/m, '')
+                                        .replace(/^\s+|\s+$/g, '');
+                                      await handleCopy(cleanOutput || '', 'Output', tool.id);
+                                    }}
+                                    className="opacity-0 group-hover/output:opacity-100 transition-opacity p-1.5 rounded-md bg-[#1A1F2E] hover:bg-[#2D3B4E] text-slate-400 flex items-center gap-1.5"
+                                    title="Copy output"
+                                  >
+                                    {copiedStates[`${tool.id}-Output`] ? (
+                                      <>
+                                        <Check className="h-3 w-3 text-green-400" />
+                                        <span className="text-xs text-green-400">Copied!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3" />
+                                        <span className="text-xs">Copy</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                              <div className="relative">
+                                <div className="max-h-[400px] overflow-y-auto rounded-md bg-[#1A1F2E] p-3">
+                                  <pre className="text-sm text-slate-300/90 whitespace-pre-wrap font-mono">
+                                    <code>
+                                      {!tool.message && tool.status === 'running' ? (
+                                        <div className="flex items-center gap-2 text-slate-400/70 animate-pulse">
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          <span>Waiting for output...</span>
+                                        </div>
+                                      ) : (
+                                        (() => {
+                                          // Clean up the output text
+                                          const cleanOutput = tool.message
+                                            ?.replace(/🔧 Executing: .*?\n/g, '')    // Remove all "Executing:" lines
+                                            .replace(/✅ Command executed successfully.*$/m, '')  // Remove success message
+                                            .replace(/❌ Command failed:?.*$/m, '')   // Remove error prefix
+                                            .replace(/^\s+|\s+$/g, '');              // Trim whitespace
+
+                                          if (!cleanOutput) return null;
+
+                                          // Split into lines and process
+                                          const lines = cleanOutput.split('\n');
+                                          
+                                          // Find header line (usually contains NAME, NAMESPACE, etc.)
+                                          const headerIndex = lines.findIndex(line => 
+                                            line.includes('NAME') || 
+                                            line.includes('NAMESPACE') || 
+                                            line.includes('STATUS')
+                                          );
+
+                                          if (headerIndex === -1) {
+                                            // If no table format detected, return as plain text
+                                            return (
+                                              <div className="space-y-1">
+                                                {lines.map((line, i) => (
+                                                  <div 
+                                                    key={i}
+                                                    className={`
+                                                      ${tool.status === 'running' && i === lines.length - 1 ? 'border-l-2 border-l-purple-500/50 pl-2' : ''}
+                                                    `}
+                                                  >
+                                                    {line}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            );
+                                          }
+
+                                          // Process as table
+                                          const header = lines[headerIndex];
+                                          const rows = lines.slice(headerIndex + 1);
+
+                                          return (
+                                            <div className="space-y-1">
+                                              {/* Header */}
+                                              <div className="text-purple-400/90 font-medium pb-1 mb-1 border-b border-[#2D3B4E]/30">
+                                                {header}
+                                              </div>
+                                              {/* Rows */}
+                                              {rows.map((row, i) => (
+                                                <div
+                                                  key={i}
+                                                  className={`
+                                                    py-0.5
+                                                    ${i % 2 === 0 ? 'bg-[#1A1F2E]' : 'bg-[#1E2433]/50'}
+                                                    hover:bg-[#2D3B4E]/30
+                                                    transition-colors duration-150
+                                                    ${tool.status === 'running' && i === rows.length - 1 ? 'border-l-2 border-l-purple-500/50 pl-2' : 'pl-2.5'}
+                                                    ${row.toLowerCase().includes('error') ? 'text-red-400/90' : ''}
+                                                  `}
+                                                >
+                                                  {row}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          );
+                                        })()
+                                      )}
+                                    </code>
+                                  </pre>
+                                </div>
+                                {tool.message && tool.message.length > 400 && !expandedTools[tool.id] && (
+                                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#2A3347] to-transparent pointer-events-none" />
+                                )}
+                              </div>
                             </div>
                           )}
                         </div>
-                      </div>
-                      <div className="relative group">
-                        <pre className="p-4 text-xs overflow-x-auto">
-                          <code className="text-[#E2E8F0]">
-                            {tool.type === 'tool_init' 
-                              ? tool.tool_description || 'Determining best tool for the task...'
-                              : tool.message}
-                            {tool.type === 'tool_init' && (
-                              <span className="inline-block w-2 h-4 bg-purple-400 animate-pulse ml-1" />
-                            )}
-                          </code>
-                        </pre>
-                        <CopyButton content={tool.type === 'tool_init' 
-                          ? tool.tool_description || 'Determining best tool for the task...'
-                          : tool.message || ''} />
                       </div>
                     </div>
                   ))}

@@ -622,6 +622,7 @@ export const ChatMessages = ({
             tool_calls: groupedToolCalls
           }}
           isSystem={false}
+          sourceMetadata={sourceMetadata || undefined}
         />
       );
     }
@@ -632,6 +633,7 @@ export const ChatMessages = ({
           key={message.id} 
           message={message} 
           isSystem={true}
+          sourceMetadata={sourceMetadata || undefined}
         />
       );
     }

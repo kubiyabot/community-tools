@@ -62,6 +62,17 @@ interface TeammateState {
   }>;
 }
 
+interface ToolCall {
+  type: 'tool_init' | 'tool_output';
+  id: string;
+  name?: string;
+  arguments?: Record<string, unknown>;
+  message?: string;
+  timestamp?: string;
+  tool_description?: string;
+  status?: string;
+}
+
 export const Chat = () => {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
@@ -253,23 +264,6 @@ export const Chat = () => {
                             : msg
                         );
                       }
-
-                      // Update teammate state immediately with new message
-                      const updatedState = {
-                        ...currentState,
-                        threads: {
-                          ...currentState.threads,
-                          [threadId]: {
-                            ...currentThread,
-                            messages: currentMessages,
-                            metadata: {
-                              ...currentThread.metadata,
-                              updatedAt: new Date().toISOString()
-                            }
-                          }
-                        }
-                      };
-                      setTeammateState(selectedTeammate, updatedState);
                     } else {
                       // Update existing message with complete content
                       currentMessages = currentMessages.map(msg => 
@@ -280,38 +274,46 @@ export const Chat = () => {
                             }
                           : msg
                       );
-
-                      // Update teammate state with complete message
-                      const updatedState = {
-                        ...currentState,
-                        threads: {
-                          ...currentState.threads,
-                          [threadId]: {
-                            ...currentThread,
-                            messages: currentMessages,
-                            metadata: {
-                              ...currentThread.metadata,
-                              updatedAt: new Date().toISOString()
-                            }
-                          }
-                        }
-                      };
-                      setTeammateState(selectedTeammate, updatedState);
                     }
 
-                    // Log for debugging
-                    console.log('[Chat] Message update:', {
-                      id: currentAssistantMessageId,
-                      text: eventData.message,
-                      messageCount: currentMessages.length,
-                      fullMessage: true
-                    });
+                    // If there's an active tool, mark it as complete
+                    if (currentThread.metadata.activeTool) {
+                      const toolMessage = [...currentMessages].reverse().find(msg => 
+                        msg.tool_calls?.some((call: ToolCall) => 
+                          call.name === currentThread.metadata.activeTool
+                        )
+                      );
+
+                      if (toolMessage) {
+                        currentMessages = currentMessages.map(msg => 
+                          msg.id === toolMessage.id
+                            ? {
+                                ...msg,
+                                tool_calls: msg.tool_calls?.map((call: ToolCall) => ({
+                                  ...call,
+                                  status: 'complete'
+                                }))
+                              }
+                            : msg
+                        );
+                      }
+
+                      // Clear active tool
+                      currentThread.metadata.activeTool = undefined;
+                    }
                   }
                   break;
                 case 'system_message':
                   if (eventData.messages && Array.isArray(eventData.messages)) {
                     // Handle array of system messages
-                    eventData.messages.forEach((message: string) => {
+                    const uniqueSystemMessages = eventData.messages.filter((message: string) => 
+                      !currentMessages.some(msg => 
+                        msg.role === 'system' && 
+                        msg.content[0]?.text === message
+                      )
+                    );
+
+                    uniqueSystemMessages.forEach((message: string) => {
                       const systemMessage = {
                         id: generateUniqueId('system'),
                         role: 'system',
@@ -323,69 +325,143 @@ export const Chat = () => {
                       collectedSystemMessages = [...collectedSystemMessages, message];
                       setSystemMessages(prev => [...prev, message]);
                     });
-
-                    // Update teammate state with latest messages including system messages
-                    const updatedState = {
-                      ...currentState,
-                      threads: {
-                        ...currentState.threads,
-                        [threadId]: {
-                          ...currentThread,
-                          messages: currentMessages,
-                          metadata: {
-                            ...currentThread.metadata,
-                            updatedAt: new Date().toISOString()
-                          }
-                        }
-                      }
-                    };
-                    setTeammateState(selectedTeammate, updatedState);
                   }
                   break;
                 case 'tool':
-                  if (eventData.tool_name) {
-                    currentAssistantMessageId = null; // Reset message tracking
-                    partialMessage = ''; // Reset partial message
-                    const toolId = generateUniqueId('tool');
-                    const toolMessage = {
-                      id: toolId,
-                      role: 'assistant',
-                      content: [],
-                      tool_calls: [{
-                        type: 'tool_init',
-                        id: toolId,
-                        name: eventData.tool_name,
-                        arguments: eventData.arguments,
-                        timestamp: new Date().toISOString()
-                      }],
-                      createdAt: new Date()
-                    };
-                    currentMessages = [...currentMessages, toolMessage];
+                  if (eventData.message) {
+                    // Extract tool information from the message more robustly
+                    const toolMatch = eventData.message.match(/Tool: ([\w-]+)\nArguments: ({[\s\S]*})/);
+                    if (toolMatch) {
+                      const [_, toolName, argsString] = toolMatch;
+                      let toolArgs;
+                      try {
+                        // Clean up the args string before parsing
+                        const cleanArgsString = argsString.trim();
+                        toolArgs = JSON.parse(cleanArgsString);
+                      } catch (e) {
+                        console.error('Failed to parse tool arguments:', e);
+                        // Try to extract just the JSON part
+                        try {
+                          const jsonStart = eventData.message.indexOf('{');
+                          const jsonEnd = eventData.message.lastIndexOf('}') + 1;
+                          if (jsonStart !== -1 && jsonEnd !== -1) {
+                            const jsonString = eventData.message.slice(jsonStart, jsonEnd);
+                            toolArgs = JSON.parse(jsonString);
+                          } else {
+                            toolArgs = {};
+                          }
+                        } catch (e) {
+                          console.error('Failed second attempt to parse tool arguments:', e);
+                          toolArgs = {};
+                        }
+                      }
+
+                      const toolId = eventData.id || generateUniqueId('tool');
+                      
+                      // Check if we already have a message for this tool
+                      const existingToolMessage = currentMessages.find(msg => 
+                        msg.tool_calls?.some((call: ToolCall) => call.id === toolId)
+                      );
+
+                      if (existingToolMessage) {
+                        // Only update if the message content has changed
+                        const currentToolCall = existingToolMessage.tool_calls?.[0];
+                        if (currentToolCall?.message !== eventData.message) {
+                          currentMessages = currentMessages.map(msg => 
+                            msg.id === existingToolMessage.id
+                              ? {
+                                  ...msg,
+                                  tool_calls: [{
+                                    ...msg.tool_calls[0],
+                                    name: toolName,
+                                    arguments: toolArgs,
+                                    message: eventData.message,
+                                    status: 'running'
+                                  }]
+                                }
+                              : msg
+                          );
+                        }
+                      } else {
+                        // Create new tool message
+                        const toolMessage = {
+                          id: toolId,
+                          role: 'assistant',
+                          content: [],
+                          tool_calls: [{
+                            type: 'tool_init',
+                            id: toolId,
+                            name: toolName,
+                            arguments: toolArgs,
+                            message: eventData.message,
+                            timestamp: new Date().toISOString(),
+                            status: 'running'
+                          }],
+                          createdAt: new Date(),
+                          metadata: {
+                            activeTool: toolName
+                          }
+                        };
+                        currentMessages = [...currentMessages, toolMessage];
+                      }
+
+                      // Update thread metadata with active tool
+                      currentThread.metadata.activeTool = toolName;
+                    }
                   }
                   break;
                 case 'tool_output':
                   if (eventData.message) {
-                    currentAssistantMessageId = null; // Reset message tracking
-                    partialMessage = ''; // Reset partial message
-                    const outputId = generateUniqueId('tool_output');
-                    const toolOutputMessage = {
-                      id: outputId,
-                      role: 'assistant',
-                      content: [],
-                      tool_calls: [{
-                        type: 'tool_output',
-                        id: outputId,
-                        message: eventData.message,
-                        timestamp: new Date().toISOString()
-                      }],
-                      createdAt: new Date()
-                    };
-                    currentMessages = [...currentMessages, toolOutputMessage];
+                    const toolId = eventData.id || currentThread.metadata.activeTool;
+                    
+                    // Find the last tool message to update
+                    const toolMessage = [...currentMessages].reverse().find(msg => 
+                      msg.tool_calls?.some((call: ToolCall) => 
+                        call.id === toolId || 
+                        call.name === currentThread.metadata.activeTool ||
+                        msg.metadata?.activeTool === currentThread.metadata.activeTool
+                      )
+                    );
+                    
+                    if (toolMessage) {
+                      // Check if this is a completion message or if we received a regular message after
+                      const isComplete = eventData.message.includes('✅') || 
+                        eventData.status === 'complete' || 
+                        eventData.type === 'msg' || 
+                        eventData.type === 'assistant';
+
+                      // Only update if the message content has actually changed
+                      const currentOutput = toolMessage.tool_calls?.[0]?.output;
+                      const currentMessage = toolMessage.tool_calls?.[0]?.message;
+                      
+                      if (currentOutput !== eventData.message || currentMessage !== eventData.message) {
+                        // Update existing tool message
+                        currentMessages = currentMessages.map(msg => 
+                          msg.id === toolMessage.id
+                            ? {
+                                ...msg,
+                                tool_calls: [{
+                                  ...msg.tool_calls[0],
+                                  output: eventData.message,
+                                  message: eventData.message,
+                                  timestamp: new Date().toISOString(),
+                                  status: isComplete ? 'complete' : 'running'
+                                }]
+                              }
+                            : msg
+                        );
+                      }
+
+                      // Clear active tool if complete
+                      if (isComplete) {
+                        currentThread.metadata.activeTool = undefined;
+                      }
+                    }
                   }
                   break;
               }
 
-              // Update teammate state with latest messages
+              // Update teammate state with latest messages immediately after each event
               const updatedState = {
                 ...currentState,
                 threads: {

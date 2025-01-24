@@ -3,7 +3,7 @@
 import { useAssistantToolUI } from "@assistant-ui/react";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { LoginButton } from './LoginButton';
-import { ToolExecution } from './assistant-ui/ToolExecution';
+import { GenericToolUI } from './assistant-ui/ToolUI';
 import { Chat } from './assistant-ui/Chat';
 import { useTeammateContext } from '../MyRuntimeProvider';
 import { useConfig } from '@/lib/config-context';
@@ -15,15 +15,26 @@ export default function MyAssistant() {
   const { selectedTeammate, teammates } = useTeammateContext();
   const { clearApiKey } = useConfig();
 
-  // Register tool UIs
+  // Register the generic tool UI handler for all tools
   useAssistantToolUI({
-    toolName: "tool",
-    render: ToolExecution
+    toolName: "*",
+    render: (props) => (
+      <GenericToolUI 
+        {...props}
+        key={`${props.args.id || ''}_${Date.now()}`} // Ensure unique key for each render
+      />
+    )
+  });
+
+  // Register specific tool handlers for better type safety
+  useAssistantToolUI({
+    toolName: "tool_init",
+    render: GenericToolUI
   });
 
   useAssistantToolUI({
     toolName: "tool_output",
-    render: ToolExecution
+    render: GenericToolUI
   });
 
   return (

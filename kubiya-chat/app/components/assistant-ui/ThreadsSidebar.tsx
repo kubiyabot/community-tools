@@ -166,10 +166,10 @@ export const ThreadsSidebar = () => {
         {filteredThreads.length > 0 ? (
           <div className="p-2 space-y-1">
             {filteredThreads.map((thread) => (
-              <button
+              <div
                 key={thread.id}
                 onClick={() => switchThread(selectedTeammate, thread.id)}
-                className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all duration-200
+                className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all duration-200 cursor-pointer
                          hover:bg-gray-800/80 group relative
                          ${currentState?.currentThreadId === thread.id 
                            ? 'bg-gray-800/90 shadow-lg shadow-purple-500/5' 
@@ -214,41 +214,65 @@ export const ThreadsSidebar = () => {
                   </div>
                 </div>
 
-                <div className="relative flex items-center ml-2">
-                  <button
+                <div className="relative flex items-center ml-2" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveDropdown(activeDropdown === thread.id ? null : thread.id);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setActiveDropdown(activeDropdown === thread.id ? null : thread.id);
+                      }
+                    }}
                     className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-gray-700/50
-                             transition-all duration-200"
+                             transition-all duration-200 cursor-pointer"
                   >
                     <MoreHorizontal className="h-4 w-4 text-gray-400 hover:text-purple-400" />
-                  </button>
+                  </div>
 
                   {activeDropdown === thread.id && (
                     <div className="absolute right-0 top-0 mt-8 w-36 py-1 bg-gray-800 rounded-lg shadow-xl
                                   border border-gray-700/50 z-50">
-                      <button
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => handleEditClick(thread, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleEditClick(thread, e as any);
+                          }
+                        }}
                         className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-gray-300
-                                 hover:bg-gray-700/50 hover:text-purple-400 transition-colors"
+                                 hover:bg-gray-700/50 hover:text-purple-400 transition-colors cursor-pointer"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                         Rename
-                      </button>
-                      <button
+                      </div>
+                      <div
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => handleDeleteThread(thread.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleDeleteThread(thread.id, e as any);
+                          }
+                        }}
                         className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-red-400
-                                 hover:bg-gray-700/50 hover:text-red-300 transition-colors"
+                                 hover:bg-gray-700/50 hover:text-red-300 transition-colors cursor-pointer"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         Delete
-                      </button>
+                      </div>
                     </div>
                   )}
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         ) : (
