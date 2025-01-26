@@ -5,7 +5,9 @@ import { useUser } from '@auth0/nextjs-auth0/client';
 import MyRuntimeProvider from '../MyRuntimeProvider';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { useConfig } from '@/lib/config-context';
+import { useConfig } from '../../lib/config-context';
+import { ApiKeySetup } from './ApiKeySetup';
+import { TeammateSelector } from './TeammateSelector';
 
 interface ClientProviderProps {
   children: ReactNode;

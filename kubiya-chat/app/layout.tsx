@@ -6,6 +6,7 @@ import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ConfigProvider } from '@/lib/config-context';
 import ClientProvider from './components/ClientProvider';
 import { SessionHandler } from './components/SessionHandler';
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -43,6 +44,7 @@ export default function RootLayout({
             </ConfigProvider>
           </UserProvider>
         </ErrorBoundary>
+        <Toaster />
       </body>
     </html>
   );

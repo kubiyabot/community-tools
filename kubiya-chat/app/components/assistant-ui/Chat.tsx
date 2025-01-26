@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useRouter } from 'next/navigation';
 import { useTeammateContext } from '../../MyRuntimeProvider';
@@ -9,9 +9,23 @@ import { ChatMessages } from './ChatMessages';
 import { ThreadsSidebar } from './ThreadsSidebar';
 import { SystemMessages } from './SystemMessages';
 import { ToolExecution } from './ToolExecution';
-import { Info } from 'lucide-react';
+import { Info, Clock, Calendar, CheckCircle2, RotateCcw, AlertCircle, ChevronRight, ListTodo, Trello, Webhook } from 'lucide-react';
 import { Button } from '@/app/components/button';
 import { TeammateDetailsModal } from '../shared/TeammateDetailsModal';
+import { TaskSchedulingModal } from '../TaskSchedulingModal';
+import { ScheduledTaskCard } from '../ScheduledTaskCard';
+import { cn } from '@/lib/utils';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
+import { format, isToday } from "date-fns";
+import { toast } from "@/app/components/ui/use-toast";
+import { ScheduledTasksModal } from '../ScheduledTasksModal';
+import { Badge } from "@/app/components/ui/badge";
+import { MessageSquare } from 'lucide-react';
 
 interface ThreadInfo {
   id: string;
@@ -73,6 +87,45 @@ interface ToolCall {
   status?: string;
 }
 
+interface ScheduledTask {
+  id: string;
+  task_id: string;
+  task_uuid: string;
+  task_type: string;
+  scheduled_time: string;
+  channel_id: string;
+  parameters: {
+    message_text: string;
+    team_id: string;
+    user_email: string;
+    cron_string?: string;
+    context?: string;
+  };
+  status: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
+// Add new helper functions for task stats
+const getTaskStats = (tasks: ScheduledTask[]) => {
+  const now = new Date();
+  return {
+    total: tasks.length,
+    completed: tasks.filter(task => task.status === 'completed').length,
+    pending: tasks.filter(task => task.status === 'scheduled').length,
+    recurring: tasks.filter(task => !!task.parameters.cron_string).length,
+    today: tasks.filter(task => {
+      const taskDate = new Date(task.scheduled_time);
+      return isToday(taskDate) && task.status === 'scheduled';
+    }).length,
+    sources: {
+      chat: tasks.filter(task => task.task_type === 'chat_activity').length,
+      jira: tasks.filter(task => task.task_type === 'jira_ticket').length,
+      webhook: tasks.filter(task => task.task_type === 'webhook').length
+    }
+  };
+};
+
 export const Chat = () => {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
@@ -84,6 +137,20 @@ export const Chat = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [capabilities, setCapabilities] = useState<any>(null);
   const [teammate, setTeammate] = useState<any>(null);
+  const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
+  const [scheduledTasks, setScheduledTasks] = useState<ScheduledTask[]>([]);
+  const [isScheduledTasksModalOpen, setIsScheduledTasksModalOpen] = useState(false);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
+  const [schedulingInitialData, setSchedulingInitialData] = useState<{
+    description?: string;
+    slackTarget?: string;
+    scheduleType?: 'quick' | 'custom';
+    repeatOption?: string;
+    date?: Date;
+  } | undefined>(undefined);
+
+  // Get task stats
+  const taskStats = useMemo(() => getTaskStats(scheduledTasks), [scheduledTasks]);
 
   // Track system messages
   useEffect(() => {
@@ -125,6 +192,34 @@ export const Chat = () => {
       fetchDetails();
     }
   }, [selectedTeammate, teammates]);
+
+  // Fetch scheduled tasks
+  useEffect(() => {
+    const fetchScheduledTasks = async () => {
+      if (!teammate?.uuid) return;
+      
+      setIsLoadingTasks(true);
+      try {
+        const response = await fetch('/api/scheduled_tasks');
+        if (!response.ok) {
+          throw new Error('Failed to fetch scheduled tasks');
+        }
+        const tasks = await response.json();
+        setScheduledTasks(tasks);
+      } catch (error) {
+        console.error('Error fetching scheduled tasks:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load scheduled tasks",
+        });
+      } finally {
+        setIsLoadingTasks(false);
+      }
+    };
+
+    fetchScheduledTasks();
+  }, [teammate?.uuid]);
 
   const handleSubmit = async (message: string) => {
     if (!selectedTeammate || !currentState?.currentThreadId) {
@@ -498,6 +593,126 @@ export const Chat = () => {
     }
   };
 
+  const handleScheduleTask = async (taskData: any) => {
+    try {
+      const response = await fetch('/api/scheduled_tasks', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(taskData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to schedule task');
+      }
+
+      const result = await response.json();
+      setScheduledTasks(prev => [...prev, result]);
+
+      // Add a system message about the scheduled task
+      const systemMessage = {
+        id: `system-${Date.now()}`,
+        role: 'system',
+        content: [{ 
+          type: 'text', 
+          text: `✅ Task scheduled successfully\n${taskData.task_description}\n${
+            taskData.cron_string 
+              ? `Recurring: ${taskData.cron_string}` 
+              : `Scheduled for: ${new Date(taskData.schedule_time).toLocaleString()}`
+          }`
+        }],
+        createdAt: new Date(),
+        metadata: {
+          custom: {
+            isSystemMessage: true,
+            scheduledTask: result
+          }
+        }
+      };
+
+      if (currentState?.currentThreadId && currentState.threads[currentState.currentThreadId]) {
+        const updatedThread = {
+          ...currentState.threads[currentState.currentThreadId],
+          messages: [...currentState.threads[currentState.currentThreadId].messages, systemMessage],
+        };
+
+        const updatedState = {
+          ...currentState,
+          threads: {
+            ...currentState.threads,
+            [currentState.currentThreadId]: updatedThread,
+          },
+        };
+
+        if (selectedTeammate) {
+          setTeammateState(selectedTeammate, updatedState);
+        }
+      }
+    } catch (error) {
+      console.error('Error scheduling task:', error);
+      throw error;
+    }
+  };
+
+  const handleScheduleSimilar = (initialData: {
+    description: string;
+    slackTarget: string;
+    scheduleType: 'quick' | 'custom';
+    repeatOption: string;
+  }) => {
+    setIsScheduledTasksModalOpen(false);
+    setIsSchedulingModalOpen(true);
+    setSchedulingInitialData({
+      description: initialData.description,
+      slackTarget: initialData.slackTarget,
+      scheduleType: initialData.scheduleType,
+      repeatOption: initialData.repeatOption,
+      date: new Date() // Set a default date
+    });
+  };
+
+  // Get preview text for tasks tooltip
+  const getTasksPreview = () => {
+    if (scheduledTasks.length === 0) return "No scheduled tasks";
+    
+    const previewTasks = scheduledTasks.slice(0, 3);
+    const remainingCount = scheduledTasks.length - 3;
+    
+    const preview = previewTasks.map(task => (
+      `• ${task.parameters.message_text.slice(0, 50)}${task.parameters.message_text.length > 50 ? '...' : ''}\n  ${format(new Date(task.scheduled_time), 'MMM d, h:mm a')}`
+    )).join('\n');
+
+    return `${preview}${remainingCount > 0 ? `\n\n+ ${remainingCount} more task${remainingCount > 1 ? 's' : ''}` : ''}`;
+  };
+
+  // Handle task deletion with feedback
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/scheduled_tasks?taskId=${taskId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
+
+      setScheduledTasks(prev => prev.filter(task => task.task_id !== taskId));
+      toast({
+        title: "Task Deleted",
+        description: "The scheduled task has been cancelled.",
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete task. Please try again.",
+      });
+      throw error;
+    }
+  };
+
   // Show loading state
   if (userLoading) {
     return (
@@ -520,8 +735,8 @@ export const Chat = () => {
     <div className="flex h-full">
       <ThreadsSidebar />
       <div className="flex-1 flex flex-col h-full relative">
-        {/* Header with Info Button */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#2A3347]">
+        {/* Header with Actions */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-[#2A3347] bg-[#1E293B] z-10">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-medium text-white">{teammate?.name}</h1>
             <Button
@@ -533,36 +748,162 @@ export const Chat = () => {
               <Info className="h-4 w-4" />
             </Button>
           </div>
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsSchedulingModalOpen(true)}
+              className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg",
+                "bg-purple-500/10 hover:bg-purple-500/20",
+                "text-purple-400 hover:text-purple-300",
+                "transition-all duration-200",
+                "border border-purple-500/20 hover:border-purple-500/30",
+                "cursor-pointer"
+              )}
+            >
+              <ListTodo className="h-4 w-4" />
+              <span>Assign Task</span>
+            </Button>
+            
+            <TooltipProvider>
+              <Tooltip delayDuration={0}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsScheduledTasksModalOpen(true)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg min-w-[200px]",
+                      "bg-blue-500/10 hover:bg-blue-500/20",
+                      "text-blue-400 hover:text-blue-300",
+                      "transition-all duration-200",
+                      "border border-blue-500/20 hover:border-blue-500/30",
+                      "cursor-pointer"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 flex-1">
+                      <Calendar className="h-4 w-4" />
+                      <span className="flex-1 text-left">Tasks</span>
+                      <div className="flex items-center gap-2">
+                        {taskStats.today > 0 && (
+                          <Badge variant="default" className="bg-blue-500 text-white">
+                            {taskStats.today} today
+                          </Badge>
+                        )}
+                        <Badge variant="outline" className="border-blue-500/30 text-blue-400">
+                          {taskStats.total}
+                        </Badge>
+                        <ChevronRight className="h-4 w-4 opacity-50" />
+                      </div>
+                    </div>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent 
+                  side="bottom" 
+                  className="max-w-[300px] p-4 bg-[#1E293B] border-[#2D3B4E] text-slate-200"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2 text-sm font-medium">
+                      <span className="text-slate-200">Task Summary</span>
+                      <Badge variant="outline" className="border-blue-500/30 text-blue-400">
+                        {taskStats.total} total
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Clock className="h-3.5 w-3.5 text-blue-400" />
+                        <span className="text-slate-400">{taskStats.pending} pending</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-400" />
+                        <span className="text-slate-400">{taskStats.completed} completed</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <RotateCcw className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="text-slate-400">{taskStats.recurring} recurring</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm">
+                        <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />
+                        <span className="text-slate-400">{taskStats.today} today</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-[#2D3B4E]">
+                      <div className="text-xs font-medium text-slate-400 mb-2">Task Sources</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <MessageSquare className="h-3 w-3 text-purple-400" />
+                          <span className="text-slate-400">{taskStats.sources.chat}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Trello className="h-3 w-3 text-blue-400" />
+                          <span className="text-slate-400">{taskStats.sources.jira}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Webhook className="h-3 w-3 text-green-400" />
+                          <span className="text-slate-400">{taskStats.sources.webhook}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {taskStats.total > 0 && (
+                      <div className="pt-2 mt-2 border-t border-[#2D3B4E] text-xs text-slate-400">
+                        Click to view and manage all tasks
+                      </div>
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <ChatMessages 
-            messages={currentState?.threads[currentState.currentThreadId]?.messages || []} 
-            isCollectingSystemMessages={isCollectingSystemMessages}
-            systemMessages={systemMessages}
-            capabilities={capabilities}
-            teammate={teammate}
-            showTeammateDetails={() => setIsDetailsModalOpen(true)}
-            onStarterCommand={handleSubmit}
-          />
-        </div>
-        <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
-        
-        {/* Tool Execution Panel */}
-        <div className="absolute top-0 right-0 w-80 p-4 space-y-2">
-          {currentState?.threads[currentState.currentThreadId]?.metadata?.activeTool && (
-            <ToolExecution 
-              toolName={currentState.threads[currentState.currentThreadId].metadata.activeTool || ''} 
+        {/* Main Chat Area */}
+        <div className="flex-1 overflow-hidden relative">
+          <div className="absolute inset-0 overflow-y-auto">
+            <ChatMessages 
+              messages={currentState?.threads[currentState.currentThreadId]?.messages || []} 
+              isCollectingSystemMessages={isCollectingSystemMessages}
+              systemMessages={systemMessages}
+              capabilities={capabilities}
+              teammate={teammate}
+              showTeammateDetails={() => setIsDetailsModalOpen(true)}
+              onStarterCommand={handleSubmit}
+              onScheduleTask={() => setIsSchedulingModalOpen(true)}
             />
-          )}
+          </div>
         </div>
 
-        {/* Teammate Details Modal */}
+        {/* Chat Input */}
+        <div className="border-t border-[#2A3347] bg-[#1E293B] z-10">
+          <ChatInput onSubmit={handleSubmit} isDisabled={isProcessing} />
+        </div>
+
+        {/* Modals */}
         <TeammateDetailsModal
           isOpen={isDetailsModalOpen}
           onClose={() => setIsDetailsModalOpen(false)}
           teammate={teammate}
           capabilities={capabilities}
+        />
+
+        <TaskSchedulingModal
+          isOpen={isSchedulingModalOpen}
+          onClose={() => setIsSchedulingModalOpen(false)}
+          teammate={teammate}
+          onSchedule={handleScheduleTask}
+          initialData={schedulingInitialData}
+        />
+
+        <ScheduledTasksModal
+          isOpen={isScheduledTasksModalOpen}
+          onClose={() => setIsScheduledTasksModalOpen(false)}
+          tasks={scheduledTasks}
+          onDelete={handleDeleteTask}
+          isLoading={isLoadingTasks}
+          teammate={teammate}
+          onScheduleSimilar={handleScheduleSimilar}
         />
       </div>
     </div>

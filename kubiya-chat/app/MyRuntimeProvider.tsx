@@ -13,8 +13,8 @@ import {
   ChatModelRunResult,
   ContentPart
 } from "@assistant-ui/react";
-import { useConfig } from "@/lib/config-context";
-import { ApiKeySetup } from "@/app/components/ApiKeySetup";
+import { useConfig } from "../lib/config-context";
+import { ApiKeySetup } from "./components/ApiKeySetup";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { getKubiyaConfig } from "../lib/config";
 import { TeammateSelector } from "./components/TeammateSelector";
@@ -679,11 +679,31 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     const loadTeammates = async () => {
       if (!user) return;
       try {
-        const response = await fetch('/api/teammates');
+        console.log('Loading teammates for user:', user.email);
+        const response = await fetch('/api/teammates', {
+          credentials: 'include',
+          headers: {
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        });
+
         if (!response.ok) {
-          throw new Error('Failed to load teammates');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to load teammates:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData
+          });
+          throw new Error(`Failed to load teammates: ${response.statusText}`);
         }
+
         const data = await response.json();
+        console.log('Successfully loaded teammates:', {
+          count: data.length,
+          firstTeammate: data[0]
+        });
         setTeammates(data);
       } catch (error) {
         console.error('Error loading teammates:', error);

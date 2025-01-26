@@ -6,7 +6,7 @@ import { LoginButton } from './LoginButton';
 import { GenericToolUI } from './assistant-ui/ToolUI';
 import { Chat } from './assistant-ui/Chat';
 import { useTeammateContext } from '../MyRuntimeProvider';
-import { useConfig } from '@/lib/config-context';
+import { useConfig } from '../../lib/config-context';
 import { TeammateSelector } from './TeammateSelector';
 import { UserProfileButton } from './UserProfileButton';
 
@@ -84,7 +84,7 @@ export default function MyAssistant() {
           <Chat />
 
           {/* Footer Logo */}
-          <div className="absolute bottom-3 right-3 opacity-20 transition-opacity duration-200 hover:opacity-40">
+          <div className="absolute bottom-3 left-3 opacity-20 transition-opacity duration-200 hover:opacity-40">
             <img
               src="https://media.licdn.com/dms/image/v2/D560BAQG9BrF3G3A3Aw/company-logo_200_200/company-logo_200_200/0/1726534282425/kubiya_logo?e=2147483647&v=beta&t=2BT_nUHPJVNqbU2JjeU5XEWF6y2kn78xr-WZQcYVq5s"
               alt="Kubiya Logo"

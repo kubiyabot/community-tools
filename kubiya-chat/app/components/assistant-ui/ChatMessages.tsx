@@ -6,9 +6,29 @@ import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { SystemMessages } from './SystemMessages';
 import { useTeammateContext } from "../../MyRuntimeProvider";
-import { Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, Settings, Search, ChevronDown, Bot, Workflow, Globe, Loader2 } from "lucide-react";
+import { 
+  Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, 
+  Settings, Search, ChevronDown, Bot, Workflow, Globe, Loader2,
+  Clock, Plus, Calendar, Bell, X, MoreHorizontal
+} from "lucide-react";
 import { Button } from "@/app/components/button";
 import { toolRegistry, CustomToolUI } from './ToolRegistry';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "../../components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { toast } from "../../components/ui/use-toast";
+import { ScheduledTasksModal } from '../ScheduledTasksModal';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -95,9 +115,15 @@ interface ChatMessagesProps {
     description?: string;
     uuid?: string;
     avatar_url?: string;
+    team_id?: string;
+    user_id?: string;
+    org_id?: string;
+    email?: string;
+    context?: string;
   };
   showTeammateDetails?: () => void;
   onStarterCommand?: (command: string) => void;
+  onScheduleTask?: () => void;
 }
 
 interface TextContent {
@@ -116,6 +142,24 @@ interface ToolMetadata {
 interface IntegrationData {
   tools: Record<string, ToolMetadata>;
   categories: string[];
+}
+
+interface ScheduledTask {
+  id: string;
+  task_id: string;
+  task_uuid: string;
+  task_type: string;
+  scheduled_time: string;
+  channel_id: string;
+  parameters: {
+    message_text: string;
+    team_id: string;
+    user_email: string;
+    cron_string?: string;
+  };
+  status: string;
+  created_at: string;
+  updated_at: string | null;
 }
 
 const defaultIcons = {
@@ -180,6 +224,15 @@ const getIcon = (type: string) => {
   return <Terminal className="h-5 w-5 text-purple-400" />;
 };
 
+interface QuickAction {
+  icon: React.ComponentType<any>;
+  label: string;
+  description: string;
+  action: () => void;
+  color: string;
+  badge?: number;
+}
+
 export const ChatMessages = ({ 
   messages, 
   isCollectingSystemMessages, 
@@ -187,7 +240,8 @@ export const ChatMessages = ({
   capabilities,
   teammate,
   showTeammateDetails,
-  onStarterCommand
+  onStarterCommand,
+  onScheduleTask
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { selectedTeammate, currentState } = useTeammateContext();
@@ -268,38 +322,41 @@ export const ChatMessages = ({
         const data: IntegrationData = await response.json();
         
         // Process tool metadata and register tools
-        Object.entries(data.tools).forEach(([toolName, metadata]) => {
-          // Convert icon URL to component if it's a string URL
-          let icon = metadata.icon;
-          if (typeof icon === 'string') {
-            // If it's a URL, create an img component
-            const IconComponent = (props: any) => (
-              <img 
-                src={icon as string} 
-                alt={`${toolName} icon`}
-                className="w-4 h-4"
-                {...props}
-              />
-            );
-            icon = IconComponent;
-          } else {
-            // Use default icon based on category or name
-            icon = defaultIcons[toolName.toLowerCase() as keyof typeof defaultIcons] || Terminal;
-          }
-
-          // Register tool with processed metadata
-          const toolUI: CustomToolUI = {
-            name: metadata.name,
-            description: metadata.description,
-            icon: icon as React.ComponentType<any>,
-            metadata: {
-              category: metadata.category || 'Other',
-              version: metadata.version || '1.0'
+        const tools = data?.tools || {};
+        if (Object.keys(tools).length > 0) {
+          Object.entries(tools).forEach(([toolName, metadata]) => {
+            // Convert icon URL to component if it's a string URL
+            let icon = metadata.icon;
+            if (typeof icon === 'string') {
+              // If it's a URL, create an img component
+              const IconComponent = (props: any) => (
+                <img 
+                  src={icon as string} 
+                  alt={`${toolName} icon`}
+                  className="w-4 h-4"
+                  {...props}
+                />
+              );
+              icon = IconComponent;
+            } else {
+              // Use default icon based on category or name
+              icon = defaultIcons[toolName.toLowerCase() as keyof typeof defaultIcons] || Terminal;
             }
-          };
-          
-          toolRegistry[toolName] = toolUI;
-        });
+
+            // Register tool with processed metadata
+            const toolUI: CustomToolUI = {
+              name: metadata.name,
+              description: metadata.description,
+              icon: icon as React.ComponentType<any>,
+              metadata: {
+                category: metadata.category || 'Other',
+                version: metadata.version || '1.0'
+              }
+            };
+            
+            toolRegistry[toolName] = toolUI;
+          });
+        }
 
         setIntegrations(data);
       } catch (err) {
@@ -642,7 +699,7 @@ export const ChatMessages = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto relative">
       <div className="max-w-4xl mx-auto p-4 space-y-6">
         {groupedMessages.map(renderMessage)}
 
