@@ -37,22 +37,20 @@ TEMP_DIR=$(mktemp -d) || { log "ERROR: Failed to create temporary directory"; ex
 log "Created temporary directory: $TEMP_DIR"
 cd "$TEMP_DIR" || { log "ERROR: Failed to change to temporary directory"; exit 1; }
 
-# Install Jupyter and dependencies
+# Install minimal Jupyter dependencies
 log "Installing Jupyter dependencies..."
-pip install nbformat nbconvert jupyter_client ipykernel 2>&1 || { 
+pip install -q nbconvert ipykernel || { 
     log "ERROR: Failed to install Jupyter dependencies"
     exit 1
 }
-log "Successfully installed Jupyter dependencies"
 
 # Install additional requirements if provided
 if [ ! -z "$REQUIREMENTS" ]; then
     log "Installing additional requirements..."
-    pip install $REQUIREMENTS 2>&1 || { 
+    pip install -q $REQUIREMENTS || { 
         log "ERROR: Failed to install additional requirements"
         exit 1
     }
-    log "Successfully installed additional requirements"
 fi
 
 # Create notebook file
@@ -62,22 +60,20 @@ echo "$NOTEBOOK" > notebook.ipynb || { log "ERROR: Failed to create notebook fil
 # Set up kernel
 KERNEL_NAME=${KERNEL_NAME:-python3}
 log "Setting up Jupyter kernel: $KERNEL_NAME"
-python -m ipykernel install --user --name "$KERNEL_NAME" 2>&1 || {
+python -m ipykernel install --user --name "$KERNEL_NAME" --quiet || {
     log "ERROR: Failed to install Jupyter kernel"
     exit 1
 }
-log "Successfully installed Jupyter kernel"
 
 # Execute notebook
 log "Executing notebook..."
 jupyter nbconvert --to notebook --execute \
     --ExecutePreprocessor.kernel_name="$KERNEL_NAME" \
     --ExecutePreprocessor.timeout=600 \
-    --stdout notebook.ipynb 2>&1 || {
+    --stdout notebook.ipynb || {
     log "ERROR: Failed to execute notebook"
     exit 1
 }
-log "Notebook execution completed successfully"
 
 # Cleanup
 log "Cleaning up..."

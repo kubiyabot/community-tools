@@ -35,17 +35,25 @@ class PythonExecutorTool(Tool):
         if with_files is None:
             with_files = []
 
-        # Add setup script to install virtualenv and common dependencies
+        # Add minimal setup script - only install essential packages
         setup_script = """
 #!/bin/sh
 set -e
 
-# Update package list and install common dependencies
-apt-get update > /dev/null
-apt-get install -y jq curl > /dev/null
+# Function for logging
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+}
 
-# Install Python dependencies
-pip install --no-cache-dir virtualenv > /dev/null
+# Install only if command not available
+if ! command -v jq >/dev/null 2>&1; then
+    log "Installing jq..."
+    apt-get update -qq >/dev/null 2>&1
+    apt-get install -qq -y jq >/dev/null 2>&1
+fi
+
+# Install Python packages without cache
+export PIP_NO_CACHE_DIR=1
 """
         
         full_content = setup_script + "\n" + content
