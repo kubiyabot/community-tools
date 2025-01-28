@@ -10,7 +10,6 @@ import logging
 from typing import Optional, List, Dict, Any
 
 PYTHON_EXECUTOR_ICON = "https://img.icons8.com/color/512/python.png"
-DOCKER_IMAGE = "python:3.12-slim-bookworm"  # Using slim-bookworm for better package management
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,6 @@ class PythonExecutorTool(Tool):
         description: str,
         content: str,
         args: List[Arg],
-        mermaid: str,
         env: Optional[List[str]] = None,
         secrets: Optional[List[str]] = None,
         with_files: Optional[List[str]] = None,
@@ -35,26 +33,12 @@ class PythonExecutorTool(Tool):
         if with_files is None:
             with_files = []
 
-        # Add minimal setup script - only install essential packages
+        # Add setup script to install virtualenv
         setup_script = """
-#!/bin/sh
-set -e
-
-# Function for logging
-log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
-}
-
-# Install only if command not available
-if ! command -v jq >/dev/null 2>&1; then
-    log "Installing jq..."
-    apt-get update -qq >/dev/null 2>&1
-    apt-get install -qq -y jq >/dev/null 2>&1
-fi
-
-# Install Python packages without cache
-export PIP_NO_CACHE_DIR=1
-"""
+        #!/bin/sh
+        set -e
+        pip install virtualenv > /dev/null
+        """
         
         full_content = setup_script + "\n" + content
 
@@ -63,13 +47,12 @@ export PIP_NO_CACHE_DIR=1
             description=description,
             icon_url=PYTHON_EXECUTOR_ICON,
             type="docker",
-            image=DOCKER_IMAGE,
+            image="python:3.12-slim",
             content=full_content,
             args=args,
             env=env,
             secrets=secrets,
-            with_files=with_files,
-            mermaid=mermaid
+            with_files=with_files
         )
         
         # Register the tool
