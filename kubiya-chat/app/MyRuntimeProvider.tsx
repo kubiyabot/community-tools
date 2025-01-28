@@ -1074,11 +1074,3 @@ const useKubiyaRuntime = (
 
   return useLocalRuntime(adapter);
 };
-
-const createRuntime = () => {
-  // Implementation of createRuntime function
-};
-
-const switchThread = (teammateId: string, threadId: string) => {
-  // Implementation of switchThread function
-}; 
