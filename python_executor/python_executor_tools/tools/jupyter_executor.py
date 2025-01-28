@@ -9,23 +9,7 @@ class JupyterExecutor(PythonExecutorTool):
     def __init__(self):
         super().__init__(
             name="jupyter",
-            description="""Execute Jupyter notebooks with optional dependencies.
-        
-Notebook Format (JSON):
-{
-    "cells": [
-        {
-            "cell_type": "code",
-            "source": "print('Hello World')",
-            "metadata": {}
-        }
-    ],
-    "metadata": {
-        "kernelspec": {
-            "name": "python3"
-        }
-    }
-}""",
+            description="Execute Jupyter notebooks in an isolated environment. Supports custom kernels and dependencies.",
             content="""
 #!/bin/sh
 set -e  # Exit on any error
@@ -105,22 +89,71 @@ log "Cleanup completed"
                 Arg(
                     name="notebook",
                     type="str",
-                    description="The Jupyter notebook content in JSON format",
-                    required=True
+                    description="Jupyter notebook JSON content",
+                    required=True,
+                    example="""
+{
+    "cells": [{
+        "cell_type": "code",
+        "source": "print('Hello World')",
+        "metadata": {}
+    }],
+    "metadata": {
+        "kernelspec": {"name": "python3"}
+    }
+}"""
                 ),
                 Arg(
                     name="requirements",
                     type="str",
-                    description="Space-separated list of pip requirements to install",
-                    required=False
+                    description="Package requirements (space-separated)",
+                    required=False,
+                    example="pandas numpy matplotlib"
                 ),
                 Arg(
                     name="kernel_name",
                     type="str",
-                    description="The name of the Jupyter kernel to use (default: python3)",
-                    required=False
+                    description="Jupyter kernel name (default: python3)",
+                    required=False,
+                    example="python3"
                 )
-            ]
+            ],
+            mermaid="""
+graph TD
+    A[Input] --> B[Setup]
+    B --> C[Install Jupyter]
+    C --> D[Install Dependencies]
+    D --> E[Create Kernel]
+    E --> F[Execute Notebook]
+    F --> G[Cleanup]
+
+    B --> |Validation| H[Error Handling]
+    C --> |Errors| H
+    D --> |Errors| H
+    E --> |Errors| H
+    F --> |Errors| H
+    
+    subgraph Setup
+        B
+        C
+    end
+    
+    subgraph Execution
+        D
+        E
+        F
+    end
+    
+    subgraph Error Management
+        H --> I[Log Error]
+        I --> J[Exit]
+    end
+
+    subgraph Notebook Processing
+        F --> K[Execute Cells]
+        K --> L[Collect Output]
+    end
+"""
         )
 
 # Create singleton instance

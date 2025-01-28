@@ -9,24 +9,7 @@ class PythonExecutor(PythonExecutorTool):
     def __init__(self):
         super().__init__(
             name="python",
-            description="""Execute Python code in an isolated environment with optional dependencies and additional files.
-        
-File Structure (JSON):
-{
-    "files": {
-        "path/to/file.py": "file content here",
-        "config/settings.yaml": "yaml content here",
-        "data/input.txt": "data content here"
-    },
-    "directories": [
-        "logs",
-        "data/processed",
-        "output/reports"
-    ]
-}
-
-The 'files' object maps file paths to their content, and the 'directories' array lists additional directories to create.
-Parent directories are automatically created for all files and directories.""",
+            description="Execute Python code in an isolated environment. Supports dependencies, environment variables, and file creation.",
             content="""
 #!/bin/sh
 set -e  # Exit on any error
@@ -72,12 +55,6 @@ cd "$TEMP_DIR" || { log "ERROR: Failed to change to temporary directory"; exit 1
 
 # Process file structure if provided
 if [ ! -z "$FILE_STRUCTURE" ]; then
-    # Install jq for JSON processing
-    apt-get update > /dev/null && apt-get install -y jq > /dev/null || { 
-        log "ERROR: Failed to install jq for JSON processing"
-        exit 1
-    }
-    
     # Create directories
     log "Creating directories from file structure..."
     echo "$FILE_STRUCTURE" | jq -r '.directories[]?' | while read -r dir; do
@@ -128,38 +105,70 @@ log "Cleanup completed"
                 Arg(
                     name="code",
                     type="str",
-                    description="The main Python code to execute",
-                    required=True
+                    description="Python code to execute",
+                    required=True,
+                    example='print("Hello World")'
                 ),
                 Arg(
                     name="requirements",
                     type="str",
-                    description="Newline-separated list of pip requirements to install",
-                    required=False
+                    description="Package requirements (one per line)",
+                    required=False,
+                    example="requests==2.31.0\npandas==2.1.0"
                 ),
                 Arg(
                     name="env_vars",
                     type="str",
-                    description="Environment variables in the format 'KEY1=value1 KEY2=value2'",
-                    required=False
+                    description="Environment variables (space-separated KEY=value pairs)",
+                    required=False,
+                    example="API_KEY=xyz DEBUG=true"
                 ),
                 Arg(
                     name="file_structure",
                     type="str",
-                    description="""JSON string defining files and directories to create. Format:
+                    description="JSON defining files and directories to create",
+                    required=False,
+                    example="""
 {
     "files": {
-        "path/to/file.py": "content",
-        "config/settings.yaml": "content"
+        "script.py": "def main():\\n    print('Hello')",
+        "config.yaml": "key: value"
     },
-    "directories": [
-        "logs",
-        "data/processed"
-    ]
-}""",
-                    required=False
+    "directories": ["logs", "data"]
+}"""
                 )
-            ]
+            ],
+            mermaid="""
+graph TD
+    A[Input] --> B[Setup]
+    B --> C[Create Environment]
+    C --> D[Process Files]
+    D --> E[Install Dependencies]
+    E --> F[Execute Code]
+    F --> G[Cleanup]
+
+    B --> |Validation| H[Error Handling]
+    C --> |Errors| H
+    D --> |Errors| H
+    E --> |Errors| H
+    F --> |Errors| H
+    
+    subgraph Setup
+        B
+    end
+    
+    subgraph Execution
+        C
+        D
+        E
+        F
+    end
+    
+    subgraph Error Management
+        H --> I[Log Error]
+        I --> J[Exit]
+    end
+"""
         )
 
 # Create singleton instance
