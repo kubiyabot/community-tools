@@ -6,7 +6,7 @@ import shutil
 import logging
 from typing import Optional, List, Dict, Any
 
-PYTHON_EXECUTOR_ICON = "https://www.python.org/static/community_logos/python-logo-generic.svg"
+PYTHON_EXECUTOR_ICON = "https://img.icons8.com/color/512/python.png"
 
 logger = logging.getLogger(__name__)
 

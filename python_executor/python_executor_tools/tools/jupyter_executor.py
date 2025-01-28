@@ -1,6 +1,6 @@
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
-from kubiya_sdk.tools.registry import ToolRegistry
+from kubiya_sdk.tools.registry import tool_registry
 
 def create_jupyter_executor():
     """Create a Jupyter notebook execution tool."""
@@ -120,5 +120,6 @@ log "Cleanup completed"
         ]
     )
 
-# Create the tool instance
-ToolRegistry.register("jupyter_executor", create_jupyter_executor())
+# Register the tool
+jupyter_executor = create_jupyter_executor()
+tool_registry.register("jupyter_executor", jupyter_executor)

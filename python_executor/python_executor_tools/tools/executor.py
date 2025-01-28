@@ -1,7 +1,6 @@
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
-# registry
-from kubiya_sdk.tools.registry import ToolRegistry
+from kubiya_sdk.tools.registry import tool_registry  # Import the instance, not the class
 
 def create_python_executor():
     """Create a Python code execution tool."""
@@ -160,4 +159,6 @@ log "Cleanup completed"
         ]
     )
 
-ToolRegistry.register("python_executor", create_python_executor())
+# Register the tool
+python_executor = create_python_executor()
+tool_registry.register("python_executor", python_executor)
