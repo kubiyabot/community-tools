@@ -1,4 +1,7 @@
+"""Base tool for Python execution."""
+
 from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools.registry import tool_registry
 import tempfile
 import os
 import subprocess
@@ -11,6 +14,8 @@ PYTHON_EXECUTOR_ICON = "https://img.icons8.com/color/512/python.png"
 logger = logging.getLogger(__name__)
 
 class PythonExecutorTool(Tool):
+    """Base class for Python execution tools."""
+    
     def __init__(
         self,
         name: str,
@@ -48,4 +53,7 @@ class PythonExecutorTool(Tool):
             env=env,
             secrets=secrets,
             with_files=with_files
-        ) 
+        )
+        
+        # Register the tool
+        tool_registry.register(f"python_executor.{name}", self) 

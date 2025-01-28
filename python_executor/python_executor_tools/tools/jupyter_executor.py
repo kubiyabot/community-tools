@@ -8,7 +8,7 @@ class JupyterExecutor(PythonExecutorTool):
     
     def __init__(self):
         super().__init__(
-            name="execute_jupyter",
+            name="jupyter",
             description="""Execute Jupyter notebooks with optional dependencies.
         
 Notebook Format (JSON):
@@ -123,5 +123,5 @@ log "Cleanup completed"
             ]
         )
 
-# Create the tool instance
+# Create singleton instance
 jupyter_executor = JupyterExecutor()

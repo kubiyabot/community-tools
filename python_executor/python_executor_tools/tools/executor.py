@@ -8,7 +8,7 @@ class PythonExecutor(PythonExecutorTool):
     
     def __init__(self):
         super().__init__(
-            name="execute_python",
+            name="python",
             description="""Execute Python code in an isolated environment with optional dependencies and additional files.
         
 File Structure (JSON):
@@ -162,5 +162,5 @@ log "Cleanup completed"
             ]
         )
 
-# Create the tool instance
+# Create singleton instance
 python_executor = PythonExecutor()
