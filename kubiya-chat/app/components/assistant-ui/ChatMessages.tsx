@@ -9,7 +9,7 @@ import { useTeammateContext } from "../../MyRuntimeProvider";
 import { 
   Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, 
   Settings, Search, ChevronDown, Bot, Workflow, Globe, Loader2,
-  Clock, Plus, Calendar, Bell, X, MoreHorizontal
+  Clock, Plus, Calendar, Bell, X, MoreHorizontal, ListTodo
 } from "lucide-react";
 import { Button } from "@/app/components/button";
 import { toolRegistry, CustomToolUI } from './ToolRegistry';
@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "../../components/ui/use-toast";
 import { ScheduledTasksModal } from '../ScheduledTasksModal';
 import mermaid from 'mermaid';
+import { TaskSchedulingModal } from '@/app/components/task';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -121,6 +122,7 @@ interface ChatMessagesProps {
     org_id?: string;
     email?: string;
     context?: string;
+    integrations?: Array<Integration | string>;
   };
   showTeammateDetails?: () => void;
   onStarterCommand?: (command: string) => void;
@@ -161,6 +163,40 @@ interface ScheduledTask {
   status: string;
   created_at: string;
   updated_at: string | null;
+}
+
+interface TaskData {
+  channel_id: string;
+  channel_name: string;
+  created_at: string;
+  next_schedule_time: string | null;
+  parameters: {
+    action_context_data: Record<string, any>;
+    body: {
+      team: {
+        id: string;
+      };
+      user: {
+        id: string;
+      };
+    };
+    channel_id: string;
+    context: string;
+    cron_string: string;
+    existing_session: boolean;
+    message_text: string;
+    organization_name: string;
+    repeat: boolean;
+    task_uuid: string;
+    team_id: string;
+    user_email: string;
+  };
+  scheduled_time: string;
+  status: string;
+  task_id: string;
+  task_uuid: string;
+  updated_at: string | null;
+  user_email: string;
 }
 
 const defaultIcons = {
@@ -291,13 +327,14 @@ export const ChatMessages = ({
   onScheduleTask
 }: ChatMessagesProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { selectedTeammate, currentState } = useTeammateContext();
+  const { selectedTeammate, currentState, teammates } = useTeammateContext();
   const [sourceMetadata, setSourceMetadata] = useState<SourceMetadata | null>(null);
   const [isToolsExpanded, setIsToolsExpanded] = useState(false);
   const [toolsFilter, setToolsFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [integrations, setIntegrations] = useState<IntegrationData | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
 
   // Helper function to extract Mermaid diagrams
   const extractMermaidDiagrams = (text: string): { diagrams: string[], remainingText: string } => {
@@ -596,6 +633,17 @@ export const ChatMessages = ({
             <p className="text-slate-400 text-lg max-w-2xl mx-auto">
               {teammate?.description || capabilities?.description}
             </p>
+            <div className="flex items-center justify-center gap-3 mt-4">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setShowTaskModal(true)}
+                className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+              >
+                <ListTodo className="h-4 w-4 mr-1.5" />
+                Assign Task
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -827,6 +875,47 @@ export const ChatMessages = ({
 
         <div ref={messagesEndRef} className="h-4" />
       </div>
+
+      {/* Task Scheduling Modal */}
+      {showTaskModal && teammate?.uuid && (
+        <TaskSchedulingModal
+          isOpen={showTaskModal}
+          onClose={() => setShowTaskModal(false)}
+          teammate={{
+            uuid: teammate.uuid,
+            name: teammate.name || 'Unknown',
+            team_id: teammate.team_id || '',
+            user_id: teammate.user_id || '',
+            org_id: teammate.org_id || '',
+            email: teammate.email || '',
+            context: teammate.context || teammate.uuid,
+            integrations: teammate.integrations || []
+          }}
+          onSchedule={async (data) => {
+            try {
+              await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+              });
+              toast({
+                title: "Task Scheduled",
+                description: "The task has been scheduled successfully.",
+              });
+              setShowTaskModal(false);
+            } catch (error) {
+              console.error('Failed to schedule task:', error);
+              toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to schedule task. Please try again.",
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }; 

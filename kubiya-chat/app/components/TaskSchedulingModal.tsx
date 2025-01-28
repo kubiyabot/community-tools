@@ -1,4 +1,4 @@
-import { useState, useEffect, Dispatch, SetStateAction, useRef } from 'react';
+import { useState, useEffect, Dispatch, SetStateAction, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -33,7 +33,10 @@ import {
   Rocket,
   Smile,
   Bell,
-  Activity
+  Activity,
+  Wrench,
+  Database,
+  Terminal
 } from 'lucide-react';
 import { toast } from './ui/use-toast';
 import { cn } from '@/lib/utils';
@@ -43,13 +46,13 @@ import { Calendar } from "@/app/components/ui/calendar";
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { WebhookFlowSection } from './webhook/WebhookFlowSection';
 import { WebhookProvider as ImportedWebhookProvider } from './webhook/providers';
+import { TeammateInfo } from '@/app/types/teammate';
+import { Integration } from '@/app/types/integration';
+import { Avatar, AvatarImage, AvatarFallback } from '@/app/components/ui/avatar';
+import { Check } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from '@/app/components/ui/dropdown-menu';
 
 // Type definitions
-interface Integration {
-  name: string;
-  type?: string;
-}
-
 interface ContextVariable {
   path: string;
   description: string;
@@ -77,58 +80,81 @@ export type WebhookProvider = ImportedWebhookProvider;
 // Update the type definition
 type WebhookStep = 'provider' | 'event' | 'event_example' | 'prompt' | 'webhook';
 
-interface WebhookFlowProps {
-  webhookProvider: WebhookProvider | null;
-  eventType: string;
-  promptTemplate: string;
-  currentStep: WebhookStep;
-  setWebhookProvider: (provider: WebhookProvider | null) => void;
-  setEventType: (type: string) => void;
-  setPromptTemplate: (template: string) => void;
-  setCurrentStep: Dispatch<SetStateAction<WebhookStep>>;
-  session: any;
-  teammate: TeammateInfo | undefined;
-  standalone: boolean;
+interface InitialTaskData {
+  description?: string;
+  slackTarget?: string;
+  scheduleType?: 'quick' | 'custom';
+  repeatOption?: string;
+  date?: Date;
+  source?: WebhookProvider;
+  assignmentMethod?: AssignmentMethod;
+  webhookProvider?: WebhookProvider | null;
+  webhookUrl?: string;
+  promptTemplate?: string;
+  eventType?: string;
 }
 
-interface TeammateInfo {
-  uuid: string;
-  name: string;
-  team_id?: string;
-  user_id?: string;
-  org_id?: string;
-  email?: string;
-  context?: string;
+interface TaskData {
+  channel_id: string;
+  channel_name: string;
+  created_at: string;
+  next_schedule_time: string | null;
+  parameters: {
+    action_context_data: Record<string, any>;
+    body: {
+      team: {
+        id: string;
+      };
+      user: {
+        id: string;
+      };
+    };
+    channel_id: string;
+    context: string;
+    cron_string: string;
+    existing_session: boolean;
+    message_text: string;
+    organization_name: string;
+    repeat: boolean;
+    task_uuid: string;
+    team_id: string;
+    user_email: string;
+  };
+  scheduled_time: string;
+  status: string;
+  task_id: string;
+  task_uuid: string;
+  updated_at: string | null;
+  user_email: string;
+}
+
+interface Starter {
+  command: string;
+  display_name: string;
+  icon?: string;
+}
+
+interface TeammateCapabilities {
+  tools?: any[];
+  integrations?: Array<string | Integration>;
+  starters?: Array<Starter>;
+  instruction_type?: string;
+  llm_model?: string;
   description?: string;
-  integrations?: Array<Integration | string>;
+  runner?: string;
+}
+
+interface TeammateWithCapabilities extends TeammateInfo {
+  capabilities?: TeammateCapabilities;
 }
 
 interface TaskSchedulingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  teammate?: {
-    uuid: string;
-    name?: string;
-    team_id?: string;
-    user_id?: string;
-    org_id?: string;
-    email?: string;
-    context?: string;
-  };
-  onSchedule: (data: any) => void;
-  initialData?: {
-    description?: string;
-    slackTarget?: string;
-    scheduleType?: 'quick' | 'custom';
-    repeatOption?: string;
-    date?: Date;
-    source?: WebhookProvider;
-    assignmentMethod?: 'chat' | 'jira' | 'webhook';
-    webhookProvider?: WebhookProvider | null;
-    webhookUrl?: string;
-    promptTemplate?: string;
-    eventType?: string;
-  };
+  teammate?: TeammateInfo;
+  onSchedule: (data: TaskData) => Promise<void>;
+  initialData?: InitialTaskData;
+  capabilities?: TeammateCapabilities;
 }
 
 interface QuickTemplate {
@@ -200,6 +226,7 @@ interface JiraBoard {
 
 // Constants
 const TICKETS_PER_PAGE = 5;
+const TEAMMATES_PER_PAGE = 5;
 
 // Add more mock tickets for pagination demo
 const JIRA_MOCK_DATA = {
@@ -706,10 +733,145 @@ function generateAvatarUrl(input: AvatarInput) {
   return `/images/avatars/${AVATAR_IMAGES[randomIndex]}`;
 }
 
-export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, initialData }: TaskSchedulingModalProps) {
+// Add new types for filtering
+interface TeammateFilter {
+  searchTerm: string;
+  integrations: string[];
+  tools: string[];
+}
+
+interface Tool {
+  name: string;
+  type?: string;
+  description?: string;
+}
+
+// Helper function to get the appropriate icon for an integration
+const getIcon = (type: string) => {
+  const checkType = (keyword: string) => type.toLowerCase().includes(keyword);
+
+  // Integration-specific icons with direct URLs
+  if (checkType('slack')) return <img src="https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/306_Slack_logo-512.png" alt="Slack" className="h-4 w-4 object-contain" />;
+  if (checkType('aws')) return <img src="https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/aws-icon.png" alt="AWS" className="h-4 w-4 object-contain" />;
+  if (checkType('github')) return <img src="https://cdn-icons-png.flaticon.com/512/25/25231.png" alt="GitHub" className="h-4 w-4 object-contain" />;
+  if (checkType('jira')) return <img src="https://cdn-icons-png.flaticon.com/512/5968/5968875.png" alt="Jira" className="h-4 w-4 object-contain" />;
+  if (checkType('kubernetes')) return <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Kubernetes_logo_without_workmark.svg/2109px-Kubernetes_logo_without_workmark.svg.png" alt="Kubernetes" className="h-4 w-4 object-contain" />;
+  
+  // Other icons
+  if (checkType('terraform')) return <img src="/icons/terraform.svg" alt="Terraform" className="h-4 w-4" />;
+  if (checkType('tool')) return <Wrench className="h-4 w-4 text-purple-400" />;
+  if (checkType('workflow')) return <GitBranch className="h-4 w-4 text-blue-400" />;
+  if (checkType('database')) return <Database className="h-4 w-4 text-green-400" />;
+  if (checkType('code')) return <Code className="h-4 w-4 text-yellow-400" />;
+  return <Terminal className="h-4 w-4 text-purple-400" />;
+};
+
+export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, initialData, capabilities }: TaskSchedulingModalProps) {
   const { user } = useUser();
   const { selectedTeammate, currentState, teammates } = useTeammateContext();
   const [hasJiraIntegration, setHasJiraIntegration] = useState(false);
+
+  // Move state declarations from renderTeammateSelection to here
+  const [teammateCurrentPage, setTeammateCurrentPage] = useState(1);
+  const [selectedTeammateForList, setSelectedTeammateForList] = useState<TeammateWithCapabilities | null>(null);
+  const [teammateFilters, setTeammateFilters] = useState<TeammateFilter>({
+    searchTerm: '',
+    integrations: [],
+    tools: []
+  });
+
+  // Move useMemo hooks to top level
+  const availableTools = useMemo(() => {
+    const tools = new Set<string>();
+    capabilities?.tools?.forEach(tool => {
+      if (typeof tool === 'string') {
+        tools.add(tool);
+      } else if (tool.name) {
+        tools.add(tool.name);
+      }
+    });
+    return Array.from(tools);
+  }, [capabilities?.tools]);
+
+  const availableIntegrations = useMemo(() => {
+    const integrations = new Set<string>();
+    capabilities?.integrations?.forEach(integration => {
+      if (typeof integration === 'string') {
+        integrations.add(integration);
+      } else if (integration.name) {
+        integrations.add(integration.name);
+      }
+    });
+    return Array.from(integrations);
+  }, [capabilities?.integrations]);
+
+  // Filter teammates computation
+  const filteredTeammates = useMemo(() => {
+    if (!teammates) return [];
+    
+    return teammates.filter((t: TeammateWithCapabilities) => {
+      // Search filter
+      if (teammateFilters.searchTerm && !t.name.toLowerCase().includes(teammateFilters.searchTerm.toLowerCase())) {
+        return false;
+      }
+
+      // Tools filter
+      if (teammateFilters.tools.length > 0) {
+        const teammateTools = t.capabilities?.tools || [];
+        const hasMatchingTool = teammateFilters.tools.some(tool => 
+          teammateTools.some((t: string | Tool) => 
+            (typeof t === 'string' ? t : t.name).toLowerCase() === tool.toLowerCase()
+          )
+        );
+        if (!hasMatchingTool) return false;
+      }
+
+      // Integrations filter
+      if (teammateFilters.integrations.length > 0) {
+        const teammateIntegrations = t.capabilities?.integrations || [];
+        const hasMatchingIntegration = teammateFilters.integrations.some(integration =>
+          teammateIntegrations.some((i: string | Integration) =>
+            (typeof i === 'string' ? i : i.name).toLowerCase() === integration.toLowerCase()
+          )
+        );
+        if (!hasMatchingIntegration) return false;
+      }
+
+      return true;
+    });
+  }, [teammates, teammateFilters]);
+
+  // Add filterOptions computation back
+  const filterOptions = useMemo(() => {
+    const integrations = new Set<string>();
+    const tools = new Set<string>();
+
+    teammates?.forEach(t => {
+      t.capabilities?.integrations?.forEach((i: Integration | string) => {
+        integrations.add(typeof i === 'string' ? i : i.name);
+      });
+    });
+
+    capabilities?.tools?.forEach((tool: Tool | string) => {
+      if (typeof tool === 'string') {
+        tools.add(tool);
+      } else {
+        tools.add(tool.name);
+      }
+    });
+
+    return {
+      integrations: Array.from(integrations),
+      tools: Array.from(tools)
+    };
+  }, [teammates, capabilities?.tools]);
+
+  // Add filter states
+  const [filters, setFilters] = useState<TeammateFilter>({
+    integrations: [],
+    tools: [],
+    searchTerm: ''
+  });
 
   // Update step state to include teammate selection
   const [step, setStep] = useState<ModalStep>(initialData?.source ? 'config' : 'teammate');
@@ -1117,12 +1279,12 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
       setStep('config');
     } else if (step === 'config') {
       if (assignmentMethod === 'jira') {
-        handleSubmit();
+        handleSchedule();
       } else {
         setStep('schedule');
       }
     } else if (step === 'schedule') {
-      handleSubmit();
+      handleSchedule();
     }
   };
 
@@ -1162,62 +1324,53 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSchedule = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!teammate) return;
+
     try {
-      const channelId = slackTarget.startsWith('#') ? slackTarget.substring(1) : slackTarget;
-      const taskUuid = crypto.randomUUID();
-      const taskId = taskUuid.replace(/-/g, '').substring(0, 32);
-      const scheduledTime = date.toISOString();
+      const channelId = slackTarget?.startsWith('#') ? slackTarget.substring(1) : slackTarget || '';
+      const now = new Date();
+      const taskId = crypto.randomUUID();
       
-      const taskData = {
+      const taskData: TaskData = {
         channel_id: channelId,
         channel_name: `#${channelId}`,
-        created_at: new Date().toISOString(),
-        next_schedule_time: repeatOption !== 'never' ? scheduledTime : null,
+        created_at: now.toISOString(),
+        next_schedule_time: date ? date.toISOString() : null,
         parameters: {
           action_context_data: {},
           body: {
-            team: {
-              id: teammate.team_id || ''
-            },
-            user: {
-              id: teammate.user_id || ''
-            }
+            team: { id: teammate.team_id || '' },
+            user: { id: teammate.user_id || '' }
           },
           channel_id: channelId,
-          context: teammate.context || teammate.uuid,
+          context: description || '',
           cron_string: getCronString(date, repeatOption),
           existing_session: false,
-          message_text: description,
-          organization_name: teammate.org_id || 'kubiya-ai',
+          message_text: description || '',
+          organization_name: teammate.org_id || '',
           repeat: repeatOption !== 'never',
-          task_uuid: taskUuid,
+          task_uuid: taskId,
           team_id: teammate.team_id || '',
           user_email: teammate.email || ''
         },
-        scheduled_time: scheduledTime,
+        scheduled_time: date ? date.toISOString() : now.toISOString(),
         status: "scheduled",
         task_id: taskId,
-        task_uuid: taskUuid,
+        task_uuid: taskId,
         updated_at: null,
         user_email: teammate.email || ''
       };
 
-      console.log('Submitting task:', JSON.stringify(taskData, null, 2));
       await onSchedule(taskData);
-      
-      toast({
-        title: "Task Scheduled",
-        description: "Your task has been scheduled successfully.",
-      });
       onClose();
     } catch (error) {
       console.error('Failed to schedule task:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to schedule task. Please try again.",
+        title: 'Error',
+        description: 'Failed to schedule task. Please try again.',
+        variant: 'destructive'
       });
     }
   };
@@ -1373,34 +1526,6 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
             </button>
           </>
         )}
-        {step !== 'teammate' && step !== 'method' && (
-          <>
-            <ChevronRight className="h-4 w-4 text-slate-600" />
-            <div className={cn(
-              "flex items-center rounded-full px-3 py-1",
-              "bg-emerald-500 text-white"
-            )}>
-              {assignmentMethod === 'chat' && (
-                <>
-                  <MessageSquare className="h-3 w-3 mr-1" />
-                  Chat
-                </>
-              )}
-              {assignmentMethod === 'jira' && (
-                <>
-                  <Trello className="h-3 w-3 mr-1" />
-                  JIRA
-                </>
-              )}
-              {assignmentMethod === 'webhook' && (
-                <>
-                  <Webhook className="h-3 w-3 mr-1" />
-                  Webhook
-                </>
-              )}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
@@ -1411,100 +1536,285 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   };
 
-  // Add teammate selection rendering
-  const renderTeammateSelection = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <Activity className="h-5 w-5 text-purple-400 flex-shrink-0" />
-        <div>
-          <h3 className="text-base font-medium text-slate-200">
-            Who should perform this task?
-          </h3>
-          <p className="text-sm text-slate-400 mt-1">
-            Choose a teammate to handle this task
-          </p>
-        </div>
-      </div>
+  // Update renderTeammateSelection to use the memoized values
+  const renderTeammateSelection = (): JSX.Element => {
+    // Pagination
+    const totalPages = Math.ceil(filteredTeammates.length / TEAMMATES_PER_PAGE);
+    const paginatedTeammates = filteredTeammates.slice(
+      (teammateCurrentPage - 1) * TEAMMATES_PER_PAGE,
+      teammateCurrentPage * TEAMMATES_PER_PAGE
+    );
 
-      <div className="grid grid-cols-2 gap-4">
-        {teammates.map((t) => (
-          <button
-            key={t.uuid}
-            onClick={() => setSelectedTeammateId(t.uuid)}
-            className={cn(
-              "relative p-4 rounded-lg text-left transition-all group",
-              "border hover:border-opacity-30",
-              selectedTeammateId === t.uuid
-                ? "bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30"
-                : "bg-gradient-to-br from-slate-800 to-slate-900 border-[#2D3B4E] hover:from-purple-500/10 hover:to-purple-500/5"
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <div className="relative flex-shrink-0">
-                <img
-                  src={generateAvatarUrl({ uuid: t.uuid, name: t.name })}
-                  alt={t.name}
-                  className="w-12 h-12 rounded-lg transform transition-all duration-300 
-                           group-hover:scale-105 group-hover:shadow-md group-hover:shadow-purple-500/10
-                           object-cover"
-                />
-                {t.integrations && t.integrations.length > 0 && (
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-purple-500 
-                               rounded-full ring-2 ring-[#1E293B] shadow-lg" />
+    // If teammate is pre-selected, show the nice confirmation UI
+    if (teammate && !selectedTeammateForList) {
+      setSelectedTeammateForList(teammate as TeammateWithCapabilities);
+    }
+
+    const renderTeammateCard = (t: TeammateWithCapabilities) => {
+      const isSelected = selectedTeammateForList?.uuid === t.uuid;
+      const tools = t.capabilities?.tools || [];
+      const integrations = t.capabilities?.integrations || [];
+      const runner = t.capabilities?.runner;
+
+      return (
+        <div
+          key={t.uuid}
+          className={cn(
+            "flex flex-col p-6 rounded-lg transition-all cursor-pointer border",
+            isSelected
+              ? "bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border-emerald-500/30"
+              : "bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700/30 hover:border-emerald-500/20 hover:from-emerald-500/10 hover:to-emerald-500/5"
+          )}
+          onClick={() => setSelectedTeammateForList(t)}
+        >
+          <div className="flex items-start gap-4">
+            <Avatar className="h-12 w-12 rounded-lg border-2 border-slate-700/50">
+              <AvatarImage src={generateAvatarUrl({ uuid: t.uuid, name: t.name })} />
+              <AvatarFallback>{t.name[0]}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h4 className="text-base font-medium text-slate-200">{t.name}</h4>
+                {isSelected && (
+                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                    <Check className="h-3 w-3 mr-1" />
+                    Selected
+                  </Badge>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-slate-200">{t.name}</div>
-                {t.description && (
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{t.description}</p>
-                )}
-                {t.integrations && t.integrations.length > 0 && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="flex -space-x-1.5">
-                      {t.integrations.slice(0, 3).map((integration: Integration | string, idx: number) => {
-                        const type = typeof integration === 'string' ? integration.toLowerCase() : integration.type?.toLowerCase() || integration.name.toLowerCase();
-                        return (
-                          <div 
-                            key={idx}
-                            className="w-5 h-5 rounded-full bg-[#1A2438] border border-[#2D3B4E] flex items-center justify-center overflow-hidden"
-                            title={type.charAt(0).toUpperCase() + type.slice(1)}
-                          >
-                            {type === 'jira' && (
-                              <img src="https://wac-cdn.atlassian.com/assets/img/favicons/atlassian/favicon-32x32.png" alt="JIRA" className="w-3.5 h-3.5" />
-                            )}
-                            {type === 'slack' && (
-                              <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg" alt="Slack" className="w-3.5 h-3.5" />
-                            )}
-                            {type === 'github' && (
-                              <img src="https://github.githubassets.com/favicons/favicon.svg" alt="GitHub" className="w-3.5 h-3.5" />
-                            )}
-                            {type === 'gitlab' && (
-                              <img src="https://gitlab.com/uploads/-/system/group/avatar/6543/gitlab-logo-square.png" alt="GitLab" className="w-3.5 h-3.5" />
-                            )}
-                          </div>
-                        );
-                      })}
-                      {t.integrations.length > 3 && (
-                        <div 
-                          className="w-5 h-5 rounded-full bg-[#1A2438] border border-[#2D3B4E] flex items-center justify-center"
-                          title={`${t.integrations.length - 3} more integration${t.integrations.length - 3 !== 1 ? 's' : ''}`}
-                        >
-                          <span className="text-[10px] text-slate-400">+{t.integrations.length - 3}</span>
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-400">
-                      {t.integrations.length} integration{t.integrations.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                )}
-              </div>
+              {runner && (
+                <div className="flex items-center gap-2 mt-1 text-sm text-slate-400">
+                  <Terminal className="h-4 w-4 text-purple-400" />
+                  <span>Runs with {runner}</span>
+                </div>
+              )}
             </div>
-          </button>
-        ))}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {tools.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Wrench className="h-4 w-4" />
+                  <span>Tools</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tools.slice(0, 4).map((tool: Tool | string, idx: number) => (
+                    <Badge
+                      key={idx}
+                      variant="secondary"
+                      className="bg-purple-500/10 text-purple-400 border-purple-500/20"
+                    >
+                      {typeof tool === 'string' ? tool : tool.name}
+                    </Badge>
+                  ))}
+                  {tools.length > 4 && (
+                    <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                      +{tools.length - 4} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {integrations.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <Database className="h-4 w-4" />
+                  <span>Integrations</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {integrations.slice(0, 4).map((integration: Integration | string, idx: number) => {
+                    const type = typeof integration === 'string' ? integration.toLowerCase() : integration.type?.toLowerCase() || integration.name.toLowerCase();
+                    return (
+                      <Badge
+                        key={idx}
+                        variant="secondary"
+                        className="bg-blue-500/10 text-blue-400 border-blue-500/20 flex items-center gap-1.5"
+                      >
+                        {getIcon(type)}
+                        {typeof integration === 'string' ? integration : integration.name}
+                      </Badge>
+                    );
+                  })}
+                  {integrations.length > 4 && (
+                    <Badge variant="secondary" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                      +{integrations.length - 4} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    const renderFilterChips = () => {
+      const chips = [
+        ...teammateFilters.tools.map(tool => ({
+          label: tool,
+          type: 'tool' as const
+        })),
+        ...teammateFilters.integrations.map(integration => ({
+          label: integration,
+          type: 'integration' as const
+        }))
+      ];
+
+      if (chips.length === 0) return null;
+
+      return (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {chips.map(chip => (
+            <Badge
+              key={`${chip.type}-${chip.label}`}
+              variant="secondary"
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1",
+                chip.type === 'tool' 
+                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+              )}
+            >
+              {chip.type === 'tool' ? <Wrench className="h-3 w-3" /> : <Database className="h-3 w-3" />}
+              {chip.label}
+              <X
+                className="h-3 w-3 ml-1 cursor-pointer hover:text-red-400 transition-colors"
+                onClick={() => {
+                  setTeammateFilters(prev => ({
+                    ...prev,
+                    [chip.type === 'tool' ? 'tools' : 'integrations']: prev[chip.type === 'tool' ? 'tools' : 'integrations'].filter(
+                      item => item !== chip.label
+                    )
+                  }));
+                }}
+              />
+            </Badge>
+          ))}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-slate-400 hover:text-purple-400"
+            onClick={() => setTeammateFilters({ searchTerm: '', tools: [], integrations: [] })}
+          >
+            Clear all
+          </Button>
+        </div>
+      );
+    };
+
+    return (
+      <div className="space-y-6">
+        {selectedTeammateForList && teammate?.uuid === selectedTeammateForList.uuid && (
+          <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3">
+            <div className="p-2 rounded-full bg-emerald-500/20">
+              <Check className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-emerald-400">Perfect Choice!</h4>
+              <p className="text-sm text-slate-400">
+                {selectedTeammateForList.name} is ready to handle this task with their expertise.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <Input
+              placeholder="Search teammates..."
+              value={teammateFilters.searchTerm}
+              onChange={e => setTeammateFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+              className="w-full"
+            />
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Database className="h-4 w-4" />
+                Integrations
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {filterOptions.integrations.map(integration => (
+                <DropdownMenuCheckboxItem
+                  key={integration}
+                  checked={teammateFilters.integrations.includes(integration)}
+                  onCheckedChange={(checked) => {
+                    setTeammateFilters(prev => ({
+                      ...prev,
+                      integrations: checked
+                        ? [...prev.integrations, integration]
+                        : prev.integrations.filter(i => i !== integration)
+                    }));
+                  }}
+                >
+                  {integration}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Wrench className="h-4 w-4" />
+                Tools
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {filterOptions.tools.map(tool => (
+                <DropdownMenuCheckboxItem
+                  key={tool}
+                  checked={teammateFilters.tools.includes(tool)}
+                  onCheckedChange={(checked) => {
+                    setTeammateFilters(prev => ({
+                      ...prev,
+                      tools: checked
+                        ? [...prev.tools, tool]
+                        : prev.tools.filter(t => t !== tool)
+                    }));
+                  }}
+                >
+                  {tool}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {renderFilterChips()}
+
+        <div className="grid grid-cols-2 gap-4">
+          {paginatedTeammates.map(renderTeammateCard)}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTeammateCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={teammateCurrentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-slate-400">
+              Page {teammateCurrentPage} of {totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTeammateCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={teammateCurrentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <Dialog 
