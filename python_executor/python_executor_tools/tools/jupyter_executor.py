@@ -1,12 +1,15 @@
+"""Jupyter notebook execution tool."""
+
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
-from kubiya_sdk.tools.registry import tool_registry
 
-def create_jupyter_executor():
-    """Create a Jupyter notebook execution tool."""
-    return PythonExecutorTool(
-        name="execute_jupyter",
-        description="""Execute Jupyter notebooks with optional dependencies.
+class JupyterExecutor(PythonExecutorTool):
+    """Jupyter notebook execution tool."""
+    
+    def __init__(self):
+        super().__init__(
+            name="execute_jupyter",
+            description="""Execute Jupyter notebooks with optional dependencies.
         
 Notebook Format (JSON):
 {
@@ -23,7 +26,7 @@ Notebook Format (JSON):
         }
     }
 }""",
-        content="""
+            content="""
 #!/bin/sh
 set -e  # Exit on any error
 
@@ -98,28 +101,27 @@ cd / || { log "ERROR: Failed to leave temporary directory"; exit 1; }
 rm -rf "$TEMP_DIR" || { log "WARNING: Failed to clean up temporary directory: $TEMP_DIR"; }
 log "Cleanup completed"
 """,
-        args=[
-            Arg(
-                name="notebook",
-                type="str",
-                description="The Jupyter notebook content in JSON format",
-                required=True
-            ),
-            Arg(
-                name="requirements",
-                type="str",
-                description="Space-separated list of pip requirements to install",
-                required=False
-            ),
-            Arg(
-                name="kernel_name",
-                type="str",
-                description="The name of the Jupyter kernel to use (default: python3)",
-                required=False
-            )
-        ]
-    )
+            args=[
+                Arg(
+                    name="notebook",
+                    type="str",
+                    description="The Jupyter notebook content in JSON format",
+                    required=True
+                ),
+                Arg(
+                    name="requirements",
+                    type="str",
+                    description="Space-separated list of pip requirements to install",
+                    required=False
+                ),
+                Arg(
+                    name="kernel_name",
+                    type="str",
+                    description="The name of the Jupyter kernel to use (default: python3)",
+                    required=False
+                )
+            ]
+        )
 
-# Register the tool
-jupyter_executor = create_jupyter_executor()
-tool_registry.register("jupyter_executor", jupyter_executor)
+# Create the tool instance
+jupyter_executor = JupyterExecutor()

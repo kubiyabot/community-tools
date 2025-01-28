@@ -1,12 +1,15 @@
+"""Python code execution tool."""
+
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
-from kubiya_sdk.tools.registry import tool_registry  # Import the instance, not the class
 
-def create_python_executor():
-    """Create a Python code execution tool."""
-    return PythonExecutorTool(
-        name="execute_python",
-        description="""Execute Python code in an isolated environment with optional dependencies and additional files.
+class PythonExecutor(PythonExecutorTool):
+    """Python code execution tool."""
+    
+    def __init__(self):
+        super().__init__(
+            name="execute_python",
+            description="""Execute Python code in an isolated environment with optional dependencies and additional files.
         
 File Structure (JSON):
 {
@@ -24,7 +27,7 @@ File Structure (JSON):
 
 The 'files' object maps file paths to their content, and the 'directories' array lists additional directories to create.
 Parent directories are automatically created for all files and directories.""",
-        content="""
+            content="""
 #!/bin/sh
 set -e  # Exit on any error
 
@@ -121,29 +124,29 @@ cd / || { log "ERROR: Failed to leave temporary directory"; exit 1; }
 rm -rf "$TEMP_DIR" || { log "WARNING: Failed to clean up temporary directory: $TEMP_DIR"; }
 log "Cleanup completed"
 """,
-        args=[
-            Arg(
-                name="code",
-                type="str",
-                description="The main Python code to execute",
-                required=True
-            ),
-            Arg(
-                name="requirements",
-                type="str",
-                description="Newline-separated list of pip requirements to install",
-                required=False
-            ),
-            Arg(
-                name="env_vars",
-                type="str",
-                description="Environment variables in the format 'KEY1=value1 KEY2=value2'",
-                required=False
-            ),
-            Arg(
-                name="file_structure",
-                type="str",
-                description="""JSON string defining files and directories to create. Format:
+            args=[
+                Arg(
+                    name="code",
+                    type="str",
+                    description="The main Python code to execute",
+                    required=True
+                ),
+                Arg(
+                    name="requirements",
+                    type="str",
+                    description="Newline-separated list of pip requirements to install",
+                    required=False
+                ),
+                Arg(
+                    name="env_vars",
+                    type="str",
+                    description="Environment variables in the format 'KEY1=value1 KEY2=value2'",
+                    required=False
+                ),
+                Arg(
+                    name="file_structure",
+                    type="str",
+                    description="""JSON string defining files and directories to create. Format:
 {
     "files": {
         "path/to/file.py": "content",
@@ -154,11 +157,10 @@ log "Cleanup completed"
         "data/processed"
     ]
 }""",
-                required=False
-            )
-        ]
-    )
+                    required=False
+                )
+            ]
+        )
 
-# Register the tool
-python_executor = create_python_executor()
-tool_registry.register("python_executor", python_executor)
+# Create the tool instance
+python_executor = PythonExecutor()
