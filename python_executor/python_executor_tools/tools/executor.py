@@ -1,5 +1,7 @@
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
+# registry
+from kubiya_sdk.tools.registry import ToolRegistry
 
 def create_python_executor():
     """Create a Python code execution tool."""
@@ -158,5 +160,4 @@ log "Cleanup completed"
         ]
     )
 
-# Create the tool instance
-python_executor = create_python_executor() 
+ToolRegistry.register("python_executor", create_python_executor())

@@ -1,11 +1,28 @@
 from kubiya_sdk.tools import Arg
 from .base import PythonExecutorTool
+from kubiya_sdk.tools.registry import ToolRegistry
 
 def create_jupyter_executor():
     """Create a Jupyter notebook execution tool."""
     return PythonExecutorTool(
         name="execute_jupyter",
-        description="Execute Jupyter notebooks with optional dependencies",
+        description="""Execute Jupyter notebooks with optional dependencies.
+        
+Notebook Format (JSON):
+{
+    "cells": [
+        {
+            "cell_type": "code",
+            "source": "print('Hello World')",
+            "metadata": {}
+        }
+    ],
+    "metadata": {
+        "kernelspec": {
+            "name": "python3"
+        }
+    }
+}""",
         content="""
 #!/bin/sh
 set -e  # Exit on any error
@@ -28,7 +45,12 @@ if [ -z "$NOTEBOOK" ]; then
     exit 1
 fi
 
-# Install Jupyter dependencies with error handling
+# Create temporary directory with error handling
+TEMP_DIR=$(mktemp -d) || { log "ERROR: Failed to create temporary directory"; exit 1; }
+log "Created temporary directory: $TEMP_DIR"
+cd "$TEMP_DIR" || { log "ERROR: Failed to change to temporary directory"; exit 1; }
+
+# Install Jupyter and dependencies
 log "Installing Jupyter dependencies..."
 pip install nbformat nbconvert jupyter_client ipykernel 2>&1 || { 
     log "ERROR: Failed to install Jupyter dependencies"
@@ -36,16 +58,7 @@ pip install nbformat nbconvert jupyter_client ipykernel 2>&1 || {
 }
 log "Successfully installed Jupyter dependencies"
 
-# Create temporary directory with error handling
-TEMP_DIR=$(mktemp -d) || { log "ERROR: Failed to create temporary directory"; exit 1; }
-log "Created temporary directory: $TEMP_DIR"
-cd "$TEMP_DIR" || { log "ERROR: Failed to change to temporary directory"; exit 1; }
-
-# Create notebook file with error checking
-log "Creating notebook file..."
-echo "$NOTEBOOK" > notebook.ipynb || { log "ERROR: Failed to create notebook file"; exit 1; }
-
-# Install requirements if provided
+# Install additional requirements if provided
 if [ ! -z "$REQUIREMENTS" ]; then
     log "Installing additional requirements..."
     pip install $REQUIREMENTS 2>&1 || { 
@@ -55,7 +68,11 @@ if [ ! -z "$REQUIREMENTS" ]; then
     log "Successfully installed additional requirements"
 fi
 
-# Install and set kernel with error handling
+# Create notebook file
+log "Creating notebook file..."
+echo "$NOTEBOOK" > notebook.ipynb || { log "ERROR: Failed to create notebook file"; exit 1; }
+
+# Set up kernel
 KERNEL_NAME=${KERNEL_NAME:-python3}
 log "Setting up Jupyter kernel: $KERNEL_NAME"
 python -m ipykernel install --user --name "$KERNEL_NAME" 2>&1 || {
@@ -64,7 +81,7 @@ python -m ipykernel install --user --name "$KERNEL_NAME" 2>&1 || {
 }
 log "Successfully installed Jupyter kernel"
 
-# Execute notebook with error handling
+# Execute notebook
 log "Executing notebook..."
 jupyter nbconvert --to notebook --execute \
     --ExecutePreprocessor.kernel_name="$KERNEL_NAME" \
@@ -104,4 +121,4 @@ log "Cleanup completed"
     )
 
 # Create the tool instance
-jupyter_executor = create_jupyter_executor() 
+ToolRegistry.register("jupyter_executor", create_jupyter_executor())
