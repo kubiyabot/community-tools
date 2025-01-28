@@ -60,7 +60,11 @@ export async function POST(req: NextRequest) {
       communication: data.communication,
       created_at: data.created_at,
       created_by: data.created_by,
-      org: data.org
+      org: data.org,
+      teammate: data.agent_id ? {
+        uuid: data.agent_id,
+        name: data.agent_name || 'Unknown Agent'
+      } : undefined
     });
   } catch (error) {
     console.error('Error creating webhook:', error);

@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "../../components/ui/use-toast";
 import { ScheduledTasksModal } from '../ScheduledTasksModal';
+import mermaid from 'mermaid';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -188,20 +189,13 @@ function isThreadMessage(message: string | ThreadMessage): message is ThreadMess
   return typeof message !== 'string' && 'role' in message;
 }
 
-const getMessageKey = (message: string | ThreadMessage): string => {
-  if (!isThreadMessage(message)) return `string-${message}`;
-  const textContent = message.content.find((c): c is TextContentPart => c.type === 'text');
-  return message.id || `${message.role}-${textContent?.text || Date.now()}`;
-};
-
-const isTextContent = (content: any): content is TextContent => {
+function isTextContentPart(content: any): content is TextContentPart {
   return content?.type === 'text' && typeof content?.text === 'string';
-};
+}
 
-const hasToolCalls = (msg: ThreadMessage & { tool_calls?: ToolCall[] }): boolean => {
-  return 'tool_calls' in msg && 
-    Array.isArray(msg.tool_calls) && 
-    msg.tool_calls.length > 0;
+const getMessageKey = (message: string | ThreadMessage): string => {
+  if (typeof message === 'string') return `string-${message}`;
+  return message.id || `${message.role}-${Date.now()}`;
 };
 
 // Helper function to get the appropriate icon for an integration
@@ -233,6 +227,59 @@ interface QuickAction {
   badge?: number;
 }
 
+// Add MermaidDiagram component before ChatMessages component
+const MermaidDiagram = ({ code }: { code: string }) => {
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const elementId = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
+
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      securityLevel: 'loose',
+      themeVariables: {
+        darkMode: true,
+        background: '#1A1F2E',
+        primaryColor: '#7C3AED',
+        primaryTextColor: '#E2E8F0',
+        secondaryColor: '#4B5563',
+        lineColor: '#4B5563',
+        textColor: '#E2E8F0',
+      }
+    });
+
+    const renderDiagram = async () => {
+      try {
+        const { svg } = await mermaid.render(elementId, code);
+        setSvg(svg);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to render mermaid diagram:', err);
+        setError('Failed to render diagram');
+      }
+    };
+
+    renderDiagram();
+  }, [code, elementId]);
+
+  if (error) {
+    return (
+      <div className="text-red-400 bg-red-400/10 rounded-lg p-3 text-sm">
+        {error}
+        <pre className="mt-2 text-xs">{code}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="mermaid-diagram bg-[#1A1F2E] rounded-lg p-4 my-4"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+};
+
 export const ChatMessages = ({ 
   messages, 
   isCollectingSystemMessages, 
@@ -251,6 +298,87 @@ export const ChatMessages = ({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [integrations, setIntegrations] = useState<IntegrationData | null>(null);
+
+  // Helper function to extract Mermaid diagrams
+  const extractMermaidDiagrams = (text: string): { diagrams: string[], remainingText: string } => {
+    const mermaidPattern = /```mermaid\n([\s\S]*?)```/g;
+    const diagrams: string[] = [];
+    const remainingText = text.replace(mermaidPattern, (match, diagramCode) => {
+      diagrams.push(diagramCode.trim());
+      return '{{MERMAID_DIAGRAM}}';
+    });
+    
+    return { diagrams, remainingText };
+  };
+
+  // Render message with Mermaid support
+  const renderMessage = (message: ThreadMessage) => {
+    if (isUserMessage(message)) {
+      return <UserMessage key={getMessageKey(message)} message={message} />;
+    }
+    
+    if (isAssistantMessage(message)) {
+      // Process text content for Mermaid diagrams
+      const processedContent = message.content.map(content => {
+        if (isTextContentPart(content)) {
+          const { diagrams, remainingText } = extractMermaidDiagrams(content.text);
+          if (diagrams.length > 0) {
+            // Split text by diagram placeholders and interleave with Mermaid components
+            const parts = remainingText.split('{{MERMAID_DIAGRAM}}');
+            const processedText = parts.reduce((acc, part, index) => {
+              if (index === 0) return part;
+              const diagram = diagrams[index - 1];
+              return acc + `\n\n\`\`\`mermaid\n${diagram}\n\`\`\`\n\n` + part;
+            }, '');
+            
+            return {
+              type: 'text' as const,
+              text: processedText
+            };
+          }
+        }
+        return content;
+      }) as ThreadAssistantContentPart[];
+
+      // Group tool calls by their ID to maintain execution context
+      const toolCallsById = new Map<string, ToolCall[]>();
+      
+      // Process all tool calls
+      message.tool_calls?.forEach(call => {
+        const existingCalls = toolCallsById.get(call.id) || [];
+        toolCallsById.set(call.id, [...existingCalls, call]);
+      });
+
+      // Convert the grouped calls back to a flat array, maintaining order
+      const groupedToolCalls = Array.from(toolCallsById.values()).flat();
+      
+      return (
+        <AssistantMessage 
+          key={getMessageKey(message)} 
+          message={{
+            ...message,
+            content: processedContent,
+            tool_calls: groupedToolCalls
+          }}
+          isSystem={false}
+          sourceMetadata={sourceMetadata || undefined}
+        />
+      );
+    }
+    
+    if (isSystemMessage(message)) {
+      return (
+        <AssistantMessage 
+          key={getMessageKey(message)} 
+          message={message} 
+          isSystem={true}
+          sourceMetadata={sourceMetadata || undefined}
+        />
+      );
+    }
+    
+    return null;
+  };
 
   useEffect(() => {
     const fetchSourcesAndMetadata = async () => {
@@ -651,52 +779,6 @@ export const ChatMessages = ({
       </div>
     );
   }
-
-  // Update the message rendering to handle tool_init events
-  const renderMessage = (message: ThreadMessage) => {
-    if (isUserMessage(message)) {
-      return <UserMessage key={message.id} message={message} />;
-    }
-    
-    if (isAssistantMessage(message)) {
-      // Group tool calls by their ID to maintain execution context
-      const toolCallsById = new Map<string, ToolCall[]>();
-      
-      // Process all tool calls
-      message.tool_calls?.forEach(call => {
-        const existingCalls = toolCallsById.get(call.id) || [];
-        toolCallsById.set(call.id, [...existingCalls, call]);
-      });
-
-      // Convert the grouped calls back to a flat array, maintaining order
-      const groupedToolCalls = Array.from(toolCallsById.values()).flat();
-      
-      return (
-        <AssistantMessage 
-          key={message.id} 
-          message={{
-            ...message,
-            tool_calls: groupedToolCalls
-          }}
-          isSystem={false}
-          sourceMetadata={sourceMetadata || undefined}
-        />
-      );
-    }
-    
-    if (isSystemMessage(message)) {
-      return (
-        <AssistantMessage 
-          key={message.id} 
-          message={message} 
-          isSystem={true}
-          sourceMetadata={sourceMetadata || undefined}
-        />
-      );
-    }
-    
-    return null;
-  };
 
   return (
     <div className="flex-1 overflow-y-auto relative">

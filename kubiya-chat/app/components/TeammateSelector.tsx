@@ -6,14 +6,7 @@ import { Search, X, Info } from 'lucide-react';
 import { Button } from './button';
 import { TeammateDetailsModal } from './shared/TeammateDetailsModal';
 
-interface Teammate {
-  uuid: string;
-  name: string;
-  description?: string;
-  llm_model?: string;
-  instruction_type?: string;
-}
-
+// Avatar generation constants
 const AVATAR_IMAGES = [
   'Accountant.png',
   'Chemist-scientist.png',
@@ -27,9 +20,17 @@ const AVATAR_IMAGES = [
   'capitan-3.png'
 ];
 
-function generateAvatarUrl(teammate: Teammate) {
-  // Create a more random distribution using multiple properties
-  const seed = (teammate.uuid + teammate.name).split('').reduce((acc, char, i) => 
+interface Teammate {
+  uuid: string;
+  name: string;
+  description?: string;
+  llm_model?: string;
+  instruction_type?: string;
+}
+
+// Export the generateAvatarUrl function
+export function generateAvatarUrl(input: { uuid: string; name: string }): string {
+  const seed = (input.uuid + input.name).split('').reduce((acc: number, char: string, i: number) => 
     acc + (char.charCodeAt(0) * (i + 1)), 0);
   const randomIndex = Math.abs(Math.sin(seed) * AVATAR_IMAGES.length) | 0;
   return `/images/avatars/${AVATAR_IMAGES[randomIndex]}`;
@@ -135,7 +136,7 @@ export function TeammateSelector() {
               >
                 <div className="relative flex-shrink-0">
                   <img
-                    src={generateAvatarUrl(teammate)}
+                    src={generateAvatarUrl({ uuid: teammate.uuid, name: teammate.name })}
                     alt={teammate.name}
                     className="w-9 h-9 rounded-lg transform transition-all duration-300 
                              group-hover:scale-105 group-hover:shadow-md group-hover:shadow-purple-500/10

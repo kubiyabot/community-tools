@@ -13,7 +13,6 @@ import { Info, Clock, Calendar, CheckCircle2, RotateCcw, AlertCircle, ChevronRig
 import { Button } from '@/app/components/button';
 import { TeammateDetailsModal } from '../shared/TeammateDetailsModal';
 import { TaskSchedulingModal } from '../TaskSchedulingModal';
-import { ScheduledTaskCard } from '../ScheduledTaskCard';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -26,6 +25,8 @@ import { toast } from "@/app/components/ui/use-toast";
 import { ScheduledTasksModal } from '../ScheduledTasksModal';
 import { Badge } from "@/app/components/ui/badge";
 import { MessageSquare } from 'lucide-react';
+import { ActivityHub } from '../activity/ActivityHub';
+import { Task } from '../activity/types';
 
 interface ThreadInfo {
   id: string;
@@ -126,6 +127,20 @@ const getTaskStats = (tasks: ScheduledTask[]) => {
   };
 };
 
+// Add interface for tool arguments
+interface ToolArguments {
+  [key: string]: unknown;
+}
+
+// Add task mapping function
+const mapScheduledTasksToTasks = (scheduledTasks: ScheduledTask[]): Task[] => {
+  return scheduledTasks.map(task => ({
+    ...task,
+    status: task.status as "completed" | "scheduled" | "pending" | "failed",
+    task_type: task.task_type || 'chat_activity'
+  }));
+};
+
 export const Chat = () => {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
@@ -148,6 +163,7 @@ export const Chat = () => {
     repeatOption?: string;
     date?: Date;
   } | undefined>(undefined);
+  const [isActivityHubOpen, setIsActivityHubOpen] = useState(false);
 
   // Get task stats
   const taskStats = useMemo(() => getTaskStats(scheduledTasks), [scheduledTasks]);
@@ -428,7 +444,7 @@ export const Chat = () => {
                     const toolMatch = eventData.message.match(/Tool: ([\w-]+)\nArguments: ({[\s\S]*})/);
                     if (toolMatch) {
                       const [_, toolName, argsString] = toolMatch;
-                      let toolArgs;
+                      let toolArgs: ToolArguments;
                       try {
                         // Clean up the args string before parsing
                         const cleanArgsString = argsString.trim();
@@ -774,9 +790,9 @@ export const Chat = () => {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setIsScheduledTasksModalOpen(true)}
+                    onClick={() => setIsActivityHubOpen(true)}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-lg min-w-[200px]",
+                      "flex items-center gap-2 px-3 py-2 rounded-lg",
                       "bg-blue-500/10 hover:bg-blue-500/20",
                       "text-blue-400 hover:text-blue-300",
                       "transition-all duration-200",
@@ -787,17 +803,11 @@ export const Chat = () => {
                     <div className="flex items-center gap-2 flex-1">
                       <Calendar className="h-4 w-4" />
                       <span className="flex-1 text-left">Tasks</span>
-                      <div className="flex items-center gap-2">
-                        {taskStats.today > 0 && (
-                          <Badge variant="default" className="bg-blue-500 text-white">
-                            {taskStats.today} today
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="border-blue-500/30 text-blue-400">
-                          {taskStats.total}
-                        </Badge>
-                        <ChevronRight className="h-4 w-4 opacity-50" />
-                      </div>
+                      {scheduledTasks.length > 0 && (
+                        <div className="flex items-center justify-center min-w-[20px] h-5 rounded-full bg-blue-500 text-white text-xs font-medium px-1.5">
+                          {scheduledTasks.length}
+                        </div>
+                      )}
                     </div>
                   </Button>
                 </TooltipTrigger>
@@ -904,6 +914,15 @@ export const Chat = () => {
           isLoading={isLoadingTasks}
           teammate={teammate}
           onScheduleSimilar={handleScheduleSimilar}
+        />
+
+        <ActivityHub
+          isOpen={isActivityHubOpen}
+          onClose={() => setIsActivityHubOpen(false)}
+          tasks={mapScheduledTasksToTasks(scheduledTasks)}
+          webhooks={[]}
+          isLoading={isLoadingTasks}
+          teammates={teammates}
         />
       </div>
     </div>

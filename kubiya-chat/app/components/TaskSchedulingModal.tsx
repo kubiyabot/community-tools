@@ -85,10 +85,22 @@ interface WebhookFlowProps {
   setWebhookProvider: (provider: WebhookProvider | null) => void;
   setEventType: (type: string) => void;
   setPromptTemplate: (template: string) => void;
-  setCurrentStep: (step: WebhookStep) => void;
+  setCurrentStep: Dispatch<SetStateAction<WebhookStep>>;
   session: any;
-  teammate: any;
+  teammate: TeammateInfo | undefined;
   standalone: boolean;
+}
+
+interface TeammateInfo {
+  uuid: string;
+  name: string;
+  team_id?: string;
+  user_id?: string;
+  org_id?: string;
+  email?: string;
+  context?: string;
+  description?: string;
+  integrations?: Array<Integration | string>;
 }
 
 interface TaskSchedulingModalProps {
@@ -665,31 +677,43 @@ function extractFieldPaths(obj: any, prefix = ''): string[] {
   return paths;
 }
 
+// Add type for teammate selection step
+type ModalStep = 'teammate' | 'method' | 'config' | 'schedule';
+
+// Add avatar generation logic
+const AVATAR_IMAGES = [
+  'Accountant.png',
+  'Chemist-scientist.png',
+  'Postman.png',
+  'Security-guard.png',
+  'builder-1.png',
+  'builder-2.png',
+  'builder-3.png',
+  'capitan-1.png',
+  'capitan-2.png',
+  'capitan-3.png'
+];
+
+interface AvatarInput {
+  uuid: string;
+  name: string;
+}
+
+function generateAvatarUrl(input: AvatarInput) {
+  const seed = (input.uuid + input.name).split('').reduce((acc: number, char: string, i: number) => 
+    acc + (char.charCodeAt(0) * (i + 1)), 0);
+  const randomIndex = Math.abs(Math.sin(seed) * AVATAR_IMAGES.length) | 0;
+  return `/images/avatars/${AVATAR_IMAGES[randomIndex]}`;
+}
+
 export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, initialData }: TaskSchedulingModalProps) {
   const { user } = useUser();
-  const { selectedTeammate, currentState } = useTeammateContext();
+  const { selectedTeammate, currentState, teammates } = useTeammateContext();
   const [hasJiraIntegration, setHasJiraIntegration] = useState(false);
 
-  // Check for JIRA integration on mount
-  useEffect(() => {
-    const checkJiraIntegration = async () => {
-      if (!teammate?.uuid) return;
-      try {
-        const response = await fetch(`/api/teammates/${teammate.uuid}/integrations`);
-        const data = await response.json();
-        setHasJiraIntegration(data?.integrations?.some((i: string | Integration) => 
-          typeof i === 'string' ? i.toLowerCase() === 'jira' : i.name.toLowerCase() === 'jira'
-        ));
-      } catch (error) {
-        console.error('Failed to check JIRA integration:', error);
-        setHasJiraIntegration(false);
-      }
-    };
-    checkJiraIntegration();
-  }, [teammate?.uuid]);
-
-  // State management
-  const [step, setStep] = useState<'method' | 'config' | 'schedule'>(initialData?.source ? 'config' : 'method');
+  // Update step state to include teammate selection
+  const [step, setStep] = useState<ModalStep>(initialData?.source ? 'config' : 'teammate');
+  const [selectedTeammateId, setSelectedTeammateId] = useState<string | undefined>(teammate?.uuid);
   const [assignmentMethod, setAssignmentMethod] = useState<'chat' | 'jira' | 'webhook'>(
     initialData?.assignmentMethod || 'chat'
   );
@@ -1021,13 +1045,20 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   }, [webhookProvider]);
 
-  // Update the step content wrapper
+  // Create a wrapper function to handle the step type conversion
+  const handleWebhookStepChange = (step: 'provider' | 'event' | 'event_example' | 'prompt' | 'webhook') => {
+    setCurrentStep(step);
+  };
+
+  // Update the WebhookFlowSection props
   const renderStepContent = () => (
     <div className={cn(
       "transform transition-all duration-300",
       isLoadingProviders ? "opacity-50" : "opacity-100"
     )}>
-      {step === 'method' ? (
+      {step === 'teammate' ? (
+        renderTeammateSelection()
+      ) : step === 'method' ? (
         renderMethodSelection()
       ) : step === 'config' ? (
         assignmentMethod === 'chat' ? (
@@ -1041,7 +1072,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
             setWebhookProvider={setWebhookProvider}
             setEventType={setEventType}
             setPromptTemplate={setPromptTemplate}
-            setCurrentStep={setCurrentStep}
+            setCurrentStep={handleWebhookStepChange as any}
             session={{
               idToken: user?.sub || '',
               user: {
@@ -1049,7 +1080,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
                 org_id: user?.org_id || undefined
               }
             }}
-            teammate={teammate}
+            teammate={teammates.find(t => t.uuid === selectedTeammateId)}
             standalone={false}
           />
         ) : null
@@ -1060,7 +1091,9 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
   );
 
   const canProceed = () => {
-    switch (step) {
+    switch (step as ModalStep) {
+      case 'teammate':
+        return !!selectedTeammateId;
       case 'method':
         return true;
       case 'config':
@@ -1078,7 +1111,9 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
   };
 
   const handleNext = () => {
-    if (step === 'method') {
+    if (step === 'teammate') {
+      setStep('method');
+    } else if (step === 'method') {
       setStep('config');
     } else if (step === 'config') {
       if (assignmentMethod === 'jira') {
@@ -1092,25 +1127,10 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
   };
 
   const handleBack = () => {
-    if (step === 'config') {
-      // Reset all states when going back to method selection
+    if (step === 'method') {
+      setStep('teammate');
+    } else if (step === 'config') {
       setStep('method');
-      setAssignmentMethod('chat');
-      setSelectedBoard('');
-      setSelectedTicket('');
-      setDescription('');
-      setAdditionalContext('');
-      setShouldComment(true);
-      setShouldTransition(true);
-      setSelectedTransition('');
-      setWebhookUrl('');
-      setWebhookProvider(null);
-      setPromptTemplate('');
-      setTicketsPage(1);
-      setTicketSearch('');
-      setCustomTime('09:00');
-      setEventType('');
-      setCurrentStep('provider');
     } else if (step === 'schedule') {
       setStep('config');
     }
@@ -1310,6 +1330,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
   };
 
   const getButtonText = () => {
+    if (step === 'teammate') return 'Continue';
     if (step === 'method') return 'Continue';
     if (step === 'config') {
       if (assignmentMethod === 'jira') return 'Create Task';
@@ -1323,19 +1344,36 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
       <div className="flex items-center gap-2 p-2 rounded-lg bg-[#141B2B] border border-[#2D3B4E]">
         <button
           onClick={() => {
-            if (step !== 'method') handleBack();
+            if (step !== 'teammate') handleBack();
           }}
           className={cn(
             "flex items-center rounded-full px-3 py-1 transition-all",
-            step === 'method'
+            step === 'teammate'
               ? "bg-emerald-500 hover:bg-emerald-600 text-white"
               : "border border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400"
           )}
         >
-          <ListTodo className="h-3 w-3 mr-1" />
-          Task Type
+          <Activity className="h-3 w-3 mr-1" />
+          Teammate
         </button>
-        {step !== 'method' && (
+        {step !== 'teammate' && (
+          <>
+            <ChevronRight className="h-4 w-4 text-slate-600" />
+            <button
+              onClick={() => step !== 'method' && setStep('method')}
+              className={cn(
+                "flex items-center rounded-full px-3 py-1 transition-all",
+                step === 'method'
+                  ? "bg-emerald-500 hover:bg-emerald-600 text-white"
+                  : "border border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400"
+              )}
+            >
+              <ListTodo className="h-3 w-3 mr-1" />
+              Task Type
+            </button>
+          </>
+        )}
+        {step !== 'teammate' && step !== 'method' && (
           <>
             <ChevronRight className="h-4 w-4 text-slate-600" />
             <div className={cn(
@@ -1373,14 +1411,110 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   };
 
+  // Add teammate selection rendering
+  const renderTeammateSelection = () => (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Activity className="h-5 w-5 text-purple-400 flex-shrink-0" />
+        <div>
+          <h3 className="text-base font-medium text-slate-200">
+            Who should perform this task?
+          </h3>
+          <p className="text-sm text-slate-400 mt-1">
+            Choose a teammate to handle this task
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        {teammates.map((t) => (
+          <button
+            key={t.uuid}
+            onClick={() => setSelectedTeammateId(t.uuid)}
+            className={cn(
+              "relative p-4 rounded-lg text-left transition-all group",
+              "border hover:border-opacity-30",
+              selectedTeammateId === t.uuid
+                ? "bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30"
+                : "bg-gradient-to-br from-slate-800 to-slate-900 border-[#2D3B4E] hover:from-purple-500/10 hover:to-purple-500/5"
+            )}
+          >
+            <div className="flex items-start gap-3">
+              <div className="relative flex-shrink-0">
+                <img
+                  src={generateAvatarUrl({ uuid: t.uuid, name: t.name })}
+                  alt={t.name}
+                  className="w-12 h-12 rounded-lg transform transition-all duration-300 
+                           group-hover:scale-105 group-hover:shadow-md group-hover:shadow-purple-500/10
+                           object-cover"
+                />
+                {t.integrations && t.integrations.length > 0 && (
+                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-purple-500 
+                               rounded-full ring-2 ring-[#1E293B] shadow-lg" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-slate-200">{t.name}</div>
+                {t.description && (
+                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{t.description}</p>
+                )}
+                {t.integrations && t.integrations.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex -space-x-1.5">
+                      {t.integrations.slice(0, 3).map((integration: Integration | string, idx: number) => {
+                        const type = typeof integration === 'string' ? integration.toLowerCase() : integration.type?.toLowerCase() || integration.name.toLowerCase();
+                        return (
+                          <div 
+                            key={idx}
+                            className="w-5 h-5 rounded-full bg-[#1A2438] border border-[#2D3B4E] flex items-center justify-center overflow-hidden"
+                            title={type.charAt(0).toUpperCase() + type.slice(1)}
+                          >
+                            {type === 'jira' && (
+                              <img src="https://wac-cdn.atlassian.com/assets/img/favicons/atlassian/favicon-32x32.png" alt="JIRA" className="w-3.5 h-3.5" />
+                            )}
+                            {type === 'slack' && (
+                              <img src="https://upload.wikimedia.org/wikipedia/commons/d/d5/Slack_icon_2019.svg" alt="Slack" className="w-3.5 h-3.5" />
+                            )}
+                            {type === 'github' && (
+                              <img src="https://github.githubassets.com/favicons/favicon.svg" alt="GitHub" className="w-3.5 h-3.5" />
+                            )}
+                            {type === 'gitlab' && (
+                              <img src="https://gitlab.com/uploads/-/system/group/avatar/6543/gitlab-logo-square.png" alt="GitLab" className="w-3.5 h-3.5" />
+                            )}
+                          </div>
+                        );
+                      })}
+                      {t.integrations.length > 3 && (
+                        <div 
+                          className="w-5 h-5 rounded-full bg-[#1A2438] border border-[#2D3B4E] flex items-center justify-center"
+                          title={`${t.integrations.length - 3} more integration${t.integrations.length - 3 !== 1 ? 's' : ''}`}
+                        >
+                          <span className="text-[10px] text-slate-400">+{t.integrations.length - 3}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      {t.integrations.length} integration{t.integrations.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <Dialog 
       open={isOpen} 
       onOpenChange={(open) => {
         if (!open) {
           // Reset all states when dialog closes
-          setStep('method');
+          setStep('teammate');
           setAssignmentMethod('chat');
+          setSelectedTeammateId(teammate?.uuid);
           setSelectedBoard('');
           setSelectedTicket('');
           setDescription('');
@@ -1438,7 +1572,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
 
         <DialogFooter className="p-8 border-t border-[#2D3B4E] flex-shrink-0">
           <div className="flex justify-between w-full">
-            {step !== 'method' && (
+            {step !== 'teammate' && (
               <Button
                 variant="outline"
                 size="lg"
@@ -1447,7 +1581,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
                 disabled={isBackDisabled()}
               >
                 <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to {step === 'config' ? 'Task Type' : 'Configuration'}
+                Back to {step === 'config' ? 'Task Type' : 'Teammate'}
               </Button>
             )}
             {(assignmentMethod !== 'webhook' || step !== 'config') && (

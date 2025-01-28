@@ -2,12 +2,29 @@
 
 import ReactMarkdown from 'react-markdown';
 import { Copy, Check, Terminal, Settings2, MoreHorizontal } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Components } from 'react-markdown';
 import type { ReactNode } from 'react';
 import type { HTMLProps } from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
+import mermaid from 'mermaid';
+
+// Initialize mermaid with dark theme
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  securityLevel: 'loose',
+  themeVariables: {
+    darkMode: true,
+    background: '#1A1F2E',
+    primaryColor: '#7C3AED',
+    primaryTextColor: '#E2E8F0',
+    secondaryColor: '#4B5563',
+    lineColor: '#4B5563',
+    textColor: '#E2E8F0',
+  }
+});
 
 interface MarkdownTextProps {
   content: string;
@@ -25,7 +42,12 @@ interface CodePreferences {
   fontSize: number;
 }
 
-const CodeBlock = ({ children, className }: { children: ReactNode; className?: string }) => {
+type CodeBlockProps = {
+  children: ReactNode;
+  className?: string;
+};
+
+const CodeBlock = ({ children, className }: CodeBlockProps) => {
   const [copied, setCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [showPreferences, setShowPreferences] = useState(false);
@@ -289,34 +311,67 @@ const CodeBlock = ({ children, className }: { children: ReactNode; className?: s
   );
 };
 
+// Add MermaidDiagram component
+const MermaidDiagram = ({ code }: { code: string }) => {
+  const [svg, setSvg] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const elementId = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
+
+  useEffect(() => {
+    const renderDiagram = async () => {
+      try {
+        const { svg } = await mermaid.render(elementId, code);
+        setSvg(svg);
+        setError(null);
+      } catch (err) {
+        console.error('Failed to render mermaid diagram:', err);
+        setError('Failed to render diagram');
+      }
+    };
+
+    renderDiagram();
+  }, [code, elementId]);
+
+  if (error) {
+    return (
+      <div className="text-red-400 bg-red-400/10 rounded-lg p-3 text-sm">
+        {error}
+        <pre className="mt-2 text-xs">{code}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="mermaid-diagram bg-[#1A1F2E] rounded-lg p-4 my-4"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+};
+
 export const MarkdownText = ({ content, isStreaming }: MarkdownTextProps) => {
   const components: Components = {
     code(props: CodeProps) {
-      const { className, children } = props;
-      const match = /language-(\w+)/.exec(className || '');
-      
-      // If we have a language class, it's a code block
-      if (match) {
+      const { children, className } = props;
+      const language = className?.split('-')[1];
+
+      // Handle Mermaid diagrams
+      if (language === 'mermaid') {
+        return <MermaidDiagram code={String(children).replace(/\n$/, '')} />;
+      }
+
+      // Handle other code blocks
+      if (className) {
         return (
           <CodeBlock className={className}>
-            {String(children).replace(/\n$/, '')}
+            {children}
           </CodeBlock>
         );
       }
 
-      // Check if this is a multiline code block without language
-      const content = String(children);
-      if (content.includes('\n')) {
-        return (
-          <CodeBlock>
-            {content.replace(/\n$/, '')}
-          </CodeBlock>
-        );
-      }
-
-      // Otherwise, it's an inline code block
+      // Inline code
       return (
-        <code className="bg-[#1A1F2E] px-1.5 py-0.5 rounded text-[#7C3AED] text-sm">
+        <code className="px-1.5 py-0.5 rounded-md bg-[#2D3B4E] text-[#E2E8F0] font-mono text-sm">
           {children}
         </code>
       );
@@ -415,9 +470,11 @@ export const MarkdownText = ({ content, isStreaming }: MarkdownTextProps) => {
   };
 
   return (
-    <ReactMarkdown components={components}>
-      {content}
-    </ReactMarkdown>
+    <div className="prose prose-invert prose-sm max-w-none">
+      <ReactMarkdown components={components}>
+        {content}
+      </ReactMarkdown>
+    </div>
   );
 };
 

@@ -49,6 +49,7 @@ export function WebhookSetup({
 }: WebhookSetupProps) {
   const [testPayload, setTestPayload] = useState('');
   const [isCustomPayload, setIsCustomPayload] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
 
   if (!selectedProvider) return null;
   const event = selectedProvider.events.find((e: WebhookEvent) => e.type === selectedEvent);
@@ -80,34 +81,81 @@ export function WebhookSetup({
     switch (selectedProvider.id) {
       case 'github':
         instructions.push(
-          <ol key="github" className="list-decimal list-inside space-y-2 text-sm text-slate-400">
-            <li>Go to your repository settings</li>
-            <li>Click on "Webhooks" in the left sidebar</li>
-            <li>Click "Add webhook"</li>
-            <li>Set Payload URL to: <code className="text-emerald-400">{webhookUrl}</code></li>
-            <li>Set Content type to: <code className="text-emerald-400">application/json</code></li>
-            <li>Select events: <code className="text-emerald-400">{event.name}</code></li>
-            <li>Click "Add webhook"</li>
-          </ol>
+          <div key="github" className="space-y-4">
+            <ol className="list-decimal list-inside space-y-2 text-sm text-slate-400">
+              <li>Go to your repository settings</li>
+              <li>Click on "Webhooks" in the left sidebar</li>
+              <li>Click "Add webhook"</li>
+              <li>Set Payload URL to: <code className="text-emerald-400">{webhookUrl}</code></li>
+              <li>Set Content type to: <code className="text-emerald-400">application/json</code></li>
+              <li>Select events: <code className="text-emerald-400">{event.name}</code></li>
+              <li>Click "Add webhook"</li>
+            </ol>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open('https://github.com/settings/webhooks/new', '_blank')}
+                className="text-xs"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" />
+                Open GitHub Settings
+              </Button>
+            </div>
+          </div>
         );
         break;
       case 'gitlab':
         instructions.push(
-          <ol key="gitlab" className="list-decimal list-inside space-y-2 text-sm text-slate-400">
-            <li>Go to your project's Settings {'->'} Webhooks</li>
-            <li>Enter URL: <code className="text-emerald-400">{webhookUrl}</code></li>
-            <li>Select trigger: <code className="text-emerald-400">{event.name}</code></li>
-            <li>Click "Add webhook"</li>
-          </ol>
+          <div key="gitlab" className="space-y-4">
+            <ol className="list-decimal list-inside space-y-2 text-sm text-slate-400">
+              <li>Go to your project's Settings {'->'} Webhooks</li>
+              <li>Enter URL: <code className="text-emerald-400">{webhookUrl}</code></li>
+              <li>Select trigger: <code className="text-emerald-400">{event.name}</code></li>
+              <li>Click "Add webhook"</li>
+            </ol>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open('https://gitlab.com/-/profile/applications', '_blank')}
+                className="text-xs"
+              >
+                <ExternalLink className="w-3 h-3 mr-1" />
+                Open GitLab Settings
+              </Button>
+            </div>
+          </div>
         );
         break;
       default:
         instructions.push(
-          <ol key="default" className="list-decimal list-inside space-y-2 text-sm text-slate-400">
-            <li>Configure your webhook endpoint: <code className="text-emerald-400">{webhookUrl}</code></li>
-            <li>Set Content-Type header: <code className="text-emerald-400">application/json</code></li>
-            <li>Send POST requests with JSON payload</li>
-          </ol>
+          <div key="default" className="space-y-4">
+            <ol className="list-decimal list-inside space-y-2 text-sm text-slate-400">
+              <li>Configure your webhook endpoint: <code className="text-emerald-400">{webhookUrl}</code></li>
+              <li>Set Content-Type header: <code className="text-emerald-400">application/json</code></li>
+              <li>Send POST requests with JSON payload</li>
+            </ol>
+            <div className="mt-4 p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="text-sm font-medium text-slate-200">Example cURL Command</h5>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyCurl}
+                  className="h-8 text-xs text-slate-400 hover:text-emerald-400"
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  Copy
+                </Button>
+              </div>
+              <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap break-all">
+                {`curl -X POST ${webhookUrl} \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(event.example, null, 2)}'`}
+              </pre>
+            </div>
+          </div>
         );
     }
 
@@ -128,7 +176,7 @@ export function WebhookSetup({
     }
 
     return instructions;
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -186,42 +234,11 @@ export function WebhookSetup({
                   </CollapsibleContent>
                 </Collapsible>
 
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E] hover:bg-[#1E293B]/80 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="h-4 w-4 text-emerald-400" />
-                      <h4 className="text-sm font-medium text-slate-200">cURL Example</h4>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-4">
-                    <div className="p-4 rounded-lg bg-[#141B2B] border border-[#2D3B4E]">
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="text-sm font-medium text-slate-300">Test with cURL</h5>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCopyCurl}
-                          className="h-8 text-sm text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all"
-                        >
-                          <Copy className="h-4 w-4 mr-2" />
-                          Copy
-                        </Button>
-                      </div>
-                      <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap overflow-auto">
-{`curl -X POST ${webhookUrl} \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(event.example, null, 2)}'`}
-                      </pre>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                <Collapsible>
+                <Collapsible defaultOpen>
                   <CollapsibleTrigger className="flex items-center justify-between w-full p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E] hover:bg-[#1E293B]/80 transition-colors">
                     <div className="flex items-center gap-2">
                       <ExternalLink className="h-4 w-4 text-emerald-400" />
-                      <h4 className="text-sm font-medium text-slate-200">{selectedProvider.name} Setup Guide</h4>
+                      <h4 className="text-sm font-medium text-slate-200">Setup Instructions</h4>
                     </div>
                     <ChevronDown className="h-4 w-4 text-slate-400" />
                   </CollapsibleTrigger>
@@ -262,7 +279,7 @@ export function WebhookSetup({
                     </pre>
                   )}
 
-                  <div className="mt-4">
+                  <div className="mt-4 flex items-center gap-2">
                     <Button
                       onClick={onTestWebhook}
                       disabled={isTestingWebhook}
@@ -270,6 +287,15 @@ export function WebhookSetup({
                     >
                       <PlayCircle className="h-4 w-4 mr-2" />
                       {isTestingWebhook ? 'Testing...' : 'Test Webhook'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyCurl}
+                      className="text-xs"
+                    >
+                      <Terminal className="w-3 h-3 mr-1" />
+                      Copy as cURL
                     </Button>
                   </div>
                 </div>

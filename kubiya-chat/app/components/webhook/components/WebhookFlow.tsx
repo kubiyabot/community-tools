@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '../../ui/button';
 import { toast } from '../../ui/use-toast';
 import { WebhookProvider, WebhookEvent } from '../providers';
 import { cn } from '../../../lib/utils';
 import Editor from '@monaco-editor/react';
-import { AlertCircle, Check, Copy, FileJson, Info } from 'lucide-react';
+import { AlertCircle, Check, Copy, FileJson, Info, AlertTriangle } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -26,10 +26,54 @@ export function WebhookFlow({
   onValidationChange
 }: WebhookFlowProps) {
   const [customJson, setCustomJson] = useState<string>(
-    JSON.stringify(selectedEvent.example, null, 2)
+    selectedEvent?.example ? JSON.stringify(selectedEvent.example, null, 2) : ''
   );
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [showHints, setShowHints] = useState(true);
+  const [hasAttemptedContinue, setHasAttemptedContinue] = useState(false);
+
+  useEffect(() => {
+    // Reset the attempted continue flag when provider changes
+    if (selectedProvider) {
+      setHasAttemptedContinue(false);
+    }
+  }, [selectedProvider]);
+
+  useEffect(() => {
+    // Only validate and show errors after user has attempted to continue
+    const isSelectionValid = Boolean(selectedProvider && selectedEvent);
+    onValidationChange?.(isSelectionValid);
+  }, [selectedProvider, selectedEvent, hasAttemptedContinue]);
+
+  // Show event selection if provider is selected
+  if (selectedProvider && !selectedEvent) {
+    return (
+      <div className="space-y-6">
+        <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+          <div className="flex items-center gap-2 text-emerald-400">
+            <Info className="h-4 w-4" />
+            <p className="text-sm">Great! Now please select an event type for {selectedProvider.name}.</p>
+          </div>
+        </div>
+        
+        {/* Event selection will be rendered here by the parent component */}
+      </div>
+    );
+  }
+
+  // Show error only if user has attempted to continue without both selections
+  if (hasAttemptedContinue && (!selectedProvider || !selectedEvent)) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+          <div className="flex items-center gap-2 text-yellow-300">
+            <AlertTriangle className="h-4 w-4" />
+            <p className="text-sm">Please select both a webhook provider and an event type to continue.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const validateJson = useCallback((value: string) => {
     try {

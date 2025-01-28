@@ -1,36 +1,46 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@auth0/nextjs-auth0/edge';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+
+// CORS headers for preflight requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return new Response(JSON.stringify({}), { 
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json'
+    }
+  });
+}
 
 interface TeammateResponse {
   sources?: string[];
 }
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
   try {
-    // Get the session and extract the access token
-    const res = NextResponse.next();
-    const session = await getSession(req, res);
+    // Get the session using Auth0's Edge API with both request and response
+    const response = NextResponse.next();
+    const session = await getSession(request, response);
     
     // Await the params to fix the NextJS dynamic route issue
-    const teammateId = await params.id;
+    const { id: teammateId } = await context.params;
     
     if (!session?.idToken) {
       console.error('Sources endpoint - No ID token found');
-      return new Response(JSON.stringify({ 
-        error: 'Not authenticated',
-        details: 'No ID token found'
-      }), { 
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
       });
     }
 
@@ -51,7 +61,7 @@ export async function GET(
         'Pragma': 'no-cache',
         'X-Organization-ID': session.user?.org_id || '',
         'X-Kubiya-Client': 'chat-ui'
-      },
+      }
     });
 
     if (!teammateResponse.ok) {
@@ -67,13 +77,23 @@ export async function GET(
 
     if (sourceIds.length === 0) {
       console.log('Sources endpoint - No sources found for teammate:', teammateId);
-      return new Response(JSON.stringify([]), {
+      const emptyResponse = new Response(JSON.stringify([]), {
         status: 200,
         headers: {
+          ...corsHeaders,
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store'
         }
       });
+
+      // Copy any session cookies
+      response.headers.forEach((value, key) => {
+        if (key.toLowerCase() === 'set-cookie') {
+          emptyResponse.headers.append(key, value);
+        }
+      });
+
+      return emptyResponse;
     }
 
     // Log success with source IDs
@@ -94,25 +114,38 @@ export async function GET(
       firstSource: sources[0]
     });
 
-    return new Response(JSON.stringify(sources), {
+    // Create response with session cookies
+    const responseWithSources = new Response(JSON.stringify(sources), {
       status: 200,
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
       }
     });
+
+    // Copy any session cookies
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        responseWithSources.headers.append(key, value);
+      }
+    });
+
+    return responseWithSources;
   } catch (error) {
     console.error('Sources endpoint error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      params: await params
+      params: await context.params
     });
+
     return new Response(JSON.stringify({ 
       error: 'Failed to fetch sources',
       details: error instanceof Error ? error.message : 'Unknown error'
     }), { 
       status: 500,
       headers: {
+        ...corsHeaders,
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
       }

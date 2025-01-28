@@ -10,7 +10,10 @@ export function ProviderSelection({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h3 className="text-lg font-medium text-slate-200">Select a Provider</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-medium text-slate-200">Select a Provider</h3>
+          <span className="text-xs text-red-400">*Required</span>
+        </div>
         <p className="text-sm text-slate-400">
           Choose a provider to receive events from. Each provider has different types of events you can listen to.
         </p>
@@ -29,10 +32,10 @@ export function ProviderSelection({
               events: provider.events
             })}
             className={cn(
-              "h-auto p-4 flex flex-col items-center gap-3 transition-all hover:border-emerald-500/30 hover:bg-emerald-500/10",
+              "h-auto p-4 flex flex-col items-center gap-3 transition-all",
               selectedProvider?.id === type
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                : "bg-[#1E293B] border-[#2D3B4E] text-slate-200"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 ring-2 ring-emerald-500/20"
+                : "bg-[#1E293B] border-[#2D3B4E] text-slate-200 hover:border-emerald-500/30 hover:bg-emerald-500/10"
             )}
           >
             <provider.icon className={cn(

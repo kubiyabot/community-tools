@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@auth0/nextjs-auth0/edge';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -12,31 +12,33 @@ const corsHeaders = {
 };
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+  return new Response(JSON.stringify({}), { 
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json'
+    }
+  });
 }
 
-export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: { params: { id: string } }) {
   try {
-    const res = new NextResponse();
-    const session = await getSession(req, res);
-
+    // Get the session using Auth0's Edge API with both request and response
+    const response = NextResponse.next();
+    const session = await getSession(request, response);
+    
     if (!session?.idToken) {
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        message: 'No session found'
-      }, { 
+      console.error('Capabilities endpoint - No ID token found');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
-        headers: {
+        headers: { 
           ...corsHeaders,
-          'Cache-Control': 'no-store'
-        }
+          'Content-Type': 'application/json' 
+        },
       });
     }
 
-    const teammateId = context.params.id;
+    // Await the params to fix the NextJS dynamic route issue
+    const { id: teammateId } = await context.params;
     const baseUrl = process.env.NEXT_PUBLIC_KUBIYA_API_URL || 'https://api.kubiya.ai/api/v1';
 
     // Fetch teammate details
@@ -44,9 +46,10 @@ export async function GET(
       headers: {
         'Authorization': `Bearer ${session.idToken}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      cache: 'no-store'
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
     });
 
     if (!teammateResponse.ok) {
@@ -65,20 +68,23 @@ export async function GET(
       description: teammate.description
     };
 
-    return NextResponse.json(capabilities, {
+    return new Response(JSON.stringify(capabilities), {
+      status: 200,
       headers: {
         ...corsHeaders,
+        'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
       }
     });
   } catch (error) {
     console.error('Capabilities error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch capabilities' },
+    return new Response(
+      JSON.stringify({ error: 'Failed to fetch capabilities' }),
       { 
         status: 500,
         headers: {
           ...corsHeaders,
+          'Content-Type': 'application/json',
           'Cache-Control': 'no-store'
         }
       }

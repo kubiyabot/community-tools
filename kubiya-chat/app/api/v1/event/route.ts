@@ -71,7 +71,17 @@ export async function GET(req: NextRequest) {
     }
 
     const webhooks = await response.json();
-    return NextResponse.json(webhooks);
+    
+    // Map webhooks to include teammate information
+    const mappedWebhooks = webhooks.map((webhook: any) => ({
+      ...webhook,
+      teammate: webhook.agent_id ? {
+        uuid: webhook.agent_id,
+        name: webhook.agent_name || 'Unknown Agent'
+      } : undefined
+    }));
+    
+    return NextResponse.json(mappedWebhooks);
   } catch (error) {
     console.error('Error listing webhooks:', error);
     return NextResponse.json(

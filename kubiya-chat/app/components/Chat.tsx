@@ -251,33 +251,12 @@ export const Chat = () => {
             <h1 className="text-lg font-medium text-white">{teammate?.name}</h1>
             <Button
               variant="ghost"
-              size="sm"
-              className="text-slate-400 hover:text-white p-1 h-auto"
-              onClick={() => setIsDetailsModalOpen(true)}
-            >
-              <Info className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSchedulingModalOpen(true)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg",
-                "bg-purple-500/10 hover:bg-purple-500/20",
-                "text-purple-400 hover:text-purple-300",
-                "transition-all duration-200",
-                "border border-purple-500/20 hover:border-purple-500/30",
-                "cursor-pointer"
-              )}
-            >
-              <Clock className="h-4 w-4" />
-              <span>Schedule Task</span>
-            </Button>
-            
+                size="sm"
+                className="text-slate-400 hover:text-white p-1 h-auto"
+                onClick={() => setIsDetailsModalOpen(true)}
+              >
+                <Info className="h-4 w-4" />
+              </Button>
             <TooltipProvider>
               <Tooltip delayDuration={300}>
                 <TooltipTrigger asChild>
