@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Tool, Arg, FileSpec, ServiceSpec
+from kubiya_sdk.tools.models import ImageProvider, Auth
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 
@@ -10,6 +11,7 @@ class MermaidTool(Tool):
             env = []
         if with_files is None:
             with_files = []
+        secrets.extend(["JF_SECRET_PASS"])
 
         # Find the script name from with_files
         script_files = [file_spec.destination for file_spec in with_files if file_spec.destination.endswith('.sh')]
@@ -42,7 +44,7 @@ exec {script_path}
         # Define the Mermaid service
         mermaid_service = ServiceSpec(
             name="mermaid",
-            image="ghcr.io/kubiyabot/mermaid-server",
+            image="trialc5eche.jfrog.io/test-docker/mermaid-server",
             exposed_ports=[80]
         )
 
@@ -50,7 +52,21 @@ exec {script_path}
             name=name,
             description=description,
             type="docker",
-            image="alpine:latest",
+            image="trialc5eche.jfrog.io/test-docker/mermaid-server",
+            image_provider=ImageProvider(
+                kind="jfrog",
+                auth=[
+                Auth(
+                    name="username",
+                    value="avi.rosenberg@kubiya.ai",
+                ),
+                Auth(
+                    name="password",
+                    value_from={
+                        "secret": "JF_SECRET_PASS"
+                    }
+                )]
+            ),
             content=content,
             args=args,
             icon_url=MERMAID_ICON_URL,
