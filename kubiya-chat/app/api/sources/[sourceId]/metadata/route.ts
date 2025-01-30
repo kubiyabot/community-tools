@@ -12,9 +12,6 @@ export async function GET(
     const res = NextResponse.next();
     const session = await getSession(req, res);
     
-    // Await the params to fix the NextJS dynamic route issue
-    const sourceId = await params.sourceId;
-    
     if (!session?.idToken) {
       console.error('Source metadata endpoint - No ID token found');
       return new Response(JSON.stringify({ 
@@ -29,45 +26,34 @@ export async function GET(
       });
     }
 
-    if (!sourceId) {
-      console.error('Source metadata endpoint - No source ID provided');
-      return new Response(JSON.stringify({ 
-        error: 'Bad Request',
-        details: 'Source ID is required'
-      }), { 
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
-    }
-
     // Log request details
     console.log('Source metadata endpoint - Request details:', {
-      sourceId,
+      sourceId: params.sourceId,
       hasToken: !!session.idToken,
       orgId: session.user?.org_id
     });
 
-    // Fetch metadata directly from the sources API
-    const metadataResponse = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}/metadata`, {
-      headers: {
-        'Authorization': `Bearer ${session.idToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'X-Organization-ID': session.user?.org_id || '',
-        'X-Kubiya-Client': 'chat-ui'
-      },
-    });
+    // Fetch source metadata from the API
+    const metadataResponse = await fetch(
+      `https://api.kubiya.ai/api/v1/sources/${params.sourceId}/metadata`,
+      {
+        headers: {
+          'Authorization': `Bearer ${session.idToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'X-Organization-ID': session.user?.org_id || '',
+          'X-Kubiya-Client': 'chat-ui'
+        },
+      }
+    );
 
     if (!metadataResponse.ok) {
       console.error('Source metadata endpoint - Failed to fetch metadata:', {
+        sourceId: params.sourceId,
         status: metadataResponse.status,
-        statusText: metadataResponse.statusText,
-        url: metadataResponse.url
+        statusText: metadataResponse.statusText
       });
       throw new Error(`Failed to fetch source metadata: ${await metadataResponse.text()}`);
     }
@@ -76,20 +62,11 @@ export async function GET(
 
     // Log success
     console.log('Source metadata endpoint - Successfully fetched metadata:', {
-      sourceId,
+      sourceId: params.sourceId,
       toolsCount: metadata.tools?.length || 0
     });
 
-    // Ensure we have a valid tools array and metadata object
-    const response = {
-      sourceId,
-      metadata: {
-        tools: Array.isArray(metadata.tools) ? metadata.tools : [],
-        ...(metadata.metadata || {})
-      }
-    };
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify(metadata), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -98,9 +75,9 @@ export async function GET(
     });
   } catch (error) {
     console.error('Source metadata endpoint error:', {
+      sourceId: params.sourceId,
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      params: await params
+      stack: error instanceof Error ? error.stack : undefined
     });
     return new Response(JSON.stringify({ 
       error: 'Failed to fetch source metadata',

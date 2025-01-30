@@ -35,19 +35,19 @@ const backendApi = async ({ messages, abortSignal }: any) => {
 
   return {
     async *[Symbol.asyncIterator]() {
-      const decoder = new TextDecoder();
-      let buffer = '';
+  const decoder = new TextDecoder();
+  let buffer = '';
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
           if (done) break;
 
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-          for (const line of lines) {
+      for (const line of lines) {
             const trimmedLine = line.trim();
             if (!trimmedLine || !trimmedLine.startsWith('data: ')) continue;
             
@@ -55,13 +55,13 @@ const backendApi = async ({ messages, abortSignal }: any) => {
             if (data === '[DONE]') {
               yield { type: 'done' } as StreamEvent;
               return;
-            }
-            
-            try {
+          }
+
+          try {
               const event = JSON.parse(data) as KubiyaEvent;
-              console.log('[SSE] Parsed event:', {
-                type: event.type,
-                id: event.id,
+            console.log('[SSE] Parsed event:', { 
+              type: event.type, 
+              id: event.id, 
                 messageLength: event.message?.length,
                 hasToolName: 'name' in event,
                 hasArguments: 'arguments' in event,
@@ -116,7 +116,7 @@ const MyModelAdapter: ChatModelAdapter = {
 
       if (event.type === 'msg') {
         text = event.text || '';
-        yield {
+          yield {
           content: [{ type: "text", text }],
           isComplete: false
         };

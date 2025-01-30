@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo, useMemo } from 'react';
 import { useTeammateContext } from '../MyRuntimeProvider';
 import { Search, X, Info } from 'lucide-react';
 import { Button } from './button';
 import { TeammateDetailsModal } from './shared/TeammateDetailsModal';
+import { useEntity } from '@/app/providers/EntityProvider';
 
 // Avatar generation constants
 const AVATAR_IMAGES = [
@@ -36,13 +37,23 @@ export function generateAvatarUrl(input: { uuid: string; name: string }): string
   return `/images/avatars/${AVATAR_IMAGES[randomIndex]}`;
 }
 
-export function TeammateSelector() {
+export const TeammateSelector = memo(function TeammateSelector({ onSelect, selectedId }: {
+  onSelect: (id: string) => void;
+  selectedId?: string;
+}) {
+  const { users, groups, isLoading } = useEntity();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedTeammateDetails, setSelectedTeammateDetails] = useState<Teammate | null>(null);
   const [capabilities, setCapabilities] = useState<any>(null);
+  const [integrations, setIntegrations] = useState<any>(null);
   const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
+
+  const sortedUsers = useMemo(() => {
+    if (!users || !Array.isArray(users)) return [];
+    return [...users].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [users]);
 
   useEffect(() => {
     setMounted(true);
@@ -55,16 +66,33 @@ export function TeammateSelector() {
     if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
       // If we have a valid stored teammate, select it
       setSelectedTeammate(storedTeammate);
+      // Fetch integrations for the stored teammate
+      fetchIntegrations(storedTeammate);
     } else {
       // Otherwise select the first teammate and store it
       setSelectedTeammate(teammates[0].uuid);
       localStorage.setItem('selectedTeammate', teammates[0].uuid);
+      // Fetch integrations for the first teammate
+      fetchIntegrations(teammates[0].uuid);
     }
   }, [teammates, setSelectedTeammate]); // Add setSelectedTeammate to dependencies
+
+  const fetchIntegrations = async (teammateId: string) => {
+    try {
+      const response = await fetch(`/api/teammates/${teammateId}/integrations`);
+      if (response.ok) {
+        const data = await response.json();
+        setIntegrations(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch integrations:', error);
+    }
+  };
 
   const handleTeammateSelect = (uuid: string) => {
     setSelectedTeammate(uuid);
     localStorage.setItem('selectedTeammate', uuid);
+    fetchIntegrations(uuid); // Fetch integrations when teammate is selected
   };
 
   const filteredTeammates = teammates.filter(teammate => 
@@ -90,8 +118,15 @@ export function TeammateSelector() {
     }
   };
 
-  if (!mounted) {
-    return <div className="h-full bg-gray-900 animate-pulse" />;
+  if (!mounted || isLoading) {
+    return (
+      <div className="h-full bg-gray-900 animate-pulse flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-400">Loading teammates...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -196,10 +231,13 @@ export function TeammateSelector() {
 
       <TeammateDetailsModal
         isOpen={isDetailsModalOpen}
-        onClose={() => setIsDetailsModalOpen(false)}
+        onCloseAction={async () => {
+          setIsDetailsModalOpen(false);
+          setSelectedTeammateDetails(null);
+        }}
         teammate={selectedTeammateDetails}
-        capabilities={capabilities}
+        integrations={integrations}
       />
     </div>
   );
-} 
+}); 

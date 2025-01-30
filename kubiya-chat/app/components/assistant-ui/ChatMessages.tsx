@@ -30,7 +30,8 @@ import { cn } from "@/lib/utils";
 import { toast } from "../../components/ui/use-toast";
 import { ScheduledTasksModal } from '../ScheduledTasksModal';
 import mermaid from 'mermaid';
-import { TaskSchedulingModal } from '@/app/components/task';
+import { TaskSchedulingModal } from '../TaskSchedulingModal';
+import type { Integration, SimpleIntegration, IntegrationType } from '@/app/types/integration';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -57,9 +58,17 @@ type UserThreadMessage = ThreadMessage & {
   tool_calls?: ToolCall[];
 };
 
-interface Integration {
-  name: string;
-  type?: string;
+interface Teammate {
+  name?: string;
+  description?: string;
+  uuid?: string;
+  avatar_url?: string;
+  team_id?: string;
+  user_id?: string;
+  org_id?: string;
+  email?: string;
+  context?: string;
+  integrations?: Array<string | SimpleIntegration>;
 }
 
 interface Starter {
@@ -112,18 +121,7 @@ interface ChatMessagesProps {
   isCollectingSystemMessages: boolean;
   systemMessages?: string[];
   capabilities?: TeammateCapabilities;
-  teammate?: {
-    name?: string;
-    description?: string;
-    uuid?: string;
-    avatar_url?: string;
-    team_id?: string;
-    user_id?: string;
-    org_id?: string;
-    email?: string;
-    context?: string;
-    integrations?: Array<Integration | string>;
-  };
+  teammate?: Teammate;
   showTeammateDetails?: () => void;
   onStarterCommand?: (command: string) => void;
   onScheduleTask?: () => void;
@@ -335,6 +333,25 @@ export const ChatMessages = ({
   const [isLoading, setIsLoading] = useState(true);
   const [integrations, setIntegrations] = useState<IntegrationData | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showTeammateSelectionModal, setShowTeammateSelectionModal] = useState(false);
+
+  const handleAssignTask = () => {
+    if (teammate?.uuid) {
+      // If we have a teammate, open task modal directly
+      setShowTaskModal(true);
+    } else {
+      // If no teammate, show teammate selection first
+      setShowTeammateSelectionModal(true);
+      if (showTeammateDetails) {
+        showTeammateDetails();
+      }
+      toast({
+        title: "Select a Teammate",
+        description: "Please select a teammate to assign tasks to.",
+        variant: "default"
+      });
+    }
+  };
 
   // Helper function to extract Mermaid diagrams
   const extractMermaidDiagrams = (text: string): { diagrams: string[], remainingText: string } => {
@@ -442,6 +459,11 @@ export const ChatMessages = ({
         }
 
         const metadataPromises = sources.map(async (source: Source) => {
+          if (!source.sourceId) {
+            console.warn('Skipping metadata fetch - sourceId is undefined:', source);
+            return null;
+          }
+          
           const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${source.sourceId}/metadata`);
           if (!metadataRes.ok) {
             console.error('Failed to fetch metadata:', {
@@ -634,15 +656,24 @@ export const ChatMessages = ({
               {teammate?.description || capabilities?.description}
             </p>
             <div className="flex items-center justify-center gap-3 mt-4">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setShowTaskModal(true)}
-                className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-              >
-                <ListTodo className="h-4 w-4 mr-1.5" />
-                Assign Task
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={handleAssignTask}
+                      className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                    >
+                      <ListTodo className="h-4 w-4 mr-1.5" />
+                      Assign Task
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    <p>Assign tasks to your teammate to be executed on schedule or in response to events. Perfect for automation and recurring tasks.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
 
@@ -787,7 +818,7 @@ export const ChatMessages = ({
                 )}
 
                 {/* Connected Platforms */}
-                {capabilities?.integrations && capabilities.integrations.length > 0 && (
+                {teammate?.integrations && teammate.integrations.length > 0 && (
                   <div className="bg-[#1E293B] rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="p-2 rounded-lg bg-green-500/10">
@@ -799,9 +830,9 @@ export const ChatMessages = ({
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto pr-2">
-                      {capabilities.integrations.map((integration, index) => {
+                      {teammate.integrations.map((integration, index) => {
                         const integrationName = typeof integration === 'string' ? integration : integration.name;
-                        const integrationType = typeof integration === 'string' ? integration : integration.type || integration.name;
+                        const integrationType = typeof integration === 'string' ? integration : integration.integration_type;
                         
                         return (
                           <div
@@ -813,6 +844,7 @@ export const ChatMessages = ({
                             </div>
                             <div className="min-w-0">
                               <div className="text-sm font-medium text-white truncate">{integrationName}</div>
+                              <div className="text-xs text-slate-400 truncate">{integrationType}</div>
                             </div>
                           </div>
                         );
@@ -889,7 +921,31 @@ export const ChatMessages = ({
             org_id: teammate.org_id || '',
             email: teammate.email || '',
             context: teammate.context || teammate.uuid,
-            integrations: teammate.integrations || []
+            capabilities: {
+              integrations: (teammate.integrations || []).map(integration => {
+                const defaultIntegrationType = (type: string): IntegrationType => {
+                  const validTypes: IntegrationType[] = ['jira', 'slack', 'github', 'gitlab', 'aws', 'kubernetes', 'webhook'];
+                  return validTypes.includes(type.toLowerCase() as IntegrationType) 
+                    ? type.toLowerCase() as IntegrationType 
+                    : 'custom';
+                };
+
+                if (typeof integration === 'string') {
+                  return {
+                    name: integration,
+                    integration_type: defaultIntegrationType(integration),
+                    auth_type: 'global' as const,
+                    description: integration
+                  };
+                }
+                return {
+                  name: integration.name,
+                  integration_type: integration.integration_type || defaultIntegrationType(integration.name),
+                  auth_type: integration.auth_type || 'global',
+                  description: integration.description || integration.name
+                };
+              })
+            }
           }}
           onSchedule={async (data) => {
             try {

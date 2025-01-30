@@ -64,11 +64,13 @@ export function useWebhookFlow({
   }, [teammate]);
 
   const handleProviderSelect = (provider: WebhookProvider) => {
-    setWebhookProvider(provider);
-    setEventType('');
-    setPromptTemplate('');
-    if (setInteraction) setInteraction(createDefaultInteraction());
-    setCurrentStep('event');
+    if (provider.id !== webhookProvider?.id) {
+      setWebhookProvider(provider);
+      setEventType('');
+      setPromptTemplate('');
+      if (setInteraction) setInteraction(createDefaultInteraction());
+      setCurrentStep('event');
+    }
   };
 
   const handleEventSelect = (type: string) => {

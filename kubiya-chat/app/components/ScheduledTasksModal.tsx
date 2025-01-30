@@ -1,10 +1,34 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
-import { Clock, Trash2, Slack, MessageSquare, X, Calendar, RotateCcw, Filter } from 'lucide-react';
+import { Clock, Trash2, Slack, MessageSquare, X, Calendar, RotateCcw, Filter, User, Check, AlertCircle, ChevronRight, Webhook, GitBranch, Trello, Cloud } from 'lucide-react';
 import { format, isToday, isTomorrow, isThisWeek, isThisMonth } from 'date-fns';
 import { toast } from '@/app/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { useState, useMemo } from 'react';
+import { useEntity } from '@/app/providers/EntityProvider';
+import { useTeammateContext } from '@/app/MyRuntimeProvider';
+import { generateAvatarUrl } from '@/app/components/TeammateSelector';
+import { Badge } from '@/app/components/ui/badge';
+import type { EntityMetadata } from '@/app/types/user';
+
+interface Integration {
+  name: string;
+  integration_type?: string;
+}
+
+interface TeammateWithMetadata extends Teammate {
+  metadata?: EntityMetadata;
+  integrations?: Integration[];
+}
+
+interface Teammate {
+  uuid: string;
+  name?: string;
+  email?: string;
+  status?: string;
+  type?: string;
+  integrations?: { name: string }[];
+}
 
 interface ScheduledTask {
   id: string;
@@ -51,14 +75,41 @@ export function ScheduledTasksModal({
   onClose, 
   tasks, 
   onDelete, 
-  isLoading, 
+  isLoading,
   teammate,
   onScheduleSimilar 
 }: ScheduledTasksModalProps) {
+  const { getEntityMetadata } = useEntity();
+  const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ScheduledTask | null>(null);
+  const [isTeammateSelectionOpen, setIsTeammateSelectionOpen] = useState(false);
+
+  // Get current teammate metadata with proper typing - use context or prop
+  const currentTeammate = useMemo(() => {
+    const base = teammates.find((t: Teammate) => t.uuid === selectedTeammate) || teammate;
+    if (!base) return null;
+
+    const metadata = base.uuid ? getEntityMetadata(base.uuid) : undefined;
+    return {
+      ...base,
+      metadata,
+      integrations: base.integrations || []
+    } as TeammateWithMetadata;
+  }, [teammates, selectedTeammate, teammate, getEntityMetadata]);
+
+  const handleSwitchTeammate = () => {
+    // Here you would implement the logic to open your teammate selection UI
+    toast({
+      title: "Switch Teammate",
+      description: "Opening teammate selection...",
+      duration: 3000,
+    });
+    // Trigger your teammate selection UI
+    setIsTeammateSelectionOpen(true);
+  };
 
   const handleDelete = async (taskId: string) => {
     try {
@@ -89,9 +140,9 @@ export function ScheduledTasksModal({
   };
 
   const filteredTasks = useMemo(() => {
-    // First filter by user's email
+    // Filter by current teammate's email
     let filtered = tasks.filter(task => 
-      !teammate?.email || task.parameters.user_email === teammate.email
+      !currentTeammate?.email || task.parameters.user_email === currentTeammate.email
     );
 
     // Then apply time filter
@@ -126,7 +177,7 @@ export function ScheduledTasksModal({
     });
 
     return filtered;
-  }, [tasks, timeFilter, statusFilter, teammate?.email]);
+  }, [tasks, timeFilter, statusFilter, currentTeammate?.email]);
 
   const timeFilters: { value: TimeFilter; label: string; icon: typeof Clock }[] = [
     { value: 'all', label: 'All Time', icon: Clock },
@@ -152,6 +203,17 @@ export function ScheduledTasksModal({
         repeatOption: task.parameters.cron_string ? 'custom' : 'never'
       });
     }
+  };
+
+  const getIntegrationIcon = (integration: Integration) => {
+    const type = (integration.integration_type || integration.name || '').toLowerCase();
+    
+    if (type.includes('slack')) return <Slack className="h-4 w-4 text-blue-400" />;
+    if (type.includes('github')) return <GitBranch className="h-4 w-4 text-purple-400" />;
+    if (type.includes('jira')) return <Trello className="h-4 w-4 text-blue-400" />;
+    if (type.includes('aws')) return <Cloud className="h-4 w-4 text-orange-400" />;
+    
+    return <Webhook className="h-4 w-4 text-emerald-400" />;
   };
 
   return (
@@ -193,6 +255,77 @@ export function ScheduledTasksModal({
             </div>
           </div>
         </DialogHeader>
+
+        {currentTeammate && (
+          <div className="px-6 py-4 border-b border-[#1E293B] bg-[#1A1F2E]">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center justify-center">
+                    <img
+                      src={generateAvatarUrl({ 
+                        uuid: currentTeammate.uuid, 
+                        name: currentTeammate.name || currentTeammate.email || '' 
+                      })}
+                      alt={currentTeammate.name || 'Teammate'}
+                      className="w-8 h-8 rounded"
+                    />
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-slate-200 truncate">
+                      {currentTeammate.name || currentTeammate.email}
+                    </h4>
+                    {currentTeammate.metadata?.status && (
+                      <Badge variant="secondary" className={cn(
+                        "bg-opacity-10 border-opacity-20",
+                        currentTeammate.metadata.status === 'active' 
+                          ? "bg-green-500 text-green-400 border-green-500"
+                          : "bg-yellow-500 text-yellow-400 border-yellow-500"
+                      )}>
+                        {currentTeammate.metadata.status}
+                      </Badge>
+                    )}
+                  </div>
+                  {currentTeammate.metadata?.type && (
+                    <p className="mt-1 text-xs text-slate-400">{currentTeammate.metadata.type}</p>
+                  )}
+                  
+                  {/* Integrations Section */}
+                  {currentTeammate.integrations && currentTeammate.integrations.length > 0 && (
+                    <div className="mt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Webhook className="h-4 w-4 text-emerald-400" />
+                        <span className="text-xs font-medium text-slate-300">Integrations</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {currentTeammate.integrations.map((integration, index) => (
+                          <div 
+                            key={index}
+                            className="px-2 py-1 rounded-md bg-slate-800/50 border border-slate-700/50 text-xs text-slate-300 flex items-center gap-1.5"
+                          >
+                            {getIntegrationIcon(integration)}
+                            <span>{integration.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSwitchTeammate}
+                className="text-slate-400 hover:text-purple-400 group shrink-0"
+              >
+                Choose Different Teammate
+                <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="px-6 py-3 border-b border-[#1E293B] bg-[#1A1F2E] flex-shrink-0">
           <div className="flex flex-wrap gap-2">
@@ -247,6 +380,22 @@ export function ScheduledTasksModal({
                   </div>
                 </div>
               ))}
+            </div>
+          ) : !currentTeammate ? (
+            <div className="text-center py-8">
+              <User className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-200 mb-2">Select a Teammate</h3>
+              <p className="text-sm text-slate-400 mb-4">
+                Please select a teammate to view their scheduled tasks
+              </p>
+              <Button
+                variant="default"
+                onClick={handleSwitchTeammate}
+                className="bg-purple-500 text-white hover:bg-purple-600"
+              >
+                <User className="h-4 w-4 mr-1.5" />
+                Select Teammate
+              </Button>
             </div>
           ) : filteredTasks.length === 0 ? (
             <div className="text-center py-8">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
-import MyRuntimeProvider from '../MyRuntimeProvider';
+import { MyRuntimeProvider } from '../MyRuntimeProvider';
 import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConfig } from '../../lib/config-context';

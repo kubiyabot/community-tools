@@ -10,7 +10,7 @@ import { X, ChevronRight, ChevronLeft, Clock, ListTodo } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { useRouter } from 'next/navigation';
-import { TaskSchedulingModal } from '../task';
+import { TaskSchedulingModal } from '../TaskSchedulingModal';
 import { toast } from '../ui/use-toast';
 import { useTeammateContext } from '@/app/MyRuntimeProvider';
 

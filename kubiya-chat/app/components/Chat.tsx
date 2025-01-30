@@ -323,9 +323,9 @@ export const Chat = () => {
         {/* Modals */}
         <TeammateDetailsModal
           isOpen={isDetailsModalOpen}
-          onClose={() => setIsDetailsModalOpen(false)}
           teammate={teammate}
           capabilities={capabilities}
+          onCloseAction={async () => setIsDetailsModalOpen(false)}
         />
 
         <TaskSchedulingModal

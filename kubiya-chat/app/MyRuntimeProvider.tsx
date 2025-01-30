@@ -24,6 +24,8 @@ import { Chat } from './components/assistant-ui/Chat';
 import { useRouter } from 'next/navigation';
 import { ToolProvider } from './components/assistant-ui/ToolRegistry';
 import { getToolMetadata } from './components/assistant-ui/ToolRegistry';
+import { toast } from "@/app/components/ui/use-toast";
+import { SessionExpired } from './components/SessionExpired';
 
 interface TeammateConfig {
   teammate: string;
@@ -63,35 +65,36 @@ interface Session {
 }
 
 interface TeammateContextType {
-  teammates: any[];
   selectedTeammate: string | undefined;
-  setSelectedTeammate: (id: string) => void;
-  isLoading: boolean;
-  error?: {
-    error: string;
-    details: string;
-    status?: number;
-    supportInfo?: {
-      message: string;
-      email: string;
-      subject: string;
-      body: string;
-    };
-  };
-  currentState?: TeammateState;
-  switchThread: (teammateId: string, threadId: string) => void;
+  currentState: TeammateState | null;
+  teammates: any[];
+  teammateCapabilities: Record<string, {
+    tools: any[];
+    integrations: any[];
+    description?: string;
+    runner?: string;
+    llm_model?: string;
+    instruction_type?: string;
+  }>;
+  loadingTeammateIds: Set<string>;
+  loadTeammateCapabilities: (teammateId: string) => Promise<void>;
+  switchThread: () => void;
   setTeammateState: (teammateId: string, state: TeammateState) => void;
   handleSubmit: (message: string) => Promise<void>;
+  setSelectedTeammate: (teammateId: string | undefined) => void;
 }
 
-const TeammateContext = createContext<TeammateContextType>({
-  teammates: [],
+export const TeammateContext = createContext<TeammateContextType>({
   selectedTeammate: undefined,
-  setSelectedTeammate: () => {},
-  isLoading: true,
+  currentState: null,
+  teammates: [],
+  teammateCapabilities: {},
+  loadingTeammateIds: new Set(),
+  loadTeammateCapabilities: async () => {},
   switchThread: () => {},
   setTeammateState: () => {},
-  handleSubmit: async () => {}
+  handleSubmit: async () => {},
+  setSelectedTeammate: () => {}
 });
 
 export const useTeammateContext = () => useContext(TeammateContext);
@@ -483,7 +486,10 @@ const useAssistantRuntime = (adapter: ChatModelAdapter) => {
   return useLocalRuntime(adapter);
 };
 
-export default function MyRuntimeProvider({ children }: { children: ReactNode }) {
+export const MyRuntimeProvider = ({ children }: { children: ReactNode }) => {
+  const [teammateCapabilities, setTeammateCapabilities] = useState<TeammateContextType['teammateCapabilities']>({});
+  const [loadingTeammateIds, setLoadingTeammateIds] = useState<Set<string>>(new Set());
+
   // 1. All useContext hooks first (these don't depend on state)
   const { user, isLoading: isUserLoading } = useUser();
   const { apiKey, authType } = useConfig();
@@ -518,6 +524,9 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     return states;
   });
 
+  // Add new state for session expired
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+
   // 3. All callbacks with safe state access
   const setTeammateState = useCallback((teammateId: string, state: TeammateState) => {
     if (!teammateId) return;
@@ -528,27 +537,27 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(state));
   }, []);
 
-  const switchThread = useCallback((teammateId: string, threadId: string) => {
-    if (!teammateId || !threadId) return;
+  const switchThread = useCallback(() => {
+    if (!selectedTeammate) return;
     setTeammateStates(prev => {
-      const currentState = prev[teammateId] || createEmptyTeammateState(teammateId);
+      const currentState = prev[selectedTeammate] || createEmptyTeammateState(selectedTeammate);
       const updatedState = {
         ...currentState,
-        currentThreadId: threadId,
+        currentThreadId: Date.now().toString(),
         currentSessionId: Date.now().toString(),
         threads: {
           ...currentState.threads,
-          [threadId]: currentState.threads[threadId] || createEmptyThread(teammateId)
+          [Date.now().toString()]: currentState.threads[currentState.currentThreadId] || createEmptyThread(selectedTeammate)
         }
       };
 
-      localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(updatedState));
+      localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(updatedState));
       return {
         ...prev,
-        [teammateId]: updatedState
+        [selectedTeammate]: updatedState
       };
     });
-  }, []);
+  }, [selectedTeammate]);
 
   const handleTeammateSelect = useCallback((teammateId: string) => {
     if (!teammateId) return;
@@ -563,7 +572,111 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     });
   }, []);
 
-  // 4. Create runtime adapter with proper state handling
+  // Optimize teammate loading by moving it to a separate function
+  const loadTeammates = useCallback(async () => {
+    if (!user) return;
+    try {
+      console.log('Loading teammates for user:', user.email);
+      const response = await fetch('/api/teammates', {
+        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+
+      if (response.status === 401) {
+        setIsSessionExpired(true);
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Failed to load teammates:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(`Failed to load teammates: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Successfully loaded teammates:', {
+        count: data.length,
+        firstTeammate: data[0]
+      });
+      setTeammates(data);
+    } catch (error) {
+      console.error('Error loading teammates:', error);
+      setError(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Optimize initial loading by reducing state updates
+  useEffect(() => {
+    setMounted(true);
+    
+    // Load teammates only if we have a user
+    if (user) {
+      loadTeammates();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, loadTeammates]);
+
+  // Modify the loadTeammateCapabilities to handle 401s
+  const loadTeammateCapabilities = useCallback(async (teammateId: string) => {
+    if (teammateCapabilities[teammateId] || isSessionExpired) return;
+
+    setLoadingTeammateIds((prev) => new Set([...prev, teammateId]));
+    try {
+      // Fetch capabilities and integrations in parallel
+      const [capabilitiesRes, integrationsRes] = await Promise.all([
+        fetch(`/api/teammates/${teammateId}/capabilities`),
+        fetch(`/api/teammates/${teammateId}/integrations`)
+      ]);
+
+      if (capabilitiesRes.status === 401 || integrationsRes.status === 401) {
+        setIsSessionExpired(true);
+        return;
+      }
+
+      if (!capabilitiesRes.ok) throw new Error('Failed to fetch teammate capabilities');
+      if (!integrationsRes.ok) throw new Error('Failed to fetch teammate integrations');
+
+      const capabilities = await capabilitiesRes.json();
+      const integrations = await integrationsRes.json();
+
+      setTeammateCapabilities((prev) => ({
+        ...prev,
+        [teammateId]: {
+          tools: capabilities.tools || [],
+          integrations: integrations || [],
+          description: capabilities.description,
+          runner: capabilities.runner,
+          llm_model: capabilities.llm_model,
+          instruction_type: capabilities.instruction_type
+        }
+      }));
+    } catch (error) {
+      console.error('Error loading capabilities:', error);
+      toast({
+        title: 'Error loading capabilities',
+        description: 'Failed to load teammate capabilities. Please try again.',
+      });
+    } finally {
+      setLoadingTeammateIds((prev) => {
+        const next = new Set(prev);
+        next.delete(teammateId);
+        return next;
+      });
+    }
+  }, [teammateCapabilities, isSessionExpired]);
+
+  // Modify the adapter to handle 401s
   const adapter = useMemo<ChatModelAdapter>(() => ({
     async *run(options: ChatModelRunOptions): AsyncGenerator<MessageContent, void, unknown> {
       const customConfig = {
@@ -601,46 +714,12 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
         }
 
         for await (const message of handleStreamEvents(stream)) {
-          // Get current state
-          const currentTeammateState = teammateStates[customConfig.teammate];
-          if (currentTeammateState) {
-            const currentThread = currentTeammateState.threads[customConfig.threadId] || createEmptyThread(customConfig.teammate);
-            
-            // Create updated thread with new message
-            const updatedThread = {
-              ...currentThread,
-              messages: [...(currentThread.messages || []), message],
-              lastMessageId: message.id,
-              metadata: {
-                ...currentThread.metadata,
-                updatedAt: new Date().toISOString()
-              }
-            };
-
-            // Update state atomically
-            setTeammateStates(prev => {
-              const updatedState = {
-                ...prev[customConfig.teammate],
-                threads: {
-                  ...prev[customConfig.teammate].threads,
-                  [customConfig.threadId]: updatedThread
-                }
-              };
-              
-              // Store in localStorage
-              localStorage.setItem(`teammate_state_${customConfig.teammate}`, JSON.stringify(updatedState));
-              
-              return {
-                ...prev,
-                [customConfig.teammate]: updatedState
-              };
-            });
-          }
           yield message;
         }
       } catch (error) {
         if (error instanceof Error && error.message.includes('Session expired')) {
-          throw error;
+          setIsSessionExpired(true);
+          return;
         }
         
         yield {
@@ -650,7 +729,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
         };
       }
     }
-  }), [selectedTeammate, teammateStates, apiKey, router, setTeammateStates]);
+  }), [selectedTeammate, teammateStates, apiKey, router]);
 
   // 5. Create runtime using custom hook
   const runtime = useAssistantRuntime(adapter);
@@ -670,55 +749,7 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     return state;
   }, [selectedTeammate, teammateStates]);
 
-  // 7. Effects
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    const loadTeammates = async () => {
-      if (!user) return;
-      try {
-        console.log('Loading teammates for user:', user.email);
-        const response = await fetch('/api/teammates', {
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          console.error('Failed to load teammates:', {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData
-          });
-          throw new Error(`Failed to load teammates: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Successfully loaded teammates:', {
-          count: data.length,
-          firstTeammate: data[0]
-        });
-        setTeammates(data);
-      } catch (error) {
-        console.error('Error loading teammates:', error);
-        setError(error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (user) {
-      loadTeammates();
-    }
-  }, [user]);
-
-  // 8. Message submission handler with proper state preservation
+  // 7. Message submission handler with proper state preservation
   const handleSubmit = useCallback(async (message: string) => {
     if (!selectedTeammate || !currentState?.currentThreadId) {
       setError('Please select a teammate first');
@@ -929,12 +960,16 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
     }
   }, [selectedTeammate, currentState, isProcessing, setTeammateStates]);
 
-  // 9. Loading states
+  // Show session expired page if session is expired
+  if (isSessionExpired) {
+    return <SessionExpired />;
+  }
+
+  // Optimize loading state by showing a simpler loading indicator
   if (!mounted || isUserLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0F172A] to-[#1E293B]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent mb-6"></div>
-        <p className="text-white text-lg font-medium">Loading your workspace...</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#7C3AED] border-t-transparent"></div>
       </div>
     );
   }
@@ -945,24 +980,24 @@ export default function MyRuntimeProvider({ children }: { children: ReactNode })
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-[#0F172A] to-[#1E293B]">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#7C3AED] border-t-transparent mb-6"></div>
-        <p className="text-white text-lg font-medium">Loading teammates...</p>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#7C3AED] border-t-transparent"></div>
       </div>
     );
   }
 
   // 10. Context value with all required props
   const contextValue: TeammateContextType = {
+    selectedTeammate: selectedTeammate || undefined,
+    currentState: currentState || null,
     teammates,
-    selectedTeammate,
-    setSelectedTeammate: handleTeammateSelect,
-    isLoading,
-    error,
-    currentState,
+    teammateCapabilities,
+    loadingTeammateIds,
+    loadTeammateCapabilities,
     switchThread,
     setTeammateState,
-    handleSubmit
+    handleSubmit,
+    setSelectedTeammate
   };
 
   return (

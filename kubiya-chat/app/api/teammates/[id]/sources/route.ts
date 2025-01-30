@@ -102,20 +102,80 @@ export async function GET(request: NextRequest, context: { params: { id: string 
       sourceIds
     });
 
-    // Map source IDs to simple objects with consistent format
-    const sources = sourceIds.map((sourceId: string) => ({
-      sourceId,
-      name: `Source ${sourceId.slice(0, 8)}`
+    // Fetch metadata for each source
+    const sourcesWithMetadata = await Promise.all(sourceIds.map(async (sourceId: string) => {
+      try {
+        const metadataResponse = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}/metadata`, {
+          headers: {
+            'Authorization': `Bearer ${session.idToken}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'X-Organization-ID': session.user?.org_id || '',
+            'X-Kubiya-Client': 'chat-ui'
+          }
+        });
+
+        if (!metadataResponse.ok) {
+          console.error(`Failed to fetch metadata for source ${sourceId}:`, await metadataResponse.text());
+          return null;
+        }
+
+        const metadata = await metadataResponse.json();
+        return {
+          uuid: sourceId,
+          name: metadata.name || `Source ${sourceId.slice(0, 8)}`,
+          url: metadata.url || '',
+          connected_agents_count: metadata.connected_agents_count || 0,
+          connected_tools_count: metadata.tools?.length || 0,
+          connected_workflows_count: metadata.connected_workflows_count || 0,
+          errors_count: metadata.errors?.length || 0,
+          kubiya_metadata: {
+            created_at: metadata.kubiya_metadata?.created_at || new Date().toISOString(),
+            last_updated: metadata.kubiya_metadata?.last_updated || new Date().toISOString()
+          },
+          source_meta: {
+            id: metadata.source_meta?.id || sourceId,
+            url: metadata.source_meta?.url || '',
+            branch: metadata.source_meta?.branch || 'main',
+            commit: metadata.source_meta?.commit || '',
+            committer: metadata.source_meta?.committer || ''
+          },
+          tools: metadata.tools?.map((tool: any) => ({
+            name: tool.name,
+            description: tool.description,
+            type: tool.type || 'unknown',
+            icon_url: tool.icon_url,
+            args: tool.args?.map((arg: any) => ({
+              name: arg.name,
+              type: arg.type,
+              description: arg.description,
+              required: arg.required
+            })),
+            env: tool.env,
+            image: tool.image,
+            source: tool.source,
+            metadata: tool.metadata
+          })) || []
+        };
+      } catch (error) {
+        console.error(`Error fetching metadata for source ${sourceId}:`, error);
+        return null;
+      }
     }));
+
+    // Filter out any failed fetches
+    const validSources = sourcesWithMetadata.filter(Boolean);
 
     // Log the final formatted response
     console.log('Sources endpoint - Returning formatted sources:', {
-      count: sources.length,
-      firstSource: sources[0]
+      count: validSources.length,
+      firstSource: validSources[0]
     });
 
     // Create response with session cookies
-    const responseWithSources = new Response(JSON.stringify(sources), {
+    const responseWithSources = new Response(JSON.stringify(validSources), {
       status: 200,
       headers: {
         ...corsHeaders,

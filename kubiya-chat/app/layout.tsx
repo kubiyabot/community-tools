@@ -4,6 +4,7 @@ import { Metadata } from 'next';
 import { ErrorBoundary } from '@/app/components/ErrorBoundary';
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ConfigProvider } from '@/lib/config-context';
+import { EntityProvider } from './providers/EntityProvider';
 import ClientProvider from './components/ClientProvider';
 import { SessionHandler } from './components/SessionHandler';
 import { Toaster } from "sonner";
@@ -37,10 +38,12 @@ export default function RootLayout({
         <ErrorBoundary>
           <UserProvider>
             <ConfigProvider>
-              <ClientProvider>
-                <SessionHandler />
-                {children}
-              </ClientProvider>
+              <EntityProvider>
+                <ClientProvider>
+                  <SessionHandler />
+                  {children}
+                </ClientProvider>
+              </EntityProvider>
             </ConfigProvider>
           </UserProvider>
         </ErrorBoundary>
