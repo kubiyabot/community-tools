@@ -1,4 +1,4 @@
-import type { Integration } from '@/app/types/integration';
+import type { Integration as BaseIntegration } from '@/app/types/integration';
 import type { Tool } from '@/app/types/tool';
 import type { TeammateDetails as BaseTeammateDetails } from '@/app/types/teammate';
 import type { SourceInfo } from '@/app/types/source';
@@ -36,8 +36,16 @@ export interface Runner {
   };
 }
 
-// Extend the base TeammateDetails to include additional properties needed in the UI
-export interface TeammateDetails extends Omit<BaseTeammateDetails, 'integrations' | 'runners' | 'allowed_groups' | 'allowed_users' | 'owners' | 'starters'> {
+// Define the Integration type that matches the base type
+export interface Integration extends BaseIntegration {
+  id: string;
+  name: string;
+  type: string;
+  icon_url?: string;
+}
+
+// Extend the base TeammateDetails
+export interface TeammateDetails extends BaseTeammateDetails {
   status?: 'active' | 'inactive' | 'error';
   metadata?: {
     created_at: string;
@@ -58,7 +66,7 @@ export interface TeammateDetails extends Omit<BaseTeammateDetails, 'integrations
   allowed_users?: string[];
   owners?: string[];
   starters?: Starter[];
-  runners?: Runner[];
+  runners?: string[];
   integrations?: Integration[];
 }
 
@@ -190,9 +198,7 @@ export interface Source {
 
 export interface TeammateTabProps {
   teammate: TeammateDetails | null;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
-  sources?: SourceInfo[];
+  sources?: any[];
   isLoading?: boolean;
 }
 

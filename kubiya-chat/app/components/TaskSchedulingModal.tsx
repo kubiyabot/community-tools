@@ -7,6 +7,15 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { format, addHours, addDays, addWeeks, addMonths } from 'date-fns';
 import { useTeammateContext } from "@/app/MyRuntimeProvider";
+import { useForm, ControllerRenderProps, FieldValues, FormProvider } from "react-hook-form";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "./ui/form";
 import { 
   Clock, 
   Calendar as CalendarIcon, 
@@ -33,11 +42,11 @@ import {
   Rocket,
   Smile,
   Bell,
-  Activity
+  Activity,
+  Info
 } from 'lucide-react';
 import { toast } from './ui/use-toast';
 import { cn } from '@/lib/utils';
-import { DialogFooter } from './ui/dialog';
 import { Badge } from '@/app/components/ui/badge';
 import { Calendar } from "@/app/components/ui/calendar";
 import { useUser } from '@auth0/nextjs-auth0/client';
@@ -45,6 +54,21 @@ import { WebhookFlowSection } from './webhook/WebhookFlowSection';
 import { WebhookProvider as ImportedWebhookProvider } from './webhook/providers';
 import { TeammateContextCard } from './shared/TeammateContextCard';
 import { TeammateSwitch } from './shared/TeammateSwitch';
+import { zodResolver } from '@hookform/resolvers/zod';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "./ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import * as z from 'zod';
+import type { Teammate } from './shared/TeammateSwitch';
 
 // Type definitions
 interface Integration {
@@ -93,19 +117,24 @@ interface WebhookFlowProps {
   standalone: boolean;
 }
 
+interface ScheduleTaskPayload {
+  schedule_time: string;
+  channel_id: string;
+  task_description: string;
+  selected_agent: string;
+  cron_string: string;
+}
+
+interface ScheduleTaskResult {
+  task_id: string;
+  task_uuid: string;
+}
+
 interface TaskSchedulingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  teammate?: {
-    uuid: string;
-    name?: string;
-    team_id?: string;
-    user_id?: string;
-    org_id?: string;
-    email?: string;
-    context?: string;
-  };
-  onSchedule: (data: any) => void;
+  teammate?: Teammate;
+  onSchedule: (data: ScheduleTaskPayload) => Promise<ScheduleTaskResult>;
   initialData?: {
     description?: string;
     slackTarget?: string;
@@ -667,14 +696,113 @@ function extractFieldPaths(obj: any, prefix = ''): string[] {
   return paths;
 }
 
+// Update the styles object
+const styles = {
+  dialog: {
+    content: "bg-[#0F172A] border border-[#2A3347] p-0 max-w-5xl w-full h-[95vh] overflow-hidden flex flex-col",
+    header: "p-6 border-b border-[#2A3347] flex-shrink-0",
+    body: "flex-1 flex flex-col min-h-0 overflow-hidden"
+  },
+  // ... rest of styles object ...
+};
+
+// Add this helper function before the component
+const areDatesEqual = (date1: Date, date2: Date): boolean => {
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate() &&
+    date1.getHours() === date2.getHours() &&
+    date1.getMinutes() === date2.getMinutes()
+  );
+};
+
+interface FormValues {
+  description: string;
+  slackTarget: string;
+  scheduleType: 'quick' | 'custom';
+  repeatOption: string;
+  date: Date;
+  webhookUrl: string;
+  promptTemplate: string;
+  eventType: string;
+}
+
+const formSchema = z.object({
+  description: z.string()
+    .min(1, 'Task description is required')
+    .min(5, 'Description must be at least 5 characters long')
+    .max(1000, 'Description should not exceed 1000 characters'),
+  slackTarget: z.string()
+    .min(1, 'Channel or user is required')
+    .refine((val: string) => val.startsWith('#') || val.startsWith('@'), {
+      message: 'Channel must start with # or user with @'
+    }),
+  scheduleType: z.enum(['quick', 'custom']),
+  repeatOption: z.string(),
+  date: z.date().refine((value) => value.getTime() > Date.now(), {
+    message: 'Date must be in the future',
+  }),
+  webhookUrl: z.union([
+    z.literal(''),
+    z.string().url()
+  ]),
+  promptTemplate: z.string().optional(),
+  eventType: z.string().optional()
+});
+
 export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, initialData }: TaskSchedulingModalProps) {
   const { user } = useUser();
   const { selectedTeammate, currentState } = useTeammateContext();
+  
+  // Form setup
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      description: initialData?.description || '',
+      slackTarget: initialData?.slackTarget || '#general',
+      scheduleType: initialData?.scheduleType || 'quick',
+      repeatOption: initialData?.repeatOption || 'never',
+      date: initialData?.date || addHours(new Date(), 1),
+      webhookUrl: initialData?.webhookUrl || '',
+      promptTemplate: initialData?.promptTemplate || '',
+      eventType: initialData?.eventType || ''
+    },
+    mode: 'onChange'
+  });
+
+  // All state hooks grouped together
   const [hasJiraIntegration, setHasJiraIntegration] = useState(false);
   const [showTeammateSwitch, setShowTeammateSwitch] = useState(false);
+  const [step, setStep] = useState<'method' | 'config' | 'schedule'>(initialData?.source ? 'config' : 'method');
+  const [assignmentMethod, setAssignmentMethod] = useState<'chat' | 'jira' | 'webhook'>(
+    initialData?.assignmentMethod || 'chat'
+  );
+  const [selectedBoard, setSelectedBoard] = useState<string>('');
+  const [selectedTicket, setSelectedTicket] = useState<string>('');
+  const [additionalContext, setAdditionalContext] = useState('');
+  const [shouldComment, setShouldComment] = useState(true);
+  const [shouldTransition, setShouldTransition] = useState(true);
+  const [selectedTransition, setSelectedTransition] = useState('');
+  const [repeatOption, setRepeatOption] = useState(initialData?.repeatOption || 'never');
+  const [slackTarget, setSlackTarget] = useState(initialData?.slackTarget || '');
+  const [webhookUrl, setWebhookUrl] = useState(initialData?.webhookUrl || '');
+  const [webhookProvider, setWebhookProvider] = useState<WebhookProvider | null>(initialData?.webhookProvider || null);
+  const [promptTemplate, setPromptTemplate] = useState(initialData?.promptTemplate || '');
+  const [ticketsPage, setTicketsPage] = useState(1);
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [customTime, setCustomTime] = useState('09:00');
+  const [eventType, setEventType] = useState(initialData?.eventType || '');
+  const [currentStep, setCurrentStep] = useState<WebhookStep>('provider');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<WebhookProvider | null>(null);
+  const [currentTeammate, setCurrentTeammate] = useState<Teammate | null>(teammate || null);
 
-  // Check for JIRA integration on mount
+  // All useEffect hooks grouped together
   useEffect(() => {
+    // Check for JIRA integration on mount
     const checkJiraIntegration = async () => {
       if (!teammate?.uuid) return;
       try {
@@ -691,43 +819,40 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     checkJiraIntegration();
   }, [teammate?.uuid]);
 
-  // State management
-  const [step, setStep] = useState<'method' | 'config' | 'schedule'>(initialData?.source ? 'config' : 'method');
-  const [assignmentMethod, setAssignmentMethod] = useState<'chat' | 'jira' | 'webhook'>(
-    initialData?.assignmentMethod || 'chat'
-  );
-  const [selectedBoard, setSelectedBoard] = useState<string>('');
-  const [selectedTicket, setSelectedTicket] = useState<string>('');
-  const [description, setDescription] = useState(initialData?.description || '');
-  const [additionalContext, setAdditionalContext] = useState('');
-  const [shouldComment, setShouldComment] = useState(true);
-  const [shouldTransition, setShouldTransition] = useState(true);
-  const [selectedTransition, setSelectedTransition] = useState('');
-  const [date, setDate] = useState<Date>(initialData?.date || new Date());
-  const [scheduleType, setScheduleType] = useState<'quick' | 'custom'>(
-    initialData?.scheduleType || 'quick'
-  );
-  const [repeatOption, setRepeatOption] = useState(initialData?.repeatOption || 'never');
-  const [slackTarget, setSlackTarget] = useState(initialData?.slackTarget || '');
-  const [webhookUrl, setWebhookUrl] = useState(initialData?.webhookUrl || '');
-  const [webhookProvider, setWebhookProvider] = useState<WebhookProvider | null>(initialData?.webhookProvider || null);
-  const [promptTemplate, setPromptTemplate] = useState(initialData?.promptTemplate || '');
-  const [ticketsPage, setTicketsPage] = useState(1);
-  const [ticketSearch, setTicketSearch] = useState('');
-  const [customTime, setCustomTime] = useState('09:00');
-  const [eventType, setEventType] = useState(initialData?.eventType || '');
-  const [currentStep, setCurrentStep] = useState<WebhookStep>('provider');
-
-  // Reset states when assignment method changes
   useEffect(() => {
-    setSelectedBoard('');
-    setSelectedTicket('');
-    setDescription('');
-    setAdditionalContext('');
-    setShouldComment(true);
-    setShouldTransition(true);
-    setSelectedTransition('');
-  }, [assignmentMethod]);
+    if (webhookProvider) {
+      setIsLoadingProviders(true);
+      setTimeout(() => {
+        setIsLoadingProviders(false);
+        setSelectedProvider(webhookProvider);
+      }, 800);
+    }
+  }, [webhookProvider]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const savedState = localStorage.getItem('taskSchedulingState');
+      if (savedState) {
+        try {
+          const state = JSON.parse(savedState);
+          setStep(state.step || 'method');
+          setAssignmentMethod(state.assignmentMethod || 'chat');
+          form.reset(state);
+          localStorage.removeItem('taskSchedulingState');
+        } catch (error) {
+          console.error('Error restoring task scheduling state:', error);
+          localStorage.removeItem('taskSchedulingState');
+        }
+      }
+    }
+  }, [isOpen, form]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      localStorage.removeItem('taskSchedulingState');
+    };
+  }, []);
 
   // Schedule options for chat/webhook
   const scheduleOptions = [
@@ -738,7 +863,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
       description: format(addHours(new Date(), 1), 'h:mm a')
     },
     { 
-      label: "Tomorrow 9 AM", 
+      label: "Tomorrow morning", 
       icon: CalendarDays, 
       value: (() => {
         const tomorrow = addDays(new Date(), 1);
@@ -748,7 +873,7 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
       description: "Tomorrow at 9:00 AM"
     },
     { 
-      label: "Next Monday 10 AM", 
+      label: "Next Monday", 
       icon: CalendarRange, 
       value: (() => {
         const today = new Date();
@@ -765,7 +890,15 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   ];
 
-  // Schedule section for chat/webhook
+  // "scheduleType" now comes from form:
+  const scheduleType = form.watch('scheduleType');
+
+  // Quick helper: update form scheduleType on button click 
+  const handleScheduleTypeChange = (type: 'quick' | 'custom') => {
+    form.setValue('scheduleType', type, { shouldValidate: true });
+  };
+
+  // Update the schedule section
   const renderScheduleSection = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -775,9 +908,9 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
         </div>
         <div className="flex gap-2">
           <Button
+            onClick={() => handleScheduleTypeChange('quick')}
             variant="outline"
             size="sm"
-            onClick={() => setScheduleType('quick')}
             className={cn(
               "bg-[#1E293B] border-[#2D3B4E] hover:bg-purple-500/10",
               scheduleType === 'quick' && "bg-purple-500/10 border-purple-500/30"
@@ -786,9 +919,9 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
             Quick Options
           </Button>
           <Button
+            onClick={() => handleScheduleTypeChange('custom')}
             variant="outline"
             size="sm"
-            onClick={() => setScheduleType('custom')}
             className={cn(
               "bg-[#1E293B] border-[#2D3B4E] hover:bg-purple-500/10",
               scheduleType === 'custom' && "bg-purple-500/10 border-purple-500/30"
@@ -809,11 +942,14 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
                 "flex items-center gap-3 px-4 py-3 h-auto",
                 "bg-[#1E293B] hover:bg-purple-500/10",
                 "border-[#2D3B4E] hover:border-purple-500/30",
-                date.getTime() === option.value.getTime() && "bg-purple-500/10 border-purple-500/30"
+                areDatesEqual(form.getValues('date'), option.value) && "bg-purple-500/10 border-purple-500/30"
               )}
-              onClick={() => setDate(option.value)}
+              onClick={() => {
+                form.setValue('date', option.value, { shouldValidate: true });
+              }}
             >
-              <div className="flex flex-col items-start gap-3">
+              <option.icon className="h-4 w-4 text-purple-400" />
+              <div className="flex flex-col items-start gap-1">
                 <div className="text-sm font-medium text-slate-200">{option.label}</div>
                 <span className="text-xs text-slate-400">{option.description}</span>
               </div>
@@ -821,53 +957,74 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-[1fr,auto] gap-4">
-          <Calendar
-            mode="single"
-            selected={date}
-            onSelect={(newDate) => handleDateSelect(newDate)}
-            className="rounded-lg border border-[#2D3B4E] bg-[#1E293B] p-3"
-          />
-          <div className="space-y-4">
-            <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-              <h4 className="text-sm font-medium text-slate-200 mb-3">Time</h4>
-              <Input
-                type="time"
-                value={customTime}
-                onChange={(e) => {
-                  setCustomTime(e.target.value);
-                  const [hours, minutes] = e.target.value.split(':');
-                  const newDate = new Date(date);
-                  newDate.setHours(parseInt(hours), parseInt(minutes));
-                  setDate(newDate);
-                }}
-                className="bg-[#1E293B] border-[#2D3B4E] h-10"
-              />
-            </div>
+        <div className="space-y-4">
+          <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
+            <h3 className="text-sm font-medium text-slate-200 mb-1">Custom Schedule Setup</h3>
+            <p className="text-xs text-slate-400">
+              Pick a date on the calendar, select your time, then choose how often it should repeat.
+            </p>
+          </div>
 
-            <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-              <h4 className="text-sm font-medium text-slate-200 mb-3">Repeat</h4>
-              <Select value={repeatOption} onValueChange={setRepeatOption}>
-                <SelectTrigger className="bg-[#1E293B] border-[#2D3B4E] h-10">
-                  <SelectValue placeholder="Choose frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="never">Never</SelectItem>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-[1fr,auto] gap-4">
+            <Calendar
+              mode="single"
+              selected={form.getValues('date')}
+              onSelect={(newDate) => {
+                if (newDate) {
+                  const currentDate = form.getValues('date');
+                  newDate.setHours(currentDate.getHours());
+                  newDate.setMinutes(currentDate.getMinutes());
+                  form.setValue('date', newDate, { shouldValidate: true });
+                }
+              }}
+              className="rounded-lg border border-[#2D3B4E] bg-[#1E293B] p-3"
+            />
 
-            <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-              <h4 className="text-sm font-medium text-slate-200 mb-2">Selected Schedule:</h4>
-              <p className="text-sm text-slate-400">
-                {format(date, 'MMMM d')} at {format(date, 'h:mm a')}
-              </p>
-              {repeatOption !== 'never' && (
-                <p className="text-sm text-purple-400 mt-1">Repeats {repeatOption}</p>
-              )}
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
+                <h4 className="text-sm font-medium text-slate-200 mb-3">Select Time</h4>
+                <Input
+                  type="time"
+                  value={format(form.getValues('date'), 'HH:mm')}
+                  onChange={(e) => {
+                    const [hours, minutes] = e.target.value.split(':');
+                    const newDate = new Date(form.getValues('date'));
+                    newDate.setHours(parseInt(hours), parseInt(minutes));
+                    form.setValue('date', newDate, { shouldValidate: true });
+                  }}
+                  className="bg-[#1E293B] border-[#2D3B4E] h-10"
+                />
+              </div>
+
+              <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
+                <h4 className="text-sm font-medium text-slate-200 mb-3">Repeat Options</h4>
+                <Select
+                  value={form.getValues('repeatOption')}
+                  onValueChange={(value) => form.setValue('repeatOption', value, { shouldValidate: true })}
+                >
+                  <SelectTrigger className="bg-[#1E293B] border-[#2D3B4E] h-10">
+                    <SelectValue placeholder="Choose frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="never">Never</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
+                <h4 className="text-sm font-medium text-slate-200 mb-2">Selected Schedule:</h4>
+                <p className="text-sm text-slate-400">
+                  {format(form.getValues('date'), 'MMMM d')} at {format(form.getValues('date'), 'h:mm a')}
+                </p>
+                {form.getValues('repeatOption') !== 'never' && (
+                  <p className="text-sm text-purple-400 mt-1">
+                    Repeats {form.getValues('repeatOption')}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1009,21 +1166,6 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     </div>
   );
 
-  // Add loading states
-  const [isLoadingProviders, setIsLoadingProviders] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState<WebhookProvider | null>(null);
-
-  // Add provider loading effect
-  useEffect(() => {
-    if (webhookProvider) {
-      setIsLoadingProviders(true);
-      setTimeout(() => {
-        setIsLoadingProviders(false);
-        setSelectedProvider(webhookProvider);
-      }, 800);
-    }
-  }, [webhookProvider]);
-
   // Update the step content wrapper
   const renderStepContent = () => (
     <div className={cn(
@@ -1063,24 +1205,37 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
   );
 
   const canProceed = () => {
-    switch (step) {
-      case 'method':
-        return true;
-      case 'config':
-        switch (assignmentMethod) {
-          case 'chat':
-            return slackTarget.trim().length > 0;
-          case 'webhook':
-            return webhookUrl.trim().length > 0;
-          default:
-            return false;
-        }
-      case 'schedule':
-        return true;
-    }
+    const errors = form.formState.errors;
+
+    // DEBUG: Log the form data and errors on every render
+    console.log("### DEBUG: canProceed() called ###");
+    console.log("Form values:", form.getValues());
+    console.log("Form errors:", errors);
+    console.log("scheduleType from form.watch:", scheduleType);
+    console.log("description length:", form.getValues('description')?.trim().length);
+    console.log("slackTarget length:", form.getValues('slackTarget')?.trim().length);
+    console.log("date (ISO):", form.getValues('date')?.toISOString());
+    console.log("===========================================");
+
+    return (
+      !errors.description &&
+      !errors.slackTarget &&
+      !errors.date &&
+      form.getValues('description').trim().length >= 5 &&
+      form.getValues('slackTarget').trim().length >= 1 &&
+      (scheduleType === 'quick' || scheduleType === 'custom')
+    );
   };
 
   const handleNext = () => {
+    // DEBUG: Log the step + valid state
+    console.log("### DEBUG: handleNext() invoked ###");
+    console.log("Current step:", step);
+    console.log("canProceed() =>", canProceed());
+    console.log("Form values at handleNext:", form.getValues());
+    console.log("Form errors at handleNext:", form.formState.errors);
+    console.log("=================================");
+
     if (step === 'method') {
       setStep('config');
     } else if (step === 'config') {
@@ -1101,7 +1256,6 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
       setAssignmentMethod('chat');
       setSelectedBoard('');
       setSelectedTicket('');
-      setDescription('');
       setAdditionalContext('');
       setShouldComment(true);
       setShouldTransition(true);
@@ -1119,40 +1273,357 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   };
 
-  // Add state restoration effect
-  useEffect(() => {
-    if (isOpen) {
-      const savedState = localStorage.getItem('taskSchedulingState');
-      if (savedState) {
-        try {
-          const state = JSON.parse(savedState);
-          setStep(state.step || 'method');
-          setAssignmentMethod(state.assignmentMethod || 'chat');
-          setDescription(state.description || '');
-          setSlackTarget(state.slackTarget || '');
-          setDate(state.date ? new Date(state.date) : new Date());
-          setScheduleType(state.scheduleType || 'quick');
-          setRepeatOption(state.repeatOption || 'never');
-          setWebhookProvider(state.webhookProvider || null);
-          setEventType(state.eventType || '');
-          setPromptTemplate(state.promptTemplate || '');
-          setCurrentStep(state.currentStep || 'provider');
-          setWebhookUrl(state.webhookUrl || '');
-          // Clear the saved state after restoration
-          localStorage.removeItem('taskSchedulingState');
-        } catch (error) {
-          console.error('Error restoring task scheduling state:', error);
-          localStorage.removeItem('taskSchedulingState');
-        }
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!isValid()) return;
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const formData = form.getValues();
+      const cronString = formData.scheduleType === 'custom' ? getCronString(formData.date, formData.repeatOption) : '';
+      
+      // Ensure date is properly formatted and in UTC
+      const scheduleDate = new Date(formData.date);
+      const scheduleTime = scheduleDate.toISOString();
+      
+      // Format teammate name as requested (demo_teammate format)
+      const formattedTeammateName = teammate?.name ? 
+        teammate.name.toLowerCase().replace(/\s+/g, '_') : 
+        'demo_teammate';
+      
+      const payload: ScheduleTaskPayload = {
+        schedule_time: scheduleTime,
+        channel_id: formData.slackTarget,
+        task_description: formData.description,
+        selected_agent: formattedTeammateName,
+        cron_string: cronString || ''
+      };
+
+      console.log('Scheduling task with payload:', payload);
+      const result = await onSchedule(payload);
+
+      // Show success toast immediately
+      toast({
+        title: "Task Scheduled Successfully",
+        description: `Task will run ${cronString ? 'on schedule' : 'at'} ${format(scheduleDate, 'PPpp')}`,
+        variant: "default",
+        duration: 4000,
+      });
+
+      // Create an assistant message that will appear in the chat flow
+      const assistantMessage = {
+        id: `scheduled-task-${Date.now()}-assistant`,
+        role: 'assistant',
+        content: [],
+        metadata: {
+          custom: {
+            isScheduledTask: true,
+            task: {
+              id: `scheduled-task-${Date.now()}`,
+              task_id: result.task_id,
+              task_uuid: result.task_uuid,
+              scheduled_time: scheduleDate.toISOString(),
+              parameters: {
+                message_text: formData.description,
+                cron_string: cronString || undefined,
+                team_id: teammate?.team_id || '',
+                user_email: teammate?.email || '',
+                channel_id: formData.slackTarget
+              },
+              status: 'scheduled',
+              created_at: new Date().toISOString()
+            }
+          }
+        },
+        createdAt: new Date()
+      };
+
+      // Create a system message for tracking
+      const systemMessage = {
+        id: `scheduled-task-${Date.now()}-system`,
+        role: 'system',
+        content: [
+          {
+            type: 'text',
+            text: `✅ Task scheduled successfully\n${formData.description}\n${
+              cronString 
+                ? `Recurring: ${cronString}` 
+                : `Scheduled for: ${format(scheduleDate, 'PPpp')}`
+            }`
+          }
+        ],
+        metadata: {
+          custom: {
+            isSystemMessage: true,
+            scheduledTask: result
+          }
+        },
+        createdAt: new Date()
+      };
+
+      // Add both messages to the chat
+      if (window.postMessage) {
+        // First add the system message for tracking
+        window.postMessage({
+          type: 'ADD_SYSTEM_MESSAGE',
+          message: systemMessage
+        }, '*');
+
+        // Then add the assistant message that will be visible in the chat flow
+        window.postMessage({
+          type: 'ADD_ASSISTANT_MESSAGE',
+          message: assistantMessage
+        }, '*');
       }
+
+      // Close modal and reset state
+      handleClose();
+
+    } catch (err) {
+      console.error('Failed to schedule task:', err);
+      setError(err instanceof Error ? err.message : 'Failed to schedule task. Please try again.');
+      
+      toast({
+        title: "Failed to Schedule Task",
+        description: err instanceof Error ? err.message : 'Please try again',
+        variant: "destructive",
+        duration: 5000,
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [isOpen]);
+  };
+
+  const renderChatFlow = () => (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <MessageSquare className="h-5 w-5 text-purple-400 flex-shrink-0" />
+        <div>
+          <h3 className="text-base font-medium text-slate-200">Task Configuration</h3>
+          <p className="text-sm text-slate-400">Configure your task and its destination</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Task Description */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center justify-between">
+                <FormLabel className="text-sm font-medium text-slate-200">
+                  Task Description
+                </FormLabel>
+              </div>
+              <FormControl>
+                <textarea
+                  {...field}
+                  placeholder="Describe what you want the AI to do..."
+                  className={cn(
+                    "w-full h-[120px] bg-[#1A2438] border-[#2D3B4E] rounded-lg p-3 text-slate-200 resize-none focus:border-purple-500 text-sm",
+                    form.formState.errors.description && "border-red-500 focus:border-red-500"
+                  )}
+                />
+              </FormControl>
+              {form.formState.errors.description && (
+                <p className="mt-1 text-xs text-red-400">
+                  {form.formState.errors.description.message?.toString()}
+                </p>
+              )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Channel / Slack Target */}
+        <FormField
+          control={form.control}
+          name="slackTarget"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-sm font-medium text-slate-200">
+                Destination (Channel/User)
+              </FormLabel>
+              <FormControl>
+                <div className="relative">
+                  <Input
+                    {...field}
+                    placeholder="#general or @mate"
+                    className={cn(
+                      "bg-[#1A2438] border-[#2D3B4E] text-slate-200",
+                      form.formState.errors.slackTarget && "border-red-500 focus:border-red-500"
+                    )}
+                  />
+                </div>
+              </FormControl>
+              {form.formState.errors.slackTarget && (
+                <p className="mt-1 text-xs text-red-400">
+                  {form.formState.errors.slackTarget.message?.toString()}
+                </p>
+              )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* You can add a short note reminding the user to pick a date/time too */}
+        <p className="text-xs text-slate-400">@someone or #channel must be in the future date/time below</p>
+
+      </div>
+    </div>
+  );
+
+  const isBackDisabled = () => {
+    return false; // Always allow going back
+  };
+
+  const getButtonText = () => {
+    if (step === 'method') return 'Continue to Details';
+    if (step === 'config') {
+      if (assignmentMethod === 'jira') return 'Create Task';
+      return 'Set Schedule';
+    }
+    return 'Schedule Task';
+  };
+
+  const renderStepIndicator = () => (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 p-1.5 rounded-lg bg-[#141B2B] border border-[#2D3B4E]">
+        {/* Method Selection Step */}
+        <button
+          onClick={() => {
+            if (step !== 'method') handleBack();
+          }}
+          className={cn(
+            "flex items-center rounded-full px-2.5 py-1 transition-all text-xs",
+            step === 'method'
+              ? "bg-purple-500 text-white"
+              : "border border-purple-500/30 hover:bg-purple-500/10 text-purple-400"
+          )}
+        >
+          <ListTodo className="h-3 w-3 mr-1" />
+          Method
+        </button>
+
+        {/* Configuration Step */}
+        {step !== 'method' && (
+          <>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+            <div className={cn(
+              "flex items-center rounded-full px-2.5 py-1 text-xs",
+              step === 'config'
+                ? "bg-purple-500 text-white"
+                : "border border-purple-500/30 text-purple-400"
+            )}>
+              {assignmentMethod === 'chat' && (
+                <>
+                  <MessageSquare className="h-3 w-3 mr-1" />
+                  Details
+                </>
+              )}
+              {assignmentMethod === 'jira' && (
+                <>
+                  <Trello className="h-3 w-3 mr-1" />
+                  Ticket
+                </>
+              )}
+              {assignmentMethod === 'webhook' && (
+                <>
+                  <Webhook className="h-3 w-3 mr-1" />
+                  Webhook
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Schedule Step */}
+        {step === 'schedule' && (
+          <>
+            <ChevronRight className="h-3.5 w-3.5 text-slate-600" />
+            <div className="flex items-center rounded-full px-2.5 py-1 text-xs bg-purple-500 text-white">
+              <Clock className="h-3 w-3 mr-1" />
+              Schedule
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
+  const handleTeammateSelect = (newTeammate: Teammate) => {
+    setCurrentTeammate(newTeammate);
+    setShowTeammateSwitch(false);
+  };
+
+  const handleClose = () => {
+    // Reset form
+    form.reset({
+      description: '',
+      slackTarget: '#general',
+      scheduleType: 'quick',
+      repeatOption: 'never',
+      date: addHours(new Date(), 1),
+      webhookUrl: '',
+      promptTemplate: '',
+      eventType: ''
+    });
+
+    // Reset all state variables
+    setStep('method');
+    setAssignmentMethod('chat');
+    setSelectedBoard('');
+    setSelectedTicket('');
+    setAdditionalContext('');
+    setShouldComment(true);
+    setShouldTransition(true);
+    setSelectedTransition('');
+    setWebhookUrl('');
+    setWebhookProvider(null);
+    setPromptTemplate('');
+    setTicketsPage(1);
+    setTicketSearch('');
+    setCustomTime('09:00');
+    setEventType('');
+    setCurrentStep('provider');
+    setShowTeammateSwitch(false);
+    setError(null);
+    setIsSubmitting(false);
+
+    // Remove any saved state from localStorage
+    localStorage.removeItem('taskSchedulingState');
+
+    // Close the modal
+    onClose();
+  };
 
   if (!teammate) {
     return null;
   }
 
-  const isValid = description.trim().length > 0 && !!date && slackTarget.trim().length > 0;
+  const isValid = () => {
+    const formState = form.getValues();
+    const formErrors = form.formState.errors;
+    
+    // Basic validation for required fields
+    if (!formState.description?.trim() || formErrors.description) {
+      return false;
+    }
+    
+    if (!formState.slackTarget?.trim() || formErrors.slackTarget) {
+      return false;
+    }
+    
+    if (!formState.date || formErrors.date) {
+      return false;
+    }
+    
+    // All validations passed
+    return true;
+  };
 
   const getCronString = (date: Date, repeatOption: string): string => {
     const minutes = date.getMinutes();
@@ -1174,405 +1645,107 @@ export function TaskSchedulingModal({ isOpen, onClose, teammate, onSchedule, ini
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    try {
-      const channelId = slackTarget.startsWith('#') ? slackTarget.substring(1) : slackTarget;
-      const taskUuid = crypto.randomUUID();
-      const taskId = taskUuid.replace(/-/g, '').substring(0, 32);
-      const scheduledTime = date.toISOString();
-      
-      const taskData = {
-        channel_id: channelId,
-        channel_name: `#${channelId}`,
-        created_at: new Date().toISOString(),
-        next_schedule_time: repeatOption !== 'never' ? scheduledTime : null,
-        parameters: {
-          action_context_data: {},
-          body: {
-            team: {
-              id: teammate.team_id || ''
-            },
-            user: {
-              id: teammate.user_id || ''
-            }
-          },
-          channel_id: channelId,
-          context: teammate.context || teammate.uuid,
-          cron_string: getCronString(date, repeatOption),
-          existing_session: false,
-          message_text: description,
-          organization_name: teammate.org_id || 'kubiya-ai',
-          repeat: repeatOption !== 'never',
-          task_uuid: taskUuid,
-          team_id: teammate.team_id || '',
-          user_email: teammate.email || ''
-        },
-        scheduled_time: scheduledTime,
-        status: "scheduled",
-        task_id: taskId,
-        task_uuid: taskUuid,
-        updated_at: null,
-        user_email: teammate.email || ''
-      };
-
-      console.log('Submitting task:', JSON.stringify(taskData, null, 2));
-      await onSchedule(taskData);
-      
-      toast({
-        title: "Task Scheduled",
-        description: "Your task has been scheduled successfully.",
-      });
-      onClose();
-    } catch (error) {
-      console.error('Failed to schedule task:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to schedule task. Please try again.",
-      });
-    }
-  };
-
-  const renderChatFlow = () => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <MessageSquare className="h-5 w-5 text-purple-400 flex-shrink-0" />
-        <div>
-          <h3 className="text-base font-medium text-slate-200">Where should the task run?</h3>
-          <p className="text-sm text-slate-400 mt-1">Select a channel or user to receive the task updates</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-[2fr,3fr] gap-6">
-        {/* Recent Selections */}
-        <div className="space-y-4">
-          <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-            <h4 className="text-sm font-medium text-slate-200 mb-3">Recent Channels</h4>
-            <div className="space-y-1">
-              {['#devops', '#alerts', '#monitoring'].map((channel) => (
-                <button
-                  key={channel}
-                  onClick={() => setSlackTarget(channel)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm",
-                    "hover:bg-purple-500/10 transition-colors",
-                    slackTarget === channel ? "bg-purple-500/10 text-purple-400" : "text-slate-400"
-                  )}
-                >
-                  <span className="text-slate-500">#</span>
-                  {channel.replace('#', '')}
-                </button>
-              ))}
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <FormProvider {...form}>
+        <DialogContent 
+          className={cn(
+            "max-w-5xl h-[90vh] bg-[#0F172A] border-[#1E293B] p-0 overflow-hidden flex flex-col"
+          )}
+          aria-describedby="dialog-description"
+        >
+          <DialogHeader className="px-6 py-4 border-b border-[#1E293B] flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-medium text-slate-200">
+                Assign a Task
+              </DialogTitle>
+              <DialogDescription id="dialog-description">
+                Assign a task to {teammate?.name || 'your teammate'}
+              </DialogDescription>
             </div>
-          </div>
+          </DialogHeader>
 
-          <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-            <h4 className="text-sm font-medium text-slate-200 mb-3">Recent Users</h4>
-            <div className="space-y-1">
-              {['@john', '@sarah', '@devteam'].map((user) => (
-                <button
-                  key={user}
-                  onClick={() => setSlackTarget(user)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm",
-                    "hover:bg-purple-500/10 transition-colors",
-                    slackTarget === user ? "bg-purple-500/10 text-purple-400" : "text-slate-400"
-                  )}
-                >
-                  <span className="text-slate-500">@</span>
-                  {user.replace('@', '')}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Main Configuration */}
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <label className="block text-sm font-medium text-slate-200">
-              Channel or User
-            </label>
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                <img 
-                  src="https://cdn-icons-png.flaticon.com/512/2111/2111615.png" 
-                  alt="Slack" 
-                  className="h-5 w-5 object-contain opacity-40" 
-                />
+          {error && (
+            <div className="px-6 py-3 bg-red-500/10 border-y border-red-500/20">
+              <div className="flex items-center gap-2 text-sm text-red-400">
+                <AlertCircle className="h-4 w-4" />
+                {error}
               </div>
-              <Input
-                placeholder="Enter #channel or @user"
-                value={slackTarget}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value && !value.startsWith('#') && !value.startsWith('@')) {
-                    if (/^[A-Za-z]/.test(value)) {
-                      setSlackTarget('#' + value);
-                    }
-                  } else {
-                    setSlackTarget(value);
-                  }
-                }}
-                className="bg-[#1E293B] border-[#2D3B4E] focus:border-purple-500 pl-10 pr-4 h-11 rounded-lg text-slate-200"
+            </div>
+          )}
+
+          <div className="flex-1 min-h-0 flex flex-col">
+            {/* Teammate Context Card - Fixed at top */}
+            <div className="px-6 py-3 border-b border-[#1E293B] flex-shrink-0">
+              <TeammateContextCard 
+                teammate={teammate}
+                onSwitchTeammate={() => setShowTeammateSwitch(true)}
+                className="w-full"
               />
             </div>
-            <p className="text-xs text-slate-400">
-              Use # for channels (e.g. #general) or @ for users (e.g. @john)
-            </p>
-          </div>
 
-          <div className="p-4 rounded-lg bg-[#1E293B] border border-[#2D3B4E]">
-            <h4 className="text-sm font-medium text-slate-200 mb-3">Task Description</h4>
-            <textarea
-              placeholder="What should the task do?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full h-24 bg-[#1A2438] border-[#2D3B4E] rounded-lg p-3 text-slate-200 resize-none"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const isBackDisabled = () => {
-    return false; // Always allow going back
-  };
-
-  const getButtonText = () => {
-    if (step === 'method') return 'Continue';
-    if (step === 'config') {
-      if (assignmentMethod === 'jira') return 'Create Task';
-      return 'Next';
-    }
-    return 'Schedule Task';
-  };
-
-  const renderStepIndicator = () => (
-    <div className="flex items-center gap-2 mb-6">
-      <div className="flex items-center gap-2 p-2 rounded-lg bg-[#141B2B] border border-[#2D3B4E]">
-        <button
-          onClick={() => {
-            if (step !== 'method') handleBack();
-          }}
-          className={cn(
-            "flex items-center rounded-full px-3 py-1 transition-all",
-            step === 'method'
-              ? "bg-emerald-500 hover:bg-emerald-600 text-white"
-              : "border border-emerald-500/30 hover:bg-emerald-500/10 text-emerald-400"
-          )}
-        >
-          <ListTodo className="h-3 w-3 mr-1" />
-          Task Type
-        </button>
-        {step !== 'method' && (
-          <>
-            <ChevronRight className="h-4 w-4 text-slate-600" />
-            <div className={cn(
-              "flex items-center rounded-full px-3 py-1",
-              "bg-emerald-500 text-white"
-            )}>
-              {assignmentMethod === 'chat' && (
-                <>
-                  <MessageSquare className="h-3 w-3 mr-1" />
-                  Chat
-                </>
-              )}
-              {assignmentMethod === 'jira' && (
-                <>
-                  <Trello className="h-3 w-3 mr-1" />
-                  JIRA
-                </>
-              )}
-              {assignmentMethod === 'webhook' && (
-                <>
-                  <Webhook className="h-3 w-3 mr-1" />
-                  Webhook
-                </>
-              )}
+            {/* Step Indicator - Fixed below teammate card */}
+            <div className="px-6 py-3 border-b border-[#1E293B] flex-shrink-0">
+              {renderStepIndicator()}
             </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
 
-  const handleDateSelect = (newDate: Date | undefined) => {
-    if (newDate) {
-      setDate(newDate);
-    }
-  };
-
-  const handleSwitchTeammate = () => {
-    setShowTeammateSwitch(true);
-  };
-
-  const handleTeammateSelect = (newTeammate: any) => {
-    // Update the teammate
-    if (onSchedule) {
-      onSchedule({ type: 'UPDATE_TEAMMATE', teammate: newTeammate });
-    }
-    setShowTeammateSwitch(false);
-    
-    // Reset JIRA integration check for new teammate
-    if (newTeammate?.uuid) {
-      fetch(`/api/teammates/${newTeammate.uuid}/integrations`)
-        .then(response => response.json())
-        .then(data => {
-          setHasJiraIntegration(data?.integrations?.some((i: string | Integration) => 
-            typeof i === 'string' ? i.toLowerCase() === 'jira' : i.name.toLowerCase() === 'jira'
-          ));
-        })
-        .catch(error => {
-          console.error('Failed to check JIRA integration:', error);
-          setHasJiraIntegration(false);
-        });
-    }
-  };
-
-  return (
-    <Dialog 
-      open={isOpen} 
-      onOpenChange={(open) => {
-        if (!open) {
-          // Clear state and close modal only when actually closing, not when switching teammates
-          setStep('method');
-          setAssignmentMethod('chat');
-          setSelectedBoard('');
-          setSelectedTicket('');
-          setDescription('');
-          setAdditionalContext('');
-          setShouldComment(true);
-          setShouldTransition(true);
-          setSelectedTransition('');
-          setDate(new Date());
-          setScheduleType('quick');
-          setRepeatOption('never');
-          setSlackTarget('');
-          setWebhookUrl('');
-          setWebhookProvider(null);
-          setPromptTemplate('');
-          setTicketsPage(1);
-          setTicketSearch('');
-          setCustomTime('09:00');
-          setEventType('');
-          setCurrentStep('provider');
-          setShowTeammateSwitch(false); // Make sure to close teammate switch when closing modal
-          onClose();
-        }
-      }}
-    >
-      <DialogContent 
-        className="max-w-[800px] max-h-[85vh] bg-[#0F172A] border-[#1E293B] p-0 overflow-hidden flex flex-col"
-        aria-describedby="dialog-description"
-      >
-        <DialogHeader className="px-6 py-4 border-b border-[#1E293B] flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg font-medium text-slate-200">Schedule a Task</DialogTitle>
-            <DialogDescription id="dialog-description">
-              Configure and schedule a task for {teammate?.name || 'your teammate'}
-            </DialogDescription>
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto">
-          {/* Teammate Context Card */}
-          <div className="px-6 py-4">
-            <TeammateContextCard 
-              teammate={teammate}
-              onSwitchTeammate={handleSwitchTeammate}
-              className="w-full"
-            />
-          </div>
-
-          {/* Breadcrumb Navigation */}
-          <div className="px-6 mb-4">
-            <div className="flex items-center text-sm text-slate-400">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setStep('method')}
-                className="text-slate-400 hover:text-purple-400 p-0 h-auto font-normal"
-              >
-                Task Type
-              </Button>
-              {step !== 'method' && (
-                <>
-                  <ChevronRight className="h-4 mx-2" />
-                  <div className="flex items-center rounded-full px-2 py-1 bg-purple-500/10 text-purple-400 text-xs">
-                    {assignmentMethod === 'chat' && (
-                      <>
-                        <MessageSquare className="h-3 w-3 mr-1" />
-                        Chat
-                      </>
-                    )}
-                    {assignmentMethod === 'webhook' && (
-                      <>
-                        <Webhook className="h-3 w-3 mr-1" />
-                        Webhook
-                      </>
-                    )}
-                    {assignmentMethod === 'jira' && (
-                      <>
-                        <Trello className="h-3 w-3 mr-1" />
-                        JIRA
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="px-6 py-4">
+                {renderStepContent()}
+              </div>
             </div>
-          </div>
 
-          {/* Main Content */}
-          <div className="px-6 pb-6">
-            {renderStepContent()}
-          </div>
-        </div>
-
-        <DialogFooter className="p-6 border-t border-[#1E293B] flex-shrink-0">
-          <div className="flex justify-between w-full">
-            {step !== 'method' && (
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handleBack}
-                className="bg-[#1E293B] border-[#2D3B4E] hover:bg-emerald-500/10 text-slate-200"
-                disabled={isBackDisabled()}
-              >
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to {step === 'config' ? 'Task Type' : 'Configuration'}
-              </Button>
-            )}
-            {(assignmentMethod !== 'webhook' || step !== 'config') && (
-              <Button
-                size="lg"
-                onClick={handleNext}
-                className={cn(
-                  "ml-auto",
-                  canProceed() 
-                    ? "bg-emerald-500 hover:bg-emerald-600" 
-                    : "bg-slate-700 text-slate-400 cursor-not-allowed"
+            {/* Footer - Fixed at bottom */}
+            <div className="px-6 py-4 border-t border-[#1E293B] flex-shrink-0">
+              <div className="flex justify-between w-full">
+                {step !== 'method' && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={handleBack}
+                    className="bg-[#1E293B] border-[#2D3B4E] hover:bg-emerald-500/10 text-slate-200"
+                    disabled={isBackDisabled() || isSubmitting}
+                  >
+                    <ArrowLeft className="h-5 w-5 mr-2" />
+                    Back to {step === 'config' ? 'Task Type' : 'Configuration'}
+                  </Button>
                 )}
-                disabled={!canProceed()}
-              >
-                {getButtonText()}
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </Button>
-            )}
+                {(assignmentMethod !== 'webhook' || step !== 'config') && (
+                  <Button
+                    size="lg"
+                    onClick={step === 'schedule' ? handleSubmit : handleNext}
+                    className={cn(
+                      "ml-auto",
+                      canProceed() 
+                        ? "bg-emerald-500 hover:bg-emerald-600" 
+                        : "bg-slate-700 text-slate-400 cursor-not-allowed"
+                    )}
+                    disabled={!canProceed() || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Scheduling...
+                      </>
+                    ) : (
+                      getButtonText()
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           </div>
-        </DialogFooter>
+        </DialogContent>
+      </FormProvider>
 
-        {showTeammateSwitch && teammate && (
-          <TeammateSwitch
-            currentTeammate={teammate}
-            onSelect={handleTeammateSelect}
-            onClose={() => setShowTeammateSwitch(false)}
-          />
-        )}
-      </DialogContent>
+      {showTeammateSwitch && teammate && (
+        <TeammateSwitch
+          currentTeammate={teammate}
+          onSelect={handleTeammateSelect}
+          onClose={() => setShowTeammateSwitch(false)}
+        />
+      )}
     </Dialog>
   );
 } 

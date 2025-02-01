@@ -27,6 +27,8 @@ import { Badge } from "@/app/components/ui/badge";
 import { MessageSquare } from 'lucide-react';
 import { ActivityHub } from '../activity/ActivityHub';
 import { Task } from '../activity/types';
+import { TeammateInfo } from '@/app/types/teammate';
+import type { TeammateDetails } from '@/app/components/shared/teammate-details/types';
 
 interface ThreadInfo {
   id: string;
@@ -141,6 +143,19 @@ const mapScheduledTasksToTasks = (scheduledTasks: ScheduledTask[]): Task[] => {
   }));
 };
 
+interface ScheduleTaskPayload {
+  schedule_time: string;
+  channel_id: string;
+  task_description: string;
+  selected_agent: string;
+  cron_string: string;
+}
+
+interface ScheduleTaskResult {
+  task_id: string;
+  task_uuid: string;
+}
+
 export const Chat = () => {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
@@ -164,6 +179,8 @@ export const Chat = () => {
     date?: Date;
   } | undefined>(undefined);
   const [isActivityHubOpen, setIsActivityHubOpen] = useState(false);
+  const [selectedTeammateForDetails, setSelectedTeammateForDetails] = useState<TeammateDetails | null>(null);
+  const [isTeammateDetailsOpen, setIsTeammateDetailsOpen] = useState(false);
 
   // Get task stats
   const taskStats = useMemo(() => getTaskStats(scheduledTasks), [scheduledTasks]);
@@ -435,6 +452,17 @@ export const Chat = () => {
                       currentMessages = [...currentMessages, systemMessage];
                       collectedSystemMessages = [...collectedSystemMessages, message];
                       setSystemMessages(prev => [...prev, message]);
+
+                      // Add an assistant message for task completion
+                      if (message.includes('✅')) {
+                        const assistantMessage = {
+                          id: generateUniqueId('assistant'),
+                          role: 'assistant',
+                          content: [{ type: 'text', text: 'Task completed successfully! You can delete this task or schedule it for later.' }],
+                          createdAt: new Date()
+                        };
+                        currentMessages = [...currentMessages, assistantMessage];
+                      }
                     });
                   }
                   break;
@@ -609,14 +637,14 @@ export const Chat = () => {
     }
   };
 
-  const handleScheduleTask = async (taskData: any) => {
+  const handleScheduleTask = async (taskData: ScheduleTaskPayload): Promise<ScheduleTaskResult> => {
     try {
       const response = await fetch('/api/scheduled_tasks', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(taskData)
       });
 
       if (!response.ok) {
@@ -626,45 +654,11 @@ export const Chat = () => {
       const result = await response.json();
       setScheduledTasks(prev => [...prev, result]);
 
-      // Add a system message about the scheduled task
-      const systemMessage = {
-        id: `system-${Date.now()}`,
-        role: 'system',
-        content: [{ 
-          type: 'text', 
-          text: `✅ Task scheduled successfully\n${taskData.task_description}\n${
-            taskData.cron_string 
-              ? `Recurring: ${taskData.cron_string}` 
-              : `Scheduled for: ${new Date(taskData.schedule_time).toLocaleString()}`
-          }`
-        }],
-        createdAt: new Date(),
-        metadata: {
-          custom: {
-            isSystemMessage: true,
-            scheduledTask: result
-          }
-        }
+      // Return the expected ScheduleTaskResult
+      return {
+        task_id: result.task_id,
+        task_uuid: result.task_uuid
       };
-
-      if (currentState?.currentThreadId && currentState.threads[currentState.currentThreadId]) {
-        const updatedThread = {
-          ...currentState.threads[currentState.currentThreadId],
-          messages: [...currentState.threads[currentState.currentThreadId].messages, systemMessage],
-        };
-
-        const updatedState = {
-          ...currentState,
-          threads: {
-            ...currentState.threads,
-            [currentState.currentThreadId]: updatedThread,
-          },
-        };
-
-        if (selectedTeammate) {
-          setTeammateState(selectedTeammate, updatedState);
-        }
-      }
     } catch (error) {
       console.error('Error scheduling task:', error);
       throw error;
@@ -727,6 +721,16 @@ export const Chat = () => {
       });
       throw error;
     }
+  };
+
+  const handleTeammateClick = (teammate: TeammateInfo) => {
+    if (!teammate) return;
+    const teammateDetails = {
+      ...teammate,
+      status: teammate.status === 'busy' ? 'active' : teammate.status || 'active'
+    } as TeammateDetails;
+    setSelectedTeammateForDetails(teammateDetails);
+    setIsTeammateDetailsOpen(true);
   };
 
   // Show loading state
@@ -910,10 +914,17 @@ export const Chat = () => {
         <ScheduledTasksModal
           isOpen={isScheduledTasksModalOpen}
           onClose={() => setIsScheduledTasksModalOpen(false)}
-          tasks={scheduledTasks}
+          tasks={scheduledTasks.map(task => ({
+            ...task,
+            status: task.status as 'pending' | 'completed' | 'failed' | 'scheduled' | undefined
+          }))}
           onDelete={handleDeleteTask}
           isLoading={isLoadingTasks}
-          teammate={teammate}
+          teammate={teammate ? {
+            uuid: teammate.uuid,
+            name: teammate.name,
+            email: teammate.email
+          } : undefined}
           onScheduleSimilar={handleScheduleSimilar}
         />
 

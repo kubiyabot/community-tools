@@ -51,7 +51,39 @@ export const ThreadsSidebar = () => {
   const handleNewThread = () => {
     if (!selectedTeammate) return;
     const newThreadId = Date.now().toString();
-    switchThread(selectedTeammate, newThreadId);
+    const newThread = {
+      id: newThreadId,
+      messages: [],
+      metadata: {
+        teammateId: selectedTeammate,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        title: 'New Conversation'
+      }
+    };
+    
+    // Update state with new thread
+    if (currentState) {
+      const updatedState = {
+        ...currentState,
+        threads: {
+          ...currentState.threads,
+          [newThreadId]: newThread
+        },
+        currentThreadId: newThreadId,
+        currentSessionId: newThreadId
+      };
+      setTeammateState(selectedTeammate, updatedState);
+    }
+  };
+
+  const handleThreadClick = (threadId: string) => {
+    if (!selectedTeammate || !currentState) return;
+    
+    // Only switch if clicking a different thread
+    if (currentState.currentThreadId !== threadId) {
+      switchThread(selectedTeammate, threadId);
+    }
   };
 
   const handleEditClick = (thread: any, e: React.MouseEvent) => {
@@ -168,7 +200,7 @@ export const ThreadsSidebar = () => {
             {filteredThreads.map((thread) => (
               <div
                 key={thread.id}
-                onClick={() => switchThread(selectedTeammate, thread.id)}
+                onClick={() => handleThreadClick(thread.id)}
                 className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all duration-200 cursor-pointer
                          hover:bg-gray-800/80 group relative
                          ${currentState?.currentThreadId === thread.id 

@@ -12,7 +12,7 @@ import { UserProfileButton } from './UserProfileButton';
 
 export default function MyAssistant() {
   const { user } = useUser();
-  const { selectedTeammate, teammates } = useTeammateContext();
+  const { selectedTeammate, teammates, setSelectedTeammate } = useTeammateContext();
   const { clearApiKey } = useConfig();
 
   // Register the generic tool UI handler for all tools
@@ -56,7 +56,10 @@ export default function MyAssistant() {
         {/* Scrollable Content */}
         <div className="flex-1 flex flex-col min-h-0">
           {/* Teammate Selector */}
-          <TeammateSelector />
+          <TeammateSelector
+            onSelect={setSelectedTeammate}
+            selectedId={selectedTeammate}
+          />
         </div>
       </div>
 

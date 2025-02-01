@@ -369,7 +369,19 @@ export function IntegrationsTab({ teammate }: IntegrationsTabProps) {
           }))
         });
         
-        setIntegrations(data);
+        // Filter integrations based on teammate's assigned integrations
+        const filteredIntegrations = data.filter((integration: Integration) => {
+          // Check if the integration exists in teammate's integrations array
+          return teammate.integrations?.some(teamInt => {
+            // Handle both string (uuid) and Integration object cases
+            if (typeof teamInt === 'string') {
+              return teamInt === integration.uuid;
+            }
+            return teamInt.uuid === integration.uuid || teamInt.id === integration.uuid;
+          });
+        });
+        
+        setIntegrations(filteredIntegrations);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch integration details:', err);
@@ -384,7 +396,7 @@ export function IntegrationsTab({ teammate }: IntegrationsTabProps) {
     } else {
       setIsLoading(false);
     }
-  }, [teammate?.uuid]);
+  }, [teammate?.uuid, teammate?.integrations]); // Added teammate.integrations as dependency
 
   if (!teammate) {
     return (

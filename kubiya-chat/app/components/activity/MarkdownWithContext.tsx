@@ -10,6 +10,7 @@ import type { Components } from 'react-markdown';
 interface MarkdownWithContextProps {
   content: string;
   className?: string;
+  components?: Partial<Components>;
 }
 
 // Define proper types for markdown components
@@ -70,8 +71,8 @@ function parseYamlLike(text: string): Record<string, unknown> {
   return result;
 }
 
-export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ content, className }) => {
-  const components: Partial<Components> = {
+export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ content, className, components: customComponents }) => {
+  const defaultComponents: Partial<Components> = {
     h1: ({ children, ...props }: MarkdownComponentProps) => (
       <h1 className="text-xl font-bold text-white mb-4" {...props}>{children}</h1>
     ),
@@ -109,8 +110,9 @@ export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ conten
         );
       }
 
+      // For code blocks, wrap in a div to break out of paragraph flow
       return (
-        <div className="my-2">
+        <div className="my-2 not-prose">
           <SyntaxHighlighter
             language={lang}
             style={vscDarkPlus}
@@ -122,6 +124,7 @@ export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ conten
               borderRadius: '0.375rem',
               fontSize: '0.875rem'
             }}
+            PreTag="div"
           >
             {content}
           </SyntaxHighlighter>
@@ -161,6 +164,12 @@ export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ conten
         {children}
       </td>
     ),
+  };
+
+  // Merge custom components with default components
+  const mergedComponents = {
+    ...defaultComponents,
+    ...customComponents
   };
 
   const formatMessageWithJson = (text: string): React.ReactNode[] => {
@@ -225,7 +234,7 @@ export const MarkdownWithContext: React.FC<MarkdownWithContextProps> = ({ conten
         <ReactMarkdown
           key={index}
           remarkPlugins={[remarkGfm]}
-          components={components}
+          components={mergedComponents}
           className={cn(
             "prose prose-invert max-w-none",
             "prose-headings:mt-0 prose-headings:mb-2",

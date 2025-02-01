@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,7 +38,11 @@ import {
   Lock,
   FileCode,
   FileQuestion,
-  Info
+  Info,
+  MessageSquare,
+  RefreshCw,
+  User2,
+  Wrench
 } from 'lucide-react';
 import { toast } from '@/app/components/use-toast';
 import { Tool } from '@/app/types/tool';
@@ -47,6 +51,7 @@ import { Separator } from "@/app/components/ui/separator";
 import type { SourceInfo } from "@/app/types/source";
 import Mermaid from '@/app/components/ui/mermaid';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/app/components/ui/hover-card";
+import { format } from 'date-fns';
 
 const modalStyles = {
   dialog: {
@@ -280,6 +285,9 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
   const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
   const [mermaidError, setMermaidError] = useState<string | null>(null);
   const [isMermaidLoading, setIsMermaidLoading] = useState(false);
+  const [mermaidRenderAttempts, setMermaidRenderAttempts] = useState(0);
+  const [mermaidLoadingState, setMermaidLoadingState] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
+  const mermaidTimeoutRef = useRef<NodeJS.Timeout>();
   
   // Debug logging for tool data
   useEffect(() => {
@@ -396,83 +404,164 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
     }
   };
 
-  // Add error boundary for mermaid rendering
-  const renderMermaidDiagram = () => {
+  // Replace the renderMermaidDiagram function
+  const renderMermaidDiagram = useCallback(() => {
     if (!tool.mermaid) return null;
-    
-    return (
-      <div className="w-full overflow-auto">
-        {mermaidError ? (
-          <div className="p-6 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-orange-400 mt-0.5" />
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-orange-400">
-                  There is a flow diagram attached to this tool, but we couldn't parse its Mermaid code
-                </p>
+
+    const MAX_RENDER_ATTEMPTS = 2;
+    const RENDER_TIMEOUT_MS = 5000; // Increased to 5 seconds
+
+    const handleRenderError = (error: Error, isTimeout = false) => {
+      console.error('Error rendering mermaid diagram:', error);
+      setMermaidError(error.message);
+      setMermaidLoadingState('error');
+      setIsMermaidLoading(false);
+      setMermaidRenderAttempts(prev => prev + 1);
+
+      // Show toast for timeout errors
+      if (isTimeout) {
+        toast({
+          title: "Diagram Rendering Issue",
+          description: "The flow diagram is taking too long to render. You can try again or view the diagram code.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    // Clear any existing timeout
+    if (mermaidTimeoutRef.current) {
+      clearTimeout(mermaidTimeoutRef.current);
+    }
+
+    if (mermaidRenderAttempts >= MAX_RENDER_ATTEMPTS) {
+      return (
+        <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-orange-400 mt-0.5 flex-shrink-0" />
+            <div className="space-y-2 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-medium text-orange-400">Unable to render flow diagram</h4>
                 <HoverCard>
                   <HoverCardTrigger asChild>
-                    <Button 
-                      variant="link" 
-                      className="text-xs text-orange-400 hover:text-orange-300 h-auto p-0"
-                    >
-                      View error details
+                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+                      <Info className="h-4 w-4 text-orange-400" />
                     </Button>
                   </HoverCardTrigger>
                   <HoverCardContent className="w-80">
                     <div className="space-y-2">
-                      <h5 className="text-sm font-medium text-slate-200">Parsing Error</h5>
-                      <div className="text-xs text-slate-400 bg-slate-800/50 p-2 rounded border border-slate-700">
-                        {mermaidError}
+                      <div className="text-xs text-slate-400">
+                        The flow diagram couldn't be rendered after multiple attempts. This might be due to:
                       </div>
-                      <a 
-                        href="https://mermaid.js.org/syntax/flowchart.html" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                      >
-                        View Mermaid documentation
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      <ul className="text-xs text-slate-400 list-disc pl-4 space-y-1">
+                        <li>Complex diagram structure</li>
+                        <li>Browser performance limitations</li>
+                        <li>Invalid diagram syntax</li>
+                      </ul>
                     </div>
                   </HoverCardContent>
                 </HoverCard>
-                <div className="mt-2 text-xs text-orange-400/80">
-                  <details className="cursor-pointer">
-                    <summary className="hover:text-orange-300">View Mermaid code</summary>
-                    <pre className="mt-2 p-2 bg-slate-800/50 rounded border border-orange-500/20 overflow-auto">
+              </div>
+              <div className="text-xs text-orange-400/80">
+                <details className="cursor-pointer group">
+                  <summary className="hover:text-orange-300">View diagram code</summary>
+                  <div className="mt-2 p-2 bg-slate-800/50 rounded border border-orange-500/20 overflow-auto">
+                    <code className="text-slate-300 font-mono whitespace-pre-wrap break-all">
                       {tool.mermaid}
-                    </pre>
-                  </details>
-                </div>
+                    </code>
+                  </div>
+                </details>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-orange-400 hover:text-orange-300"
+                  onClick={() => {
+                    setMermaidRenderAttempts(0);
+                    setMermaidError(null);
+                    setMermaidLoadingState('idle');
+                  }}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Try again
+                </Button>
+                <a
+                  href="https://mermaid.js.org/syntax/flowchart.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1"
+                >
+                  View syntax guide
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
             </div>
           </div>
-        ) : (
-          <>
-            {isMermaidLoading && (
-              <div className="flex items-center justify-center p-6 bg-[#1E293B] border border-[#2D3B4E] rounded-lg">
-                <div className="flex flex-col items-center gap-3">
-                  <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
-                  <p className="text-sm text-slate-400">Loading flow graph we found attached to this tool to describe how it works...</p>
-                </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full overflow-auto">
+        {/* Loading State */}
+        {isMermaidLoading && (
+          <div className="flex items-center justify-center p-6 bg-[#1E293B] border border-[#2D3B4E] rounded-lg">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-6 w-6 text-purple-400 animate-spin" />
+              <div className="flex flex-col items-center text-center">
+                <span className="text-sm font-medium text-slate-300">Trying to render flow diagram...</span>
+                <span className="text-xs text-slate-400 mt-1">This might take a few seconds</span>
               </div>
-            )}
-            <Mermaid 
-              chart={tool.mermaid}
-              onError={(error) => {
-                console.error('Error rendering mermaid diagram:', error);
-                setMermaidError(error.message);
-                setIsMermaidLoading(false);
-              }}
-              onRenderStart={() => setIsMermaidLoading(true)}
-              onRenderEnd={() => setIsMermaidLoading(false)}
-            />
-          </>
+            </div>
+          </div>
         )}
+
+        {/* Mermaid Diagram */}
+        <div 
+          className={cn(
+            "w-full overflow-auto transition-all duration-300", 
+            {
+              "opacity-0 scale-95": isMermaidLoading,
+              "opacity-100 scale-100": !isMermaidLoading,
+            }
+          )}
+        >
+          <Mermaid 
+            chart={tool.mermaid}
+            onError={(error) => handleRenderError(error)}
+            onRenderStart={() => {
+              setIsMermaidLoading(true);
+              setMermaidLoadingState('loading');
+              
+              // Set timeout to prevent infinite rendering
+              mermaidTimeoutRef.current = setTimeout(() => {
+                handleRenderError(
+                  new Error('The diagram is taking longer than expected to render. Please try again.'),
+                  true
+                );
+              }, RENDER_TIMEOUT_MS);
+            }}
+            onRenderEnd={() => {
+              setIsMermaidLoading(false);
+              setMermaidLoadingState('success');
+              if (mermaidTimeoutRef.current) {
+                clearTimeout(mermaidTimeoutRef.current);
+              }
+            }}
+          />
+        </div>
       </div>
     );
-  };
+  }, [tool.mermaid, mermaidRenderAttempts]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (mermaidTimeoutRef.current) {
+        clearTimeout(mermaidTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Add better error handling for file content
   const renderFileContent = (file: FileNode) => {
@@ -571,256 +660,516 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
     switch (activeTab) {
       case 'overview':
         return (
-          <div className="space-y-4 p-4">
-            {/* Build with SDK Section */}
-            <div className={cn(modalStyles.cards.container, "space-y-3")}>
-              <div className="flex items-start gap-3">
-                <div className="p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
-                  <img 
-                    src="https://www.python.org/static/community_logos/python-logo-generic.svg" 
-                    alt="Python" 
-                    className="h-5 w-5 object-contain"
-                  />
-                </div>
-                <div className="space-y-2 flex-1">
-                  <h3 className="text-sm font-medium text-slate-200">Build with Python SDK</h3>
-                  <div className="flex items-center gap-3">
-                    <a 
-                      href="https://pypi.org/project/kubiya-sdk/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                    >
-                      <FileCode className="h-4 w-4" />
-                      SDK Documentation
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                    <a 
-                      href="https://github.com/kubiya-engineering/kubiya-sdk" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                    >
-                      <GitPullRequest className="h-4 w-4" />
-                      GitHub Repository
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
+          <ScrollArea className="flex-1 h-full">
+            <div className="space-y-6 p-6">
+              {/* Core Tool Details */}
+              <div className={cn(modalStyles.cards.container, "space-y-4")}>
+                <h3 className={cn(modalStyles.text.subtitle, "flex items-center gap-2")}>
+                  <Wrench className="h-5 w-5 text-purple-400" />
+                  Tool Information
+                </h3>
+                <div className="grid gap-4">
+                  <div className="flex items-start gap-3 p-3 bg-[#1E293B]/50 rounded-lg border border-[#2D3B4E]">
+                    <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20">
+                      <Info className="h-4 w-4 text-purple-400" />
+                    </div>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-300">Type:</span>
+                        <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                          {tool.type}
+                        </Badge>
+                      </div>
+                      <h4 className="text-base font-medium text-slate-200">{tool.name}</h4>
+                      <p className="text-sm text-slate-400">{tool.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {tool.created_by && (
+                      <div className="flex items-center gap-2 p-3 bg-[#1E293B]/50 rounded-lg border border-[#2D3B4E]">
+                        <User2 className="h-4 w-4 text-blue-400" />
+                        <div>
+                          <span className="text-xs text-slate-400">Created by</span>
+                          <div className="text-sm text-slate-200">{tool.created_by}</div>
+                        </div>
+                      </div>
+                    )}
+                    {tool.created_at && (
+                      <div className="flex items-center gap-2 p-3 bg-[#1E293B]/50 rounded-lg border border-[#2D3B4E]">
+                        <Clock className="h-4 w-4 text-emerald-400" />
+                        <div>
+                          <span className="text-xs text-slate-400">Created on</span>
+                          <div className="text-sm text-slate-200">
+                            {format(new Date(tool.created_at), 'MMM d, yyyy')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Flow Diagram */}
-            {tool.mermaid && renderMermaidDiagram()}
-          </div>
+              {/* SDK Information */}
+              <div className={cn(modalStyles.cards.container, "space-y-4")}>
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
+                    <img 
+                      src="https://www.svgrepo.com/show/376344/python.svg"
+                      alt="Python"
+                      className="h-5 w-5 object-contain"
+                    />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-slate-200">Built with Kubiya Python SDK</h3>
+                      <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                        v1.0.2
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <a 
+                        href="https://pypi.org/project/kubiya-sdk/" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                        <FileCode className="h-4 w-4" />
+                        SDK Documentation
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                      <a 
+                        href="https://github.com/kubiya-engineering/kubiya-sdk" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                        <GitPullRequest className="h-4 w-4" />
+                        GitHub Repository
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Flow Diagram */}
+              {tool.mermaid && renderMermaidDiagram()}
+            </div>
+          </ScrollArea>
         );
 
       case 'runtime':
         return (
-          <div className="space-y-4 p-4">
-            {/* Docker Configuration */}
-            {tool.type === 'docker' && (
-              <div className={cn(modalStyles.cards.container, "space-y-3")}>
-                <h3 className={modalStyles.text.subtitle}>Container Configuration</h3>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Ship className="h-4 w-4 text-purple-400" />
-                    <span className={modalStyles.text.primary}>Docker Image: {tool.image}</span>
+          <ScrollArea className="flex-1 h-full">
+            <div className="space-y-6 p-6">
+              {/* Docker Configuration */}
+              {tool.type === 'docker' && tool.image && (
+                <div className={cn(modalStyles.cards.container, "space-y-4 relative overflow-hidden group")}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="relative">
+                    <h3 className={cn(modalStyles.text.subtitle, "flex items-center gap-2 mb-4")}>
+                      <Ship className="h-5 w-5 text-purple-400" />
+                      Container Configuration
+                    </h3>
+                    <div className="space-y-4">
+                      <HoverCard>
+                        <HoverCardTrigger>
+                          <div className="flex items-center gap-3 p-3 bg-[#1E293B]/50 rounded-lg cursor-help border border-[#2D3B4E] hover:border-purple-500/30 transition-colors">
+                            <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20">
+                              <Ship className="h-4 w-4 text-purple-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={modalStyles.text.primary}>Docker Image:</span>
+                                <code className="px-2 py-0.5 bg-slate-800 rounded text-sm font-mono text-slate-300">
+                                  {tool.image}
+                                </code>
+                              </div>
+                              <div className="flex gap-2 mt-2">
+                                {tool.image?.includes('docker.io') && (
+                                  <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                    Docker Hub
+                                  </Badge>
+                                )}
+                                {tool.image?.includes('gcr.io') && (
+                                  <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">
+                                    Google Container Registry
+                                  </Badge>
+                                )}
+                                {tool.image?.includes('ecr') && (
+                                  <Badge variant="outline" className="bg-orange-500/10 text-orange-400 border-orange-500/20">
+                                    Amazon ECR
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-slate-200">Container Runtime</h4>
+                            <p className="text-xs text-slate-400">
+                              This tool runs in an isolated Docker container with all required dependencies. The image can be from any container registry, allowing for flexible deployment and execution environments.
+                            </p>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+
+                      {tool.workdir && (
+                        <div className="flex items-center gap-3 p-3 bg-[#1E293B]/50 rounded-lg border border-[#2D3B4E]">
+                          <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20">
+                            <Folder className="h-4 w-4 text-purple-400" />
+                          </div>
+                          <div>
+                            <span className={modalStyles.text.primary}>Working Directory:</span>
+                            <code className="ml-2 px-2 py-0.5 bg-slate-800 rounded text-sm font-mono text-slate-300">
+                              {tool.workdir}
+                            </code>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {tool.workdir && (
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-4 w-4 text-purple-400" />
-                      <span className={modalStyles.text.primary}>Working Directory: {tool.workdir}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Environment Variables */}
-            {((tool.env && tool.env.length > 0) || (tool.secrets && tool.secrets.length > 0)) && (
-              <div className={cn(modalStyles.cards.container, "space-y-3")}>
-                <h3 className={modalStyles.text.subtitle}>Environment & Secrets</h3>
-                <div className="space-y-3">
-                  {tool.env && tool.env.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Variable className="h-4 w-4 text-emerald-400" />
-                        <span className={modalStyles.text.primary}>Environment Variables</span>
-                      </div>
-                      <div className="pl-6 space-y-1">
-                        {tool.env.map((env, idx) => (
-                          <div key={idx} className="text-sm text-slate-400">{env}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {tool.secrets && tool.secrets.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Key className="h-4 w-4 text-red-400" />
-                        <span className={modalStyles.text.primary}>Required Secrets</span>
-                      </div>
-                      <div className="pl-6 space-y-1">
-                        {tool.secrets.map((secret, idx) => (
-                          <div key={idx} className="text-sm text-slate-400">{secret}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+              {/* Environment Variables & Secrets */}
+              <div className={cn(modalStyles.cards.container, "space-y-4 relative overflow-hidden group")}>
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <div className="relative">
+                  <h3 className={cn(modalStyles.text.subtitle, "flex items-center gap-2 mb-4")}>
+                    <Key className="h-5 w-5 text-emerald-400" />
+                    Runtime Configuration
+                  </h3>
+                  <div className="grid gap-4">
+                    <HoverCard openDelay={200}>
+                      <HoverCardTrigger>
+                        <div className="p-4 bg-[#1E293B]/50 rounded-lg cursor-help border border-[#2D3B4E] hover:border-emerald-500/30 transition-colors">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Variable className="h-4 w-4 text-emerald-400" />
+                            <span className={modalStyles.text.primary}>Environment Variables</span>
+                          </div>
+                          {tool.env && tool.env.length > 0 ? (
+                            <div className="space-y-2">
+                              {tool.env.map((env, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <code className="px-2 py-0.5 bg-slate-800 rounded text-sm font-mono text-slate-300 flex-1">
+                                    {env}
+                                  </code>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-400">No environment variables defined</p>
+                          )}
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-slate-200">Dynamic Environment Variables</h4>
+                          <p className="text-xs text-slate-400">
+                            Environment variables can be injected at runtime based on:
+                          </p>
+                          <ul className="text-xs text-slate-400 space-y-1 list-disc pl-4">
+                            <li className="flex items-center gap-2">
+                              <MessageSquare className="h-4 w-4 text-purple-400" />
+                              <span>Teammate's configuration</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <GitBranch className="h-4 w-4 text-emerald-400" />
+                              <span>Active integrations</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Settings className="h-4 w-4 text-blue-400" />
+                              <span>Runtime context and events</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
 
-            {/* Volumes/Mounts */}
-            {tool.with_volumes && tool.with_volumes.length > 0 && (
-              <div className={cn(modalStyles.cards.container, "space-y-3")}>
-                <h3 className={modalStyles.text.subtitle}>Volume Mounts</h3>
-                <div className="space-y-2">
-                  {tool.with_volumes.map((mount: VolumeMount | string, idx: number) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Database className="h-4 w-4 text-purple-400" />
-                      <span className={modalStyles.text.primary}>
-                        {typeof mount === 'string' ? mount : `${mount.path} (${mount.name})`}
-                      </span>
-                    </div>
-                  ))}
+                    <HoverCard openDelay={200}>
+                      <HoverCardTrigger>
+                        <div className="p-4 bg-[#1E293B]/50 rounded-lg cursor-help border border-[#2D3B4E] hover:border-red-500/30 transition-colors">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Key className="h-4 w-4 text-red-400" />
+                            <span className={modalStyles.text.primary}>Runtime Secrets</span>
+                          </div>
+                          {tool.secrets && tool.secrets.length > 0 ? (
+                            <div className="space-y-2">
+                              {tool.secrets.map((secret, idx) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <Lock className="h-3.5 w-3.5 text-red-400/70" />
+                                  <code className="px-2 py-0.5 bg-slate-800 rounded text-sm font-mono text-slate-300 flex-1">
+                                    {secret}
+                                  </code>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-400">No secrets required</p>
+                          )}
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-slate-200">Secure Secrets Injection</h4>
+                          <p className="text-xs text-slate-400">
+                            Secrets are securely managed and injected from:
+                          </p>
+                          <ul className="text-xs text-slate-400 space-y-1 list-disc pl-4">
+                            <li className="flex items-center gap-2">
+                              <Lock className="h-3.5 w-3.5 text-red-400/70" />
+                              <span>Teammate's secure vault</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <GitBranch className="h-4 w-4 text-emerald-400" />
+                              <span>Connected integration credentials</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <Settings className="h-4 w-4 text-blue-400" />
+                              <span>Organization's secret store</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+
+                    {/* Volumes/Mounts */}
+                    <HoverCard openDelay={200}>
+                      <HoverCardTrigger>
+                        <div className="p-4 bg-[#1E293B]/50 rounded-lg cursor-help border border-[#2D3B4E] hover:border-purple-500/30 transition-colors">
+                          <div className="flex items-center gap-2 mb-3">
+                            <Database className="h-4 w-4 text-purple-400" />
+                            <span className={modalStyles.text.primary}>Volume Mounts</span>
+                          </div>
+                          {tool.with_volumes && tool.with_volumes.length > 0 ? (
+                            <div className="space-y-2">
+                              {tool.with_volumes.map((mount: VolumeMount | string, idx: number) => (
+                                <div key={idx} className="flex items-center gap-2">
+                                  <FolderOpen className="h-3.5 w-3.5 text-purple-400/70" />
+                                  <code className="px-2 py-0.5 bg-slate-800 rounded text-sm font-mono text-slate-300 flex-1">
+                                    {typeof mount === 'string' ? mount : `${mount.path} (${mount.name})`}
+                                  </code>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-400">No volume mounts configured</p>
+                          )}
+                        </div>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-80">
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium text-slate-200">Persistent Storage</h4>
+                          <p className="text-xs text-slate-400">
+                            Volume mounts provide persistent storage and data sharing between:
+                          </p>
+                          <ul className="text-xs text-slate-400 space-y-1 list-disc pl-4">
+                            <li className="flex items-center gap-2">
+                              <FolderOpen className="h-3.5 w-3.5 text-purple-400/70" />
+                              <span>Container executions</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <FolderOpen className="h-3.5 w-3.5 text-purple-400/70" />
+                              <span>Host system resources</span>
+                            </li>
+                            <li className="flex items-center gap-2">
+                              <FolderOpen className="h-3.5 w-3.5 text-purple-400/70" />
+                              <span>Shared team storage</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          </ScrollArea>
         );
 
       case 'inputs':
         return (
-          <div className="space-y-6 h-full">
-            {tool.args && tool.args.length > 0 ? (
-              <div className={cn(modalStyles.cards.container, "h-full flex flex-col")}>
-                <div className="flex items-start gap-3 mb-6">
-                  <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20 flex-shrink-0">
-                    <PackageOpen className="h-5 w-5 text-purple-400" />
+          <ScrollArea className="flex-1 h-full">
+            <div className="space-y-6 p-6">
+              {tool?.args?.length ? (
+                <div className={cn(modalStyles.cards.container, "h-full flex flex-col")}>
+                  <div className="flex items-start gap-4 mb-6">
+                    <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 flex-shrink-0">
+                      <MessageSquare className="h-6 w-6 text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-medium text-slate-200">AI-Driven Parameters</h3>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 p-0">
+                              <Info className="h-4 w-4 text-slate-400" />
+                            </Button>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-96">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium text-slate-200">Contextual Intelligence</h4>
+                                <p className="text-xs text-slate-400">
+                                  These parameters are handled intelligently by your AI Teammate through:
+                                </p>
+                                <ul className="text-xs text-slate-400 space-y-2 mt-2">
+                                  <li className="flex items-center gap-2">
+                                    <MessageSquare className="h-4 w-4 text-purple-400" />
+                                    <span>Natural conversation and dialogue</span>
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <GitBranch className="h-4 w-4 text-emerald-400" />
+                                    <span>Event context and system state</span>
+                                  </li>
+                                  <li className="flex items-center gap-2">
+                                    <Settings className="h-4 w-4 text-blue-400" />
+                                    <span>Automated decision making</span>
+                                  </li>
+                                </ul>
+                              </div>
+                              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                                <p className="text-xs text-purple-400">
+                                  Your AI Teammate can gather this information through natural conversation or automatically from context, making the interaction seamless and intuitive.
+                                </p>
+                              </div>
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
+                          Conversation Driven
+                        </Badge>
+                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                          Context Aware
+                        </Badge>
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                          AI Powered
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-slate-200 mb-1">Input Parameters</h3>
-                    <p className="text-xs text-slate-400">
-                      These parameters define the questions your AI Teammate will ask to gather necessary context before running this tool.
-                    </p>
-                  </div>
-                </div>
-
-                <ScrollArea className="flex-1 -mx-4 px-4">
-                  <div className="space-y-3 pb-4">
-                    {tool.args.map((arg, idx) => (
-                      <div 
-                        key={idx} 
-                        className="p-4 bg-[#1E293B]/50 hover:bg-[#1E293B] border border-[#2D3B4E] hover:border-[#7C3AED]/30 rounded-lg transition-colors group"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2 min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-slate-200 break-all">{arg.name}</span>
-                              <HoverCard>
-                                <HoverCardTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-slate-400 hover:text-slate-300 flex-shrink-0">
-                                    <Info className="h-4 w-4" />
-                                  </Button>
-                                </HoverCardTrigger>
-                                <HoverCardContent side="right" align="start" className="w-80">
-                                  <div className="space-y-2">
-                                    <h4 className="text-sm font-medium text-slate-200">Parameter Details</h4>
-                                    <div className="space-y-1">
-                                      <p className="text-xs text-slate-400">{arg.description}</p>
-                                      <div className="pt-2 flex flex-wrap gap-2">
-                                        {arg.type && (
-                                          <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
-                                            Type: {arg.type}
-                                          </Badge>
-                                        )}
-                                        {arg.required && (
-                                          <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20">
-                                            Required
-                                          </Badge>
-                                        )}
-                                        {arg.default !== undefined && (
-                                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                            Default: {JSON.stringify(arg.default)}
-                                          </Badge>
+                  <ScrollArea className="flex-1 -mx-4 px-4">
+                    <div className="space-y-3 pb-4">
+                      {tool.args.map((arg, idx) => (
+                        <div 
+                          key={idx} 
+                          className="p-4 bg-[#1E293B]/50 hover:bg-[#1E293B] border border-[#2D3B4E] hover:border-[#7C3AED]/30 rounded-lg transition-colors group"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-2 min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-medium text-slate-200 break-all">{arg.name}</span>
+                                <HoverCard>
+                                  <HoverCardTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0 text-slate-400 hover:text-slate-300 flex-shrink-0">
+                                      <Info className="h-4 w-4" />
+                                    </Button>
+                                  </HoverCardTrigger>
+                                  <HoverCardContent side="right" align="start" className="w-80">
+                                    <div className="space-y-2">
+                                      <h4 className="text-sm font-medium text-slate-200">Parameter Details</h4>
+                                      <div className="space-y-1">
+                                        <p className="text-xs text-slate-400">{arg.description}</p>
+                                        <div className="pt-2 flex flex-wrap gap-2">
+                                          {arg.type && (
+                                            <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                              Type: {arg.type}
+                                            </Badge>
+                                          )}
+                                          {arg.required && (
+                                            <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20">
+                                                Required
+                                            </Badge>
+                                          )}
+                                          {arg.default !== undefined && (
+                                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                              Default: {JSON.stringify(arg.default)}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {arg.enum && (
+                                          <div className="pt-2">
+                                            <span className="text-xs font-medium text-slate-300">Allowed Values:</span>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                              {arg.enum.map((value, i) => (
+                                                <Badge key={i} variant="outline" className="text-[10px]">
+                                                  {JSON.stringify(value)}
+                                                </Badge>
+                                              ))}
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
-                                      {arg.enum && (
-                                        <div className="pt-2">
-                                          <span className="text-xs font-medium text-slate-300">Allowed Values:</span>
-                                          <div className="mt-1 flex flex-wrap gap-1">
-                                            {arg.enum.map((value, i) => (
-                                              <Badge key={i} variant="outline" className="text-[10px]">
-                                                {JSON.stringify(value)}
-                                              </Badge>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
                                     </div>
-                                  </div>
-                                </HoverCardContent>
-                              </HoverCard>
+                                  </HoverCardContent>
+                                </HoverCard>
+                              </div>
+                              <p className="text-sm text-slate-400 break-words line-clamp-2 group-hover:line-clamp-none transition-all">
+                                {arg.description}
+                              </p>
                             </div>
-                            <p className="text-sm text-slate-400 break-words line-clamp-2 group-hover:line-clamp-none transition-all">
-                              {arg.description}
-                            </p>
-                          </div>
-                          <div className="flex items-start gap-2 flex-shrink-0 flex-wrap justify-end" style={{ minWidth: '120px' }}>
-                            <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20 whitespace-nowrap">
-                              {arg.type}
-                            </Badge>
-                            {arg.required && (
-                              <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 whitespace-nowrap">
-                                required
+                            <div className="flex items-start gap-2 flex-shrink-0 flex-wrap justify-end" style={{ minWidth: '120px' }}>
+                              <Badge variant="outline" className="bg-purple-500/10 text-purple-400 border-purple-500/20 whitespace-nowrap">
+                                {arg.type}
                               </Badge>
-                            )}
+                              {arg.required && (
+                                <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20 whitespace-nowrap">
+                                  required
+                                </Badge>
+                              )}
+                            </div>
                           </div>
+                          {(arg.pattern || arg.min !== undefined || arg.max !== undefined || arg.minLength !== undefined || arg.maxLength !== undefined) && (
+                            <div className="mt-3 pt-3 border-t border-[#2D3B4E] grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {arg.pattern && (
+                                <div className="col-span-full">
+                                  <span className="text-xs font-medium text-slate-300">Pattern:</span>
+                                  <code className="ml-2 text-xs text-slate-400 font-mono bg-slate-800/50 px-1.5 py-0.5 rounded break-all">
+                                    {arg.pattern}
+                                  </code>
+                                </div>
+                              )}
+                              {(arg.min !== undefined || arg.max !== undefined) && (
+                                <div>
+                                  <span className="text-xs font-medium text-slate-300">Range:</span>
+                                  <span className="ml-2 text-xs text-slate-400">
+                                    {arg.min !== undefined ? arg.min : '∞'} to {arg.max !== undefined ? arg.max : '∞'}
+                                  </span>
+                                </div>
+                              )}
+                              {(arg.minLength !== undefined || arg.maxLength !== undefined) && (
+                                <div>
+                                  <span className="text-xs font-medium text-slate-300">Length:</span>
+                                  <span className="ml-2 text-xs text-slate-400">
+                                    {arg.minLength !== undefined ? arg.minLength : '0'} to {arg.maxLength !== undefined ? arg.maxLength : '∞'} chars
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        {(arg.pattern || arg.min !== undefined || arg.max !== undefined || arg.minLength !== undefined || arg.maxLength !== undefined) && (
-                          <div className="mt-3 pt-3 border-t border-[#2D3B4E] grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {arg.pattern && (
-                              <div className="col-span-full">
-                                <span className="text-xs font-medium text-slate-300">Pattern:</span>
-                                <code className="ml-2 text-xs text-slate-400 font-mono bg-slate-800/50 px-1.5 py-0.5 rounded break-all">
-                                  {arg.pattern}
-                                </code>
-                              </div>
-                            )}
-                            {(arg.min !== undefined || arg.max !== undefined) && (
-                              <div>
-                                <span className="text-xs font-medium text-slate-300">Range:</span>
-                                <span className="ml-2 text-xs text-slate-400">
-                                  {arg.min !== undefined ? arg.min : '∞'} to {arg.max !== undefined ? arg.max : '∞'}
-                                </span>
-                              </div>
-                            )}
-                            {(arg.minLength !== undefined || arg.maxLength !== undefined) && (
-                              <div>
-                                <span className="text-xs font-medium text-slate-300">Length:</span>
-                                <span className="ml-2 text-xs text-slate-400">
-                                  {arg.minLength !== undefined ? arg.minLength : '0'} to {arg.maxLength !== undefined ? arg.maxLength : '∞'} chars
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-[400px] p-6">
-                <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
-                  <PackageOpen className="h-6 w-6 text-[#7C3AED]" />
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
-                <p className="text-sm font-medium text-[#94A3B8] mt-4">No input parameters required</p>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-[400px] p-6">
+                  <div className="p-4 rounded-full bg-[#1E293B] border border-purple-500/20">
+                    <MessageSquare className="h-8 w-8 text-purple-400" />
+                  </div>
+                  <h4 className="text-lg font-medium text-slate-200 mt-4">No Parameters Required</h4>
+                  <p className="text-sm text-slate-400 mt-2 text-center max-w-md">
+                    This tool can be executed directly without any additional input. Your AI Teammate will handle it automatically based on the context.
+                  </p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
         );
 
       case 'source':
@@ -1099,9 +1448,14 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
         <DialogHeader className={modalStyles.dialog.header}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center w-12 h-12">
                 {tool?.icon_url ? (
-                  <img src={tool.icon_url} alt={tool?.name || 'Tool'} className="h-6 w-6" />
+                  <img 
+                    src={tool.icon_url} 
+                    alt={tool?.name || 'Tool'} 
+                    className="h-6 w-6 object-contain"
+                    style={{ imageRendering: 'crisp-edges' }}
+                  />
                 ) : tool?.type === 'docker' ? (
                   <Ship className="h-6 w-6 text-emerald-400" />
                 ) : (

@@ -63,6 +63,52 @@ async function fetchTeammateDetails(teammateId: string, session: any) {
   }
 }
 
+// Add interface for API request body
+interface ScheduledTaskApiRequest {
+  schedule_time: string;
+  channel_id: string;
+  task_description: string;
+  selected_agent: string;
+  cron_string: string;
+}
+
+interface TeammateInfo {
+  uuid: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+}
+
+interface FormattedTaskResult {
+  task_id: string;
+  task_uuid: string;
+  task_type: string;
+  status: string;
+  scheduled_time: string;
+  channel_id: string;
+  created_at: string;
+  updated_at: string;
+  parameters: {
+    message_text: string;
+    cron_string: string;
+    selected_agent: string;
+    selected_agent_name?: string;
+    context: Record<string, any>;
+    slack_info: {
+      team_id: string;
+      channel_id: string;
+      channel_name: string;
+      channel_link: string;
+      tooltips: {
+        channel_context: string;
+        bi_directional: string;
+        direct_commands: string;
+      };
+    };
+  };
+  teammate?: TeammateInfo;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const res = NextResponse.next();
@@ -73,6 +119,7 @@ export async function GET(req: NextRequest) {
       return createUnauthorizedResponse('No ID token found');
     }
 
+    console.log('Fetching scheduled tasks...');
     const response = await fetch('https://api.kubiya.ai/api/v1/scheduled_tasks', {
       headers: {
         'Authorization': `Bearer ${session.idToken}`,
@@ -94,20 +141,51 @@ export async function GET(req: NextRequest) {
 
     const fetchedTasks: any[] = await response.json();
 
-    // Create a Set of unique teammate IDs
-    const teammateIds = new Set<string>(
-      fetchedTasks
-        .filter((task: any) => task.parameters?.selected_agent && typeof task.parameters.selected_agent === 'string')
-        .map((task: any) => task.parameters.selected_agent as string)
-    );
+    console.log('Raw tasks from API:', {
+      count: fetchedTasks.length,
+      sample: fetchedTasks.slice(0, 2).map(t => ({
+        taskId: t.task_id,
+        rawData: {
+          context: t.parameters?.context,
+          parameters: t.parameters
+        }
+      }))
+    });
+
+    // Create a Set of unique teammate IDs from parameters.context
+    const teammateIds = new Set<string>();
+    fetchedTasks.forEach((task: any) => {
+      // Extract teammate ID from parameters.context
+      if (task.parameters?.context && typeof task.parameters.context === 'string') {
+        teammateIds.add(task.parameters.context);
+        console.log('Found teammate ID in parameters.context:', {
+          taskId: task.task_id,
+          context: task.parameters.context
+        });
+      }
+    });
+
+    console.log('Found teammate IDs:', {
+      count: teammateIds.size,
+      ids: Array.from(teammateIds)
+    });
 
     // Fetch all unique teammates in parallel
     const teammateDetailsMap = new Map<string, any>();
     try {
       await Promise.all(
         Array.from(teammateIds).map(async (teammateId) => {
+          if (!teammateId.trim()) {
+            console.log('Skipping empty teammate ID');
+            return;
+          }
           const teammate = await fetchTeammateDetails(teammateId, session);
           teammateDetailsMap.set(teammateId, teammate);
+          console.log('Fetched teammate details:', {
+            teammateId,
+            name: teammate.name,
+            found: !!teammate
+          });
         })
       );
     } catch (error) {
@@ -119,51 +197,91 @@ export async function GET(req: NextRequest) {
 
     // Map tasks with teammate details
     const enhancedTasks = fetchedTasks.map((task: any) => {
-      // First try to get teammate details from the map
-      if (task.parameters?.selected_agent) {
-        const teammate = teammateDetailsMap.get(task.parameters.selected_agent);
-        if (teammate) {
-          return {
-            ...task,
-            teammate: {
-              uuid: teammate.uuid,
-              name: task.parameters.selected_agent_name || teammate.name,
-              description: teammate.description,
-              avatar: undefined // Avatar will be generated on the client side
-            }
-          };
+      // Log raw task data before processing
+      console.log('Processing task:', {
+        taskId: task.task_id,
+        rawData: {
+          context: task.parameters?.context,
+          parameters: task.parameters
         }
-      }
+      });
 
-      // If no teammate details but we have selected_agent_name, use that
-      if (task.parameters?.selected_agent_name) {
-        return {
-          ...task,
-          teammate: {
-            uuid: task.parameters.selected_agent || 'unknown',
-            name: task.parameters.selected_agent_name,
-            description: 'Teammate details loading...'
+      // Initialize the formatted task
+      const formattedTask: FormattedTaskResult = {
+        task_id: task.task_id,
+        task_uuid: task.task_uuid,
+        task_type: task.task_type || 'chat_activity',
+        status: task.status || 'pending',
+        scheduled_time: task.scheduled_time,
+        channel_id: task.channel_id,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+        parameters: {
+          message_text: task.parameters?.message_text || '',
+          cron_string: task.parameters?.cron_string || '',
+          selected_agent: task.parameters?.context || '',
+          selected_agent_name: '',
+          context: task.parameters?.action_context_data || {},
+          slack_info: {
+            team_id: task.parameters?.body?.team?.id || '',
+            channel_id: task.channel_id,
+            channel_name: task.channel_name || task.channel_id,
+            channel_link: task.parameters?.body?.team?.id ? 
+              `slack://channel?team=${task.parameters.body.team.id}&id=${task.channel_id.replace('#', '')}` : '',
+            tooltips: {
+              channel_context: "This task will run in this Slack channel. You can interact with the teammate directly in the channel.",
+              bi_directional: "Intelligent conversations are supported - the teammate understands context from previous messages in the channel.",
+              direct_commands: "Use @mention to give direct commands to the teammate in this channel"
+            }
           }
-        };
+        }
+      };
+
+      // Try to find teammate details from context
+      const teammateId = task.parameters?.context;
+      if (teammateId?.trim()) {
+        const teammate = teammateDetailsMap.get(teammateId);
+        if (teammate) {
+          formattedTask.teammate = {
+            uuid: teammate.uuid,
+            name: teammate.name,
+            description: teammate.description,
+            avatar: undefined // Avatar will be generated on client side
+          };
+          // Update selected_agent_name
+          formattedTask.parameters.selected_agent_name = teammate.name;
+          console.log('Added teammate to task:', {
+            taskId: task.task_id,
+            teammate: formattedTask.teammate
+          });
+        } else {
+          console.log('No teammate found for task:', {
+            taskId: task.task_id,
+            teammateId
+          });
+        }
+      } else {
+        console.log('No valid teammate ID for task:', {
+          taskId: task.task_id,
+          context: task.parameters?.context
+        });
       }
 
-      // If we have selected_agent but no name, format the agent ID
-      if (task.parameters?.selected_agent) {
-        const formattedName = task.parameters.selected_agent
-          .split('_')
-          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        return {
-          ...task,
-          teammate: {
-            uuid: task.parameters.selected_agent,
-            name: formattedName,
-            description: 'Teammate details loading...'
-          }
-        };
-      }
+      return formattedTask;
+    });
 
-      return task;
+    console.log('Final enhanced tasks:', {
+      count: enhancedTasks.length,
+      withTeammates: enhancedTasks.filter(t => t.teammate).length,
+      withoutTeammates: enhancedTasks.filter(t => !t.teammate).length,
+      sample: enhancedTasks.slice(0, 2).map(t => ({
+        taskId: t.task_id,
+        teammate: t.teammate,
+        parameters: {
+          selected_agent: t.parameters.selected_agent,
+          selected_agent_name: t.parameters.selected_agent_name
+        }
+      }))
     });
 
     return new Response(JSON.stringify(enhancedTasks), {
@@ -219,22 +337,53 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('Creating scheduled task with body:', body);
 
-    // Format the request body to match API requirements
-    const apiRequestBody = {
-      task_type: body.task_type || 'message',
-      scheduled_time: body.scheduled_time,
+    // Format the request body to match API requirements exactly
+    const apiRequestBody: ScheduledTaskApiRequest = {
+      schedule_time: body.scheduled_time || body.schedule_time, // Handle both formats
       channel_id: body.channel_id,
-      parameters: {
-        message_text: body.parameters.message_text,
-        selected_agent: body.parameters.selected_agent,
-        selected_agent_name: body.parameters.selected_agent_name || 
-          (body.teammate?.name ? body.teammate.name : undefined),
-        cron_string: body.parameters.cron_string,
-        context: body.parameters.context || {}
-      }
+      task_description: body.parameters?.message_text || body.task_description, // Handle both formats
+      selected_agent: body.parameters?.selected_agent || body.selected_agent, // Handle both formats
+      cron_string: (body.parameters?.cron_string || body.cron_string || '').trim() // Always include cron_string, default to empty string
     };
 
-    // Start creating task and fetching teammate details in parallel if a teammate is selected
+    // Validate required fields
+    if (!apiRequestBody.schedule_time || !apiRequestBody.channel_id || !apiRequestBody.task_description || !apiRequestBody.selected_agent) {
+      return new Response(JSON.stringify({
+        error: 'Missing required fields',
+        details: 'schedule_time, channel_id, task_description, and selected_agent are required'
+      }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    // Ensure schedule_time is in ISO format
+    try {
+      apiRequestBody.schedule_time = new Date(apiRequestBody.schedule_time).toISOString();
+    } catch (e) {
+      return new Response(JSON.stringify({
+        error: 'Invalid date format',
+        details: 'schedule_time must be a valid date'
+      }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    // Ensure channel_id starts with # or @
+    if (!apiRequestBody.channel_id.startsWith('#') && !apiRequestBody.channel_id.startsWith('@')) {
+      apiRequestBody.channel_id = `#${apiRequestBody.channel_id}`;
+    }
+
+    console.log('Sending API request with body:', apiRequestBody);
+
+    // Start creating task and fetching teammate details in parallel
     const [response, teammate] = await Promise.all([
       fetch('https://api.kubiya.ai/api/v1/scheduled_tasks', {
         method: 'POST',
@@ -249,9 +398,7 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify(apiRequestBody),
       }),
-      body.parameters?.selected_agent ? 
-        fetchTeammateDetails(body.parameters.selected_agent, session) : 
-        Promise.resolve(null)
+      fetchTeammateDetails(apiRequestBody.selected_agent, session)
     ]);
 
     if (!response.ok) {
@@ -288,17 +435,53 @@ export async function POST(req: NextRequest) {
 
     const result = await response.json();
 
-    // Add teammate details if available
-    const taskWithTeammate = teammate ? {
-      ...result,
-      teammate: {
-        uuid: teammate.uuid,
-        name: body.parameters.selected_agent_name || teammate.name,
-        description: teammate.description
+    // Format the response to match what the client expects
+    const formattedResult: FormattedTaskResult = {
+      task_id: result.task_id || body.task_id,
+      task_uuid: result.task_uuid || body.task_uuid,
+      task_type: result.task_type || 'message',
+      status: result.status || 'pending',
+      scheduled_time: result.schedule_time || apiRequestBody.schedule_time,
+      channel_id: result.channel_id || apiRequestBody.channel_id,
+      created_at: result.created_at || new Date().toISOString(),
+      updated_at: result.updated_at || new Date().toISOString(),
+      parameters: {
+        message_text: result.task_description || apiRequestBody.task_description,
+        cron_string: result.cron_string || apiRequestBody.cron_string || '',
+        selected_agent: result.selected_agent || apiRequestBody.selected_agent,
+        selected_agent_name: body.parameters?.selected_agent_name || teammate?.name,
+        context: body.parameters?.context || {},
+        slack_info: {
+          team_id: result.parameters?.body?.team?.id || '',
+          channel_id: result.channel_id,
+          channel_name: result.channel_name || result.channel_id,
+          channel_link: result.parameters?.body?.team?.id ? 
+            `slack://channel?team=${result.parameters.body.team.id}&id=${result.channel_id.replace('#', '')}` : '',
+          tooltips: {
+            channel_context: "This task will run in this Slack channel. You can interact with the teammate directly in the channel.",
+            bi_directional: "Intelligent conversations are supported - the teammate understands context from previous messages in the channel.",
+            direct_commands: "Use @mention to give direct commands to the teammate in this channel"
+          }
+        }
       }
-    } : result;
+    };
 
-    return new Response(JSON.stringify(taskWithTeammate), {
+    // Add teammate details if available
+    if (teammate) {
+      console.log('Adding teammate details to response:', teammate);
+      formattedResult.teammate = {
+        uuid: teammate.uuid,
+        name: teammate.name,
+        description: teammate.description,
+        avatar: undefined // Avatar will be generated on client side
+      };
+    } else {
+      console.log('No teammate details available for:', apiRequestBody.selected_agent);
+    }
+
+    console.log('Returning formatted result:', formattedResult);
+
+    return new Response(JSON.stringify(formattedResult), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -330,22 +513,15 @@ export async function DELETE(req: NextRequest) {
     
     if (!session?.idToken) {
       console.error('Scheduled Tasks endpoint - No ID token found');
-      return new Response(JSON.stringify({ 
-        error: 'Not authenticated',
-        details: 'No ID token found'
-      }), { 
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
+      return createUnauthorizedResponse('No ID token found');
     }
 
+    // Extract taskId from the URL
     const { searchParams } = new URL(req.url);
     const taskId = searchParams.get('taskId');
 
     if (!taskId) {
+      console.error('Delete task - No taskId provided');
       return new Response(JSON.stringify({ 
         error: 'Bad Request',
         details: 'Task ID is required'
@@ -357,6 +533,8 @@ export async function DELETE(req: NextRequest) {
         }
       });
     }
+
+    console.log('Attempting to delete task:', { taskId });
 
     const response = await fetch(`https://api.kubiya.ai/api/v1/scheduled_tasks/${taskId}`, {
       method: 'DELETE',
@@ -372,13 +550,32 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!response.ok) {
+      // Handle specific error cases
+      if (response.status === 401) {
+        return createUnauthorizedResponse('Session expired while deleting task');
+      }
+
+      if (response.status === 404) {
+        console.error('Task not found:', { taskId });
+        return new Response(JSON.stringify({
+          error: 'Task not found',
+          details: 'The specified task could not be found'
+        }), { 
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store'
+          }
+        });
+      }
+
       let errorData;
       try {
         errorData = await response.json();
-        console.error('Scheduled Tasks endpoint - Delete task error:', {
+        console.error('Delete task error:', {
+          taskId,
           status: response.status,
-          headers: Object.fromEntries(response.headers.entries()),
-          body: errorData
+          error: errorData
         });
       } catch (e) {
         errorData = {
@@ -389,9 +586,10 @@ export async function DELETE(req: NextRequest) {
       }
 
       return new Response(JSON.stringify({
-        error: 'Failed to delete scheduled task',
+        error: 'Failed to delete task',
         status: response.status,
-        details: errorData?.msg || response.statusText
+        details: errorData?.msg || response.statusText,
+        taskId
       }), { 
         status: response.status,
         headers: {
@@ -401,6 +599,9 @@ export async function DELETE(req: NextRequest) {
       });
     }
 
+    console.log('Task deleted successfully:', { taskId });
+
+    // Return 204 No Content for successful deletion
     return new Response(null, { 
       status: 204,
       headers: {
@@ -408,12 +609,17 @@ export async function DELETE(req: NextRequest) {
       }
     });
   } catch (error) {
-    console.error('Scheduled Tasks endpoint - Delete error:', {
+    console.error('Delete task error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined
     });
+
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createUnauthorizedResponse(error.message);
+    }
+
     return new Response(JSON.stringify({ 
-      error: 'Failed to delete scheduled task',
+      error: 'Failed to delete task',
       details: error instanceof Error ? error.message : 'Unknown error'
     }), { 
       status: 500,

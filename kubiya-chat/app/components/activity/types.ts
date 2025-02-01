@@ -3,6 +3,23 @@ export interface TeammateInfo {
   name: string;
   avatar?: string;
   description?: string;
+  overview?: {
+    description?: string;
+    integrations?: string[];
+    metrics?: {
+      tasksCompleted: number;
+      successRate: number;
+      lastActive: string;
+    };
+  };
+  capabilities?: {
+    tools?: string[];
+    integrations?: string[];
+    starters?: string[];
+    instruction_type?: string;
+    llm_model?: string;
+    description?: string;
+  };
 }
 
 export interface TaskParameters {
@@ -67,14 +84,15 @@ export interface Webhook {
 
 export interface TaskCardProps {
   task: Task;
-  onDelete: (taskId: string) => Promise<void>;
-  badges?: Array<{
-    variant?: 'default' | 'secondary' | 'destructive' | 'outline';
-    className?: string;
-    icon?: React.ReactNode;
+  badges?: {
+    variant: "outline";
+    className: string;
+    icon: React.ReactNode;
     text: string;
-  }>;
-  actions?: React.ReactNode;
+  }[];
+  onDelete?: (taskId: string) => Promise<void>;
+  onTeammateClick?: (teammate: any) => void;
+  currentUserEmail?: string;
 }
 
 export interface WebhookCardProps {
@@ -103,6 +121,7 @@ export interface TasksTabContentProps {
   onScheduleTask?: (task: TaskEditData) => void;
   onEditTask?: (task: TaskEditData) => void;
   onDeleteTask?: (taskId: string) => void;
+  currentUserEmail?: string;
 }
 
 export interface WebhooksTabContentProps {

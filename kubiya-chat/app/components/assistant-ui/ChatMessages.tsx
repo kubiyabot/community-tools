@@ -113,6 +113,7 @@ interface SourceMetadata {
 
 interface Source {
   sourceId: string;
+  uuid?: string;
   name?: string;
 }
 
@@ -264,54 +265,106 @@ interface QuickAction {
 // Add MermaidDiagram component before ChatMessages component
 const MermaidDiagram = ({ code }: { code: string }) => {
   const [svg, setSvg] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const elementId = useMemo(() => `mermaid-${Math.random().toString(36).substr(2, 9)}`, []);
+  const retryCount = useRef(0);
+  const maxRetries = 3;
 
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: true,
-      theme: 'dark',
-      securityLevel: 'loose',
-      themeVariables: {
-        darkMode: true,
-        background: '#1A1F2E',
-        primaryColor: '#7C3AED',
-        primaryTextColor: '#E2E8F0',
-        secondaryColor: '#4B5563',
-        lineColor: '#4B5563',
-        textColor: '#E2E8F0',
+    const initializeMermaid = async () => {
+      try {
+        await mermaid.initialize({
+          startOnLoad: true,
+          theme: 'dark',
+          securityLevel: 'loose',
+          themeVariables: {
+            darkMode: true,
+            background: '#1A1F2E',
+            primaryColor: '#7C3AED',
+            primaryTextColor: '#E2E8F0',
+            secondaryColor: '#4B5563',
+            lineColor: '#4B5563',
+            textColor: '#E2E8F0',
+          },
+          flowchart: {
+            curve: 'basis',
+            padding: 20,
+          },
+          sequence: {
+            actorMargin: 50,
+            boxMargin: 10,
+            mirrorActors: false,
+            bottomMarginAdj: 1,
+          }
+        });
+        return true;
+      } catch (err) {
+        console.warn('Failed to initialize mermaid:', err);
+        return false;
       }
-    });
+    };
 
     const renderDiagram = async () => {
+      setStatus('loading');
+      
       try {
-        const { svg } = await mermaid.render(elementId, code);
-        setSvg(svg);
-        setError(null);
+        // Initialize mermaid first
+        const initialized = await initializeMermaid();
+        if (!initialized) {
+          throw new Error('Failed to initialize mermaid');
+        }
+
+        // Parse the diagram to validate syntax
+        await mermaid.parse(code);
+        
+        // Render the diagram
+        const { svg: renderedSvg } = await mermaid.render(elementId, code);
+        
+        // If successful, update state
+        setSvg(renderedSvg);
+        setStatus('success');
+        retryCount.current = 0;
       } catch (err) {
-        console.error('Failed to render mermaid diagram:', err);
-        setError('Failed to render diagram');
+        console.warn('Mermaid render attempt failed:', err);
+        
+        // Implement retry logic
+        if (retryCount.current < maxRetries) {
+          retryCount.current += 1;
+          setTimeout(renderDiagram, 1000); // Retry after 1 second
+        } else {
+          setStatus('error');
+          console.error('Failed to render mermaid diagram after retries:', err);
+        }
       }
     };
 
     renderDiagram();
   }, [code, elementId]);
 
-  if (error) {
+  // Only show the diagram when it's successfully rendered
+  if (status === 'success' && svg) {
     return (
-      <div className="text-red-400 bg-red-400/10 rounded-lg p-3 text-sm">
-        {error}
-        <pre className="mt-2 text-xs">{code}</pre>
+      <div 
+        className="mermaid-diagram bg-[#1A1F2E] rounded-lg p-4 my-4 shadow-lg border border-purple-500/10"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    );
+  }
+
+  // Show loading state
+  if (status === 'loading') {
+    return (
+      <div className="mermaid-diagram-loading bg-[#1A1F2E] rounded-lg p-4 my-4 border border-purple-500/10 flex items-center justify-center h-20">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <div className="animate-spin h-4 w-4 border-2 border-purple-500/20 border-t-purple-500 rounded-full" />
+          <span>Rendering diagram...</span>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div 
-      className="mermaid-diagram bg-[#1A1F2E] rounded-lg p-4 my-4"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
+  // Don't show anything on error
+  return null;
 };
 
 export const ChatMessages = ({ 
@@ -459,15 +512,16 @@ export const ChatMessages = ({
         }
 
         const metadataPromises = sources.map(async (source: Source) => {
-          if (!source.sourceId) {
-            console.warn('Skipping metadata fetch - sourceId is undefined:', source);
+          const effectiveSourceId = source.sourceId || source.uuid;
+          if (!effectiveSourceId) {
+            console.warn('Skipping metadata fetch - no sourceId or uuid found:', source);
             return null;
           }
           
-          const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${source.sourceId}/metadata`);
+          const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${effectiveSourceId}/metadata`);
           if (!metadataRes.ok) {
             console.error('Failed to fetch metadata:', {
-              sourceId: source.sourceId,
+              sourceId: effectiveSourceId,
               status: metadataRes.status
             });
             return null;
@@ -921,53 +975,29 @@ export const ChatMessages = ({
             org_id: teammate.org_id || '',
             email: teammate.email || '',
             context: teammate.context || teammate.uuid,
-            capabilities: {
-              integrations: (teammate.integrations || []).map(integration => {
-                const defaultIntegrationType = (type: string): IntegrationType => {
-                  const validTypes: IntegrationType[] = ['jira', 'slack', 'github', 'gitlab', 'aws', 'kubernetes', 'webhook'];
-                  return validTypes.includes(type.toLowerCase() as IntegrationType) 
-                    ? type.toLowerCase() as IntegrationType 
-                    : 'custom';
-                };
-
-                if (typeof integration === 'string') {
-                  return {
-                    name: integration,
-                    integration_type: defaultIntegrationType(integration),
-                    auth_type: 'global' as const,
-                    description: integration
-                  };
-                }
-                return {
-                  name: integration.name,
-                  integration_type: integration.integration_type || defaultIntegrationType(integration.name),
-                  auth_type: integration.auth_type || 'global',
-                  description: integration.description || integration.name
-                };
-              })
-            }
           }}
           onSchedule={async (data) => {
             try {
-              await fetch('/api/tasks', {
+              const response = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(data),
               });
-              toast({
-                title: "Task Scheduled",
-                description: "The task has been scheduled successfully.",
-              });
-              setShowTaskModal(false);
+              
+              if (!response.ok) {
+                throw new Error('Failed to schedule task');
+              }
+              
+              const result = await response.json();
+              return {
+                task_id: result.task_id,
+                task_uuid: result.task_uuid
+              };
             } catch (error) {
               console.error('Failed to schedule task:', error);
-              toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Failed to schedule task. Please try again.",
-              });
+              throw error;
             }
           }}
         />

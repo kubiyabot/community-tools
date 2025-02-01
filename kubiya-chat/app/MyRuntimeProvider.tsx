@@ -78,7 +78,7 @@ interface TeammateContextType {
   }>;
   loadingTeammateIds: Set<string>;
   loadTeammateCapabilities: (teammateId: string) => Promise<void>;
-  switchThread: () => void;
+  switchThread: (teammate: string, threadId: string) => void;
   setTeammateState: (teammateId: string, state: TeammateState) => void;
   handleSubmit: (message: string) => Promise<void>;
   setSelectedTeammate: (teammateId: string | undefined) => void;
@@ -537,27 +537,34 @@ export const MyRuntimeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem(`teammate_state_${teammateId}`, JSON.stringify(state));
   }, []);
 
-  const switchThread = useCallback(() => {
-    if (!selectedTeammate) return;
+  const switchThread = useCallback((teammate: string, threadId: string) => {
+    if (!teammate) return;
+    
     setTeammateStates(prev => {
-      const currentState = prev[selectedTeammate] || createEmptyTeammateState(selectedTeammate);
+      const currentState = prev[teammate] || createEmptyTeammateState(teammate);
+      
+      // If the thread doesn't exist, create it
+      if (!currentState.threads[threadId]) {
+        currentState.threads[threadId] = createEmptyThread(teammate);
+      }
+      
+      // Create updated state
       const updatedState = {
         ...currentState,
-        currentThreadId: Date.now().toString(),
-        currentSessionId: Date.now().toString(),
-        threads: {
-          ...currentState.threads,
-          [Date.now().toString()]: currentState.threads[currentState.currentThreadId] || createEmptyThread(selectedTeammate)
-        }
+        currentThreadId: threadId,
+        currentSessionId: threadId
       };
-
-      localStorage.setItem(`teammate_state_${selectedTeammate}`, JSON.stringify(updatedState));
+      
+      // Persist to localStorage
+      localStorage.setItem(`teammate_state_${teammate}`, JSON.stringify(updatedState));
+      
+      // Return updated states
       return {
         ...prev,
-        [selectedTeammate]: updatedState
+        [teammate]: updatedState
       };
     });
-  }, [selectedTeammate]);
+  }, []);
 
   const handleTeammateSelect = useCallback((teammateId: string) => {
     if (!teammateId) return;

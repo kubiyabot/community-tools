@@ -9,7 +9,7 @@ interface Integration {
   status: 'active' | 'inactive';
 }
 
-interface Teammate {
+export interface Teammate {
   uuid: string;
   name?: string;
   team_id?: string;
@@ -20,6 +20,11 @@ interface Teammate {
   integrations?: Integration[];
 }
 
+interface TeammateWithLoadingState extends Teammate {
+  isLoadingIntegrations?: boolean;
+  hasLoadedIntegrations?: boolean;
+}
+
 interface TeammateSwitchProps {
   currentTeammate: Teammate;
   onSelect: (teammate: Teammate) => void;
@@ -28,37 +33,21 @@ interface TeammateSwitchProps {
 }
 
 export function TeammateSwitch({ currentTeammate, onSelect, onClose, className }: TeammateSwitchProps) {
-  const [teammates, setTeammates] = useState<Teammate[]>([]);
+  const [teammates, setTeammates] = useState<TeammateWithLoadingState[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load teammates without integrations first
   useEffect(() => {
     const fetchTeammates = async () => {
       try {
         const response = await fetch('/api/teammates');
         const data = await response.json();
-        
-        // Fetch integrations for each teammate
-        const teammatesWithIntegrations = await Promise.all(
-          data.map(async (teammate: Teammate) => {
-            try {
-              const integrationsResponse = await fetch(`/api/teammates/${teammate.uuid}/integrations`);
-              const integrationsData = await integrationsResponse.json();
-              return {
-                ...teammate,
-                integrations: integrationsData.integrations.map((integration: string | Integration) => ({
-                  name: typeof integration === 'string' ? integration : integration.name,
-                  status: 'active' as const
-                }))
-              };
-            } catch (error) {
-              console.error(`Failed to fetch integrations for teammate ${teammate.uuid}:`, error);
-              return teammate;
-            }
-          })
-        );
-
-        setTeammates(teammatesWithIntegrations);
+        setTeammates(data.map((teammate: Teammate) => ({
+          ...teammate,
+          isLoadingIntegrations: false,
+          hasLoadedIntegrations: false
+        })));
       } catch (error) {
         console.error('Failed to fetch teammates:', error);
         setError('Failed to load teammates. Please try again.');
@@ -69,6 +58,53 @@ export function TeammateSwitch({ currentTeammate, onSelect, onClose, className }
 
     fetchTeammates();
   }, []);
+
+  // Function to load integrations for a specific teammate
+  const loadIntegrationsForTeammate = async (teammateId: string) => {
+    // Don't load if already loaded or loading
+    const teammate = teammates.find(t => t.uuid === teammateId);
+    if (teammate?.hasLoadedIntegrations || teammate?.isLoadingIntegrations) return;
+
+    // Update loading state
+    setTeammates(prev => prev.map(t => 
+      t.uuid === teammateId ? { ...t, isLoadingIntegrations: true } : t
+    ));
+
+    try {
+      const response = await fetch(`/api/teammates/${teammateId}/integrations`);
+      const data = await response.json();
+      
+      setTeammates(prev => prev.map(t => 
+        t.uuid === teammateId ? {
+          ...t,
+          integrations: data.integrations.map((integration: string | Integration) => ({
+            name: typeof integration === 'string' ? integration : integration.name,
+            status: 'active' as const
+          })),
+          isLoadingIntegrations: false,
+          hasLoadedIntegrations: true
+        } : t
+      ));
+    } catch (error) {
+      console.error(`Failed to fetch integrations for teammate ${teammateId}:`, error);
+      setTeammates(prev => prev.map(t => 
+        t.uuid === teammateId ? { ...t, isLoadingIntegrations: false } : t
+      ));
+    }
+  };
+
+  // Load integrations for current teammate immediately
+  useEffect(() => {
+    if (currentTeammate?.uuid) {
+      loadIntegrationsForTeammate(currentTeammate.uuid);
+    }
+  }, [currentTeammate.uuid]);
+
+  const handleTeammateClick = async (teammate: TeammateWithLoadingState) => {
+    onSelect(teammate);
+    // Load integrations after selection
+    loadIntegrationsForTeammate(teammate.uuid);
+  };
 
   const getIntegrationIcon = (name: string) => {
     const icons: Record<string, string> = {
@@ -82,7 +118,6 @@ export function TeammateSwitch({ currentTeammate, onSelect, onClose, className }
   };
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    // Prevent click from reaching the parent modal
     e.stopPropagation();
   };
 
@@ -125,7 +160,7 @@ export function TeammateSwitch({ currentTeammate, onSelect, onClose, className }
               {teammates.map((teammate) => (
                 <button
                   key={teammate.uuid}
-                  onClick={() => onSelect(teammate)}
+                  onClick={() => handleTeammateClick(teammate)}
                   className={cn(
                     "w-full p-4 rounded-lg text-left transition-all",
                     "border hover:border-opacity-30",
@@ -152,7 +187,9 @@ export function TeammateSwitch({ currentTeammate, onSelect, onClose, className }
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {teammate.integrations?.map((integration) => (
+                      {teammate.isLoadingIntegrations ? (
+                        <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
+                      ) : teammate.integrations?.map((integration) => (
                         <div
                           key={integration.name}
                           className="relative group"
