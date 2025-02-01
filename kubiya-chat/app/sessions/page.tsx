@@ -12,19 +12,19 @@ import {
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Input } from '@/app/components/ui/input';
+import { Button } from '@/app/components/ui/button';
+import { Badge } from '@/app/components/ui/badge';
+import { Card } from '@/app/components/ui/card';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from '@/app/components/ui/select';
+import { ScrollArea } from '@/app/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/app/components/ui/alert';
 import { cn } from '@/lib/utils';
 
 interface Session {

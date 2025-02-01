@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { useEntity } from '@/app/providers/EntityProvider';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/app/components/ui/badge';
+import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { User, Users, AlertCircle } from 'lucide-react';
 import type { TeammateDetails } from './types';
 

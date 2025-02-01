@@ -1,10 +1,11 @@
 "use client";
 
+import React from 'react';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/app/components/ui/dialog";
+import { Button } from "@/app/components/ui/button";
+import { ScrollArea } from "@/app/components/ui/scroll-area";
+import { Badge } from "@/app/components/ui/badge";
 import Editor from '@monaco-editor/react';
 import { cn } from "@/lib/utils";
 import {

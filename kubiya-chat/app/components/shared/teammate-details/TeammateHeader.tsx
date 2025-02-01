@@ -2,7 +2,7 @@
 
 import { Calendar, User, Code, Cpu, Variable, Lock, Globe, Key, GitFork, GitMerge, GitPullRequest } from 'lucide-react';
 import type { TeammateHeaderProps } from './types';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { generateAvatarUrl } from '@/app/components/TeammateSelector';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';

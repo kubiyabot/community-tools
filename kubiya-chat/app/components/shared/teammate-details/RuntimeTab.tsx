@@ -6,8 +6,8 @@ import {
   Lock, Variable, Database, Server, Cloud, Cpu, HardDrive, 
   GitBranch, Key, Shield, Clock, Settings, AlertCircle, User, Terminal, Users 
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/app/components/ui/badge';
+import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { useEntity } from '@/app/providers/EntityProvider';
 import type { TeammateDetails, Runner } from './types';
 import { Avatar, AvatarImage, AvatarFallback } from '../../../components/ui/avatar';
