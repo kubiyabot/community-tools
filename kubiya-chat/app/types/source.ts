@@ -20,22 +20,33 @@ export interface DynamicConfig {
 }
 
 export interface SourceInfo {
-  sourceId: string;
   uuid: string;
+  sourceId: string;
   name: string;
   url: string;
   type: string;
-  tools: Tool[];
+  runner: string;
+  tools: any[];
   isLoading?: boolean;
   error?: string;
   connected_agents_count: number;
   connected_tools_count: number;
   connected_workflows_count: number;
-  kubiya_metadata: KubiyaMetadata;
+  kubiya_metadata: {
+    created_at: string;
+    last_updated: string;
+    user_created: string;
+    user_last_updated: string;
+  };
   errors_count: number;
-  source_meta: SourceMeta;
-  dynamic_config: DynamicConfig | null;
-  runner: string;
+  source_meta: {
+    id: string;
+    url: string;
+    branch: string;
+    commit: string;
+    committer: string;
+  };
+  dynamic_config: any;
   managed_by: string;
   task_id: string;
 } 

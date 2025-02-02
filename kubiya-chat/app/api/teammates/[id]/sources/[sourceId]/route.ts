@@ -113,4 +113,92 @@ export async function GET(
       }
     });
   }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string; sourceId: string } }
+) {
+  try {
+    const res = NextResponse.next();
+    const session = await getSession(req, res);
+    
+    if (!session?.idToken) {
+      console.error('Attach source endpoint - No ID token found');
+      return new Response(JSON.stringify({ 
+        error: 'Not authenticated',
+        details: 'No ID token found'
+      }), { 
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store'
+        }
+      });
+    }
+
+    // First get the teammate to get current sources
+    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${params.id}`, {
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
+      }
+    });
+
+    if (!teammateResponse.ok) {
+      throw new Error(`Failed to fetch teammate: ${await teammateResponse.text()}`);
+    }
+
+    const teammate = await teammateResponse.json();
+    const currentSources = teammate.sources || [];
+
+    // Add the new source if it's not already there
+    if (!currentSources.includes(params.sourceId)) {
+      currentSources.push(params.sourceId);
+    }
+
+    // Update the teammate with the new sources array
+    const updateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${params.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
+      },
+      body: JSON.stringify({
+        sources: currentSources
+      })
+    });
+
+    if (!updateResponse.ok) {
+      throw new Error(`Failed to update teammate: ${await updateResponse.text()}`);
+    }
+
+    return new Response(null, { status: 204 });
+  } catch (error) {
+    console.error('Attach source endpoint error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      params: await params
+    });
+    return new Response(JSON.stringify({ 
+      error: 'Failed to attach source',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { 
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store'
+      }
+    });
+  }
 } 

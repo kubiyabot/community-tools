@@ -74,28 +74,11 @@ export interface Tool {
 }
 
 export interface TeammateDetails {
-  uuid: string;
+  id: string;
   name: string;
-  description?: string;
-  avatar_url?: string;
-  llm_model?: string;
-  instruction_type?: string;
-  tools?: Tool[];
+  uuid: string;
   runners?: string[];
-  integrations?: Array<{
-    id: string;
-    name: string;
-    type: string;
-    icon_url?: string;
-  }>;
-  sources?: string[];  // Array of source UUIDs
-  metadata?: {
-    created_at: string;
-    last_updated: string;
-    tools_count: number;
-    integrations_count: number;
-    sources_count: number;
-  };
+  // ... other existing properties
 }
 
 export interface TeammateWithCapabilities extends TeammateDetails {
