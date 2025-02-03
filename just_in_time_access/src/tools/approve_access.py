@@ -70,6 +70,7 @@ approve_access_tool = JustInTimeAccessTool(
     env=[
         "KUBIYA_AGENT_NAME",
         "SLACK_CHANNEL_ID",
+        "KUBIYA_AGENT_UUID",
     ],
     secrets=[
         "SLACK_API_TOKEN",

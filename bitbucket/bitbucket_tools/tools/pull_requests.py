@@ -1,7 +1,7 @@
-from .base import BitbucketTool, register_bitbucket_tool
+from .base import BitbucketCliTool, register_bitbucket_tool
 from kubiya_sdk.tools import Arg
 
-pr_create = BitbucketTool(
+pr_create = BitbucketCliTool(
     name="pr_create",
     description="Create a new Bitbucket pull request",
     content="""
@@ -34,7 +34,7 @@ print(f"Created pull request: {pr['id']} - {pr['title']}")
     ],
 )
 
-pr_get = BitbucketTool(
+pr_get = BitbucketCliTool(
     name="pr_get",
     description="Get Bitbucket pull request details",
     content="""
@@ -57,7 +57,7 @@ print(f"Pull request details: {pr}")
     ],
 )
 
-pr_list = BitbucketTool(
+pr_list = BitbucketCliTool(
     name="pr_list",
     description="List Bitbucket pull requests",
     content="""
@@ -80,7 +80,7 @@ for pr in prs:
     ],
 )
 
-pr_merge = BitbucketTool(
+pr_merge = BitbucketCliTool(
     name="pr_merge",
     description="Merge a Bitbucket pull request",
     content="""

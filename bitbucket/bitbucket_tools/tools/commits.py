@@ -1,7 +1,7 @@
-from .base import BitbucketTool, register_bitbucket_tool
+from .base import BitbucketCliTool, register_bitbucket_tool
 from kubiya_sdk.tools import Arg
 
-commit_get = BitbucketTool(
+commit_get = BitbucketCliTool(
     name="commit_get",
     description="Get Bitbucket commit details",
     content="""
@@ -24,7 +24,7 @@ print(f"Commit details: {commit}")
     ],
 )
 
-commit_list = BitbucketTool(
+commit_list = BitbucketCliTool(
     name="commit_list",
     description="List Bitbucket commits",
     content="""

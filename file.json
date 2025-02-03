@@ -1,0 +1,17 @@
+{
+    "jenkins": {
+        "url": "http://jenkins.jenkins",
+        "username": "admin",
+        "password": "JENKINS_API_TOKEN",
+        "jobs": {
+            "sync_all": false,
+            "include": [
+                "deploy-to-production",
+                "run-integration-tests"
+            ],
+            "exclude": [
+                "internal-builds"
+            ]
+        }
+    }
+}
