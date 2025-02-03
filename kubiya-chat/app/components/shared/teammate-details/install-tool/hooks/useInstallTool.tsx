@@ -5,13 +5,13 @@ import type { FormState, CommunityTool, CategoryInfo } from '../types';
 import { RetryQueue } from '../utils/RetryQueue';
 import { createSourceInfo } from '../utils/sourceInfo';
 import { discoverTools } from '../utils/discovery';
-import type { TeammateDetails } from '@/app/types/teammate';
-import { TOOL_CATEGORIES } from '@/app/constants/tools';
+import type { TeammateDetails } from '../../../../../types/teammate';
+import { TOOL_CATEGORIES } from '../../../../../constants/tools';
 import { CategoriesSidebar } from '../components/CategoriesSidebar';
 import { CommunityToolsSkeleton } from '../components/CommunityToolsSkeleton';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ToolsLayout } from '../components/ToolsLayout';
-import type { CommunityTool as BaseCommunityTool } from '@/app/types/tools';
+import type { CommunityTool as BaseCommunityTool } from '../../../../../types/tools';
 
 // Convert TOOL_CATEGORIES from Record to Array
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -48,6 +48,7 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
   const [failedIcons, setFailedIcons] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [retryQueue] = useState(() => new RetryQueue());
+  const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
 
   const methods = useForm({
     defaultValues: {
@@ -109,46 +110,8 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
   }, [handleRefresh]);
 
   const handleToolSelect = useCallback((tool: Partial<CommunityTool>) => {
-    // If tool metadata isn't loaded yet, load it
-    if (!tool.tools?.length && tool.loadingState !== 'loading') {
-      discoverTools(tool as CommunityTool)
-        .then(data => {
-          setSelectedTool({
-            ...tool,
-            loadingState: 'success',
-            tools: data?.tools || [],
-            isDiscovering: false,
-            path: tool.path || '',
-            description: tool.description || '',
-            tools_count: data?.tools?.length || 0,
-            name: tool.name || ''
-          } as CommunityTool);
-        })
-        .catch(error => {
-          setSelectedTool({
-            ...tool,
-            loadingState: 'error',
-            tools: [],
-            error: error instanceof Error ? error.message : 'Failed to load metadata',
-            isDiscovering: false,
-            path: tool.path || '',
-            description: tool.description || '',
-            tools_count: 0,
-            name: tool.name || ''
-          } as CommunityTool);
-        });
-    } else {
-      setSelectedTool({
-        ...tool,
-        loadingState: tool.loadingState || 'success',
-        tools: tool.tools || [],
-        isDiscovering: false,
-        path: tool.path || '',
-        description: tool.description || '',
-        tools_count: tool.tools?.length || 0,
-        name: tool.name || ''
-      } as CommunityTool);
-    }
+    if (!tool.name) return; // Add validation for required fields
+    setSelectedTool(tool as CommunityTool);
   }, []);
 
   const handleIconError = useCallback((url: string) => {
@@ -162,35 +125,52 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
       tools: tool.tools || []  // Ensure tools is always an array
     });
     
-    if (!tool.tools) {
-      try {
-        const data = await discoverTools({
-          ...tool,
-          tools: [] as any[],
-          loadingState: 'loading' as const
-        });
-        if (data && (Array.isArray(data.tools) || Array.isArray(data))) {
-          setFormState(prev => ({
-            ...prev,
-            preview: {
-              ...prev.preview,
-              data: {
-                tools: Array.isArray(data.tools) ? data.tools : Array.isArray(data) ? data : [],
-                source: createSourceInfo(tool, Array.isArray(data.tools) ? data.tools : Array.isArray(data) ? data : []),
-                errors: []
-              }
-            }
-          }));
-        }
-      } catch (error) {
+    try {
+      // If tools are already loaded, use them directly
+      if (tool.tools?.length > 0) {
         setFormState(prev => ({
           ...prev,
           preview: {
             ...prev.preview,
-            error: error instanceof Error ? error.message : 'Failed to discover tools'
+            data: {
+              tools: tool.tools,
+              source: createSourceInfo(tool, tool.tools),
+              errors: []
+            }
+          }
+        }));
+        return;
+      }
+
+      // Otherwise, discover tools
+      const data = await discoverTools({
+        ...tool,
+        tools: [] as any[],
+        loadingState: 'loading' as const
+      });
+
+      if (data && (Array.isArray(data.tools) || Array.isArray(data))) {
+        const toolsArray = Array.isArray(data.tools) ? data.tools : Array.isArray(data) ? data : [];
+        setFormState(prev => ({
+          ...prev,
+          preview: {
+            ...prev.preview,
+            data: {
+              tools: toolsArray,
+              source: createSourceInfo(tool, toolsArray),
+              errors: []
+            }
           }
         }));
       }
+    } catch (error) {
+      setFormState(prev => ({
+        ...prev,
+        preview: {
+          ...prev.preview,
+          error: error instanceof Error ? error.message : 'Failed to discover tools'
+        }
+      }));
     }
   }, []);
 
@@ -217,42 +197,39 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
   }, [methods, onInstall]);
 
   const goToNextStep = useCallback(() => {
-    const steps = ['source', 'preview', 'configure'];
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
-    }
-  }, [currentStep]);
+    setCurrentStep(prev => {
+      switch(prev) {
+        case 'source': return 'select';
+        case 'select': return 'configure';
+        case 'configure': return 'installing';
+        default: return prev;
+      }
+    });
+  }, []);
 
   const goToPreviousStep = useCallback(() => {
-    const steps = ['source', 'preview', 'configure'];
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1]);
-    }
-  }, [currentStep]);
+    setCurrentStep(prev => {
+      switch(prev) {
+        case 'select': return 'source';
+        case 'configure': return 'select';
+        case 'installing': return 'configure';
+        default: return prev;
+      }
+    });
+  }, []);
 
   const canProceed = useCallback(() => {
     switch (currentStep) {
-      case 'source': {
-        // For community tools
-        const hasValidCommunityTool = selectedTool && selectedTool.tools && selectedTool.tools.length > 0;
-        
-        // For custom source
-        const customUrl = methods.getValues('url');
-        const isValidUrl = customUrl ? /^https?:\/\/.+/.test(customUrl) : false;
-        
-        // Can proceed if either condition is met
-        return hasValidCommunityTool || isValidUrl;
-      }
-      case 'preview':
-        return formState.preview.data !== null;
+      case 'source':
+        return selectedTool !== null;
+      case 'select':
+        return true; // Always allow proceeding from review step
       case 'configure':
         return true;
       default:
         return false;
     }
-  }, [currentStep, selectedTool, methods, formState.preview.data]);
+  }, [currentStep, selectedTool]);
 
   const renderStepContent = useCallback(() => {
     if (formState.communityTools.error) {
@@ -329,7 +306,10 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
     handleSubmit,
     goToNextStep,
     goToPreviousStep,
+    selectedTools,
+    setSelectedTools,
     canProceed: canProceed(),
-    renderStepContent
+    renderStepContent,
+    teammate
   };
 } 

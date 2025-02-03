@@ -10,15 +10,15 @@ export const STEPS: Step[] = [
     icon: <GitBranch className="h-5 w-5" />
   },
   {
-    id: 'preview',
-    title: 'Preview Tools',
-    description: 'Review the available tools from this source',
+    id: 'select',
+    title: 'Select Tool',
+    description: 'Review and select tools to install',
     icon: <Search className="h-5 w-5" />
   },
   {
     id: 'configure',
     title: 'Configure',
-    description: 'Configure optional settings for installation',
+    description: 'Configure installation settings',
     icon: <Settings className="h-5 w-5" />
   }
 ]; 

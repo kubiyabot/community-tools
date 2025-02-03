@@ -4,7 +4,7 @@ import { Button } from '@/app/components/ui/button';
 import { useState } from 'react';
 
 interface CommunityToolsHeaderProps {
-  onRefresh: () => Promise<void>;
+  onRefresh: () => void;
 }
 
 export function CommunityToolsHeader({ onRefresh }: CommunityToolsHeaderProps) {

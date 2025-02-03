@@ -39,7 +39,7 @@ export interface Step {
   id: string;
   title: string;
   description: string;
-  icon: ReactElement;
+  icon: React.ReactNode;
 }
 
 export interface CategoryInfo {
@@ -97,6 +97,9 @@ export interface UseInstallToolReturn {
   goToPreviousStep: () => void;
   canProceed: boolean;
   renderStepContent: () => React.ReactNode;
+  teammate: TeammateDetails;
+  selectedTools: Set<string>;
+  setSelectedTools: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 export interface UseInstallToolProps {

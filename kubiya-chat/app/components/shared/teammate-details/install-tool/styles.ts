@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 export const styles = {
   animations: {
     slideUp: {
@@ -19,11 +21,23 @@ export const styles = {
     subtitle: "text-sm font-medium text-slate-200 mb-3"
   },
   cards: {
-    base: "bg-[#1E293B] border border-[#2D3B4E] rounded-lg",
-    container: "bg-[#1E293B] border border-[#2D3B4E] rounded-lg p-4"
+    base: cn(
+      "border-slate-800 bg-slate-900/50",
+      "dark:border-slate-800 dark:bg-slate-900/50"
+    ),
+    container: cn(
+      "bg-slate-800/50 border border-slate-700",
+      "dark:bg-slate-800/50 dark:border-slate-700"
+    )
   },
   buttons: {
-    ghost: "text-slate-400 hover:text-slate-300 hover:bg-[#1E293B]",
-    primary: "bg-purple-500 text-white hover:bg-purple-600"
+    ghost: cn(
+      "text-slate-400 hover:text-slate-300",
+      "hover:bg-slate-800/50"
+    ),
+    primary: cn(
+      "bg-purple-600 text-white",
+      "hover:bg-purple-700"
+    )
   }
 } as const; 

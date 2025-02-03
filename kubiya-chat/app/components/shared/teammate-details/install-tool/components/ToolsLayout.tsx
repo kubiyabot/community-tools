@@ -9,12 +9,12 @@ interface ToolsLayoutProps {
   tools: CommunityTool[];
   categories: CategoryInfo[];
   selectedTool: CommunityTool | null;
-  onToolSelect: (tool: Partial<CommunityTool>) => void;
+  onToolSelect: (tool: CommunityTool) => void;
   failedIcons: Set<string>;
   onIconError: (url: string) => void;
   expandedTools: Set<string>;
   setExpandedTools: React.Dispatch<React.SetStateAction<Set<string>>>;
-  handleRefresh: () => Promise<void>;
+  handleRefresh: () => void;
 }
 
 export function ToolsLayout({
@@ -63,7 +63,7 @@ export function ToolsLayout({
                 "hover:border-purple-500/30",
                 selectedTool?.name === tool.name && "ring-2 ring-purple-500 border-purple-500"
               )}
-              onClick={() => onToolSelect(tool)}
+              onClick={() => onToolSelect(tool as CommunityTool)}
             >
               <div className="p-4">
                 <div className="flex items-start gap-3">
