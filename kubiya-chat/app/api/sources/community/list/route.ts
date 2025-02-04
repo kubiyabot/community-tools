@@ -1,28 +1,12 @@
-import { NextRequest } from 'next/server';
-import { CommunityToolsClient } from '../client';
+import { NextRequest, NextResponse } from 'next/server';
+import { listTools } from '@/app/api/sources/community/client';
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const client = CommunityToolsClient.getInstance(req);
-    const tools = await client.listTools();
-    return new Response(JSON.stringify(tools), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store'
-      }
-    });
+    const tools = await listTools(request);
+    return NextResponse.json(tools);
   } catch (error) {
-    console.error('Error listing community tools:', error);
-    return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Failed to list community tools' 
-      }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      }
-    );
+    console.error('Error listing tools:', error);
+    return NextResponse.json({ error: 'Failed to list tools' }, { status: 500 });
   }
 } 
