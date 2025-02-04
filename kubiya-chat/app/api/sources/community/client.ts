@@ -1,3 +1,5 @@
+'use server';
+
 import { GitHubContentsResponse } from './types';
 import fs from 'fs/promises';
 import path from 'path';
