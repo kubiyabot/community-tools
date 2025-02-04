@@ -3,6 +3,8 @@ import { GeistSans } from 'geist/font/sans';
 import { Metadata } from 'next';
 import { Toaster } from "sonner";
 import { Providers } from './providers/client-providers';
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -34,6 +36,8 @@ export default function RootLayout({
           {children}
         </Providers>
         <Toaster />
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

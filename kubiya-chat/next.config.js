@@ -15,13 +15,15 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push({
-        'child_process': 'commonjs child_process',
-        'fs': 'commonjs fs',
-        'path': 'commonjs path',
-        'os': 'commonjs os'
-      });
+    if (!isServer) {
+      // Don't attempt to import node modules on the client side
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        child_process: false,
+        os: false,
+      };
     }
     return config;
   }
