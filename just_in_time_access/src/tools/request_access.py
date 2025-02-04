@@ -57,9 +57,6 @@ request_access_tool = JustInTimeAccessTool(
     env=[
         "REQUEST_ACCESS_WEBHOOK_URL",
     ],
-    secrets=[
-        "SLACK_API_TOKEN",
-    ],
     with_files=[
         FileSpec(
             destination="/opt/scripts/access_request_handler.py",
