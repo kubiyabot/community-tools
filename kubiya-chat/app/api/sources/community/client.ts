@@ -4,22 +4,14 @@ import { CommunityTool, CommitInfo } from './types';
 import { NextRequest } from 'next/server';
 import { REPO_PATH, updateRepo } from './git-utils';
 import { fetchSource } from './utils';
-
-// Import Node.js modules dynamically
-const getNodeModules = async () => {
-  const [fs, path, childProcess] = await Promise.all([
-    import('fs/promises'),
-    import('path'),
-    import('child_process')
-  ]);
-  return { fs, path, execSync: childProcess.execSync };
-};
+import { readdir, readFile, access } from 'node:fs/promises';
+import { join, relative } from 'node:path';
+import { execSync } from 'node:child_process';
 
 async function readDir(dirPath: string) {
-  const { fs, path } = await getNodeModules();
   try {
     await updateRepo();
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    const entries = await readdir(dirPath, { withFileTypes: true });
     
     // Filter for directories that aren't dotfiles and have README.md
     const validDirs = await Promise.all(
@@ -29,13 +21,13 @@ async function readDir(dirPath: string) {
           !entry.name.startsWith('.')
         )
         .map(async entry => {
-          const fullPath = path.join(dirPath, entry.name);
+          const fullPath = join(dirPath, entry.name);
           try {
             // Check for README.md
-            await fs.access(path.join(fullPath, 'README.md'));
+            await access(join(fullPath, 'README.md'));
             return {
               name: entry.name,
-              path: path.relative(REPO_PATH, fullPath),
+              path: relative(REPO_PATH, fullPath),
               type: 'dir'
             };
           } catch {
@@ -68,10 +60,9 @@ async function getRepoMetadata() {
 }
 
 async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
-  const { path, execSync } = await getNodeModules();
   try {
     await updateRepo();
-    const fullPath = path.join(REPO_PATH, dirPath);
+    const fullPath = join(REPO_PATH, dirPath);
     
     // Get last commit for specific directory
     const lastCommit = execSync(
@@ -94,10 +85,9 @@ async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
 }
 
 async function getContributors(dirPath: string): Promise<number> {
-  const { path, execSync } = await getNodeModules();
   try {
     await updateRepo();
-    const fullPath = path.join(REPO_PATH, dirPath);
+    const fullPath = join(REPO_PATH, dirPath);
     
     // Get unique contributors count
     const contributors = execSync(
@@ -129,7 +119,6 @@ function generateReadmeSummary(readme: string): string {
 }
 
 export async function listTools(request?: NextRequest): Promise<CommunityTool[]> {
-  const { fs, path } = await getNodeModules();
   try {
     const contents = await readDir(REPO_PATH);
     const repoMetadata = await getRepoMetadata();
@@ -147,7 +136,7 @@ export async function listTools(request?: NextRequest): Promise<CommunityTool[]>
                        Array.isArray(data) ? data : 
                        [];
 
-          const readme = await fs.readFile(path.join(REPO_PATH, item.path, 'README.md'), 'utf-8');
+          const readme = await readFile(join(REPO_PATH, item.path, 'README.md'), 'utf-8');
           const readme_summary = generateReadmeSummary(readme);
 
           return {
