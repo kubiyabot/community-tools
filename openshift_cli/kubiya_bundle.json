@@ -1,0 +1,858 @@
+{
+  "tools": [
+    {
+      "name": "list_projects",
+      "source": null,
+      "alias": null,
+      "description": "List all OpenShift projects",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    echo \"=== Available Projects ===\"\n    oc get projects -o custom-columns=NAME:.metadata.name,DISPLAY_NAME:.metadata.annotations.openshift\\.io/display-name,STATUS:.status.phase,CREATED:.metadata.creationTimestamp\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"list_projects\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "create_project",
+      "source": null,
+      "alias": null,
+      "description": "Create a new project in OpenShift",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    oc new-project $project_name --description='$description'\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "project_name",
+          "type": null,
+          "description": "Name of the project to create",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "description",
+          "type": null,
+          "description": "Project description",
+          "required": false,
+          "default": null,
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"create_project\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"project_name (Required)<br/>Name of the project to create\"):::paramClass\n        Param1(\"description (Optional)<br/>Project description\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "switch_project",
+      "source": null,
+      "alias": null,
+      "description": "Switch to a different OpenShift project",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    if ! oc get project \"$project_name\" >/dev/null 2>&1; then\n        echo \"Error: Project $project_name does not exist\"\n        exit 1\n    fi\n    oc project \"$project_name\"\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "project_name",
+          "type": null,
+          "description": "Name of the project to switch to",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"switch_project\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"project_name (Required)<br/>Name of the project to switch to\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "delete_project",
+      "source": null,
+      "alias": null,
+      "description": "Delete an OpenShift project",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    if ! oc get project \"$project_name\" >/dev/null 2>&1; then\n        echo \"Error: Project $project_name does not exist\"\n        exit 1\n    fi\n    oc delete project \"$project_name\"\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "project_name",
+          "type": null,
+          "description": "Name of the project to delete",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"delete_project\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"project_name (Required)<br/>Name of the project to delete\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "deploy_module",
+      "source": null,
+      "alias": null,
+      "description": "Deploy or update a module in OpenShift",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    # Validate module exists\n    if [ ! -f \"$module_path\" ]; then\n        echo \"Error: Module file $module_path does not exist\"\n        exit 1\n    fi\n    \n    # Apply the module configuration\n    echo \"Deploying module from $module_path to namespace $namespace\"\n    oc apply -f \"$module_path\" -n $namespace\n    \n    # Wait for deployment\n    if oc get deployment -n $namespace 2>/dev/null | grep -q \"$module\"; then\n        echo \"Waiting for deployment to complete...\"\n        oc rollout status deployment/$module -n $namespace\n    fi\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "module",
+          "type": null,
+          "description": "Name of the module to deploy",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "module_path",
+          "type": null,
+          "description": "Path to the module's YAML configuration file",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"deploy_module\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"module (Required)<br/>Name of the module to deploy\"):::paramClass\n        Param1(\"module_path (Required)<br/>Path to the module's YAML configuration file\"):::paramClass\n        Param2(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "scale_deployment",
+      "source": null,
+      "alias": null,
+      "description": "Scale a deployment to specified number of replicas",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    NAMESPACE=${namespace:-default}\n    \n    # Verify deployment exists\n    if ! oc get deployment $deployment_name -n $NAMESPACE >/dev/null 2>&1; then\n        echo \"Error: Deployment $deployment_name not found in namespace $NAMESPACE\"\n        exit 1\n    fi\n    \n    oc scale deployment/$deployment_name --replicas=$replicas -n $NAMESPACE\n    oc rollout status deployment/$deployment_name -n $NAMESPACE\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "deployment_name",
+          "type": null,
+          "description": "Name of the deployment to scale",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "replicas",
+          "type": null,
+          "description": "Number of desired replicas",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"scale_deployment\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"deployment_name (Required)<br/>Name of the deployment to scale\"):::paramClass\n        Param1(\"replicas (Required)<br/>Number of desired replicas\"):::paramClass\n        Param2(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "create_storage",
+      "source": null,
+      "alias": null,
+      "description": "Create persistent storage",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    cat <<EOF | oc apply -n $namespace -f -\n    apiVersion: v1\n    kind: PersistentVolumeClaim\n    metadata:\n      name: $pvc_name\n    spec:\n      accessModes:\n        - $access_mode\n      resources:\n        requests:\n          storage: $storage_size\n      storageClassName: $storage_class\nEOF\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "pvc_name",
+          "type": null,
+          "description": "Name of the PVC",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "storage_size",
+          "type": null,
+          "description": "Size of storage (e.g., 10Gi)",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "storage_class",
+          "type": null,
+          "description": "Storage class to use",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "access_mode",
+          "type": null,
+          "description": "Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany)",
+          "required": false,
+          "default": "ReadWriteOnce",
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"create_storage\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"pvc_name (Required)<br/>Name of the PVC\"):::paramClass\n        Param1(\"storage_size (Required)<br/>Size of storage (e.g., 10Gi)\"):::paramClass\n        Param2(\"storage_class (Required)<br/>Storage class to use\"):::paramClass\n        Param3(\"access_mode (Optional)<br/>Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany)<br/>Default: ReadWriteOnce\"):::paramClass\n        Param4(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "create_route",
+      "source": null,
+      "alias": null,
+      "description": "Create or update an OpenShift route",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    oc create route edge $route_name --service=$service_name --hostname=$hostname -n $namespace --insecure-policy=Redirect --dry-run=client -o yaml | oc apply -f -\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "route_name",
+          "type": null,
+          "description": "Name of the route",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "service_name",
+          "type": null,
+          "description": "Name of the service to expose",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "hostname",
+          "type": null,
+          "description": "Hostname for the route",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"create_route\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"route_name (Required)<br/>Name of the route\"):::paramClass\n        Param1(\"service_name (Required)<br/>Name of the service to expose\"):::paramClass\n        Param2(\"hostname (Required)<br/>Hostname for the route\"):::paramClass\n        Param3(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_context",
+      "source": null,
+      "alias": null,
+      "description": "Display current context information",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    echo \"=== Current User ===\"\n    oc whoami\n    \n    echo -e \"\n=== Current Project ===\"\n    oc project\n    \n    echo -e \"\n=== Current Server ===\"\n    oc whoami --show-server\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_context\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_resources",
+      "source": null,
+      "alias": null,
+      "description": "List specific OpenShift resources",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    oc get $resource_type -n $namespace -o wide\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "resource_type",
+          "type": null,
+          "description": "Resource type (pods, deployments, services, etc)",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_resources\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"resource_type (Required)<br/>Resource type (pods, deployments, services, etc)\"):::paramClass\n        Param1(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "describe_resource",
+      "source": null,
+      "alias": null,
+      "description": "Get detailed information about a specific resource",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    if ! oc get $resource_type/$resource_name -n $namespace >/dev/null 2>&1; then\n        echo \"Error: Resource $resource_name of type $resource_type not found in namespace $namespace\"\n        exit 1\n    fi\n    oc describe $resource_type/$resource_name -n $namespace\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "resource_type",
+          "type": null,
+          "description": "Resource type (pod, deployment, service, etc)",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "resource_name",
+          "type": null,
+          "description": "Name of the resource",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"describe_resource\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"resource_type (Required)<br/>Resource type (pod, deployment, service, etc)\"):::paramClass\n        Param1(\"resource_name (Required)<br/>Name of the resource\"):::paramClass\n        Param2(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_logs",
+      "source": null,
+      "alias": null,
+      "description": "Get logs from a specific pod",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    if ! oc get pod $pod_name -n $namespace >/dev/null 2>&1; then\n        echo \"Error: Pod $pod_name not found in namespace $namespace\"\n        exit 1\n    fi\n    \n    oc logs $pod_name -n $namespace --tail=${tail_lines} ${follow:+--follow}\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "pod_name",
+          "type": null,
+          "description": "Name of the pod",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "tail_lines",
+          "type": null,
+          "description": "Number of lines to show from the end",
+          "required": false,
+          "default": "100",
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "follow",
+          "type": null,
+          "description": "Follow the logs in real-time",
+          "required": false,
+          "default": "false",
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_logs\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"pod_name (Required)<br/>Name of the pod\"):::paramClass\n        Param1(\"tail_lines (Optional)<br/>Number of lines to show from the end<br/>Default: 100\"):::paramClass\n        Param2(\"follow (Optional)<br/>Follow the logs in real-time<br/>Default: false\"):::paramClass\n        Param3(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "create_quota",
+      "source": null,
+      "alias": null,
+      "description": "Create a resource quota in a namespace",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    cat <<EOF | oc apply -n $namespace -f -\n    apiVersion: v1\n    kind: ResourceQuota\n    metadata:\n      name: $quota_name\n    spec:\n      hard:\n        cpu: \"$cpu_limit\"\n        memory: \"$memory_limit\"\n        pods: \"$pod_limit\"\nEOF\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [
+        {
+          "name": "quota_name",
+          "type": null,
+          "description": "Name of the quota",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "cpu_limit",
+          "type": null,
+          "description": "CPU limit (e.g., '2' or '2000m')",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "memory_limit",
+          "type": null,
+          "description": "Memory limit (e.g., '2Gi')",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "pod_limit",
+          "type": null,
+          "description": "Maximum number of pods",
+          "required": true,
+          "default": null,
+          "options": null,
+          "options_from": null
+        },
+        {
+          "name": "namespace",
+          "type": null,
+          "description": "Target namespace",
+          "required": false,
+          "default": "default",
+          "options": null,
+          "options_from": null
+        }
+      ],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"create_quota\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n        Param0(\"quota_name (Required)<br/>Name of the quota\"):::paramClass\n        Param1(\"cpu_limit (Required)<br/>CPU limit (e.g., '2' or '2000m')\"):::paramClass\n        Param2(\"memory_limit (Required)<br/>Memory limit (e.g., '2Gi')\"):::paramClass\n        Param3(\"pod_limit (Required)<br/>Maximum number of pods\"):::paramClass\n        Param4(\"namespace (Optional)<br/>Target namespace<br/>Default: default\"):::paramClass\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_cluster_status",
+      "source": null,
+      "alias": null,
+      "description": "Get OpenShift cluster status",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    echo \"=== Cluster Operators Status ===\"\n    oc get clusteroperators\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_cluster_status\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_node_status",
+      "source": null,
+      "alias": null,
+      "description": "Get status of cluster nodes",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    echo \"=== Node Status ===\"\n    oc get nodes -o wide\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_node_status\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    },
+    {
+      "name": "get_cluster_version",
+      "source": null,
+      "alias": null,
+      "description": "Get OpenShift cluster version information",
+      "type": "docker",
+      "content": "\nset -e\n\n# Function to handle command output and remove ANSI color codes\nhandle_output() {\n    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r' | sed 's/</\\</g' | sed 's/>/\\>/g'\n}\n\n# Login with username/password\nif ! oc login \"$OPENSHIFT_URL\" \\\n    --username=\"$OPENSHIFT_USERNAME\" \\\n    --password=\"$OPENSHIFT_PASSWORD\" \\\n    --insecure-skip-tls-verify=true \\\n    2>/dev/null; then\n    echo \"Failed to login to OpenShift cluster - check your credentials and URL\" | handle_output\n    exit 1\nfi\n\n# Execute the actual command with output handling\n{\n\n    echo \"=== Cluster Version ===\"\n    oc get clusterversion\n    \n} 2>&1 | handle_output\n",
+      "content_url": null,
+      "args": [],
+      "env": [
+        "OPENSHIFT_URL",
+        "OPENSHIFT_USERNAME"
+      ],
+      "secrets": [
+        "OPENSHIFT_PASSWORD"
+      ],
+      "dependencies": null,
+      "dependencies_url": null,
+      "openapi": null,
+      "with_files": [],
+      "with_services": [],
+      "with_git_repo": null,
+      "with_volumes": [],
+      "entrypoint": [],
+      "icon_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s",
+      "image": "openshift/origin-cli:latest",
+      "long_running": false,
+      "on_start": null,
+      "on_build": null,
+      "on_complete": null,
+      "mermaid": "graph TD\n    %% Styles\n    classDef triggerClass fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px,font-weight:bold\n    classDef paramClass fill:#2ecc71,color:#fff,stroke:#27ae60,stroke-width:2px\n    classDef execClass fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px,font-weight:bold\n    classDef envClass fill:#f39c12,color:#fff,stroke:#f1c40f,stroke-width:2px\n\n    %% Main Components\n    Trigger(\"Trigger\"):::triggerClass\n    Params(\"Parameters\"):::paramClass\n    Exec(\"get_cluster_version\"):::execClass\n    Env(\"Environment\"):::envClass\n\n    %% Flow\n    Trigger --> Params --> Exec\n    Env --> Exec\n\n    %% Trigger Options\n    User(\"User\")\n    API(\"API\")\n    Webhook(\"Webhook\")\n    Cron(\"Scheduled\")\n    User --> Trigger\n    API --> Trigger\n    Webhook --> Trigger\n    Cron --> Trigger\n\n    %% Parameters\n    subgraph Parameters[\"Parameters\"]\n        direction TB\n    end\n    Parameters --- Params\n\n    %% Execution\n    subgraph Execution[\"Execution\"]\n        direction TB\n        Code(\"Script: <br/>set -e<br/><br/># Function to handle command output and r...\")\n        Type(\"Type: Docker\")\n        Image(\"Docker Image: openshift/origin-cli:latest\")\n    end\n    Execution --- Exec\n\n    %% Environment\n    subgraph Environment[\"Environment\"]\n        direction TB\n        EnvVars(\"Environment Variables:<br/>OPENSHIFT_URL<br/>OPENSHIFT_USERNAME\"):::envClass\n        Secrets(\"Secrets:<br/>OPENSHIFT_PASSWORD\"):::envClass\n    end\n    Environment --- Env\n\n    %% Context Note\n    ContextNote(\"Parameter values can be<br/>fetched from context<br/>based on the trigger\")\n    ContextNote -.-> Params",
+      "workflow": false,
+      "metadata": {}
+    }
+  ],
+  "errors": [],
+  "python_bundle_version": "3.12.0"
+}
