@@ -13,6 +13,9 @@ export interface SourceMeta {
   commit: string;
   committer: string;
   branch: string;
+  repository?: string;
+  owner?: string;
+  repo?: string;
 }
 
 export interface DynamicConfig {

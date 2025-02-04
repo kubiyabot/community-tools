@@ -1,140 +1,65 @@
-import { useState } from 'react';
-import { Card } from '@/app/components/ui/card';
-import { Button } from '@/app/components/ui/button';
-import { ChevronDown, ChevronUp, PackageOpen } from 'lucide-react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/app/components/ui/hover-card';
+import * as React from 'react';
+import { Code } from 'lucide-react';
+import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { CommunityTool } from '../types';
-import { MarkdownText } from '@/app/components/assistant-ui/MarkdownText';
 
 interface ToolCardProps {
-  tool: CommunityTool;
-  isSelected: boolean;
-  isExpanded: boolean;
-  onSelect: (tool: CommunityTool) => void;
-  onToggleExpand: () => void;
-  Icon?: React.ComponentType<{ className?: string }>;
+  tool: {
+    name: string;
+    path: string;
+    description?: string;
+    category?: string;
+    icon_url?: string;
+    type?: string;
+  };
+  onSelect: () => void;
 }
 
-export function ToolCard({ 
-  tool, 
-  isSelected, 
-  isExpanded,
-  onSelect, 
-  onToggleExpand,
-  Icon 
-}: ToolCardProps) {
-  const [isReadmeLoading, setIsReadmeLoading] = useState(false);
-  const [readme, setReadme] = useState<string | null>(null);
-
-  const loadReadme = async () => {
-    if (readme || isReadmeLoading) return;
-    setIsReadmeLoading(true);
-    try {
-      const response = await fetch(`/api/sources/community/${tool.path}/readme`);
-      const data = await response.json();
-      setReadme(data.content);
-    } catch (error) {
-      console.error('Failed to load README:', error);
-    } finally {
-      setIsReadmeLoading(false);
-    }
-  };
-
+export function ToolCard({ tool, onSelect }: ToolCardProps) {
   return (
-    <Card
-      className={cn(
-        "transition-all duration-200 cursor-pointer",
-        "hover:border-purple-500/30",
-        isSelected && "ring-2 ring-purple-500 border-purple-500",
-        isExpanded && "col-span-2",
-        tool.loadingState === 'error' && "border-red-500/30"
-      )}
-      onClick={() => onSelect(tool)}
+    <div 
+      className="group relative bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700 hover:border-purple-500/50 transition-all duration-200 cursor-pointer p-4 m-2"
+      onClick={onSelect}
     >
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20">
-            {Icon ? (
-              <Icon className="h-8 w-8 text-purple-400" />
-            ) : (
-              <PackageOpen className="h-8 w-8 text-purple-400" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-slate-200">
-                {tool.name}
-                {tool.loadingState === 'loading' && (
-                  <span className="ml-2 text-sm text-slate-400">(Loading...)</span>
-                )}
-              </h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleExpand();
-                  if (!isExpanded) {
-                    loadReadme();
-                  }
-                }}
-                disabled={tool.loadingState === 'loading'}
-              >
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            {tool.loadingState === 'error' && tool.error ? (
-              <p className="text-sm text-red-400 mt-1">{tool.error}</p>
-            ) : (
-              <HoverCard>
-                <HoverCardTrigger>
-                  <p className="text-sm text-slate-400 mt-1 line-clamp-2">
-                    {tool.description}
-                  </p>
-                </HoverCardTrigger>
-                <HoverCardContent className="w-80">
-                  <p className="text-sm">{tool.description}</p>
-                </HoverCardContent>
-              </HoverCard>
-            )}
-            {isExpanded && (
-              <div className="mt-4 border-t border-slate-800 pt-4">
-                {isReadmeLoading ? (
-                  <div className="animate-pulse space-y-2">
-                    <div className="h-4 bg-slate-800 rounded w-3/4" />
-                    <div className="h-4 bg-slate-800 rounded w-1/2" />
-                  </div>
-                ) : readme ? (
-                  <MarkdownText content={readme} />
-                ) : (
-                  <p className="text-sm text-slate-400">No README available</p>
-                )}
-              </div>
-            )}
-          </div>
+      <div className="flex items-start gap-3">
+        <div className="p-2 rounded-md bg-slate-700 border border-slate-600">
+          {tool.icon_url ? (
+            <img src={tool.icon_url} alt={tool.name} className="h-5 w-5" />
+          ) : (
+            <Code className="h-5 w-5 text-purple-400" />
+          )}
         </div>
-        {isExpanded && tool.tools_count > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-800">
-            <h4 className="text-sm font-medium text-slate-200 mb-2">Available Tools</h4>
-            <div className="grid grid-cols-2 gap-2">
-              {tool.tools.map((subTool: any) => (
-                <div
-                  key={subTool.name}
-                  className="p-2 rounded-md bg-slate-800/50 text-sm text-slate-400"
-                >
-                  {subTool.name}
-                </div>
-              ))}
+        <div>
+          <h4 className="text-sm font-medium text-white tracking-wide flex items-center gap-2">
+            {tool.name}
+            {tool.type && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs font-medium tracking-wide",
+                  tool.type === 'docker' 
+                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                    : "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                )}
+              >
+                {tool.type}
+              </Badge>
+            )}
+          </h4>
+          {tool.description && (
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              {tool.description}
+            </p>
+          )}
+          {tool.category && (
+            <div className="mt-2">
+              <Badge variant="outline" className="text-xs bg-slate-700/50 text-slate-300 border-slate-600">
+                {tool.category}
+              </Badge>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </Card>
+    </div>
   );
 } 

@@ -17,9 +17,18 @@ interface EntityContextType {
 
 const EntityContext = createContext<EntityContextType | undefined>(undefined);
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
-const THROTTLE_DURATION = 2000; // 2 seconds throttle between requests
-const MAX_AUTH_RETRIES = 2; // Maximum number of retries for auth errors
+const CACHE_DURATION = 60 * 60 * 1000; // Increase to 60 minutes
+const REFRESH_INTERVAL = 30 * 60 * 1000; // Increase refresh to 30 minutes
+const THROTTLE_DURATION = 30000; // Increase throttle to 30 seconds
+const DEBOUNCE_DURATION = 1000; // Add debounce duration
+const MAX_AUTH_RETRIES = 3; // Increase max retries
+
+// Add session storage keys
+const SESSION_STORAGE_KEYS = {
+  USERS: 'entity_provider_users',
+  GROUPS: 'entity_provider_groups',
+  TIMESTAMP: 'entity_provider_timestamp'
+};
 
 interface CacheData<T> {
   data: T[];
@@ -84,25 +93,75 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Optimize saveToSessionStorage to avoid recreating on every render
+  const saveToSessionStorage = useCallback((key: string, data: unknown) => {
+    try {
+      sessionStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.warn('Failed to save to session storage:', error);
+    }
+  }, []); // Empty dependency array since it doesn't depend on any props or state
+
+  // Move loadFromSessionStorage inside useEffect to avoid stale closure issues
+  useEffect(() => {
+    function loadFromSessionStorage() {
+      try {
+        const timestamp = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMESTAMP);
+        if (timestamp && (Date.now() - Number(timestamp) < CACHE_DURATION)) {
+          const users = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEYS.USERS) || '[]');
+          const groups = JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEYS.GROUPS) || '[]');
+          return { users, groups };
+        }
+      } catch (error) {
+        console.warn('Failed to load from session storage:', error);
+      }
+      return null;
+    }
+
+    const cachedData = loadFromSessionStorage();
+    if (cachedData) {
+      setUsers(cachedData.users);
+      setGroups(cachedData.groups);
+      setIsLoading(false);
+    }
+  }, []); // Run only once on mount
+
   const fetchUsers = useCallback(async (force = false) => {
     // Don't fetch if we have an auth error and exceeded retries
     if (authError && authRetryCount.current >= MAX_AUTH_RETRIES) {
-      return;
+      return users;
     }
 
     const now = Date.now();
     
-    // Check cache and throttle
-    if (!force && cache.current.users && (now - cache.current.users.timestamp < CACHE_DURATION)) {
-      return;
+    // Enhanced cache check with session storage
+    if (!force) {
+      // First check memory cache
+      if (cache.current.users && (now - cache.current.users.timestamp < CACHE_DURATION)) {
+        return cache.current.users.data;
+      }
+      
+      // Then check session storage
+      try {
+        const storedData = sessionStorage.getItem(SESSION_STORAGE_KEYS.USERS);
+        const timestamp = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMESTAMP);
+        if (storedData && timestamp && (now - Number(timestamp) < CACHE_DURATION)) {
+          const parsedData = JSON.parse(storedData);
+          cache.current.users = { data: parsedData, timestamp: Number(timestamp) };
+          setUsers(parsedData);
+          return parsedData;
+        }
+      } catch (error) {
+        console.warn('Failed to load from session storage:', error);
+      }
     }
 
     // Prevent concurrent requests
     if (isFetching.current.users) {
-      return;
+      return users;
     }
 
-    // Clear any existing timer
+    // Clear existing timer
     if (fetchTimers.current.users) {
       clearTimeout(fetchTimers.current.users);
     }
@@ -114,7 +173,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       
       if (response.status === 401 || response.status === 403) {
         handleAuthError();
-        return;
+        return users;
       }
       
       if (!response.ok) {
@@ -123,50 +182,65 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       
       const data = await response.json();
       
-      // Reset auth error state on successful fetch
+      // Reset auth error state
       setAuthError(false);
       authRetryCount.current = 0;
       
-      // Update cache and state
-      cache.current.users = {
-        data,
-        timestamp: now
-      };
+      // Update cache, session storage, and state
+      cache.current.users = { data, timestamp: now };
+      saveToSessionStorage(SESSION_STORAGE_KEYS.USERS, data);
+      saveToSessionStorage(SESSION_STORAGE_KEYS.TIMESTAMP, now);
       setUsers(data);
+      return data;
     } catch (err) {
       console.error('Error fetching users:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch users'));
+      return users;
     } finally {
       isFetching.current.users = false;
       
-      // Set throttle timer only if we don't have an auth error
       if (!authError) {
         fetchTimers.current.users = setTimeout(() => {
           fetchTimers.current.users = null;
         }, THROTTLE_DURATION);
       }
     }
-  }, [authError, handleAuthError]);
+  }, [authError, handleAuthError, users, saveToSessionStorage]);
 
   const fetchGroups = useCallback(async (force = false) => {
-    // Don't fetch if we have an auth error and exceeded retries
     if (authError && authRetryCount.current >= MAX_AUTH_RETRIES) {
-      return;
+      return groups;
     }
 
     const now = Date.now();
     
-    // Check cache and throttle
-    if (!force && cache.current.groups && (now - cache.current.groups.timestamp < CACHE_DURATION)) {
-      return;
+    // Enhanced cache check with session storage
+    if (!force) {
+      // First check memory cache
+      if (cache.current.groups && (now - cache.current.groups.timestamp < CACHE_DURATION)) {
+        return cache.current.groups.data;
+      }
+      
+      // Then check session storage
+      try {
+        const storedData = sessionStorage.getItem(SESSION_STORAGE_KEYS.GROUPS);
+        const timestamp = sessionStorage.getItem(SESSION_STORAGE_KEYS.TIMESTAMP);
+        if (storedData && timestamp && (now - Number(timestamp) < CACHE_DURATION)) {
+          const parsedData = JSON.parse(storedData);
+          cache.current.groups = { data: parsedData, timestamp: Number(timestamp) };
+          setGroups(parsedData);
+          return parsedData;
+        }
+      } catch (error) {
+        console.warn('Failed to load from session storage:', error);
+      }
     }
 
     // Prevent concurrent requests
     if (isFetching.current.groups) {
-      return;
+      return groups;
     }
 
-    // Clear any existing timer
     if (fetchTimers.current.groups) {
       clearTimeout(fetchTimers.current.groups);
     }
@@ -178,7 +252,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       
       if (response.status === 401 || response.status === 403) {
         handleAuthError();
-        return;
+        return groups;
       }
       
       if (!response.ok) {
@@ -187,30 +261,29 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       
       const data = await response.json();
       
-      // Reset auth error state on successful fetch
       setAuthError(false);
       authRetryCount.current = 0;
       
-      // Update cache and state
-      cache.current.groups = {
-        data,
-        timestamp: now
-      };
+      // Update cache, session storage, and state
+      cache.current.groups = { data, timestamp: now };
+      saveToSessionStorage(SESSION_STORAGE_KEYS.GROUPS, data);
+      saveToSessionStorage(SESSION_STORAGE_KEYS.TIMESTAMP, now);
       setGroups(data);
+      return data;
     } catch (err) {
       console.error('Error fetching groups:', err);
       setError(err instanceof Error ? err : new Error('Failed to fetch groups'));
+      return groups;
     } finally {
       isFetching.current.groups = false;
       
-      // Set throttle timer only if we don't have an auth error
       if (!authError) {
         fetchTimers.current.groups = setTimeout(() => {
           fetchTimers.current.groups = null;
         }, THROTTLE_DURATION);
       }
     }
-  }, [authError, handleAuthError]);
+  }, [authError, handleAuthError, groups, saveToSessionStorage]);
 
   const getEntityMetadata = useCallback((uuid: string): EntityMetadata | undefined => {
     // Use cached data if available
@@ -247,28 +320,79 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
     return undefined;
   }, [users, groups]); // Dependencies still needed for state updates
 
-  // Initial fetch
-  useEffect(() => {
-    if (user && !authError) {
-      setIsLoading(true);
-      Promise.all([fetchUsers(), fetchGroups()])
-        .finally(() => setIsLoading(false));
+  // Add debounce function
+  const debounce = useCallback((fn: Function, delay: number) => {
+    let timeoutId: NodeJS.Timeout;
+    return (...args: any[]) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => fn(...args), delay);
+    };
+  }, []);
 
-      // Set up periodic refresh only if no auth errors
-      const refreshInterval = setInterval(() => {
-        if (!document.hidden && !authError) {
+  // Optimize the main data fetching effect
+  useEffect(() => {
+    if (!user || authError) return;
+
+    let mounted = true;
+    let refreshTimeout: NodeJS.Timeout;
+
+    const debouncedFetch = debounce(async () => {
+      if (mounted && !authError) {
+        if (users.length === 0 && groups.length === 0) {
+          setIsLoading(true);
+          try {
+            await Promise.all([fetchUsers(), fetchGroups()]);
+          } finally {
+            if (mounted) {
+              setIsLoading(false);
+            }
+          }
+        }
+      }
+    }, DEBOUNCE_DURATION);
+
+    debouncedFetch();
+
+    const scheduleNextRefresh = () => {
+      if (mounted && !authError) {
+        refreshTimeout = setTimeout(() => {
+          if (!document.hidden && !isFetching.current.users && !isFetching.current.groups) {
+            const now = Date.now();
+            const shouldRefreshUsers = !cache.current.users?.timestamp || 
+              (now - cache.current.users.timestamp >= REFRESH_INTERVAL);
+            const shouldRefreshGroups = !cache.current.groups?.timestamp || 
+              (now - cache.current.groups.timestamp >= REFRESH_INTERVAL);
+
+            if (shouldRefreshUsers) fetchUsers();
+            if (shouldRefreshGroups) fetchGroups();
+          }
+          scheduleNextRefresh();
+        }, REFRESH_INTERVAL);
+      }
+    };
+
+    scheduleNextRefresh();
+
+    const handleVisibilityChange = debounce(() => {
+      if (mounted && !document.hidden) {
+        const now = Date.now();
+        if (now - (cache.current.users?.timestamp || 0) >= REFRESH_INTERVAL) {
           fetchUsers();
           fetchGroups();
         }
-      }, CACHE_DURATION);
+      }
+    }, DEBOUNCE_DURATION);
 
-      return () => {
-        clearInterval(refreshInterval);
-        if (fetchTimers.current.users) clearTimeout(fetchTimers.current.users);
-        if (fetchTimers.current.groups) clearTimeout(fetchTimers.current.groups);
-      };
-    }
-  }, [user, fetchUsers, fetchGroups, authError]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      mounted = false;
+      clearTimeout(refreshTimeout);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (fetchTimers.current.users) clearTimeout(fetchTimers.current.users);
+      if (fetchTimers.current.groups) clearTimeout(fetchTimers.current.groups);
+    };
+  }, [user, authError, fetchUsers, fetchGroups, users.length, groups.length, debounce]);
 
   const refetchUsers = useCallback(async () => {
     await fetchUsers(true);

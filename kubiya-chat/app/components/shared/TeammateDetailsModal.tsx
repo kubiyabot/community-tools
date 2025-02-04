@@ -7,7 +7,8 @@ import { toast } from '../ui/use-toast';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-import type { TeammateDetails as TeammateDetailsType } from './teammate-details/types';
+import type { TeammateDetails as TeammateDetailsType } from '@/app/types/teammate';
+import type { TeammateWithIntegrations } from './teammate-details/types';
 import type { Integration } from '@/app/types/integration';
 import type { Tool } from '@/app/types/tool';
 import { generateAvatarUrl } from '@/app/components/TeammateSelector';
@@ -16,7 +17,7 @@ import type { SourceInfo } from '@/app/types/source';
 // Import components from teammate-details folder
 import { TeammateDetails } from './teammate-details/TeammateDetails';
 import { OverviewTab } from './teammate-details/OverviewTab';
-import { IntegrationsTab } from './teammate-details/IntegrationsTab';
+import IntegrationsTab from './teammate-details/IntegrationsTab';
 import { SourcesTab } from './teammate-details/SourcesTab';
 import { RuntimeTab } from './teammate-details/RuntimeTab';
 import { AccessControlTab } from './teammate-details/AccessControlTab';
@@ -25,7 +26,7 @@ interface TeammateDetailsModalProps {
   isOpen: boolean;
   onCloseAction: () => void;
   teammate: TeammateDetailsType | null;
-  integrations?: any;
+  integrations?: Integration[];
 }
 
 const LoadingOverlay = () => (
@@ -68,7 +69,7 @@ function getSourceType(url: string): string {
   }
 }
 
-export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrations }: TeammateDetailsModalProps) {
+export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrations = [] }: TeammateDetailsModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
   const [isLoadingSources, setIsLoadingSources] = useState(false);
@@ -214,7 +215,10 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
       });
 
       const loadedSources = await Promise.all(processPromises);
-      setSources(loadedSources);
+      setSources(loadedSources.map(source => {
+        const uuid = typeof source.uuid === 'object' ? source.uuid.id : source.uuid;
+        return { ...source, uuid } as SourceInfo;
+      }));
     } catch (err) {
       console.error('Error fetching sources:', err);
       toast({
@@ -267,13 +271,16 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
     }
   }, [activeTab]);
 
-  // Prepare teammate data with integrations
-  const teammateWithIntegrations = teammate ? {
+  // Type guard to check if teammate exists
+  if (!teammate) {
+    return null;
+  }
+
+  // Now TypeScript knows teammate is not null
+  const teammateWithIntegrations: TeammateWithIntegrations = {
     ...teammate,
     integrations
-  } : null;
-
-  if (!teammate) return null;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onCloseAction}>
@@ -309,7 +316,7 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
                   <TabsContent value="integrations" className="h-full m-0 data-[state=active]:flex">
                     <ScrollArea className="flex-1">
                       <IntegrationsTab 
-                        teammate={teammateWithIntegrations} 
+                        teammate={teammateWithIntegrations}
                       />
                     </ScrollArea>
                   </TabsContent>

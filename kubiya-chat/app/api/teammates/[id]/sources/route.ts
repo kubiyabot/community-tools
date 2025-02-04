@@ -1,5 +1,6 @@
 import { getSession } from '@auth0/nextjs-auth0/edge';
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath, revalidateTag } from 'next/cache';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,10 @@ export async function GET(request: NextRequest, context: { params: { id: string 
     const session = await getSession(request, response);
     
     // Await the params to fix the NextJS dynamic route issue
-    const { id: teammateId } = await context.params;
+    const teammateId = await context.params.id;
+    
+    // Add the tag for this specific teammate's sources
+    const tag = `teammate-${teammateId}-sources`;
     
     if (!session?.idToken) {
       console.error('Sources endpoint - No ID token found');
@@ -51,28 +55,77 @@ export async function GET(request: NextRequest, context: { params: { id: string 
       orgId: session.user?.org_id
     });
 
-    // First get the teammate details to ensure it exists
-    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
-      headers: {
-        'Authorization': `Bearer ${session.idToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'X-Organization-ID': session.user?.org_id || '',
-        'X-Kubiya-Client': 'chat-ui'
-      }
-    });
+    // Try both teammate ID formats
+    const attempts = [teammateId];
 
-    if (!teammateResponse.ok) {
-      console.error('Sources endpoint - Failed to fetch teammate:', {
-        status: teammateResponse.status,
-        statusText: teammateResponse.statusText
+    console.log('Attempting teammate lookup with ID:', teammateId);
+
+    let teammate = null;
+    let lastError = null;
+
+    try {
+      const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
+        headers: {
+          'Authorization': `Bearer ${session.idToken}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'X-Organization-ID': session.user?.org_id || '',
+          'X-Kubiya-Client': 'chat-ui'
+        }
       });
-      throw new Error(`Failed to fetch teammate: ${await teammateResponse.text()}`);
+
+      const responseText = await teammateResponse.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = { error: responseText };
+      }
+
+      if (teammateResponse.ok) {
+        teammate = responseData;
+        // Log the teammate data to help with debugging
+        console.log('Teammate found:', {
+          id: teammate.id,
+          uuid: teammate.uuid,
+          name: teammate.name
+        });
+      } else {
+        lastError = {
+          status: teammateResponse.status,
+          error: responseData.error || responseData.message || 'Unknown error',
+          id: teammateId,
+          response: responseText
+        };
+        console.error(`Teammate lookup failed for ID ${teammateId}:`, {
+          status: teammateResponse.status,
+          error: responseData,
+          response: responseText
+        });
+      }
+    } catch (error) {
+      console.error(`Failed attempt with ID ${teammateId}:`, error);
+      lastError = {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        id: teammateId
+      };
     }
 
-    const teammate = await teammateResponse.json();
+    if (!teammate) {
+      console.error('Teammate lookup failed:', {
+        id: teammateId,
+        lastError
+      });
+      return new Response(JSON.stringify({
+        error: 'Not Found',
+        details: 'Teammate not found',
+        id: teammateId,
+        last_error: lastError
+      }), { status: 404 });
+    }
+
     const sourceIds = teammate.sources || [];
 
     if (sourceIds.length === 0) {
@@ -208,6 +261,122 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         ...corsHeaders,
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store'
+      }
+    });
+  }
+}
+
+export async function PUT(request: NextRequest, context: { params: { id: string } }) {
+  try {
+    // Get the session using Auth0's Edge API
+    const response = NextResponse.next();
+    const session = await getSession(request, response);
+    
+    if (!session?.idToken) {
+      console.error('Sources update endpoint - No ID token found');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json' 
+        },
+      });
+    }
+
+    const teammateId = await context.params.id;
+    const { sources } = await request.json();
+
+    // First, get the current teammate data
+    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
+      }
+    });
+
+    if (!teammateResponse.ok) {
+      console.error('Sources update endpoint - Failed to fetch teammate:', teammateResponse.statusText);
+      return new Response(JSON.stringify({ 
+        error: 'Failed to fetch teammate',
+        details: await teammateResponse.text()
+      }), { 
+        status: teammateResponse.status,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    const teammate = await teammateResponse.json();
+
+    // Update only the sources field while preserving all other fields
+    // Omit the id field from the update payload
+    const { id, ...teammateWithoutId } = teammate;
+    const updatedTeammate = {
+      ...teammateWithoutId,
+      sources: sources
+    };
+
+    // Update the teammate with the new sources
+    const updateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
+      },
+      body: JSON.stringify(updatedTeammate)
+    });
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text();
+      console.error('Sources update endpoint - Failed to update teammate:', {
+        status: updateResponse.status,
+        error: errorText
+      });
+      return new Response(JSON.stringify({ 
+        error: 'Failed to update teammate sources',
+        details: errorText
+      }), { 
+        status: updateResponse.status,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        }
+      });
+    }
+
+    // Revalidate the cache for this teammate's sources
+    revalidateTag(`teammate-${teammateId}-sources`);
+    revalidatePath(`/api/teammates/${teammateId}/sources`);
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (error) {
+    console.error('Sources update endpoint error:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }), { 
+      status: 500,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
       }
     });
   }

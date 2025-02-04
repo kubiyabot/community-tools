@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { TaskSchedulingModal } from '../TaskSchedulingModal';
 import { toast } from '../ui/use-toast';
 import { useTeammateContext } from '@/app/MyRuntimeProvider';
+import type { ScheduleTaskPayload, ScheduleTaskResult } from '@/app/components/assistant-ui/Chat';
 
 type TabValue = 'activity' | 'analytics' | 'teammates' | 'tasks' | 'webhooks';
 type TimeRange = '1h' | '24h' | '7d' | '30d' | 'all';
@@ -492,20 +493,31 @@ export const ActivityHub: React.FC<ActivityHubProps> = ({
           isOpen={showTaskModal}
           onClose={() => setShowTaskModal(false)}
           teammate={contextTeammates.find(t => t.uuid === contextSelectedTeammate)}
-          onSchedule={async (data: TaskData) => {
+          onSchedule={async (data: ScheduleTaskPayload): Promise<ScheduleTaskResult> => {
             try {
-              await fetch('/api/tasks', {
+              const response = await fetch('/api/tasks', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                 },
                 body: JSON.stringify(data),
               });
+              
+              if (!response.ok) {
+                throw new Error('Failed to schedule task');
+              }
+              
+              const result = await response.json();
               toast({
                 title: "Task Scheduled",
                 description: "The task has been scheduled successfully.",
               });
               setShowTaskModal(false);
+              
+              return {
+                task_id: result.task_id,
+                task_uuid: result.task_uuid
+              };
             } catch (error) {
               console.error('Failed to schedule task:', error);
               toast({
@@ -513,6 +525,7 @@ export const ActivityHub: React.FC<ActivityHubProps> = ({
                 title: "Error",
                 description: "Failed to schedule task. Please try again.",
               });
+              throw error;
             }
           }}
         />

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import type { TeammateDetails } from './types';
+import React, { useEffect, useState, useCallback } from 'react';
+import type { TeammateWithIntegrations } from './types';
 import type { Integration } from '@/app/types/integration';
-import { GitMerge, Globe, Key, Settings, Calendar, User, Lock, ExternalLink, AlertCircle, Clock, Info, Database, ChevronRight } from 'lucide-react';
+import { GitMerge, Globe, Key, Settings, Calendar, User, Lock, ExternalLink, AlertCircle, Clock, Info, Database, ChevronRight, RefreshCw } from 'lucide-react';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ import {
 } from '../../ui/tooltip';
 
 interface IntegrationsTabProps {
-  teammate: (TeammateDetails & { integrations: Integration[] }) | null;
+  teammate: TeammateWithIntegrations;
 }
 
 const IntegrationIcon = ({ type }: { type: string }) => {
@@ -327,76 +327,76 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
   );
 };
 
-export function IntegrationsTab({ teammate }: IntegrationsTabProps) {
+const IntegrationsTab: React.FC<IntegrationsTabProps> = ({ teammate }) => {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchIntegrationDetails = async () => {
-      try {
-        if (!teammate?.uuid) {
-          console.error('No teammate UUID provided to IntegrationsTab');
-          setError('No teammate ID available');
-          setIsLoading(false);
-          return;
-        }
-
-        setIsLoading(true);
-        console.log('Fetching integrations for teammate:', {
-          uuid: teammate.uuid,
-          name: teammate.name
-        });
-        
-        const res = await fetch(`/api/teammates/${teammate.uuid}/integrations`);
-        if (!res.ok) {
-          const errorData = await res.json().catch(() => null);
-          console.error('Failed to fetch integrations:', {
-            status: res.status,
-            statusText: res.statusText,
-            errorData
-          });
-          throw new Error(errorData?.details || `Failed to fetch integrations: ${res.statusText}`);
-        }
-        
-        const data = await res.json();
-        console.log('Received integrations data:', {
-          count: data.length,
-          integrations: data.map((i: Integration) => ({
-            uuid: i.uuid,
-            name: i.name,
-            type: i.integration_type
-          }))
-        });
-        
-        // Filter integrations based on teammate's assigned integrations
-        const filteredIntegrations = data.filter((integration: Integration) => {
-          // Check if the integration exists in teammate's integrations array
-          return teammate.integrations?.some(teamInt => {
-            // Handle both string (uuid) and Integration object cases
-            if (typeof teamInt === 'string') {
-              return teamInt === integration.uuid;
-            }
-            return teamInt.uuid === integration.uuid || teamInt.id === integration.uuid;
-          });
-        });
-        
-        setIntegrations(filteredIntegrations);
-        setError(null);
-      } catch (err) {
-        console.error('Failed to fetch integration details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load integration details');
-      } finally {
+  const fetchIntegrationDetails = useCallback(async () => {
+    try {
+      // Check for teammate UUID
+      if (!teammate?.uuid) {
+        console.error('No teammate UUID provided to IntegrationsTab');
+        setError('No teammate ID available. Please ensure the teammate exists and try again.');
         setIsLoading(false);
+        return;
       }
-    };
 
+      setIsLoading(true);
+      console.log('Fetching integrations for teammate:', {
+        uuid: teammate.uuid,
+        name: teammate.name || 'Unknown'
+      });
+      
+      const res = await fetch(`/api/teammates/${teammate.uuid}/integrations`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({ 
+          error: 'Unknown error',
+          details: res.statusText 
+        }));
+        
+        console.error('Failed to fetch integrations:', {
+          status: res.status,
+          statusText: res.statusText,
+          errorData,
+          teammateId: teammate.uuid
+        });
+        
+        throw new Error(
+          errorData.details || 
+          errorData.error || 
+          `Failed to fetch integrations. Please ensure you have the correct permissions and try again.`
+        );
+      }
+      
+      const data = await res.json();
+      console.log('Received integrations data:', {
+        count: data.length,
+        integrations: data.map((i: Integration) => ({
+          uuid: i.uuid,
+          name: i.name,
+          integration_type: i.integration_type
+        }))
+      });
+      
+      setIntegrations(data);
+      setError(null);
+    } catch (err) {
+      console.error('Failed to fetch integration details:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load integration details');
+      setIntegrations([]); // Clear integrations on error
+    } finally {
+      setIsLoading(false);
+    }
+  }, [teammate?.uuid, teammate?.name]);
+
+  useEffect(() => {
     if (teammate?.uuid) {
       fetchIntegrationDetails();
     } else {
       setIsLoading(false);
     }
-  }, [teammate?.uuid, teammate?.integrations]); // Added teammate.integrations as dependency
+  }, [teammate?.uuid, fetchIntegrationDetails]);
 
   if (!teammate) {
     return (
@@ -433,9 +433,21 @@ export function IntegrationsTab({ teammate }: IntegrationsTabProps) {
           <AlertCircle className="h-6 w-6 text-red-400" />
         </div>
         <h3 className="text-lg font-medium text-red-400 mb-2">Error Loading Integrations</h3>
-        <p className="text-sm text-[#94A3B8] max-w-sm">
-          {error}. Please try refreshing the page.
+        <p className="text-sm text-[#94A3B8] max-w-sm mb-4">
+          {error}
         </p>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            setError(null);
+            setIsLoading(true);
+            fetchIntegrationDetails();
+          }}
+          className="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
       </div>
     );
   }
@@ -461,4 +473,6 @@ export function IntegrationsTab({ teammate }: IntegrationsTabProps) {
       ))}
     </div>
   );
-} 
+};
+
+export default IntegrationsTab; 

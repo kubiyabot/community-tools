@@ -57,5 +57,38 @@ export const TeammateAPI = {
     const res = await fetch(`${BASE_URL}/${teammateId}/tools`);
     if (!res.ok) throw new Error('Failed to fetch tools');
     return res.json();
+  },
+
+  // Add method to invalidate teammate cache
+  async invalidateTeammateCache(teammateId: string): Promise<void> {
+    await fetch(`${BASE_URL}/${teammateId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'revalidate' })
+    });
+  },
+
+  // Add method to invalidate integrations cache
+  async invalidateIntegrationsCache(teammateId: string): Promise<void> {
+    await fetch(`${BASE_URL}/${teammateId}/integrations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'revalidate' })
+    });
+  },
+
+  // Add method to invalidate all teammates cache
+  async invalidateAllTeammatesCache(): Promise<void> {
+    await fetch(BASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'revalidate' })
+    });
   }
 }; 

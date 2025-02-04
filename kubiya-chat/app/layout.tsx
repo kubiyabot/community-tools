@@ -1,13 +1,8 @@
 import './globals.css';
 import { GeistSans } from 'geist/font/sans';
 import { Metadata } from 'next';
-import { ErrorBoundary } from '@/app/components/ErrorBoundary';
-import { UserProvider } from '@auth0/nextjs-auth0/client';
-import { ConfigProvider } from '@/lib/config-context';
-import { EntityProvider } from './providers/EntityProvider';
-import ClientProvider from './components/ClientProvider';
-import { SessionHandler } from './components/SessionHandler';
 import { Toaster } from "sonner";
+import { Providers } from './providers/client-providers';
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -35,18 +30,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`}>
-        <ErrorBoundary>
-          <UserProvider>
-            <ConfigProvider>
-              <EntityProvider>
-                <ClientProvider>
-                  <SessionHandler />
-                  {children}
-                </ClientProvider>
-              </EntityProvider>
-            </ConfigProvider>
-          </UserProvider>
-        </ErrorBoundary>
+        <Providers>
+          {children}
+        </Providers>
         <Toaster />
       </body>
     </html>

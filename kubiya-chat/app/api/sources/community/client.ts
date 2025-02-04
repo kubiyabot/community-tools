@@ -1,18 +1,46 @@
-import { CommunityTool, GitHubContentsResponse } from './types';
+import { GitHubContentsResponse } from './types';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 import { fetchSource } from './utils';
 import { NextRequest } from 'next/server';
+import { formatDistanceToNow } from 'date-fns';
+import { REPO_PATH, REPO_URL, updateRepo } from './git-utils';
 
 const KUBIYA_API_URL = process.env.KUBIYA_API_URL || 'https://api.kubiya.ai';
-const REPO_URL = 'https://github.com/kubiyabot/community-tools.git';
-const REPO_PATH = path.join(os.tmpdir(), 'kubiya-community-tools');
 
 interface ErrorResponse {
   error?: string;
   message?: string;
+}
+
+interface CommitInfo {
+  sha: string;
+  date: string;
+  message: string;
+  author: {
+    name: string;
+    avatar?: string;
+  };
+}
+
+interface CommunityTool {
+  name: string;
+  path: string;
+  description: string;
+  tools_count: number;
+  icon_url?: string;
+  readme?: string;
+  readme_summary?: string;
+  tools?: any[];
+  isDiscovering?: boolean;
+  error?: string;
+  lastUpdated?: string;
+  stars?: number;
+  lastCommit?: CommitInfo;
+  contributors_count?: number;
+  loadingState: 'idle' | 'loading' | 'success' | 'error';
 }
 
 export class CommunityToolsClient {
@@ -21,6 +49,8 @@ export class CommunityToolsClient {
   private CACHE_TTL = 5 * 60 * 1000; // 5 minutes
   private isInitializing: boolean = false;
   private initPromise: Promise<void> | null = null;
+  private lastUpdateTime: number = 0;
+  private UPDATE_COOLDOWN = 30 * 1000; // 30 seconds cooldown between updates
   private request: NextRequest | undefined;
 
   private constructor(request?: NextRequest) {
@@ -35,36 +65,21 @@ export class CommunityToolsClient {
   }
 
   private async ensureRepo() {
-    if (this.isInitializing) {
-      // Wait for existing initialization
+    if (this.initPromise) {
       await this.initPromise;
+      return;
+    }
+
+    const now = Date.now();
+    if (now - this.lastUpdateTime < this.UPDATE_COOLDOWN) {
       return;
     }
 
     try {
       this.isInitializing = true;
-      this.initPromise = (async () => {
-        const exists = await fs.access(REPO_PATH).then(() => true).catch(() => false);
-        
-        if (exists) {
-          try {
-            // Try to update existing repo
-            console.log('Updating community tools repo...');
-            execSync('git pull', { cwd: REPO_PATH });
-          } catch (error) {
-            // If update fails, remove and clone fresh
-            console.log('Update failed, re-cloning repo...');
-            await fs.rm(REPO_PATH, { recursive: true, force: true });
-            execSync(`git clone ${REPO_URL} ${REPO_PATH}`);
-          }
-        } else {
-          // Fresh clone
-          console.log('Cloning community tools repo...');
-          execSync(`git clone ${REPO_URL} ${REPO_PATH}`);
-        }
-      })();
-
+      this.initPromise = updateRepo();
       await this.initPromise;
+      this.lastUpdateTime = now;
     } catch (error) {
       console.error('Failed to initialize repo:', error);
       throw new Error('Failed to initialize community tools repository');
@@ -118,6 +133,105 @@ export class CommunityToolsClient {
     }
   }
 
+  private async getRepoMetadata() {
+    try {
+      const response = await fetch('https://api.github.com/repos/kubiyabot/community-tools', {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'kubiya-chat-ui'
+        }
+      });
+      if (!response.ok) throw new Error('Failed to fetch repo metadata');
+      return await response.json();
+    } catch (error) {
+      console.warn('Failed to fetch repo metadata:', error);
+      return null;
+    }
+  }
+
+  private async getRepoInfo() {
+    try {
+      await this.ensureRepo();
+      
+      // Get last commit info from git log
+      const lastCommit = execSync(
+        'git log -1 --format="%H%n%at%n%s%n%an"',
+        { cwd: REPO_PATH, encoding: 'utf-8' }
+      ).split('\n');
+
+      return {
+        sha: lastCommit[0],
+        date: new Date(parseInt(lastCommit[1]) * 1000).toISOString(),
+        message: lastCommit[2],
+        author: {
+          name: lastCommit[3]
+        }
+      };
+    } catch (error) {
+      console.warn('Failed to get repo info:', error);
+      return null;
+    }
+  }
+
+  private async getLastCommit(dirPath: string): Promise<CommitInfo | null> {
+    try {
+      await this.ensureRepo();
+      const fullPath = path.join(REPO_PATH, dirPath);
+      
+      // Get last commit for specific directory
+      const lastCommit = execSync(
+        `git log -1 --format="%H%n%at%n%s%n%an" -- "${fullPath}"`,
+        { cwd: REPO_PATH, encoding: 'utf-8' }
+      ).split('\n');
+
+      return {
+        sha: lastCommit[0],
+        date: new Date(parseInt(lastCommit[1]) * 1000).toISOString(),
+        message: lastCommit[2],
+        author: {
+          name: lastCommit[3]
+        }
+      };
+    } catch (error) {
+      console.warn('Failed to get commit info:', error);
+      return null;
+    }
+  }
+
+  private async getContributors(dirPath: string): Promise<number> {
+    try {
+      await this.ensureRepo();
+      const fullPath = path.join(REPO_PATH, dirPath);
+      
+      // Get unique contributors count
+      const contributors = execSync(
+        `git log --format="%ae" -- "${fullPath}" | sort -u | wc -l`,
+        { cwd: REPO_PATH, encoding: 'utf-8' }
+      );
+
+      return parseInt(contributors.trim());
+    } catch (error) {
+      console.warn('Failed to get contributors:', error);
+      return 0;
+    }
+  }
+
+  private generateReadmeSummary(readme: string): string {
+    if (!readme) return '';
+    
+    // Remove markdown headers
+    const withoutHeaders = readme.replace(/^#.*$/gm, '').trim();
+    
+    // Get first two paragraphs
+    const paragraphs = withoutHeaders.split('\n\n')
+      .filter(p => p.trim().length > 0)
+      .slice(0, 2);
+    
+    // Combine and truncate if too long
+    const summary = paragraphs.join('\n\n');
+    return summary.length > 300 ? summary.slice(0, 297) + '...' : summary;
+  }
+
   async listTools(): Promise<CommunityTool[]> {
     const cacheKey = 'community-tools-list';
     const cached = this.getCached<CommunityTool[]>(cacheKey);
@@ -128,25 +242,37 @@ export class CommunityToolsClient {
 
     try {
       const contents = await this.readDir(REPO_PATH);
+      const repoMetadata = await this.getRepoMetadata();
       
       const tools = await Promise.all(
         contents.map(async item => {
           const url = `https://github.com/kubiyabot/community-tools/tree/main/${item.path}`;
           try {
             const data = await this.loadSource(url);
+            const lastCommit = await this.getLastCommit(item.path);
+            const contributors_count = await this.getContributors(item.path);
             
             // Ensure we have a valid response format
             const tools = Array.isArray(data.tools) ? data.tools : 
                          Array.isArray(data) ? data : 
                          [];
 
+            const readme = await fs.readFile(path.join(REPO_PATH, item.path, 'README.md'), 'utf-8');
+            const readme_summary = this.generateReadmeSummary(readme);
+
             return {
               name: item.name,
               path: item.path,
-              description: data.description || '',
+              description: readme_summary || data.description || '',
               tools_count: tools.length,
               loadingState: 'success' as const,
               tools: tools,
+              readme,
+              readme_summary,
+              lastCommit: lastCommit || undefined,
+              contributors_count,
+              stars: repoMetadata?.stargazers_count,
+              lastUpdated: lastCommit?.date || repoMetadata?.updated_at,
               error: undefined
             };
           } catch (error) {

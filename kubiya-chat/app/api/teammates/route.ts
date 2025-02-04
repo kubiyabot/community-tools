@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@auth0/nextjs-auth0/edge';
+import { revalidateTag } from 'next/cache';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+
+// Add cache tags for teammates
+const TEAMMATES_CACHE_TAG = 'teammates';
 
 export async function GET(req: NextRequest) {
   try {
@@ -51,6 +55,11 @@ export async function GET(req: NextRequest) {
         'Pragma': 'no-cache',
         'X-Organization-ID': session.user?.org_id || '',
         'X-Kubiya-Client': 'chat-ui'
+      },
+      next: {
+        tags: [TEAMMATES_CACHE_TAG],
+        // Cache for 5 minutes
+        revalidate: 300
       }
     });
 
@@ -153,5 +162,21 @@ export async function GET(req: NextRequest) {
         'Cache-Control': 'no-store'
       }
     });
+  }
+}
+
+// Add POST method to handle cache invalidation
+export async function POST(req: NextRequest) {
+  try {
+    const { action } = await req.json();
+    
+    if (action === 'revalidate') {
+      revalidateTag(TEAMMATES_CACHE_TAG);
+      return NextResponse.json({ revalidated: true, timestamp: Date.now() });
+    }
+    
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 } 

@@ -1,14 +1,53 @@
 "use client";
 
+import { useMemo } from 'react';
 import { Calendar, User, Code, Cpu, Variable, Lock, Globe, Key, GitFork, GitMerge, GitPullRequest } from 'lucide-react';
-import type { TeammateHeaderProps } from './types';
+import type { TeammateHeaderProps, BaseIntegration } from './types';
 import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { generateAvatarUrl } from '@/app/components/TeammateSelector';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/app/components/ui/tooltip';
+import { useVirtualizer } from '@tanstack/react-virtual';
+
+const MAX_VISIBLE_CAPABILITIES = 10;
+const MAX_VISIBLE_INTEGRATIONS = 5;
 
 export function TeammateHeader({ teammate, integrations }: TeammateHeaderProps) {
   if (!teammate) return null;
+
+  // Memoize avatar URL to prevent regeneration on every render
+  const avatarUrl = useMemo(() => 
+    generateAvatarUrl({ uuid: teammate.uuid, name: teammate.name }), 
+    [teammate.uuid, teammate.name]
+  );
+
+  // Memoize formatted date
+  const formattedDate = useMemo(() => 
+    teammate.metadata?.created_at ? 
+      new Date(teammate.metadata.created_at).toLocaleDateString() : 
+      'Unknown',
+    [teammate.metadata?.created_at]
+  );
+
+  // Memoize capabilities list with limit
+  const capabilities = useMemo(() => 
+    teammate.metadata?.capabilities?.slice(0, MAX_VISIBLE_CAPABILITIES) || [],
+    [teammate.metadata?.capabilities]
+  );
+
+  // Memoize integrations list with limit
+  const visibleIntegrations = useMemo(() => 
+    integrations?.slice(0, MAX_VISIBLE_INTEGRATIONS) || [],
+    [integrations]
+  );
+
+  // Get total capabilities count safely
+  const totalCapabilities = teammate.metadata?.capabilities?.length || 0;
+  const hasMoreCapabilities = totalCapabilities > MAX_VISIBLE_CAPABILITIES;
+
+  // Get total integrations count safely
+  const totalIntegrations = integrations?.length || 0;
+  const hasMoreIntegrations = totalIntegrations > MAX_VISIBLE_INTEGRATIONS;
 
   return (
     <div className="flex-shrink-0 border-b border-[#1E293B] bg-[#0F172A]">
@@ -18,9 +57,11 @@ export function TeammateHeader({ teammate, integrations }: TeammateHeaderProps) 
           <div className="relative flex-shrink-0">
             <div className="h-20 w-20 rounded-xl overflow-hidden bg-[#1E293B] border border-[#2A3347] flex items-center justify-center">
               <img 
-                src={generateAvatarUrl({ uuid: teammate.uuid, name: teammate.name })}
+                src={avatarUrl}
                 alt={teammate.name} 
                 className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             <div className={cn(
@@ -56,20 +97,15 @@ export function TeammateHeader({ teammate, integrations }: TeammateHeaderProps) 
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">Created</p>
-                  <p className="text-sm font-medium text-slate-200">
-                    {teammate.metadata?.created_at ? 
-                      new Date(teammate.metadata.created_at).toLocaleDateString() : 
-                      'Unknown'
-                    }
-                  </p>
+                  <p className="text-sm font-medium text-slate-200">{formattedDate}</p>
                 </div>
               </div>
             </div>
 
-            {/* Capabilities */}
-            {teammate.metadata?.capabilities && teammate.metadata.capabilities.length > 0 && (
+            {/* Capabilities with "Show More" */}
+            {capabilities.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-6">
-                {teammate.metadata.capabilities.map((capability: string) => (
+                {capabilities.map((capability: string) => (
                   <Badge 
                     key={capability}
                     variant="secondary" 
@@ -78,29 +114,63 @@ export function TeammateHeader({ teammate, integrations }: TeammateHeaderProps) 
                     {capability}
                   </Badge>
                 ))}
+                {hasMoreCapabilities && (
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge variant="secondary" className="bg-slate-500/10 text-slate-400 border-slate-500/20">
+                        +{totalCapabilities - MAX_VISIBLE_CAPABILITIES} more
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="max-w-xs">
+                        {teammate.metadata?.capabilities?.slice(MAX_VISIBLE_CAPABILITIES).join(', ')}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
             )}
 
-            {integrations && integrations.length > 0 && (
+            {/* Integrations with "Show More" */}
+            {visibleIntegrations.length > 0 && (
               <div className="flex items-center gap-2 mt-3">
                 <GitFork className="h-4 w-4 text-purple-400" />
                 <div className="flex items-center gap-2">
-                  {integrations.map((integration: any, index: number) => (
-                    <Tooltip key={integration.id || index}>
+                  {visibleIntegrations.map((integration: BaseIntegration, index: number) => {
+                    const displayName = integration.name;
+                    return (
+                      <Tooltip key={integration.uuid || index}>
+                        <TooltipTrigger>
+                          <Badge 
+                            variant="outline" 
+                            className="bg-blue-500/10 text-blue-400 border-blue-500/20 flex items-center gap-1"
+                          >
+                            <GitPullRequest className="h-3 w-3" />
+                            {displayName}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Connected to {displayName}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                  {hasMoreIntegrations && (
+                    <Tooltip>
                       <TooltipTrigger>
-                        <Badge 
-                          variant="outline" 
-                          className="bg-blue-500/10 text-blue-400 border-blue-500/20 flex items-center gap-1"
-                        >
-                          <GitPullRequest className="h-3 w-3" />
-                          {integration.name || integration.type}
+                        <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20">
+                          +{totalIntegrations - MAX_VISIBLE_INTEGRATIONS} more
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Connected to {integration.name || integration.type}</p>
+                        <div className="max-w-xs">
+                          {integrations?.slice(MAX_VISIBLE_INTEGRATIONS)
+                            .map((i: BaseIntegration) => i.name)
+                            .join(', ')}
+                        </div>
                       </TooltipContent>
                     </Tooltip>
-                  ))}
+                  )}
                 </div>
               </div>
             )}

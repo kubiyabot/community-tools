@@ -1,10 +1,10 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/app/components/ui/dialog';
 import { Button } from '@/app/components/ui/button';
-import { Clock, Trash2, Slack, MessageSquare, X, Calendar, RotateCcw, Filter, User, Check, AlertCircle, ChevronRight, Webhook, GitBranch, Trello, Cloud, Hash, RefreshCcw } from 'lucide-react';
+import { Clock, Trash2, Slack, MessageSquare, X, Calendar, RotateCcw, Filter, User, Check, AlertCircle, ChevronRight, Webhook, GitBranch, Trello, Cloud, Hash, RefreshCcw, Search } from 'lucide-react';
 import { format, isToday, isTomorrow, isThisWeek, isThisMonth, isAfter, isBefore } from 'date-fns';
 import { toast } from '@/app/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useEntity } from '@/app/providers/EntityProvider';
 import { useTeammateContext } from '@/app/MyRuntimeProvider';
 import { Badge } from '@/app/components/ui/badge';
@@ -13,7 +13,9 @@ import { TeammateDetailsModal } from '@/app/components/shared/TeammateDetailsMod
 import type { TeammateDetails as TeammateDetailsType } from '@/app/components/shared/teammate-details/types';
 import { generateAvatarUrl } from '@/app/components/TeammateSelector';
 import type { TeammateInfo } from '@/app/types/teammate';
-import type { Integration } from '@/app/components/shared/teammate-details/types';
+import { type BaseIntegration } from '@/app/components/shared/teammate-details/types';
+import { Input } from '@/app/components/ui/input';
+import { useOnClickOutside } from '@/app/hooks/use-on-click-outside';
 
 interface ScheduledTask {
   id: string;
@@ -68,9 +70,80 @@ interface ScheduledTasksModalProps {
 type TimeFilter = 'all' | 'today' | 'tomorrow' | 'this-week' | 'this-month' | 'upcoming' | 'past';
 type StatusFilter = 'all' | 'pending' | 'completed' | 'recurring';
 
+interface QuickTeammateSwitchProps {
+  teammates: TeammateInfo[];
+  currentTeammate: TeammateInfo | null;
+  onSelect: (teammate: TeammateInfo) => void;
+  onClose: () => void;
+}
+
+function QuickTeammateSwitch({ teammates, currentTeammate, onSelect, onClose }: QuickTeammateSwitchProps) {
+  const [search, setSearch] = useState('');
+  const switchRef = useRef<HTMLDivElement>(null);
+  
+  useOnClickOutside(switchRef, onClose);
+  
+  const filteredTeammates = useMemo(() => {
+    return teammates.filter(teammate => 
+      teammate.name?.toLowerCase().includes(search.toLowerCase()) ||
+      teammate.email?.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [teammates, search]);
+
+  return (
+    <div ref={switchRef} className="absolute top-full right-0 mt-2 w-[300px] bg-[#1A1F2E] border border-[#2D3B4E] rounded-lg shadow-xl z-50">
+      <div className="p-3 border-b border-[#2D3B4E]">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+          <Input
+            placeholder="Search teammates..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-[#0F172A] border-[#2D3B4E] text-slate-200 placeholder:text-slate-400"
+          />
+        </div>
+      </div>
+      
+      <div className="max-h-[300px] overflow-y-auto">
+        {filteredTeammates.map((teammate) => (
+          <button
+            key={teammate.uuid}
+            onClick={() => {
+              onSelect(teammate);
+              onClose();
+            }}
+            className="w-full px-3 py-2 flex items-center gap-3 hover:bg-purple-500/10 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center justify-center">
+              <img
+                src={generateAvatarUrl({ 
+                  uuid: teammate.uuid, 
+                  name: teammate.name || 'Unknown'
+                })}
+                alt={teammate.name || 'Unknown'}
+                className="w-6 h-6 rounded object-cover"
+              />
+            </div>
+            <div className="flex-1 text-left">
+              <div className="text-sm font-medium text-slate-200 group-hover:text-purple-400">
+                {teammate.name || 'Unknown'}
+              </div>
+              {teammate.email && (
+                <div className="text-xs text-slate-400">{teammate.email}</div>
+              )}
+            </div>
+            {currentTeammate?.uuid === teammate.uuid && (
+              <Check className="h-4 w-4 text-purple-400" />
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Helper function to convert TeammateInfo to TeammateDetails
 function convertToTeammateDetails(teammate: TeammateInfo): TeammateDetailsType {
-  // Convert status to match TeammateDetails type
   let status: 'active' | 'inactive' | 'error' | undefined = undefined;
   if (teammate.status) {
     if (teammate.status === 'busy' || teammate.status === 'active') {
@@ -81,10 +154,19 @@ function convertToTeammateDetails(teammate: TeammateInfo): TeammateDetailsType {
   }
 
   return {
+    id: teammate.uuid,
     uuid: teammate.uuid,
-    name: teammate.name,
-    description: teammate.context,
-    avatar_url: teammate.avatar,
+    name: teammate.name || '',
+    description: teammate.context || '',
+    avatar_url: teammate.avatar || '',
+    status,
+    metadata: {
+      created_at: new Date().toISOString(),
+      last_updated: new Date().toISOString(),
+      tools_count: 0,
+      integrations_count: teammate.integrations?.length || 0,
+      sources_count: 0
+    },
     integrations: teammate.integrations?.map(i => {
       const integrationType = typeof i === 'string' ? 'custom' : (i.integration_type || 'custom');
       return {
@@ -99,9 +181,8 @@ function convertToTeammateDetails(teammate: TeammateInfo): TeammateDetailsType {
           created_at: new Date().toISOString(),
           last_updated: new Date().toISOString()
         }
-      } as Integration;
-    }),
-    status
+      } as BaseIntegration;
+    }) || []
   };
 }
 
@@ -117,7 +198,7 @@ function convertToTeammateInfo(teammate: TeammateDetailsType): TeammateInfo {
   }
 
   return {
-    uuid: teammate.uuid,
+    uuid: teammate.id,
     name: teammate.name,
     context: teammate.description,
     avatar: teammate.avatar_url,
@@ -133,8 +214,8 @@ function normalizeName(name: string): string {
     .replace(/^_|_$/g, '');
 }
 
-// Add the findTeammate helper function from TasksTabContent
-function findTeammate(teammates: any[], nameOrId: string | undefined | null) {
+// Update the findTeammate function with proper typing
+function findTeammate(teammates: TeammateInfo[], nameOrId: string | undefined | null): TeammateInfo | undefined {
   if (!nameOrId) {
     console.log('No nameOrId provided to findTeammate');
     return undefined;
@@ -163,7 +244,7 @@ function findTeammate(teammates: any[], nameOrId: string | undefined | null) {
   });
 
   const byName = teammates.find(t => 
-    normalizeName(t.name) === normalizedSearch ||
+    normalizeName(t.name || '') === normalizedSearch ||
     normalizeName(t.uuid) === normalizedSearch
   );
 
@@ -171,7 +252,7 @@ function findTeammate(teammates: any[], nameOrId: string | undefined | null) {
     console.log('Found teammate by normalized name:', {
       uuid: byName.uuid,
       name: byName.name,
-      normalizedName: normalizeName(byName.name)
+      normalizedName: normalizeName(byName.name || '')
     });
     return byName;
   }
@@ -181,6 +262,27 @@ function findTeammate(teammates: any[], nameOrId: string | undefined | null) {
     normalizedSearch
   });
   return undefined;
+}
+
+// Update the TeammateDetails type to include uuid
+interface TeammateDetailsWithUUID extends Omit<TeammateDetailsType, 'uuid'> {
+  uuid: string;
+}
+
+// Update the group type in the groupedTasks
+type TeammateGroup = {
+  teammate: TeammateDetailsWithUUID | null;
+  tasks: ScheduledTask[];
+};
+
+// Add type guard for TeammateDetailsType
+function isTeammateDetails(teammate: any): teammate is TeammateDetailsType {
+  return teammate && 'id' in teammate;
+}
+
+// Add type guard for TeammateInfo
+function isTeammateInfo(teammate: any): teammate is TeammateInfo {
+  return teammate && 'uuid' in teammate;
 }
 
 export function ScheduledTasksModal({ 
@@ -193,7 +295,7 @@ export function ScheduledTasksModal({
   onScheduleSimilar 
 }: ScheduledTasksModalProps) {
   const { getEntityMetadata } = useEntity();
-  const { teammates, selectedTeammate: contextSelectedTeammate } = useTeammateContext();
+  const { teammates, selectedTeammate: contextSelectedTeammate, setSelectedTeammate } = useTeammateContext();
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [isSchedulingModalOpen, setIsSchedulingModalOpen] = useState(false);
@@ -204,6 +306,7 @@ export function ScheduledTasksModal({
   const [isTeammateDetailsOpen, setIsTeammateDetailsOpen] = useState(false);
   const [selectedTeammateForDetails, setSelectedTeammateForDetails] = useState<TeammateDetailsType | null>(null);
   const [isLoadingTeammateDetails, setIsLoadingTeammateDetails] = useState(false);
+  const [isQuickSwitchOpen, setIsQuickSwitchOpen] = useState(false);
 
   const currentTeammate = useMemo(() => {
     if (!contextSelectedTeammate && !teammate?.uuid) return null;
@@ -344,7 +447,6 @@ export function ScheduledTasksModal({
   }, [tasks, timeFilter, statusFilter, currentTeammate?.uuid]);
 
   const convertTeammateDetailsToInfo = (teammate: TeammateDetailsType): TeammateInfo => {
-    // Convert status to TeammateInfo status type
     let status: TeammateInfo['status'];
     if (teammate.status === 'error' || teammate.status === 'inactive') {
       status = 'inactive';
@@ -353,8 +455,8 @@ export function ScheduledTasksModal({
     }
 
     return {
-      uuid: teammate.uuid.toLowerCase(),
-      name: teammate.name.toLowerCase(),
+      uuid: teammate.id,
+      name: teammate.name,
       avatar: teammate.avatar_url,
       context: teammate.description,
       status
@@ -362,155 +464,34 @@ export function ScheduledTasksModal({
   };
 
   const groupedTasks = useMemo(() => {
-    const groups = new Map<string, { teammate: TeammateDetailsType | null; tasks: ScheduledTask[] }>();
+    const groups = new Map<string, TeammateGroup>();
 
-    // Map tasks to include teammate info from selected_agent and enhance metadata
     const tasksWithTeammates = filteredTasks.map(task => {
-      // First try to find teammate from the teammate object if it exists
-      if (task.teammate?.uuid) {
-        const teammate = findTeammate(teammates, task.teammate.uuid);
-        if (teammate) {
-          console.log('Found teammate from task.teammate:', {
-            taskId: task.task_id,
-            teammateUuid: teammate.uuid,
-            teammateName: teammate.name
-          });
-          return {
-            ...task,
-            teammate: {
-              uuid: teammate.uuid,
-              name: teammate.name,
-              description: teammate.description || '',
-              status: teammate.status || 'active',
-              metadata: {
-                created_at: new Date().toISOString(),
-                last_updated: new Date().toISOString(),
-                tools_count: 0,
-                integrations_count: 0,
-                sources_count: 0
-              }
-            } as TeammateDetailsType
-          };
-        }
-      }
-
-      // Then try to find by selected_agent name or UUID
-      if (task.parameters?.selected_agent) {
-        const teammate = findTeammate(teammates, task.parameters.selected_agent);
+      const findAndConvertTeammate = (teammateId: string | undefined) => {
+        if (!teammateId) return null;
+        const teammate = findTeammate(teammates, teammateId);
+        if (!teammate) return null;
         
-        // If found by name/uuid, use that teammate
-        if (teammate) {
-          console.log('Found teammate from selected_agent:', {
-            taskId: task.task_id,
-            teammateUuid: teammate.uuid,
-            teammateName: teammate.name
-          });
-          return {
-            ...task,
-            teammate: {
-              uuid: teammate.uuid,
-              name: teammate.name,
-              description: teammate.description || '',
-              status: teammate.status || 'active',
-              metadata: {
-                created_at: new Date().toISOString(),
-                last_updated: new Date().toISOString(),
-                tools_count: 0,
-                integrations_count: 0,
-                sources_count: 0
-              }
-            } as TeammateDetailsType
-          };
-        }
+        return {
+          ...convertToTeammateDetails(teammate),
+          uuid: teammate.uuid
+        };
+      };
 
-        // If we have selected_agent_name but no match, try to find by that name
-        if (task.parameters.selected_agent_name) {
-          const teammateByName = findTeammate(teammates, task.parameters.selected_agent_name);
-          if (teammateByName) {
-            console.log('Found teammate from selected_agent_name:', {
-              taskId: task.task_id,
-              teammateUuid: teammateByName.uuid,
-              teammateName: teammateByName.name
-            });
-            return {
-              ...task,
-              teammate: {
-                uuid: teammateByName.uuid,
-                name: teammateByName.name,
-                description: teammateByName.description || '',
-                status: teammateByName.status || 'active',
-                metadata: {
-                  created_at: new Date().toISOString(),
-                  last_updated: new Date().toISOString(),
-                  tools_count: 0,
-                  integrations_count: 0,
-                  sources_count: 0
-                }
-              } as TeammateDetailsType
-            };
-          }
-        }
-      }
+      // Try to find teammate from task.teammate first
+      const teammateFromTask = task.teammate && isTeammateDetails(task.teammate) ? 
+        findAndConvertTeammate(task.teammate.id) : null;
 
-      // If we still haven't found a teammate but have a name, try one last time with any available name
-      const possibleNames = [
-        task.parameters?.selected_agent,
-        task.parameters?.selected_agent_name,
-        task.teammate?.name
-      ].filter(Boolean);
+      // If no teammate found, try selected_agent
+      const teammateFromAgent = !teammateFromTask && task.parameters?.selected_agent ? 
+        findAndConvertTeammate(task.parameters.selected_agent) : null;
 
-      if (possibleNames.length > 0) {
-        console.log('Trying possible names for teammate:', {
-          taskId: task.task_id,
-          possibleNames
-        });
-
-        for (const name of possibleNames) {
-          const teammate = findTeammate(teammates, name);
-          if (teammate) {
-            console.log('Found teammate from possible names:', {
-              taskId: task.task_id,
-              teammateUuid: teammate.uuid,
-              teammateName: teammate.name,
-              matchedName: name
-            });
-            return {
-              ...task,
-              teammate: {
-                uuid: teammate.uuid,
-                name: teammate.name,
-                description: teammate.description || '',
-                status: teammate.status || 'active',
-                metadata: {
-                  created_at: new Date().toISOString(),
-                  last_updated: new Date().toISOString(),
-                  tools_count: 0,
-                  integrations_count: 0,
-                  sources_count: 0
-                }
-              } as TeammateDetailsType
-            };
-          }
-        }
-      }
-
-      // If we get here, we couldn't find a teammate. Log the task data for debugging
-      console.log('Task with no teammate found:', {
-        taskId: task.task_id,
-        taskData: {
-          teammate: task.teammate,
-          parameters: task.parameters,
-          channel_id: task.channel_id,
-          message: task.parameters?.message_text?.substring(0, 100)
-        },
-        availableTeammates: teammates.map(t => ({ uuid: t.uuid, name: t.name }))
-      });
-
-      // Return task with undefined teammate if none was found
-      return task;
+      return {
+        ...task,
+        teammate: teammateFromTask || teammateFromAgent || null
+      } as ScheduledTask;
     });
 
-    // Group tasks by teammate
     tasksWithTeammates.forEach(task => {
       const teammateName = task.parameters.selected_agent_name || task.parameters.selected_agent || 'unassigned';
       const existingGroup = groups.get(teammateName);
@@ -526,32 +507,37 @@ export function ScheduledTasksModal({
     });
 
     return Array.from(groups.entries()).sort((a, b) => 
-      a[0].localeCompare(b[0]) // Sort by exact teammate name
+      a[0].localeCompare(b[0])
     );
   }, [filteredTasks, teammates]);
 
-  const handleTeammateClick = async (teammate: TeammateDetailsType | TeammateInfo | null) => {
+  const handleTeammateClick = async (teammate: TeammateDetailsWithUUID | TeammateInfo | null) => {
     if (!teammate) return;
     
     try {
       setIsLoadingTeammateDetails(true);
-      const response = await fetch(`/api/teammates/${teammate.uuid.toLowerCase()}`);
+      const teammateId = isTeammateInfo(teammate) ? teammate.uuid : teammate.id;
+      const response = await fetch(`/api/teammates/${teammateId?.toLowerCase()}`);
       if (!response.ok) throw new Error('Failed to fetch teammate details');
       
-      const teammateDetails: TeammateDetailsType = await response.json();
-      // Preserve the display name from the original teammate
-      teammateDetails.name = teammate.name;
-      
-      // Ensure required fields are present
-      if (!teammateDetails.metadata) {
-        teammateDetails.metadata = {
-          created_at: new Date().toISOString(),
-          last_updated: new Date().toISOString(),
-          tools_count: 0,
-          integrations_count: 0,
-          sources_count: 0
-        };
-      }
+      const data = await response.json();
+      const teammateDetails: TeammateDetailsType = {
+        id: data.id || teammateId || '',
+        uuid: data.uuid || teammateId || '',
+        name: teammate.name || data.name || '',
+        description: data.description || '',
+        avatar_url: data.avatar_url || '',
+        status: data.status || 'active',
+        metadata: {
+          created_at: data.metadata?.created_at || new Date().toISOString(),
+          last_updated: data.metadata?.last_updated || new Date().toISOString(),
+          tools_count: data.metadata?.tools_count || 0,
+          integrations_count: data.metadata?.integrations_count || 0,
+          sources_count: data.metadata?.sources_count || 0
+        },
+        integrations: data.integrations || []
+      };
+
       setSelectedTeammateForDetails(teammateDetails);
       setIsTeammateDetailsOpen(true);
     } catch (error) {
@@ -594,7 +580,7 @@ export function ScheduledTasksModal({
     }
   };
 
-  const getIntegrationIcon = (integration: Integration) => {
+  const getIntegrationIcon = (integration: BaseIntegration) => {
     const type = (integration.integration_type || integration.name || '').toLowerCase();
     
     if (type.includes('slack')) return <Slack className="h-4 w-4 text-blue-400" />;
@@ -603,6 +589,58 @@ export function ScheduledTasksModal({
     if (type.includes('aws')) return <Cloud className="h-4 w-4 text-orange-400" />;
     
     return <Webhook className="h-4 w-4 text-emerald-400" />;
+  };
+
+  const handleTeammateSwitch = async (newTeammate: TeammateInfo) => {
+    try {
+      setSelectedTeammate?.(newTeammate.uuid);
+      
+      const response = await fetch(`/api/tasks/reassign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tasks: tasks.map(task => task.task_uuid),
+          newTeammateId: newTeammate.uuid,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reassign tasks');
+      }
+
+      toast({
+        title: "Success",
+        description: `Tasks reassigned to ${newTeammate.name}`,
+        duration: 3000,
+      });
+
+      setIsQuickSwitchOpen(false);
+
+    } catch (error) {
+      console.error('Error switching teammate:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to reassign tasks. Please try again.",
+        duration: 5000,
+      });
+    }
+  };
+
+  const getAvatarUrl = (teammate: TeammateDetailsWithUUID | TeammateInfo | null) => {
+    if (!teammate) {
+      return generateAvatarUrl({ 
+        uuid: 'default', 
+        name: 'Unknown'
+      });
+    }
+    const id = 'id' in teammate ? teammate.id : teammate.uuid;
+    return generateAvatarUrl({ 
+      uuid: id || 'default', 
+      name: teammate.name || 'Unknown'
+    });
   };
 
   return (
@@ -658,10 +696,7 @@ export function ScheduledTasksModal({
                   <div className="relative">
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center justify-center">
                       <img
-                        src={generateAvatarUrl({ 
-                          uuid: currentTeammate.uuid || 'default', 
-                          name: currentTeammate.name || 'Unknown'
-                        })}
+                        src={getAvatarUrl(currentTeammate)}
                         alt={currentTeammate.name || 'Teammate'}
                         className="w-8 h-8 rounded object-cover"
                       />
@@ -683,15 +718,26 @@ export function ScheduledTasksModal({
                     </div>
                   </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleSwitchTeammate}
-                  className="text-slate-400 hover:text-purple-400 group shrink-0"
-                >
-                  Choose Different Teammate
-                  <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
-                </Button>
+                <div className="relative">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsQuickSwitchOpen(!isQuickSwitchOpen)}
+                    className="text-slate-400 hover:text-purple-400 group shrink-0"
+                  >
+                    Choose Different Teammate
+                    <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                  </Button>
+                  
+                  {isQuickSwitchOpen && (
+                    <QuickTeammateSwitch
+                      teammates={teammates}
+                      currentTeammate={currentTeammate}
+                      onSelect={handleTeammateSwitch}
+                      onClose={() => setIsQuickSwitchOpen(false)}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -799,10 +845,7 @@ export function ScheduledTasksModal({
                     >
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 flex items-center justify-center">
                         <img
-                          src={generateAvatarUrl({ 
-                            uuid: group.teammate?.uuid || 'default', 
-                            name: group.teammate?.name || 'Unknown'
-                          })}
+                          src={getAvatarUrl(group.teammate)}
                           alt={group.teammate?.name || 'Unknown'}
                           className="w-6 h-6 rounded object-cover"
                         />

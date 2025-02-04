@@ -2,9 +2,8 @@
 
 import { useMemo, useEffect, useState, useCallback } from 'react';
 import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Info, Hash, Box, Dock, AlertCircle, Plus } from 'lucide-react';
-import type { TeammateTabProps } from './types';
 import type { Tool as SourceTool } from '@/app/types/tool';
-import type { Tool as TeammateToolType, TeammateDetails } from '@/app/types/teammate';
+import type { TeammateDetails } from '@/app/types/teammate';
 import type { SourceInfo } from '@/app/types/source';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
@@ -55,13 +54,6 @@ import * as z from "zod";
 import { Textarea } from "@/app/components/ui/textarea";
 import { InstallToolForm } from './InstallToolForm';
 
-interface KubiyaMetadata {
-  created_at: string;
-  last_updated: string;
-  user_created: string;
-  user_last_updated: string;
-}
-
 interface SourceMeta {
   id: string;
   url: string;
@@ -95,6 +87,22 @@ interface Runner {
   name: string;
   description: string;
   runner_type: string;
+}
+
+interface SourceData {
+  name: string;
+  url: string;
+  runner: string;
+  type: string;
+  dynamic_config?: any;
+  teammate_id: string;
+  status: string;
+  source_meta: {
+    branch: string;
+    url: string;
+  };
+  workspace_id?: string;
+  managed_by?: string;
 }
 
 const sourceFormSchema = z.object({
@@ -863,53 +871,79 @@ interface SourcesTabProps {
   teammate: TeammateDetails | null;
   sources?: SourceInfo[];
   isLoading?: boolean;
+  onSourcesChange?: () => void;
 }
 
-export function SourcesTab({ teammate, sources = [], isLoading = false }: SourcesTabProps) {
+export function SourcesTab({ 
+  teammate, 
+  sources = [], 
+  isLoading = false,
+  onSourcesChange
+}: SourcesTabProps) {
   const [showInstallModal, setShowInstallModal] = useState(false);
 
-  const handleInstallSource = async (values: { url: string; name?: string; runner?: string; dynamic_config?: any }) => {
-    if (!teammate) return;
+  const handleInstall = async (
+    values: SourceFormValues,
+    updateProgress: (stepId: string, status: 'pending' | 'loading' | 'success' | 'error', error?: string) => void
+  ) => {
     try {
-      // Create source
-      const createResponse = await fetch('/api/v1/sources', {
+      if (!teammate) {
+        throw new Error('No teammate selected');
+      }
+
+      updateProgress('validate', 'loading');
+
+      // add print statement
+      console.log('values', values);
+
+      // Only include required fields in the request
+      const sourceData = {
+        name: values.name,
+        url: values.url,
+        ...(values.runner && { runner: values.runner }),
+        ...(Object.keys(values.dynamic_config || {}).length > 0 && {
+          dynamic_config: values.dynamic_config
+        })
+      };
+
+      updateProgress('validate', 'success');
+      updateProgress('prepare', 'loading');
+
+      const response = await fetch(`/api/teammates/${teammate.id}/sources`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(values),
+        body: JSON.stringify(sourceData)
       });
 
-      if (!createResponse.ok) {
-        throw new Error('Failed to create source');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `Failed to install tool: ${response.statusText}`);
       }
 
-      const source = await createResponse.json();
+      updateProgress('prepare', 'success');
+      updateProgress('install', 'loading');
 
-      // Attach source to teammate
-      const updateResponse = await fetch(`/api/v1/agents/${teammate.uuid}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...teammate,
-          sources: [...(teammate.sources || []), source.uuid],
-        }),
-      });
-
-      if (!updateResponse.ok) {
-        throw new Error('Failed to attach source to teammate');
+      setShowInstallModal(false);
+      
+      if (onSourcesChange) {
+        await onSourcesChange();
       }
 
-      // Refresh the page to show new source
-      window.location.reload();
+      updateProgress('install', 'success');
+      updateProgress('configure', 'success');
+
     } catch (error) {
-      console.error('Failed to install source:', error);
+      console.error('Error installing tool:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      updateProgress('prepare', 'error', errorMessage);
       throw error;
     }
   };
 
+  // Early return if loading or no teammate
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -969,7 +1003,7 @@ export function SourcesTab({ teammate, sources = [], isLoading = false }: Source
       <InstallToolForm
         isOpen={showInstallModal}
         onClose={() => setShowInstallModal(false)}
-        onInstall={handleInstallSource}
+        onInstall={handleInstall}
         teammate={teammate}
       />
     </div>

@@ -9,10 +9,12 @@ import { ChatMessages } from './ChatMessages';
 import { ThreadsSidebar } from './ThreadsSidebar';
 import { SystemMessages } from './SystemMessages';
 import { ToolExecution } from './ToolExecution';
-import { Info, Clock, Calendar, CheckCircle2, RotateCcw, AlertCircle, ChevronRight, ListTodo, Trello, Webhook } from 'lucide-react';
+import { Info, Clock, Calendar, CheckCircle2, RotateCcw, AlertCircle, ChevronRight, ListTodo, Trello, Webhook, Plus, Terminal, GitMerge } from 'lucide-react';
 import { Button } from '@/app/components/button';
 import { TeammateDetailsModal } from '../shared/TeammateDetailsModal';
 import { TaskSchedulingModal } from '../TaskSchedulingModal';
+import { InstallToolForm } from '../shared/teammate-details/InstallToolForm';
+import { SourcesTab } from '../shared/teammate-details/SourcesTab';
 import { cn } from '@/lib/utils';
 import {
   Tooltip,
@@ -29,6 +31,17 @@ import { ActivityHub } from '../activity/ActivityHub';
 import { Task } from '../activity/types';
 import { TeammateInfo } from '@/app/types/teammate';
 import type { TeammateDetails } from '@/app/components/shared/teammate-details/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/app/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/app/components/ui/popover";
 
 interface ThreadInfo {
   id: string;
@@ -143,7 +156,7 @@ const mapScheduledTasksToTasks = (scheduledTasks: ScheduledTask[]): Task[] => {
   }));
 };
 
-interface ScheduleTaskPayload {
+export interface ScheduleTaskPayload {
   schedule_time: string;
   channel_id: string;
   task_description: string;
@@ -151,7 +164,7 @@ interface ScheduleTaskPayload {
   cron_string: string;
 }
 
-interface ScheduleTaskResult {
+export interface ScheduleTaskResult {
   task_id: string;
   task_uuid: string;
 }
@@ -181,6 +194,8 @@ export const Chat = () => {
   const [isActivityHubOpen, setIsActivityHubOpen] = useState(false);
   const [selectedTeammateForDetails, setSelectedTeammateForDetails] = useState<TeammateDetails | null>(null);
   const [isTeammateDetailsOpen, setIsTeammateDetailsOpen] = useState(false);
+  const [isInstallToolOpen, setIsInstallToolOpen] = useState(false);
+  const [isSourcesModalOpen, setIsSourcesModalOpen] = useState(false);
 
   // Get task stats
   const taskStats = useMemo(() => getTaskStats(scheduledTasks), [scheduledTasks]);
@@ -733,6 +748,72 @@ export const Chat = () => {
     setIsTeammateDetailsOpen(true);
   };
 
+  // Add handler for tool installation
+  const handleInstallSource = async (values: { url: string; name?: string; runner?: string; dynamic_config?: any }) => {
+    if (!teammate) return;
+    if (!values.name) {
+      throw new Error('Name is required');
+    }
+    try {
+      // Create source
+      const createResponse = await fetch('/api/sources', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: values.name.trim(),
+          url: values.url.trim(),
+          dynamic_config: typeof values.dynamic_config === 'string' 
+            ? JSON.parse(values.dynamic_config || '{}') 
+            : values.dynamic_config || {},
+          runner: values.runner || 'kubiya-hosted',
+          hasConfig: !!values.dynamic_config,
+          hasToken: true,
+          teamId: teammate?.id
+        }),
+      });
+
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create source');
+      }
+
+      const source = await createResponse.json();
+
+      // Attach source to teammate
+      const updateResponse = await fetch(`/api/teammates/${teammate.id}/sources`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sourceId: source.uuid
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error('Failed to attach source to teammate');
+      }
+
+      toast({
+        title: "Success",
+        description: "Tool source installed successfully",
+      });
+
+      setIsInstallToolOpen(false);
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to install source:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : 'Failed to install tool source',
+      });
+      throw error;
+    }
+  };
+
   // Show loading state
   if (userLoading) {
     return (
@@ -759,34 +840,115 @@ export const Chat = () => {
         <div className="flex items-center justify-between px-6 py-3 border-b border-[#2A3347] bg-[#1E293B] z-10">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-medium text-white">{teammate?.name}</h1>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-slate-400 hover:text-white p-1 h-auto"
-              onClick={() => setIsDetailsModalOpen(true)}
-            >
-              <Info className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-slate-400 hover:text-white p-1 h-auto"
+                    onClick={() => setIsDetailsModalOpen(true)}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-[#1E293B] border-[#2D3B4E] text-slate-200">
+                  View teammate details and configuration
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
           {/* Action Buttons */}
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsSchedulingModalOpen(true)}
-              className={cn(
-                "flex items-center gap-2 px-3 py-2 rounded-lg",
-                "bg-purple-500/10 hover:bg-purple-500/20",
-                "text-purple-400 hover:text-purple-300",
-                "transition-all duration-200",
-                "border border-purple-500/20 hover:border-purple-500/30",
-                "cursor-pointer"
-              )}
-            >
-              <ListTodo className="h-4 w-4" />
-              <span>Assign Task</span>
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-2 rounded-lg",
+                    "bg-green-500/10 hover:bg-green-500/20",
+                    "text-green-400 hover:text-green-300",
+                    "transition-all duration-200",
+                    "border border-green-500/20 hover:border-green-500/30",
+                    "cursor-pointer"
+                  )}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Install Tools</span>
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent 
+                side="bottom" 
+                align="end"
+                className="w-56 p-2 bg-[#1E293B] border-[#2D3B4E]"
+              >
+                <div className="space-y-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsSourcesModalOpen(true);
+                    }}
+                    className={cn(
+                      "w-full justify-start gap-2 px-2 py-1.5 text-sm",
+                      "hover:bg-[#2A3347] text-slate-200 hover:text-white"
+                    )}
+                  >
+                    <Terminal className="h-4 w-4 text-purple-400" />
+                    <div className="flex flex-col items-start">
+                      <span>Tools Overview</span>
+                      <span className="text-xs text-slate-400">Manage all tools and sources</span>
+                    </div>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setIsInstallToolOpen(true);
+                    }}
+                    className={cn(
+                      "w-full justify-start gap-2 px-2 py-1.5 text-sm",
+                      "hover:bg-[#2A3347] text-slate-200 hover:text-white"
+                    )}
+                  >
+                    <GitMerge className="h-4 w-4 text-green-400" />
+                    <div className="flex flex-col items-start">
+                      <span>Quick Installation</span>
+                      <span className="text-xs text-slate-400">Install from URL or repository</span>
+                    </div>
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsSchedulingModalOpen(true)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-lg",
+                      "bg-purple-500/10 hover:bg-purple-500/20",
+                      "text-purple-400 hover:text-purple-300",
+                      "transition-all duration-200",
+                      "border border-purple-500/20 hover:border-purple-500/30",
+                      "cursor-pointer"
+                    )}
+                  >
+                    <ListTodo className="h-4 w-4" />
+                    <span>Assign Task</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="bg-[#1E293B] border-[#2D3B4E] text-slate-200">
+                  Schedule and assign new tasks
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
             <TooltipProvider>
               <Tooltip delayDuration={0}>
@@ -935,6 +1097,26 @@ export const Chat = () => {
           webhooks={[]}
           isLoading={isLoadingTasks}
           teammates={teammates}
+        />
+
+        <Dialog open={isSourcesModalOpen} onOpenChange={setIsSourcesModalOpen}>
+          <DialogContent className="max-w-6xl h-[800px] flex flex-col p-0 bg-slate-900 border border-slate-800">
+            <DialogHeader>
+              <DialogTitle>Tools Overview</DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-hidden">
+              <SourcesTab 
+                teammate={teammate}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <InstallToolForm
+          isOpen={isInstallToolOpen}
+          onClose={() => setIsInstallToolOpen(false)}
+          onInstall={handleInstallSource}
+          teammate={teammate}
         />
       </div>
     </div>

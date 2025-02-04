@@ -13,12 +13,14 @@ export interface CommunityTool {
   path: string;
   description: string;
   tools_count: number;
-  tools: any[];
   icon?: string;
   readme?: string;
+  tools: any[];
   isDiscovering: boolean;
-  loadingState: 'idle' | 'loading' | 'success' | 'error';
   error?: string;
+  lastUpdated?: string;
+  stars?: number;
+  loadingState: 'idle' | 'loading' | 'success' | 'error';
 }
 
 export interface ToolDefinition {

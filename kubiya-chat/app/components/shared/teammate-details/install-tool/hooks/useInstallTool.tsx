@@ -1,7 +1,14 @@
 import * as React from 'react';
-import { useState, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
-import type { FormState, CommunityTool, CategoryInfo } from '../types';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useForm, UseFormReturn } from 'react-hook-form';
+import type { 
+  InstallToolFormState,
+  CommunityTool, 
+  CategoryInfo, 
+  InstallationStep,
+  UseInstallToolProps,
+  UseInstallToolReturn
+} from '../types';
 import { RetryQueue } from '../utils/RetryQueue';
 import { createSourceInfo } from '../utils/sourceInfo';
 import { discoverTools } from '../utils/discovery';
@@ -11,7 +18,12 @@ import { CategoriesSidebar } from '../components/CategoriesSidebar';
 import { CommunityToolsSkeleton } from '../components/CommunityToolsSkeleton';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ToolsLayout } from '../components/ToolsLayout';
-import type { CommunityTool as BaseCommunityTool } from '../../../../../types/tools';
+import { PreviewStep } from '../components/PreviewStep';
+import { zodResolver } from "@hookform/resolvers/zod";
+import { sourceFormSchema } from '../schema';
+import { toast } from '@/app/components/ui/use-toast';
+import * as z from 'zod';
+import type { FormValues } from '../schema';
 
 // Convert TOOL_CATEGORIES from Record to Array
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -19,49 +31,91 @@ const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]
   id: key
 }));
 
-interface UseInstallToolProps {
-  onInstall: (data: any) => void;
-  teammate: TeammateDetails;
-}
+// At the top of the file, add this type
+type ExtendedCommunityTool = CommunityTool & {
+  runner: string;
+};
 
-export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
-  const [formState, setFormState] = useState<FormState>({
-    communityTools: {
-      isLoading: false,
-      error: null,
-      data: []
-    },
-    preview: {
-      isLoading: false,
-      error: null,
-      data: null
-    },
-    installation: {
-      isLoading: false,
-      error: null
-    }
-  });
+// Define the form data type based on the schema
+type FormData = z.infer<typeof sourceFormSchema>;
 
-  const [currentStep, setCurrentStep] = useState('source');
+// Add to the initial state
+const initialState: InstallToolFormState = {
+  isOpen: false,
+  communityTools: {
+    isLoading: false,
+    error: null,
+    data: []
+  },
+  preview: {
+    isLoading: false,
+    error: null,
+    data: null
+  },
+  installation: {
+    isLoading: false,
+    error: null,
+    data: null,
+    isComplete: false
+  }
+};
+
+export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolProps): UseInstallToolReturn {
+  const [formState, setFormState] = useState<InstallToolFormState>(initialState);
+
+  const [currentStep, setCurrentStep] = useState('select');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState<CommunityTool | null>(null);
   const [failedIcons, setFailedIcons] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
-  const [retryQueue] = useState(() => new RetryQueue());
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
-
-  const methods = useForm({
-    defaultValues: {
-      name: "",
-      url: "",
-      runner: teammate?.runners?.[0] || "kubiya-hosted",
-      dynamic_config: "",
+  const [steps, setSteps] = useState<InstallationStep[]>([
+    {
+      id: 'validate',
+      status: 'pending',
+      description: 'Validating configuration and inputs'
+    },
+    {
+      id: 'prepare',
+      status: 'pending',
+      description: 'Preparing installation'
+    },
+    {
+      id: 'install',
+      status: 'pending',
+      description: 'Installing tool'
+    },
+    {
+      id: 'configure',
+      status: 'pending',
+      description: 'Configuring tool'
     }
+  ]);
+
+  const methods = useForm<FormData>({
+    resolver: zodResolver(sourceFormSchema),
+    defaultValues: {
+      name: '',
+      url: '',
+      runner: teammate?.runners?.[0] || 'kubiya-hosted',
+      dynamic_config: {}
+    },
+    mode: "onChange"
   });
+
+  // Update form values when selectedTool changes
+  React.useEffect(() => {
+    if (selectedTool) {
+      methods.setValue('name', selectedTool.name, { shouldValidate: true });
+      methods.setValue('url', selectedTool.path, { shouldValidate: true });
+      // Set runner value from teammate context
+      methods.setValue('runner', teammate?.runners?.[0] || 'kubiya-hosted', { shouldValidate: true });
+    }
+  }, [selectedTool, methods, teammate]);
 
   const handleRefresh = useCallback(async () => {
     try {
-      setFormState(prev => ({
+      setFormState((prev: InstallToolFormState) => ({
         ...prev,
         communityTools: {
           ...prev.communityTools,
@@ -83,7 +137,7 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
       }
 
       const data = await response.json();
-      setFormState(prev => ({
+      setFormState((prev: InstallToolFormState) => ({
         ...prev,
         communityTools: {
           isLoading: false,
@@ -93,7 +147,7 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
       }));
     } catch (error) {
       console.error('Error refreshing tools:', error);
-      setFormState(prev => ({
+      setFormState((prev: InstallToolFormState) => ({
         ...prev,
         communityTools: {
           ...prev.communityTools,
@@ -109,98 +163,107 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
     handleRefresh();
   }, [handleRefresh]);
 
-  const handleToolSelect = useCallback((tool: Partial<CommunityTool>) => {
-    if (!tool.name) return; // Add validation for required fields
-    setSelectedTool(tool as CommunityTool);
-  }, []);
+  const handleToolSelect = useCallback((tool: CommunityTool) => {
+    setSelectedTool(tool);
+    // Set the name if not already set
+    if (!methods.getValues('name')) {
+      methods.setValue('name', tool.name);
+    }
+    // Don't set the URL here - let the ConfigureStep form handle it
+  }, [methods]);
 
   const handleIconError = useCallback((url: string) => {
     setFailedIcons(prev => new Set(prev).add(url));
   }, []);
 
-  const handleCommunityToolSelect = useCallback(async (tool: CommunityTool) => {
-    setSelectedTool({
-      ...tool,
-      loadingState: 'loading',
-      tools: tool.tools || []  // Ensure tools is always an array
-    });
-    
-    try {
-      // If tools are already loaded, use them directly
-      if (tool.tools?.length > 0) {
-        setFormState(prev => ({
-          ...prev,
-          preview: {
-            ...prev.preview,
-            data: {
-              tools: tool.tools,
-              source: createSourceInfo(tool, tool.tools),
-              errors: []
-            }
-          }
-        }));
-        return;
-      }
-
-      // Otherwise, discover tools
-      const data = await discoverTools({
-        ...tool,
-        tools: [] as any[],
-        loadingState: 'loading' as const
-      });
-
-      if (data && (Array.isArray(data.tools) || Array.isArray(data))) {
-        const toolsArray = Array.isArray(data.tools) ? data.tools : Array.isArray(data) ? data : [];
-        setFormState(prev => ({
-          ...prev,
-          preview: {
-            ...prev.preview,
-            data: {
-              tools: toolsArray,
-              source: createSourceInfo(tool, toolsArray),
-              errors: []
-            }
-          }
-        }));
-      }
-    } catch (error) {
-      setFormState(prev => ({
-        ...prev,
-        preview: {
-          ...prev.preview,
-          error: error instanceof Error ? error.message : 'Failed to discover tools'
-        }
-      }));
-    }
+  const handleCommunityToolSelect = useCallback((tool: CommunityTool) => {
+    setSelectedTool(tool);
   }, []);
 
-  const handleSubmit = useCallback(async () => {
+  const updateStepStatus = useCallback((
+    stepId: string, 
+    status: 'pending' | 'loading' | 'success' | 'error',
+    error?: string
+  ) => {
+    setSteps(prev => prev.map(step =>
+      step.id === stepId ? { ...step, status, error } : step
+    ));
+  }, []);
+
+  // Reset installation state when step changes
+  useEffect(() => {
+    setFormState((prev: InstallToolFormState) => ({
+      ...prev,
+      installation: {
+        isLoading: false,
+        error: null,
+        data: null,
+        isComplete: false
+      }
+    }));
+  }, [currentStep]);
+
+  // Add reset function
+  const resetInstallation = useCallback(() => {
+    setFormState((prev: InstallToolFormState) => ({
+      ...prev,
+      installation: {
+        isLoading: false,
+        error: null,
+        data: null,
+        isComplete: false
+      }
+    }));
+  }, []);
+
+  // Update handleSubmit to properly set completion status
+  const handleSubmit = useCallback(async (data: { name: string; url: string; runner?: string; dynamic_config?: any }) => {
+    setFormState((prev: InstallToolFormState) => ({
+      ...prev,
+      installation: {
+        ...prev.installation,
+        isLoading: true,
+        error: null,
+        isComplete: false
+      }
+    }));
+
     try {
-      setFormState(prev => ({
+      await onInstall(data as FormValues, updateStepStatus);
+      setFormState((prev: InstallToolFormState) => ({
         ...prev,
         installation: {
-          isLoading: true,
-          error: null
+          ...prev.installation,
+          isLoading: false,
+          isComplete: true
         }
       }));
-
-      await onInstall(methods.getValues());
     } catch (error) {
-      setFormState(prev => ({
+      setFormState((prev: InstallToolFormState) => ({
         ...prev,
         installation: {
+          ...prev.installation,
           isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to install tools'
+          error: error instanceof Error ? error.message : 'Installation failed',
+          isComplete: false
         }
       }));
     }
-  }, [methods, onInstall]);
+  }, [onInstall, updateStepStatus]);
+
+  // Add cleanup on dialog close
+  useEffect(() => {
+    if (!formState.isOpen) {
+      resetInstallation();
+    }
+  }, [formState.isOpen, resetInstallation]);
 
   const goToNextStep = useCallback(() => {
     setCurrentStep(prev => {
       switch(prev) {
         case 'source': return 'select';
-        case 'select': return 'configure';
+        case 'select': return 'preview';
+        case 'preview': return 'configure';
         case 'configure': return 'installing';
         default: return prev;
       }
@@ -211,25 +274,32 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
     setCurrentStep(prev => {
       switch(prev) {
         case 'select': return 'source';
-        case 'configure': return 'select';
+        case 'preview': return 'select';
+        case 'configure': return 'preview';
         case 'installing': return 'configure';
         default: return prev;
       }
     });
   }, []);
 
-  const canProceed = useCallback(() => {
+  const calculateCanProceed = useCallback((): boolean => {
     switch (currentStep) {
       case 'source':
-        return selectedTool !== null;
+        return Boolean(selectedTool !== null && 
+          (!selectedTool.runner || teammate?.runners?.includes(selectedTool.runner)));
       case 'select':
-        return true; // Always allow proceeding from review step
+        return Boolean(selectedTool);
+      case 'preview':
+        return Boolean(selectedTool);
       case 'configure':
         return true;
       default:
         return false;
     }
-  }, [currentStep, selectedTool]);
+  }, [currentStep, selectedTool, teammate?.runners]);
+
+  // Calculate canProceed value whenever dependencies change
+  const canProceed = useMemo(() => calculateCanProceed(), [calculateCanProceed]);
 
   const renderStepContent = useCallback(() => {
     if (formState.communityTools.error) {
@@ -243,11 +313,13 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
 
     switch (currentStep) {
       case 'source':
+        return null;
+      case 'select':
         return (
           <div className="space-y-8">
             <CategoriesSidebar 
               categories={TOOL_CATEGORIES}
-              tools={formState.communityTools.data as BaseCommunityTool[]}
+              tools={formState.communityTools.data}
               activeCategory={activeCategory}
               onCategorySelect={setActiveCategory}
             />
@@ -257,6 +329,8 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
               <ToolsLayout 
                 tools={formState.communityTools.data}
                 categories={toolCategoriesArray}
+                activeCategory={activeCategory}
+                onCategorySelect={setActiveCategory}
                 selectedTool={selectedTool}
                 onToolSelect={handleToolSelect}
                 failedIcons={failedIcons}
@@ -264,13 +338,20 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
                 expandedTools={expandedTools}
                 setExpandedTools={setExpandedTools}
                 handleRefresh={handleRefresh}
+                runners={teammate?.runners || ['kubiya-hosted']}
               />
             )}
           </div>
         );
       case 'preview':
-        return null;
+        return (
+          <div className="p-6">
+            <PreviewStep selectedTool={selectedTool} />
+          </div>
+        );
       case 'configure':
+        return null;
+      case 'installing':
         return null;
       default:
         return null;
@@ -285,12 +366,42 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
     failedIcons,
     expandedTools,
     setExpandedTools,
-    setActiveCategory
+    setActiveCategory,
+    teammate
   ]);
+
+  const startInstallation = useCallback(() => {
+    setFormState((prev: InstallToolFormState) => ({
+      ...prev,
+      installation: {
+        ...prev.installation,
+        isLoading: true,
+        error: null,
+        isComplete: false,
+        data: {
+          steps: steps
+        }
+      }
+    }));
+    setSteps(steps.map(step => ({ ...step, status: 'pending', error: undefined })));
+  }, [steps]);
+
+  const cancelInstallation = useCallback(() => {
+    setFormState((prev: InstallToolFormState) => ({
+      ...prev,
+      installation: {
+        ...prev.installation,
+        isLoading: false,
+        error: null,
+        data: null,
+        isComplete: false
+      }
+    }));
+    setSteps(steps.map(step => ({ ...step, status: 'pending', error: undefined })));
+  }, [steps]);
 
   return {
     formState,
-    selectedCommunityTool: selectedTool,
     methods,
     currentStep,
     activeCategory,
@@ -308,8 +419,18 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps) {
     goToPreviousStep,
     selectedTools,
     setSelectedTools,
-    canProceed: canProceed(),
+    canProceed,
     renderStepContent,
-    teammate
-  };
+    teammate,
+    setState: setFormState,
+    steps,
+    setSteps,
+    isLoading: formState.installation.isLoading,
+    installationSteps: steps,
+    startInstallation,
+    cancelInstallation,
+    updateStepStatus,
+    isInstallationComplete: formState.installation.isComplete,
+    resetInstallation
+  } satisfies UseInstallToolReturn;
 } 

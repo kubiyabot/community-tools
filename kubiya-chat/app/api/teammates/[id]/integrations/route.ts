@@ -1,6 +1,7 @@
 import { getSession } from '@auth0/nextjs-auth0/edge';
 import { NextRequest, NextResponse } from 'next/server';
 import type { Integration } from '@/app/types/integration';
+import { revalidateTag } from 'next/cache';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -21,19 +22,16 @@ export async function OPTIONS() {
   });
 }
 
+// Add cache tag helpers
+const getIntegrationsCacheTag = (teammateId: string) => `teammate-${teammateId}-integrations`;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getSession(request, NextResponse.next());
-    console.log('Session check:', {
-      hasSession: !!session,
-      hasIdToken: !!session?.idToken,
-      hasUser: !!session?.user,
-      orgId: session?.user?.org_id
-    });
-
+    
     if (!session?.idToken) {
       console.error('Authentication error: No ID token found');
       return NextResponse.json({ 
@@ -42,131 +40,118 @@ export async function GET(
       }, { status: 401 });
     }
 
-    if (!params.id) {
-      console.error('Invalid request: No teammate ID provided');
-      return NextResponse.json({ 
-        error: 'Invalid request',
-        details: 'No teammate ID provided'
-      }, { status: 400 });
-    }
+    // Log the incoming request
+    console.log('Integrations endpoint - Request details:', {
+      teammateId: params.id,
+      hasToken: !!session.idToken,
+      orgId: session.user?.org_id
+    });
 
-    console.log('Fetching integrations for teammate:', params.id);
-
-    // First, fetch teammate details
-    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${params.id}`, {
+    // Use internal teammate route to get teammate details with caching
+    const teammateResponse = await fetch(`${request.nextUrl.origin}/api/teammates/${params.id}`, {
       headers: {
-        'Authorization': `Bearer ${session.idToken}`,
+        'Cookie': request.headers.get('cookie') || '',
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Organization-ID': session.user?.org_id || '',
-        'X-Kubiya-Client': 'chat-ui'
+        'Content-Type': 'application/json'
+      },
+      next: {
+        tags: [getIntegrationsCacheTag(params.id)],
+        // Cache for 5 minutes
+        revalidate: 300
       }
     });
 
     if (!teammateResponse.ok) {
-      const errorText = await teammateResponse.text().catch(() => 'Unknown error');
-      console.error('Failed to fetch teammate details:', {
+      console.error('Failed to fetch teammate:', {
+        id: params.id,
         status: teammateResponse.status,
-        statusText: teammateResponse.statusText,
-        teammateId: params.id,
-        error: errorText
+        statusText: teammateResponse.statusText
       });
       return NextResponse.json({ 
-        error: 'Failed to fetch teammate details',
-        details: errorText,
-        status: teammateResponse.status
+        error: 'Failed to fetch teammate',
+        details: `Teammate not found. Please ensure the teammate exists and you have the correct permissions.`
       }, { status: teammateResponse.status });
     }
 
-    const teammateData = await teammateResponse.json();
-    console.log('Teammate data received:', {
-      id: params.id,
-      hasIntegrations: !!teammateData.integrations,
-      integrationsCount: teammateData.integrations?.length,
-      hasCapabilities: !!teammateData.capabilities,
-      capabilitiesIntegrations: teammateData.capabilities?.integrations?.length
+    const teammate = await teammateResponse.json();
+    const teammateIntegrationNames = (teammate.integrations || [])
+      .map((int: any) => typeof int === 'string' ? int : int.name)
+      .filter(Boolean);
+
+    console.log('Teammate integrations:', {
+      teammateId: params.id,
+      integrationNames: teammateIntegrationNames
     });
 
-    // Get integrations from teammate data
-    let teammateIntegrationNames: string[] = [];
-    
-    if (Array.isArray(teammateData.integrations)) {
-      teammateIntegrationNames = teammateData.integrations;
-    } else if (Array.isArray(teammateData.capabilities?.integrations)) {
-      teammateIntegrationNames = teammateData.capabilities.integrations.map((i: any) => 
-        typeof i === 'string' ? i : i.name || i.type
-      );
-    }
-
-    // Clean up and normalize integration names
-    teammateIntegrationNames = teammateIntegrationNames
-      .filter(Boolean)
-      .map(name => name.toLowerCase());
-
-    console.log('Teammate integration names:', teammateIntegrationNames);
-
-    if (teammateIntegrationNames.length === 0) {
-      console.log('No integrations found for teammate');
-      return NextResponse.json([]);
-    }
-
-    // Fetch all available integrations
-    const integrationsResponse = await fetch('https://api.kubiya.ai/api/v2/integrations?full=true', {
+    // Use internal integrations route to get all integrations with caching
+    const integrationsResponse = await fetch(`${request.nextUrl.origin}/api/integrations`, {
       headers: {
-        'Authorization': `Bearer ${session.idToken}`,
+        'Cookie': request.headers.get('cookie') || '',
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-Organization-ID': session.user?.org_id || '',
-        'X-Kubiya-Client': 'chat-ui'
+        'Content-Type': 'application/json'
+      },
+      next: {
+        tags: ['integrations'],
+        // Cache for 5 minutes
+        revalidate: 300
       }
     });
 
     if (!integrationsResponse.ok) {
-      const errorText = await integrationsResponse.text().catch(() => 'Unknown error');
       console.error('Failed to fetch integrations:', {
         status: integrationsResponse.status,
-        statusText: integrationsResponse.statusText,
-        error: errorText
+        statusText: integrationsResponse.statusText
       });
       return NextResponse.json({ 
         error: 'Failed to fetch integrations',
-        details: errorText,
-        status: integrationsResponse.status
+        details: integrationsResponse.statusText
       }, { status: integrationsResponse.status });
     }
 
     const allIntegrations = await integrationsResponse.json();
     
     // Filter integrations based on teammate's integration names
-    const filteredIntegrations = allIntegrations.filter((integration: Integration) => {
-      const integrationName = integration.name?.toLowerCase() || '';
-      const integrationType = integration.integration_type?.toLowerCase() || '';
-      
-      return teammateIntegrationNames.some(name => 
-        integrationName.includes(name) || integrationType.includes(name)
-      );
-    });
+    const filteredIntegrations = teammateIntegrationNames.length > 0
+      ? allIntegrations.filter((integration: Integration) => 
+          teammateIntegrationNames.includes(integration.name))
+      : [];
 
     console.log('Filtered integrations:', {
       total: allIntegrations.length,
-      filtered: filteredIntegrations.length,
-      matches: filteredIntegrations.map((i: Integration) => ({
-        name: i.name,
-        type: i.integration_type
-      }))
+      filtered: filteredIntegrations.length
     });
 
     return NextResponse.json(filteredIntegrations);
 
   } catch (error: any) {
     console.error('Teammate integrations endpoint error:', error);
+    const statusCode = error.status || 500;
     return NextResponse.json(
       { 
         error: 'Failed to fetch teammate integrations',
-        details: error.message,
-        teammate_id: params.id
+        details: error.message || 'An unexpected error occurred',
+        status: statusCode
       },
-      { status: 500 }
+      { status: statusCode }
     );
+  }
+}
+
+// Add method to invalidate integration cache
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { action } = await request.json();
+    
+    if (action === 'revalidate') {
+      revalidateTag(getIntegrationsCacheTag(params.id));
+      return NextResponse.json({ revalidated: true, timestamp: Date.now() });
+    }
+    
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 } 

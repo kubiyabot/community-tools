@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
-import { ThreadMessage, ThreadAssistantContentPart, TextContentPart } from '@assistant-ui/react';
+import { ThreadMessage, ThreadAssistantContentPart, TextContentPart, Tool } from '@assistant-ui/react';
 import { UserMessage } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { SystemMessages } from './SystemMessages';
@@ -9,7 +9,7 @@ import { useTeammateContext } from "../../MyRuntimeProvider";
 import { 
   Terminal, Box, Cloud, Wrench, GitBranch, Database, Code, 
   Settings, Search, ChevronDown, Bot, Workflow, Globe, Loader2,
-  Clock, Plus, Calendar, Bell, X, MoreHorizontal, ListTodo
+  Clock, Plus, Calendar, Bell, X, MoreHorizontal, ListTodo, User
 } from "lucide-react";
 import { Button } from "@/app/components/button";
 import { toolRegistry, CustomToolUI } from './ToolRegistry';
@@ -28,10 +28,12 @@ import {
 } from "../../components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { toast } from "../../components/ui/use-toast";
-import { ScheduledTasksModal } from '../ScheduledTasksModal';
+import { lazy, Suspense } from 'react';
 import mermaid from 'mermaid';
 import { TaskSchedulingModal } from '../TaskSchedulingModal';
 import type { Integration, SimpleIntegration, IntegrationType } from '@/app/types/integration';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { SourceInfo } from '@/app/types/source';
 
 interface ToolCall {
   type: 'tool_init' | 'tool_output';
@@ -43,10 +45,22 @@ interface ToolCall {
   tool_description?: string;
 }
 
-type SystemMessage = ThreadMessage & { 
+export interface SystemMessage {
+  id: string;
   role: 'system';
-  tool_calls?: ToolCall[];
-};
+  content: readonly [TextContentPart];
+  metadata: {
+    readonly unstable_data?: readonly unknown[];
+    readonly steps?: readonly {
+      id: string;
+      type: string;
+      status: string;
+      details?: Record<string, unknown>;
+    }[];
+    readonly custom: Record<string, unknown>;
+  };
+  createdAt: string;
+}
 
 type AssistantMessage = ThreadMessage & { 
   role: 'assistant';
@@ -95,18 +109,6 @@ interface SourceMetadata {
       description: string;
       type?: string;
       icon_url?: string;
-      metadata?: {
-        git_url?: string;
-        git_branch?: string;
-        git_path?: string;
-        docker_image?: string;
-      };
-      parameters?: Array<{
-        name: string;
-        type: string;
-        description?: string;
-        required?: boolean;
-      }>;
     }>;
   };
 }
@@ -215,7 +217,7 @@ function isUserMessage(message: ThreadMessage): message is UserThreadMessage {
   return message.role === 'user';
 }
 
-function isSystemMessage(message: ThreadMessage): message is SystemMessage {
+function isSystemMessage(message: ThreadMessage): message is ThreadMessage & { role: 'system' } {
   return message.role === 'system' || (message.metadata?.custom?.isSystemMessage === true);
 }
 
@@ -367,125 +369,89 @@ const MermaidDiagram = ({ code }: { code: string }) => {
   return null;
 };
 
-export const ChatMessages = ({ 
-  messages, 
-  isCollectingSystemMessages, 
-  systemMessages = [],
-  capabilities,
-  teammate,
-  showTeammateDetails,
-  onStarterCommand,
-  onScheduleTask
-}: ChatMessagesProps) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { selectedTeammate, currentState, teammates } = useTeammateContext();
-  const [sourceMetadata, setSourceMetadata] = useState<SourceMetadata | null>(null);
-  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
-  const [toolsFilter, setToolsFilter] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [integrations, setIntegrations] = useState<IntegrationData | null>(null);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [showTeammateSelectionModal, setShowTeammateSelectionModal] = useState(false);
+// Define interfaces locally instead of importing
+interface ToolDetailsModalProps {
+  teammateId?: string;
+  toolId?: string;
+  isOpen: boolean;
+  onCloseAction: () => void;
+  tool: Tool;
+  source?: SourceInfo;
+}
 
-  const handleAssignTask = () => {
-    if (teammate?.uuid) {
-      // If we have a teammate, open task modal directly
-      setShowTaskModal(true);
-    } else {
-      // If no teammate, show teammate selection first
-      setShowTeammateSelectionModal(true);
-      if (showTeammateDetails) {
-        showTeammateDetails();
-      }
-      toast({
-        title: "Select a Teammate",
-        description: "Please select a teammate to assign tasks to.",
-        variant: "default"
-      });
-    }
+interface ScheduledTasksModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  tasks: ScheduledTask[];
+  onDelete: (taskId: string) => Promise<void>;
+  isLoading: boolean;
+  teammate?: {
+    email?: string;
+    name?: string;
+    uuid?: string;
   };
+  onScheduleSimilar?: (initialData: {
+    description: string;
+    slackTarget: string;
+    scheduleType: 'quick' | 'custom';
+    repeatOption: string;
+  }) => void;
+}
 
-  // Helper function to extract Mermaid diagrams
-  const extractMermaidDiagrams = (text: string): { diagrams: string[], remainingText: string } => {
-    const mermaidPattern = /```mermaid\n([\s\S]*?)```/g;
-    const diagrams: string[] = [];
-    const remainingText = text.replace(mermaidPattern, (match, diagramCode) => {
-      diagrams.push(diagramCode.trim());
-      return '{{MERMAID_DIAGRAM}}';
-    });
-    
-    return { diagrams, remainingText };
-  };
+// Fix lazy loading by using default imports
+const LazyToolDetailsModal = lazy(() => import('@/app/components/shared/tool-details/ToolDetailsModal').then(mod => ({ default: mod.ToolDetailsModal })));
 
-  // Render message with Mermaid support
-  const renderMessage = (message: ThreadMessage) => {
-    if (isUserMessage(message)) {
-      return <UserMessage key={getMessageKey(message)} message={message} />;
+const LazyScheduledTasksModal = lazy(() => import('@/app/components/ScheduledTasksModal').then(mod => ({ default: mod.ScheduledTasksModal })));
+
+// Optimize message rendering with virtualization
+const MessageVirtualizer = ({ messages, renderMessage }: { messages: ThreadMessage[], renderMessage: (message: ThreadMessage) => React.ReactNode }) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  
+  const rowVirtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 100,
+    overscan: 5,
+    getItemKey: (index) => {
+      const msg = messages[index];
+      const id = msg?.id;
+      return typeof id === 'string' || typeof id === 'number' ? String(id) : `msg-${index}`;
     }
-    
-    if (isAssistantMessage(message)) {
-      // Process text content for Mermaid diagrams
-      const processedContent = message.content.map(content => {
-        if (isTextContentPart(content)) {
-          const { diagrams, remainingText } = extractMermaidDiagrams(content.text);
-          if (diagrams.length > 0) {
-            // Split text by diagram placeholders and interleave with Mermaid components
-            const parts = remainingText.split('{{MERMAID_DIAGRAM}}');
-            const processedText = parts.reduce((acc, part, index) => {
-              if (index === 0) return part;
-              const diagram = diagrams[index - 1];
-              return acc + `\n\n\`\`\`mermaid\n${diagram}\n\`\`\`\n\n` + part;
-            }, '');
+  });
+
+  return (
+    <div ref={parentRef} className="flex-1 overflow-y-auto relative">
+      <div
+        className="relative w-full"
+        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+          const key = typeof virtualItem.key === 'string' || typeof virtualItem.key === 'number' 
+            ? String(virtualItem.key) 
+            : `msg-${virtualItem.index}`;
             
-            return {
-              type: 'text' as const,
-              text: processedText
-            };
-          }
-        }
-        return content;
-      }) as ThreadAssistantContentPart[];
+          return (
+            <div
+              key={key}
+              className="absolute top-0 left-0 w-full"
+              style={{
+                height: `${virtualItem.size}px`,
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              {renderMessage(messages[virtualItem.index])}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
-      // Group tool calls by their ID to maintain execution context
-      const toolCallsById = new Map<string, ToolCall[]>();
-      
-      // Process all tool calls
-      message.tool_calls?.forEach(call => {
-        const existingCalls = toolCallsById.get(call.id) || [];
-        toolCallsById.set(call.id, [...existingCalls, call]);
-      });
-
-      // Convert the grouped calls back to a flat array, maintaining order
-      const groupedToolCalls = Array.from(toolCallsById.values()).flat();
-      
-      return (
-        <AssistantMessage 
-          key={getMessageKey(message)} 
-          message={{
-            ...message,
-            content: processedContent,
-            tool_calls: groupedToolCalls
-          }}
-          isSystem={false}
-          sourceMetadata={sourceMetadata || undefined}
-        />
-      );
-    }
-    
-    if (isSystemMessage(message)) {
-      return (
-        <AssistantMessage 
-          key={getMessageKey(message)} 
-          message={message} 
-          isSystem={true}
-          sourceMetadata={sourceMetadata || undefined}
-        />
-      );
-    }
-    
-    return null;
-  };
+// Optimize source metadata fetching
+const useSourceMetadata = (teammate?: Teammate) => {
+  const [sourceMetadata, setSourceMetadata] = useState<SourceMetadata | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchSourcesAndMetadata = async () => {
@@ -506,48 +472,40 @@ export const ChatMessages = ({
         }
 
         const sources = await sourcesRes.json();
-        if (!sources || !sources.length) {
-          console.log('No sources found for teammate:', teammate.uuid);
+        if (!sources?.length) {
+          setIsLoading(false);
           return;
         }
 
-        const metadataPromises = sources.map(async (source: Source) => {
-          const effectiveSourceId = source.sourceId || source.uuid;
-          if (!effectiveSourceId) {
-            console.warn('Skipping metadata fetch - no sourceId or uuid found:', source);
-            return null;
-          }
-          
-          const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${effectiveSourceId}/metadata`);
-          if (!metadataRes.ok) {
-            console.error('Failed to fetch metadata:', {
-              sourceId: effectiveSourceId,
-              status: metadataRes.status
-            });
-            return null;
-          }
+        // Fetch metadata in parallel
+        const metadataResults = await Promise.all(
+          sources.map(async (source: Source) => {
+            const effectiveSourceId = source.sourceId || source.uuid;
+            if (!effectiveSourceId) return null;
+            
+            try {
+              const metadataRes = await fetch(`/api/teammates/${teammate.uuid}/sources/${effectiveSourceId}/metadata`);
+              if (!metadataRes.ok) return null;
+              return await metadataRes.json();
+            } catch (error) {
+              console.error('Error fetching metadata:', error);
+              return null;
+            }
+          })
+        );
 
-          const metadata = await metadataRes.json();
-          return metadata;
-        });
-
-        const metadataResults = await Promise.all(metadataPromises);
-        const validMetadata = metadataResults.filter(result => result !== null);
-
+        const validMetadata = metadataResults.filter(Boolean);
         if (validMetadata.length > 0) {
-          const combinedMetadata = {
+          setSourceMetadata({
             sourceId: 'combined',
             metadata: {
               tools: validMetadata.flatMap(metadata => metadata?.metadata?.tools || [])
             }
-          };
-
-          setSourceMetadata(combinedMetadata);
+          });
         }
-
-        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching source metadata:', error);
+      } finally {
         setIsLoading(false);
       }
     };
@@ -555,60 +513,67 @@ export const ChatMessages = ({
     fetchSourcesAndMetadata();
   }, [teammate?.uuid]);
 
-  useEffect(() => {
-    // Load integrations and tool metadata on mount
-    const loadIntegrations = async () => {
-      try {
-        const response = await fetch('/api/integrations');
-        const data: IntegrationData = await response.json();
-        
-        // Process tool metadata and register tools
-        const tools = data?.tools || {};
-        if (Object.keys(tools).length > 0) {
-          Object.entries(tools).forEach(([toolName, metadata]) => {
-            // Convert icon URL to component if it's a string URL
-            let icon = metadata.icon;
-            if (typeof icon === 'string') {
-              // If it's a URL, create an img component
-              const IconComponent = (props: any) => (
-                <img 
-                  src={icon as string} 
-                  alt={`${toolName} icon`}
-                  className="w-4 h-4"
-                  {...props}
-                />
-              );
-              icon = IconComponent;
-            } else {
-              // Use default icon based on category or name
-              icon = defaultIcons[toolName.toLowerCase() as keyof typeof defaultIcons] || Terminal;
-            }
+  return { 
+    sourceMetadata: sourceMetadata as SourceMetadata | null,
+    isLoading 
+  };
+};
 
-            // Register tool with processed metadata
-            const toolUI: CustomToolUI = {
-              name: metadata.name,
-              description: metadata.description,
-              icon: icon as React.ComponentType<any>,
-              metadata: {
-                category: metadata.category || 'Other',
-                version: metadata.version || '1.0'
-              }
-            };
-            
-            toolRegistry[toolName] = toolUI;
-          });
-        }
+// Update the interface definition with proper types
+interface MessageStatus {
+  readonly type: 'running' | 'requires-action' | 'complete' | 'incomplete';
+  readonly reason?: 'tool-calls' | 'stop' | 'unknown' | 'error' | 'cancelled' | 'length' | 'content-filter' | 'other';
+  readonly error?: unknown;
+}
 
-        setIntegrations(data);
-      } catch (err) {
-        console.error('Failed to load integrations:', err);
-      }
-    };
+interface ThreadStep {
+  id: string;
+  type: string;
+  status: string;
+  details?: Record<string, unknown>;
+}
 
-    loadIntegrations();
-  }, []);
+type ThreadMessageStatus = 
+  | { readonly type: 'running' }
+  | { readonly type: 'requires-action'; readonly reason: 'tool-calls' }
+  | { readonly type: 'complete'; readonly reason: 'stop' | 'unknown' }
+  | { readonly type: 'incomplete'; readonly reason: 'tool-calls' | 'error' | 'cancelled' | 'length' | 'content-filter' | 'other'; readonly error?: unknown };
 
-  // Group and deduplicate system messages
+interface ThreadMetadata {
+  readonly unstable_data: readonly unknown[];
+  readonly steps: readonly ThreadStep[];
+  readonly custom: Record<string, unknown>;
+}
+
+interface AssistantMessageWithTools extends Omit<ThreadMessage, 'role' | 'metadata' | 'status'> {
+  role: 'assistant';
+  tool_calls?: ToolCall[];
+  metadata: ThreadMetadata;
+  status: ThreadMessageStatus;
+  content: readonly ThreadAssistantContentPart[];
+}
+
+export const ChatMessages = ({ 
+  messages, 
+  isCollectingSystemMessages, 
+  systemMessages = [],
+  capabilities,
+  teammate,
+  showTeammateDetails,
+  onStarterCommand,
+  onScheduleTask
+}: ChatMessagesProps) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { selectedTeammate, currentState, teammates } = useTeammateContext();
+  const { sourceMetadata, isLoading } = useSourceMetadata(teammate);
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false);
+  const [toolsFilter, setToolsFilter] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showTaskModal, setShowTaskModal] = useState(false);
+  const [showTeammateSelectionModal, setShowTeammateSelectionModal] = useState(false);
+  const [showSystemMessages, setShowSystemMessages] = useState(true);
+
+  // Group messages by type and time
   const groupedMessages = useMemo(() => {
     const systemMsgs: SystemMessage[] = [];
     const otherMsgs: ThreadMessage[] = [];
@@ -616,7 +581,6 @@ export const ChatMessages = ({
 
     messages.forEach(msg => {
       if (isSystemMessage(msg)) {
-        // Extract warnings from message text
         const textContent = msg.content.find((c): c is TextContentPart => c.type === 'text');
         if (textContent?.text) {
           const warnings = textContent.text
@@ -624,13 +588,19 @@ export const ChatMessages = ({
             .map(warning => warning.trim())
             .filter(warning => warning.length > 0);
 
-          // Add unique warnings
           warnings.forEach(warning => {
             if (!seenWarnings.has(warning)) {
               seenWarnings.add(warning);
               systemMsgs.push({
-                ...msg,
-                content: [{ type: 'text', text: warning }]
+                id: `system-${msg.id}`,
+                role: 'system',
+                content: [{ type: 'text', text: warning }] as const,
+                metadata: {
+                  unstable_data: [],
+                  steps: [],
+                  custom: { isSystemMessage: true }
+                },
+                createdAt: new Date().toISOString()
               });
             }
           });
@@ -640,367 +610,418 @@ export const ChatMessages = ({
       }
     });
 
-    // Combine system messages into a single message if there are any
-    if (systemMsgs.length > 0) {
-      const combinedWarnings = Array.from(seenWarnings).join('\n\n');
-      return [
-        {
-          id: 'system-warnings',
-          role: 'system',
-          content: [{ type: 'text', text: combinedWarnings }],
-          metadata: {
-            custom: {
-              isSystemMessage: true
-            }
-          },
-          createdAt: new Date()
-        } as SystemMessage,
-        ...otherMsgs
-      ];
-    }
-
-    return otherMsgs;
+    return {
+      systemMessages: systemMsgs,
+      chatMessages: otherMsgs
+    };
   }, [messages]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom effect
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [groupedMessages]);
 
-  // Group tools by category
-  const toolsByCategory = useMemo(() => {
-    if (!sourceMetadata?.metadata?.tools) return {};
-    
-    return sourceMetadata.metadata.tools.reduce((acc: Record<string, any[]>, tool) => {
-      const category = tool.type || 'Other';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(tool);
-      return acc;
-    }, {});
-  }, [sourceMetadata?.metadata?.tools]);
-
-  // Filter tools based on search and category
-  const filteredTools = useMemo(() => {
-    if (!sourceMetadata?.metadata?.tools) return [];
-    
-    return sourceMetadata.metadata.tools.filter(tool => {
-      const matchesSearch = !toolsFilter || 
-        tool.name.toLowerCase().includes(toolsFilter.toLowerCase()) ||
-        tool.description.toLowerCase().includes(toolsFilter.toLowerCase());
-      
-      const matchesCategory = !selectedCategory || tool.type === selectedCategory;
-      
-      return matchesSearch && matchesCategory;
-    });
-  }, [sourceMetadata?.metadata?.tools, toolsFilter, selectedCategory]);
-
-  // Show welcome message if no messages and we have capabilities
-  if (!groupedMessages.length && (capabilities || sourceMetadata)) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="w-full max-w-4xl mx-auto space-y-6 p-4">
-          {/* Teammate Info */}
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-white mb-3">
-              {teammate?.name || 'Welcome'}
-            </h2>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-              {teammate?.description || capabilities?.description}
-            </p>
-            <div className="flex items-center justify-center gap-3 mt-4">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={handleAssignTask}
-                      className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
-                    >
-                      <ListTodo className="h-4 w-4 mr-1.5" />
-                      Assign Task
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs">
-                    <p>Assign tasks to your teammate to be executed on schedule or in response to events. Perfect for automation and recurring tasks.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-
-          {isLoading ? (
-            // Loading skeleton
-            <div className="space-y-4">
-              <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
-                <div className="h-8 w-48 bg-[#2A3347] rounded mb-4"></div>
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-24 bg-[#2A3347] rounded"></div>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
-                <div className="h-8 w-48 bg-[#2A3347] rounded mb-4"></div>
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-12 bg-[#2A3347] rounded"></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Tools Preview Section */}
-              {sourceMetadata?.metadata?.tools && sourceMetadata.metadata.tools.length > 0 && (
-                <div className={`bg-[#1E293B] rounded-xl p-4 transition-all ${isToolsExpanded ? 'h-auto' : 'h-[250px]'}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-1.5 rounded-lg bg-purple-500/10">
-                        <Wrench className="h-5 w-5 text-purple-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Available Tools</h3>
-                        <p className="text-sm text-slate-400">
-                          {isToolsExpanded ? 'All available tools' : 'Most commonly used tools'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm px-3 py-1 rounded-full bg-[#2A3347] text-purple-400 font-medium">
-                        {sourceMetadata.metadata.tools.length} tools
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-400 hover:text-white"
-                        onClick={() => setIsToolsExpanded(!isToolsExpanded)}
-                      >
-                        <ChevronDown className={`h-4 w-4 mr-1.5 transition-transform ${isToolsExpanded ? 'rotate-180' : ''}`} />
-                        {isToolsExpanded ? 'Show Less' : 'Show More'}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Tools Grid with smooth height transition */}
-                  <div className={`grid grid-cols-2 gap-2 overflow-hidden transition-all duration-300 ${
-                    isToolsExpanded ? 'max-h-[600px]' : 'max-h-[180px]'
-                  }`}>
-                    {(isToolsExpanded ? filteredTools : filteredTools.slice(0, 4)).map((tool, index) => (
-                      <div 
-                        key={index}
-                        className="group bg-[#2A3347] rounded-lg p-2.5 hover:bg-[#374151] transition-all cursor-pointer hover:shadow-lg border border-transparent hover:border-purple-500/30"
-                        onClick={showTeammateDetails}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
-                            {tool.icon_url ? (
-                              <img src={tool.icon_url} alt={tool.name} className="h-5 w-5 object-contain" />
-                            ) : (
-                              getIcon(tool.type || 'tool')
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <h4 className="text-sm font-medium text-white truncate">{tool.name}</h4>
-                              {tool.type && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#1A1F2E] text-purple-400 flex-shrink-0">
-                                  {tool.type}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-400 line-clamp-1">{tool.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Actions Row */}
-              <div className="space-y-4">
-                {/* Quick Start Commands */}
-                {capabilities?.starters && capabilities.starters.length > 0 && (
-                  <div className="bg-[#1E293B] rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 rounded-lg bg-blue-500/10">
-                        <Terminal className="h-5 w-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Quick Start</h3>
-                        <p className="text-sm text-slate-400">Common commands</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 max-h-[160px] overflow-y-auto pr-2">
-                      {capabilities.starters.map((starter: Starter, index: number) => (
-                        <button
-                          key={index}
-                          className="group relative w-full flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all border border-transparent hover:border-blue-500/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+  return (
+    <div className="flex-1 overflow-y-auto relative">
+      <div className="max-w-4xl mx-auto px-4">
+        {!groupedMessages.chatMessages.length && (capabilities || sourceMetadata) ? (
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+            <div className="w-full space-y-8 backdrop-blur-sm bg-[#1E293B]/30 rounded-2xl p-8 border border-white/5">
+              {/* Teammate Info */}
+              <div className="text-center space-y-4">
+                <h2 className="text-3xl font-bold text-white">
+                  {teammate?.name || 'Welcome'}
+                </h2>
+                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                  {teammate?.description || capabilities?.description}
+                </p>
+                <div className="flex items-center justify-center gap-3 mt-6">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="lg"
                           onClick={() => {
-                            if (onStarterCommand) {
-                              onStarterCommand(starter.command);
+                            if (teammate?.uuid) {
+                              setShowTaskModal(true);
+                            } else {
+                              setShowTeammateSelectionModal(true);
+                              if (showTeammateDetails) {
+                                showTeammateDetails();
+                              }
+                              toast({
+                                title: "Select a Teammate",
+                                description: "Please select a teammate to assign tasks to.",
+                                variant: "default"
+                              });
                             }
                           }}
+                          className="bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
                         >
-                          <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347] transition-colors">
-                            {starter.icon ? (
-                              <img src={starter.icon} alt="" className="h-4 w-4" />
-                            ) : (
-                              <Terminal className="h-4 w-4 text-blue-400" />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-white text-sm truncate">{starter.display_name}</div>
-                            <div className="text-xs text-slate-400 font-mono truncate mt-0.5">{starter.command}</div>
-                          </div>
-                          
-                          {/* Hover tooltip */}
-                          <div className="absolute left-0 right-0 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
-                            <div className="bg-[#374151] rounded-lg p-2 shadow-lg border border-blue-500/20">
-                              <div className="text-xs text-white font-medium mb-1">{starter.display_name}</div>
-                              <div className="text-xs text-slate-300 font-mono break-all">{starter.command}</div>
-                            </div>
-                            <div className="absolute bottom-0 left-4 w-2 h-2 bg-[#374151] transform rotate-45 translate-y-1 border-r border-b border-blue-500/20"></div>
-                          </div>
-                        </button>
+                          <ListTodo className="h-4 w-4 mr-2" />
+                          Assign Task
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <p>Assign tasks to your teammate to be executed on schedule or in response to events. Perfect for automation and recurring tasks.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+
+              {isLoading ? (
+                // Loading skeleton with improved spacing
+                <div className="space-y-6">
+                  <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
+                    <div className="h-8 w-48 bg-[#2A3347] rounded mb-6"></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="h-28 bg-[#2A3347] rounded"></div>
                       ))}
                     </div>
                   </div>
-                )}
-
-                {/* Connected Platforms */}
-                {teammate?.integrations && teammate.integrations.length > 0 && (
-                  <div className="bg-[#1E293B] rounded-xl p-4">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 rounded-lg bg-green-500/10">
-                        <Cloud className="h-5 w-5 text-green-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-white">Connected Platforms</h3>
-                        <p className="text-sm text-slate-400">Active integrations</p>
-                      </div>
+                  <div className="bg-[#1E293B] rounded-xl p-6 animate-pulse">
+                    <div className="h-8 w-48 bg-[#2A3347] rounded mb-6"></div>
+                    <div className="space-y-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-14 bg-[#2A3347] rounded"></div>
+                      ))}
                     </div>
-                    <div className="grid grid-cols-3 gap-2 max-h-[120px] overflow-y-auto pr-2">
-                      {teammate.integrations.map((integration, index) => {
-                        const integrationName = typeof integration === 'string' ? integration : integration.name;
-                        const integrationType = typeof integration === 'string' ? integration : integration.integration_type;
-                        
-                        return (
-                          <div
-                            key={index}
-                            className="bg-[#2A3347] rounded-lg p-2.5 flex items-center gap-2 group hover:bg-[#374151] transition-all border border-transparent hover:border-green-500/30"
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Tools Preview Section */}
+                  {sourceMetadata?.metadata?.tools && sourceMetadata.metadata.tools.length > 0 && (
+                    <div className={cn(
+                      "bg-[#1E293B] rounded-xl p-6 transition-all duration-300",
+                      isToolsExpanded ? "h-auto" : "h-[300px]"
+                    )}>
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2 rounded-lg bg-purple-500/10">
+                            <Wrench className="h-5 w-5 text-purple-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Available Tools</h3>
+                            <p className="text-sm text-slate-400 mt-1">
+                              {isToolsExpanded ? "All available tools" : "Most commonly used tools"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm px-4 py-1.5 rounded-full bg-[#2A3347] text-purple-400 font-medium">
+                            {sourceMetadata.metadata.tools.length} tools
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-slate-400 hover:text-white"
+                            onClick={() => setIsToolsExpanded(!isToolsExpanded)}
                           >
-                            <div className="p-1.5 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
-                              {getIcon(integrationType)}
-                            </div>
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium text-white truncate">{integrationName}</div>
-                              <div className="text-xs text-slate-400 truncate">{integrationType}</div>
+                            <ChevronDown className={cn(
+                              "h-4 w-4 mr-2 transition-transform",
+                              isToolsExpanded ? "rotate-180" : ""
+                            )} />
+                            {isToolsExpanded ? "Show Less" : "Show More"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Tools Grid */}
+                      <div className={cn(
+                        "grid grid-cols-2 gap-4 overflow-hidden transition-all duration-300",
+                        isToolsExpanded ? "max-h-[800px]" : "max-h-[200px]"
+                      )}>
+                        {(isToolsExpanded ? sourceMetadata.metadata.tools : sourceMetadata.metadata.tools.slice(0, 4)).map((tool, index) => (
+                          <div 
+                            key={index}
+                            className="group bg-[#2A3347] rounded-lg p-4 hover:bg-[#374151] transition-all cursor-pointer hover:shadow-lg border border-transparent hover:border-purple-500/30"
+                            onClick={showTeammateDetails}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                                {tool.icon_url ? (
+                                  <img src={tool.icon_url} alt={tool.name} className="h-5 w-5 object-contain" />
+                                ) : (
+                                  getIcon(tool.type || "tool")
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="text-sm font-medium text-white truncate">{tool.name}</h4>
+                                  {tool.type && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1A1F2E] text-purple-400 flex-shrink-0">
+                                      {tool.type}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-slate-400 line-clamp-2">{tool.description}</p>
+                              </div>
                             </div>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* Quick Actions Section with improved spacing */}
+                  <div className="space-y-6">
+                    {/* Quick Start Commands */}
+                    {capabilities?.starters && capabilities.starters.length > 0 && (
+                      <div className="bg-[#1E293B] rounded-xl p-6">
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="p-2 rounded-lg bg-blue-500/10">
+                            <Terminal className="h-5 w-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Quick Start</h3>
+                            <p className="text-sm text-slate-400 mt-1">Common commands</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 max-h-[200px] overflow-y-auto pr-2">
+                          {capabilities.starters.map((starter: Starter, index: number) => (
+                            <button
+                              key={index}
+                              className="group relative w-full flex items-center gap-3 p-3 bg-[#2A3347] rounded-lg text-left hover:bg-[#374151] transition-all border border-transparent hover:border-blue-500/30 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                              onClick={() => {
+                                if (onStarterCommand) {
+                                  onStarterCommand(starter.command);
+                                }
+                              }}
+                            >
+                              <div className="p-2 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347] transition-colors">
+                                {starter.icon ? (
+                                  <img src={starter.icon} alt="" className="h-4 w-4" />
+                                ) : (
+                                  <Terminal className="h-4 w-4 text-blue-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-white text-sm truncate">{starter.display_name}</div>
+                                <div className="text-xs text-slate-400 font-mono truncate mt-0.5">{starter.command}</div>
+                              </div>
+                              
+                              {/* Hover tooltip */}
+                              <div className="absolute left-0 right-0 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-10">
+                                <div className="bg-[#374151] rounded-lg p-2 shadow-lg border border-blue-500/20">
+                                  <div className="text-xs text-white font-medium mb-1">{starter.display_name}</div>
+                                  <div className="text-xs text-slate-300 font-mono break-all">{starter.command}</div>
+                                </div>
+                                <div className="absolute bottom-0 left-4 w-2 h-2 bg-[#374151] transform rotate-45 translate-y-1 border-r border-b border-blue-500/20"></div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Connected Platforms with improved spacing */}
+                    {teammate?.integrations && teammate.integrations.length > 0 && (
+                      <div className="bg-[#1E293B] rounded-xl p-6">
+                        <div className="flex items-center gap-4 mb-6">
+                          <div className="p-2 rounded-lg bg-green-500/10">
+                            <Cloud className="h-5 w-5 text-green-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">Connected Platforms</h3>
+                            <p className="text-sm text-slate-400 mt-1">Active integrations</p>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 max-h-[160px] overflow-y-auto pr-2">
+                          {teammate.integrations.map((integration, index) => {
+                            const integrationName = typeof integration === 'string' ? integration : integration.name;
+                            const integrationType = typeof integration === 'string' ? integration : integration.integration_type;
+                            
+                            return (
+                              <div
+                                key={index}
+                                className="bg-[#2A3347] rounded-lg p-2.5 flex items-center gap-2 group hover:bg-[#374151] transition-all border border-transparent hover:border-green-500/30"
+                              >
+                                <div className="p-1.5 rounded-lg bg-[#1A1F2E] group-hover:bg-[#2A3347]">
+                                  {getIcon(integrationType)}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium text-white truncate">{integrationName}</div>
+                                  <div className="text-xs text-slate-400 truncate">{integrationType}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto relative">
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
-        {groupedMessages.map(renderMessage)}
-
-        {isCollectingSystemMessages && (
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2D3B4E] flex items-center justify-center relative">
-              {teammate?.avatar_url ? (
-                <img 
-                  src={teammate.avatar_url} 
-                  alt={teammate.name || 'Assistant'} 
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <Bot className="h-4 w-4 text-[#7C3AED]" />
+                </div>
               )}
-              <span className="absolute -bottom-1 -right-1 h-2 w-2">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75 animate-ping"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-              </span>
             </div>
-            <div className="flex-1 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-medium text-white">
-                  {teammate?.name || 'Assistant'}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-purple-400">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>thinking</span>
+          </div>
+        ) : (
+          <div className="flex flex-col min-h-full py-4">
+            {/* System Messages Toggle Button */}
+            {groupedMessages.systemMessages.length > 0 && (
+              <div className="fixed bottom-24 right-8 z-50">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowSystemMessages(!showSystemMessages)}
+                        className={cn(
+                          "h-10 w-10 rounded-full shadow-lg border-white/10 backdrop-blur-sm",
+                          showSystemMessages 
+                            ? "bg-purple-500/10 hover:bg-purple-500/20" 
+                            : "bg-[#1E293B]/50 hover:bg-[#2D3B4E]/50"
+                        )}
+                      >
+                        <Bot className={cn(
+                          "h-5 w-5 transition-colors",
+                          showSystemMessages ? "text-purple-400" : "text-slate-400"
+                        )} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p>{showSystemMessages ? "Hide" : "Show"} system messages</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            )}
+
+            {/* System Messages Panel */}
+            {showSystemMessages && groupedMessages.systemMessages.length > 0 && (
+              <div className="sticky top-0 z-10 backdrop-blur-xl bg-gradient-to-b from-[#0F1117]/95 to-[#1A1F2E]/95 border-b border-white/5 shadow-lg mb-4">
+                <div className="max-w-4xl mx-auto py-3">
+                  <SystemMessages messages={groupedMessages.systemMessages} />
                 </div>
               </div>
-              <div className="text-sm text-[#E2E8F0] prose prose-invert prose-sm max-w-none">
-                <div className="group relative bg-[#1A1F2E]/50 rounded-lg p-3">
-                  <div className="flex items-start">
-                    <div className="flex-1">
-                      <div className="h-4 w-12 bg-purple-400/10 rounded animate-pulse"></div>
+            )}
+
+            {/* Main Chat Messages */}
+            <div className="flex-1 space-y-3">
+              {groupedMessages.chatMessages.map((message, index, filteredMessages) => {
+                const isFirstInGroup = index === 0 || 
+                  filteredMessages[index - 1]?.role !== message.role;
+                const isLastInGroup = index === filteredMessages.length - 1 || 
+                  filteredMessages[index + 1]?.role !== message.role;
+
+                return (
+                  <div
+                    key={message.id}
+                    className={cn(
+                      "group relative transition-all duration-200",
+                      isFirstInGroup ? "mt-4" : "mt-1",
+                      isLastInGroup ? "mb-4" : "mb-1"
+                    )}
+                  >
+                    {isUserMessage(message) && (
+                      <UserMessage message={message} />
+                    )}
+                    {isAssistantMessage(message) && (
+                      <AssistantMessage 
+                        message={message}
+                        isSystem={false}
+                        sourceMetadata={sourceMetadata || undefined}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Thinking State */}
+              {isCollectingSystemMessages && (
+                <div className="mt-3">
+                  <div className="backdrop-blur-sm bg-[#1E293B]/30 rounded-2xl p-4 border border-white/5">
+                    <div className="flex items-start gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#2D3B4E] ring-1 ring-white/10 flex items-center justify-center relative">
+                        {teammate?.avatar_url ? (
+                          <img 
+                            src={teammate.avatar_url} 
+                            alt={teammate.name || 'Assistant'} 
+                            className="w-full h-full rounded-full object-cover"
+                          />
+                        ) : (
+                          <Bot className="h-4 w-4 text-purple-400" />
+                        )}
+                        <span className="absolute -bottom-1 -right-1 h-2.5 w-2.5">
+                          <span className="absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75 animate-ping"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="text-sm font-medium text-white">
+                            {teammate?.name || 'Assistant'}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs text-purple-400">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <span>thinking</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="animate-pulse flex space-x-2">
+                            <div className="h-3 w-24 bg-purple-400/10 rounded"></div>
+                            <div className="h-3 w-32 bg-purple-400/10 rounded"></div>
+                          </div>
+                          <div className="animate-pulse flex space-x-2">
+                            <div className="h-3 w-20 bg-purple-400/10 rounded"></div>
+                            <div className="h-3 w-16 bg-purple-400/10 rounded"></div>
+                            <div className="h-3 w-28 bg-purple-400/10 rounded"></div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              <div ref={messagesEndRef} className="h-4" />
             </div>
           </div>
         )}
-
-        <div ref={messagesEndRef} className="h-4" />
       </div>
 
-      {/* Task Scheduling Modal */}
+      {/* Modals */}
       {showTaskModal && teammate?.uuid && (
-        <TaskSchedulingModal
-          isOpen={showTaskModal}
-          onClose={() => setShowTaskModal(false)}
-          teammate={{
-            uuid: teammate.uuid,
-            name: teammate.name || 'Unknown',
-            team_id: teammate.team_id || '',
-            user_id: teammate.user_id || '',
-            org_id: teammate.org_id || '',
-            email: teammate.email || '',
-            context: teammate.context || teammate.uuid,
-          }}
-          onSchedule={async (data) => {
-            try {
-              const response = await fetch('/api/tasks', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data),
-              });
-              
-              if (!response.ok) {
-                throw new Error('Failed to schedule task');
+        <Suspense fallback={null}>
+          <TaskSchedulingModal
+            isOpen={showTaskModal}
+            onClose={() => setShowTaskModal(false)}
+            teammate={{
+              uuid: teammate?.uuid || '',
+              name: teammate?.name || 'Unknown',
+              team_id: teammate?.team_id || '',
+              user_id: teammate?.user_id || '',
+              org_id: teammate?.org_id || '',
+              email: teammate?.email || '',
+              context: teammate?.context || teammate?.uuid || '',
+            }}
+            onSchedule={async (data) => {
+              try {
+                const response = await fetch('/api/tasks', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(data),
+                });
+                
+                if (!response.ok) throw new Error('Failed to schedule task');
+                const result = await response.json();
+                return {
+                  task_id: result.task_id,
+                  task_uuid: result.task_uuid
+                };
+              } catch (error) {
+                console.error('Failed to schedule task:', error);
+                throw error;
               }
-              
-              const result = await response.json();
-              return {
-                task_id: result.task_id,
-                task_uuid: result.task_uuid
-              };
-            } catch (error) {
-              console.error('Failed to schedule task:', error);
-              throw error;
-            }
-          }}
-        />
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -23,6 +23,7 @@ const AVATAR_IMAGES = [
 
 interface Teammate {
   uuid: string;
+  id: string;
   name: string;
   description?: string;
   llm_model?: string;
@@ -104,7 +105,10 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   // Fetch teammate capabilities when modal is opened
   const handleInfoClick = async (teammate: Teammate, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent teammate selection when clicking info button
-    setSelectedTeammateDetails(teammate);
+    setSelectedTeammateDetails({
+      ...teammate,
+      id: teammate.uuid
+    });
     setIsDetailsModalOpen(true);
 
     try {

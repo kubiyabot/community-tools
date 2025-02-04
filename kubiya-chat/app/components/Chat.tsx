@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { ChatMessages } from './assistant-ui/ChatMessages';
-import { TaskSchedulingModal } from './TaskSchedulingModal';
 import { useTeammateContext } from '../MyRuntimeProvider';
 import { toast } from './ui/use-toast';
+
+// Lazy load modals
+const TaskSchedulingModal = lazy(() => import('./TaskSchedulingModal').then(mod => ({ default: mod.TaskSchedulingModal })));
 
 interface Teammate {
   uuid: string;
@@ -47,7 +49,8 @@ export function Chat() {
   const { selectedTeammate } = useTeammateContext();
   const [messages, setMessages] = useState<any[]>([]);
 
-  const createScheduledTaskMessage = (taskData: ScheduledTaskData) => {
+  // Memoize message creation function
+  const createScheduledTaskMessage = useCallback((taskData: ScheduledTaskData) => {
     const scheduledTime = new Date(taskData.scheduled_time);
     const isRecurring = taskData.parameters.cron_string;
     
@@ -71,13 +74,14 @@ export function Chat() {
       },
       createdAt: new Date()
     };
-  };
+  }, []);
 
-  const addMessage = (message: any) => {
+  const addMessage = useCallback((message: any) => {
     setMessages(prev => [...prev, message]);
-  };
+  }, []);
 
-  const handleScheduleTask = async (data: ScheduleTaskPayload): Promise<ScheduleTaskResult> => {
+  // Memoize schedule task handler
+  const handleScheduleTask = useCallback(async (data: ScheduleTaskPayload): Promise<ScheduleTaskResult> => {
     try {
       const taskData = {
         task_type: 'chat_activity',
@@ -108,7 +112,6 @@ export function Chat() {
 
       const result = await response.json();
       
-      // Add confirmation message to chat
       const confirmationMessage = createScheduledTaskMessage({
         ...taskData,
         parameters: {
@@ -126,29 +129,47 @@ export function Chat() {
       console.error('Failed to schedule task:', error);
       throw error;
     }
-  };
+  }, [selectedTeammate, createScheduledTaskMessage, addMessage]);
 
-  // Get the teammate object from the selected UUID
-  const selectedTeammateObj = typeof selectedTeammate === 'string' ? {
+  // Memoize teammate object
+  const selectedTeammateObj = useMemo(() => typeof selectedTeammate === 'string' ? {
     uuid: selectedTeammate,
-  } as Teammate : selectedTeammate;
+  } as Teammate : selectedTeammate, [selectedTeammate]);
 
   return (
-    <div className="flex flex-col h-full">
-      {showTaskModal && (
-        <TaskSchedulingModal
-          isOpen={showTaskModal}
-          onClose={() => setShowTaskModal(false)}
-          teammate={selectedTeammateObj}
-          onSchedule={handleScheduleTask}
-        />
-      )}
-      <ChatMessages
-        messages={messages}
-        isCollectingSystemMessages={false}
-        teammate={selectedTeammateObj}
-        onScheduleTask={() => setShowTaskModal(true)}
+    <div className="flex flex-col h-full bg-gradient-to-b from-[#0F1117] to-[#1A1F2E] relative">
+      {/* Background Pattern */}
+      <div 
+        className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))]"
+        style={{ backgroundSize: '30px 30px' }}
       />
+
+      {/* Chat Container */}
+      <div className="relative flex flex-col h-full">
+        {/* Main Chat Area */}
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full relative flex flex-col">
+            <ChatMessages
+              messages={messages}
+              isCollectingSystemMessages={false}
+              teammate={selectedTeammateObj}
+              onScheduleTask={() => setShowTaskModal(true)}
+            />
+          </div>
+        </div>
+
+        {/* Modals */}
+        {showTaskModal && (
+          <Suspense fallback={null}>
+            <TaskSchedulingModal
+              isOpen={showTaskModal}
+              onClose={() => setShowTaskModal(false)}
+              teammate={selectedTeammateObj}
+              onSchedule={handleScheduleTask}
+            />
+          </Suspense>
+        )}
+      </div>
     </div>
   );
 } 

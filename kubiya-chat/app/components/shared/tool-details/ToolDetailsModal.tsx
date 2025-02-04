@@ -276,8 +276,25 @@ interface ToolDetailsModalProps {
   isOpen: boolean;
   onCloseAction: () => void;
   tool: Tool;
-  source: SourceInfo;
+  source?: SourceInfo;
 }
+
+// Add error boundary component
+const MermaidErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const handleError = () => setHasError(true);
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
+  if (hasError) {
+    return null;
+  }
+
+  return <>{children}</>;
+};
 
 export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, tool, source }: ToolDetailsModalProps) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -405,35 +422,64 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
     }
   };
 
-  // Replace the renderMermaidDiagram function
+  // Add cleanup effect
+  useEffect(() => {
+    return () => {
+      // Cleanup on unmount
+      if (mermaidTimeoutRef.current) {
+        clearTimeout(mermaidTimeoutRef.current);
+      }
+      setMermaidError(null);
+      setMermaidLoadingState('idle');
+      setMermaidRenderAttempts(0);
+      setIsMermaidLoading(false);
+    };
+  }, []);
+
+  // Reset states when tab changes
+  useEffect(() => {
+    setMermaidError(null);
+    setMermaidLoadingState('idle');
+    setMermaidRenderAttempts(0);
+    setIsMermaidLoading(false);
+  }, [activeTab]);
+
+  const handleRenderError = useCallback((error: Error, isTimeout = false) => {
+    console.error('Error rendering mermaid diagram:', error);
+    
+    // Clear timeout if it exists
+    if (mermaidTimeoutRef.current) {
+      clearTimeout(mermaidTimeoutRef.current);
+    }
+
+    // Reset states
+    setMermaidError(error.message);
+    setMermaidLoadingState('error');
+    setIsMermaidLoading(false);
+    setMermaidRenderAttempts(1);
+    
+    // Show toast for any rendering error
+    toast({
+      title: "Diagram Rendering Failed",
+      description: isTimeout 
+        ? "The flow diagram is taking too long to render and has been cancelled."
+        : "Unable to render the flow diagram due to syntax or complexity issues.",
+      variant: "destructive",
+    });
+  }, []);
+
   const renderMermaidDiagram = useCallback(() => {
     if (!tool.mermaid) return null;
 
-    const MAX_RENDER_ATTEMPTS = 2;
-    const RENDER_TIMEOUT_MS = 5000; // Increased to 5 seconds
-
-    const handleRenderError = (error: Error, isTimeout = false) => {
-      console.error('Error rendering mermaid diagram:', error);
-      setMermaidError(error.message);
-      setMermaidLoadingState('error');
-      setIsMermaidLoading(false);
-      setMermaidRenderAttempts(prev => prev + 1);
-
-      // Show toast for timeout errors
-      if (isTimeout) {
-        toast({
-          title: "Diagram Rendering Issue",
-          description: "The flow diagram is taking too long to render. You can try again or view the diagram code.",
-          variant: "destructive",
-        });
-      }
-    };
+    const MAX_RENDER_ATTEMPTS = 1;
+    const RENDER_TIMEOUT_MS = 2000;
 
     // Clear any existing timeout
     if (mermaidTimeoutRef.current) {
       clearTimeout(mermaidTimeoutRef.current);
     }
 
+    // If we've already tried once, don't attempt again
     if (mermaidRenderAttempts >= MAX_RENDER_ATTEMPTS) {
       return (
         <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
@@ -441,7 +487,7 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
             <AlertCircle className="h-5 w-5 text-orange-400 mt-0.5 flex-shrink-0" />
             <div className="space-y-2 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="text-sm font-medium text-orange-400">Unable to render flow diagram</h4>
+                <h4 className="text-sm font-medium text-orange-400">Flow diagram cannot be rendered</h4>
                 <HoverCard>
                   <HoverCardTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
@@ -451,19 +497,19 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
                   <HoverCardContent className="w-80">
                     <div className="space-y-2">
                       <div className="text-xs text-slate-400">
-                        The flow diagram couldn't be rendered after multiple attempts. This might be due to:
+                        The flow diagram couldn't be rendered due to:
                       </div>
                       <ul className="text-xs text-slate-400 list-disc pl-4 space-y-1">
-                        <li>Complex diagram structure</li>
-                        <li>Browser performance limitations</li>
                         <li>Invalid diagram syntax</li>
+                        <li>Excessive complexity</li>
+                        <li>Browser performance constraints</li>
                       </ul>
                     </div>
                   </HoverCardContent>
                 </HoverCard>
               </div>
               <div className="text-xs text-orange-400/80">
-                <details className="cursor-pointer group">
+                <details className="cursor-pointer">
                   <summary className="hover:text-orange-300">View diagram code</summary>
                   <div className="mt-2 p-2 bg-slate-800/50 rounded border border-orange-500/20 overflow-auto">
                     <code className="text-slate-300 font-mono whitespace-pre-wrap break-all">
@@ -471,30 +517,6 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
                     </code>
                   </div>
                 </details>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs text-orange-400 hover:text-orange-300"
-                  onClick={() => {
-                    setMermaidRenderAttempts(0);
-                    setMermaidError(null);
-                    setMermaidLoadingState('idle');
-                  }}
-                >
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  Try again
-                </Button>
-                <a
-                  href="https://mermaid.js.org/syntax/flowchart.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1"
-                >
-                  View syntax guide
-                  <ExternalLink className="h-3 w-3" />
-                </a>
               </div>
             </div>
           </div>
@@ -510,50 +532,51 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-6 w-6 text-purple-400 animate-spin" />
               <div className="flex flex-col items-center text-center">
-                <span className="text-sm font-medium text-slate-300">Trying to render flow diagram...</span>
-                <span className="text-xs text-slate-400 mt-1">This might take a few seconds</span>
+                <span className="text-sm font-medium text-slate-300">Rendering flow diagram...</span>
+                <span className="text-xs text-slate-400 mt-1">This will timeout in 2 seconds if too complex</span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Mermaid Diagram */}
-        <div 
-          className={cn(
-            "w-full overflow-auto transition-all duration-300", 
-            {
-              "opacity-0 scale-95": isMermaidLoading,
-              "opacity-100 scale-100": !isMermaidLoading,
-            }
-          )}
-        >
-          <Mermaid 
-            chart={tool.mermaid}
-            onError={(error) => handleRenderError(error)}
-            onRenderStart={() => {
-              setIsMermaidLoading(true);
-              setMermaidLoadingState('loading');
-              
-              // Set timeout to prevent infinite rendering
-              mermaidTimeoutRef.current = setTimeout(() => {
-                handleRenderError(
-                  new Error('The diagram is taking longer than expected to render. Please try again.'),
-                  true
-                );
-              }, RENDER_TIMEOUT_MS);
-            }}
-            onRenderEnd={() => {
-              setIsMermaidLoading(false);
-              setMermaidLoadingState('success');
-              if (mermaidTimeoutRef.current) {
-                clearTimeout(mermaidTimeoutRef.current);
+        {/* Mermaid Diagram wrapped in error boundary */}
+        <MermaidErrorBoundary>
+          <div 
+            className={cn(
+              "w-full overflow-auto transition-all duration-300", 
+              {
+                "opacity-0 scale-95": isMermaidLoading,
+                "opacity-100 scale-100": !isMermaidLoading,
               }
-            }}
-          />
-        </div>
+            )}
+          >
+            <Mermaid 
+              chart={tool.mermaid}
+              onError={handleRenderError}
+              onRenderStart={() => {
+                setIsMermaidLoading(true);
+                setMermaidLoadingState('loading');
+                
+                mermaidTimeoutRef.current = setTimeout(() => {
+                  handleRenderError(
+                    new Error('Diagram rendering timed out - complexity too high'),
+                    true
+                  );
+                }, RENDER_TIMEOUT_MS);
+              }}
+              onRenderEnd={() => {
+                if (mermaidTimeoutRef.current) {
+                  clearTimeout(mermaidTimeoutRef.current);
+                }
+                setIsMermaidLoading(false);
+                setMermaidLoadingState('success');
+              }}
+            />
+          </div>
+        </MermaidErrorBoundary>
       </div>
     );
-  }, [tool.mermaid, mermaidRenderAttempts]);
+  }, [tool.mermaid, mermaidRenderAttempts, handleRenderError]);
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -1177,40 +1200,44 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
         return (
           <div className="space-y-4 p-4">
             {/* Source Details */}
-            {source && (
+            {source ? (
               <div className={cn(modalStyles.cards.container, "space-y-3")}>
                 <h3 className={modalStyles.text.subtitle}>Source Information</h3>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <GitPullRequest className="h-4 w-4 text-purple-400" />
                     <span className={modalStyles.text.primary}>Repository URL:</span>
-                    <a 
-                      href={source.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                    >
-                      {source.url}
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    {source.url ? (
+                      <a 
+                        href={source.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                        {source.url}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : (
+                      <span className="text-slate-400">Not available</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <FolderTree className="h-4 w-4 text-purple-400" />
                     <span className="text-slate-200">Tool Path:</span>
                     <span className="text-blue-400">
-                      {source.url?.split('/').pop() || source.name}
+                      {source.url?.split('/').pop() || source.name || 'Unknown'}
                     </span>
                     <Badge variant="outline" className="ml-2 text-xs bg-blue-500/10 text-blue-400 border-blue-500/20">
                       Directory in repository
                     </Badge>
                   </div>
-                  {source.source_meta.branch && (
+                  {source.source_meta?.branch && (
                     <div className="flex items-center gap-2">
                       <GitBranch className="h-4 w-4 text-emerald-400" />
                       <span className={modalStyles.text.primary}>Branch: {source.source_meta.branch}</span>
                     </div>
                   )}
-                  {source.source_meta.commit && (
+                  {source.source_meta?.commit && (
                     <div className="flex items-center gap-2">
                       <Hash className="h-4 w-4 text-emerald-400" />
                       <span className={modalStyles.text.primary}>
@@ -1229,7 +1256,7 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
                       )}
                     </div>
                   )}
-                  {source.source_meta.committer && (
+                  {source.source_meta?.committer && (
                     <div className="flex items-center gap-2">
                       <GitCommit className="h-4 w-4 text-emerald-400" />
                       <span className={modalStyles.text.primary}>Author: {source.source_meta.committer}</span>
@@ -1237,10 +1264,20 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
                   )}
                 </div>
               </div>
+            ) : (
+              <div className={cn(modalStyles.cards.container, "space-y-3")}>
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <GitPullRequest className="h-12 w-12 text-slate-400 mb-4" />
+                  <h3 className="text-lg font-medium text-slate-200 mb-2">No Source Information</h3>
+                  <p className="text-sm text-slate-400 max-w-md">
+                    Source information is not available for this tool. This could be because the tool hasn't been installed yet or the source data is still loading.
+                  </p>
+                </div>
+              </div>
             )}
 
-            {/* Dynamic Configuration */}
-            {source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && (
+            {/* Dynamic Configuration with null checks */}
+            {source?.dynamic_config && Object.keys(source.dynamic_config).length > 0 && (
               <div className={cn(modalStyles.cards.container, "space-y-3")}>
                 <h3 className={modalStyles.text.subtitle}>Dynamic Configuration</h3>
                 <div className="space-y-2">
