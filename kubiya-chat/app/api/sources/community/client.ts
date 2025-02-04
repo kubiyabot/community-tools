@@ -45,42 +45,9 @@ interface CommunityTool {
   loadingState: 'idle' | 'loading' | 'success' | 'error';
 }
 
-// Cache implementation
-const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-let isInitializing = false;
-let initPromise: Promise<void> | null = null;
-let lastUpdateTime = 0;
-const UPDATE_COOLDOWN = 30 * 1000; // 30 seconds cooldown between updates
-
-async function ensureRepo() {
-  if (initPromise) {
-    await initPromise;
-    return;
-  }
-
-  const now = Date.now();
-  if (now - lastUpdateTime < UPDATE_COOLDOWN) {
-    return;
-  }
-
-  try {
-    isInitializing = true;
-    initPromise = updateRepo();
-    await initPromise;
-    lastUpdateTime = now;
-  } catch (error) {
-    console.error('Failed to initialize repo:', error);
-    throw new Error('Failed to initialize community tools repository');
-  } finally {
-    isInitializing = false;
-    initPromise = null;
-  }
-}
-
 async function readDir(dirPath: string) {
   try {
-    await ensureRepo();
+    await updateRepo();
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
     
     // Filter for directories that aren't dotfiles and have README.md
@@ -113,15 +80,6 @@ async function readDir(dirPath: string) {
   }
 }
 
-async function loadSource(url: string, request?: NextRequest) {
-  try {
-    return await fetchSource(url, request);
-  } catch (error) {
-    console.warn('Failed to load source:', error);
-    throw error;
-  }
-}
-
 async function getRepoMetadata() {
   try {
     const response = await fetch('https://api.github.com/repos/kubiyabot/community-tools', {
@@ -138,33 +96,9 @@ async function getRepoMetadata() {
   }
 }
 
-async function getRepoInfo() {
-  try {
-    await ensureRepo();
-    
-    // Get last commit info from git log
-    const lastCommit = execSync(
-      'git log -1 --format="%H%n%at%n%s%n%an"',
-      { cwd: REPO_PATH, encoding: 'utf-8' }
-    ).split('\n');
-
-    return {
-      sha: lastCommit[0],
-      date: new Date(parseInt(lastCommit[1]) * 1000).toISOString(),
-      message: lastCommit[2],
-      author: {
-        name: lastCommit[3]
-      }
-    };
-  } catch (error) {
-    console.warn('Failed to get repo info:', error);
-    return null;
-  }
-}
-
 async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
   try {
-    await ensureRepo();
+    await updateRepo();
     const fullPath = path.join(REPO_PATH, dirPath);
     
     // Get last commit for specific directory
@@ -189,7 +123,7 @@ async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
 
 async function getContributors(dirPath: string): Promise<number> {
   try {
-    await ensureRepo();
+    await updateRepo();
     const fullPath = path.join(REPO_PATH, dirPath);
     
     // Get unique contributors count
@@ -221,29 +155,7 @@ function generateReadmeSummary(readme: string): string {
   return summary.length > 300 ? summary.slice(0, 297) + '...' : summary;
 }
 
-function getCached<T>(key: string): T | null {
-  const cached = cache.get(key);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
-    return cached.data as T;
-  }
-  return null;
-}
-
-function setCache(key: string, data: any) {
-  cache.set(key, {
-    data,
-    timestamp: Date.now()
-  });
-}
-
 export async function listTools(request?: NextRequest): Promise<CommunityTool[]> {
-  const cacheKey = 'community-tools-list';
-  const cached = getCached<CommunityTool[]>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
   try {
     const contents = await readDir(REPO_PATH);
     const repoMetadata = await getRepoMetadata();
@@ -252,7 +164,7 @@ export async function listTools(request?: NextRequest): Promise<CommunityTool[]>
       contents.map(async item => {
         const url = `https://github.com/kubiyabot/community-tools/tree/main/${item.path}`;
         try {
-          const data = await loadSource(url, request);
+          const data = await fetchSource(url, request);
           const lastCommit = await getLastCommit(item.path);
           const contributors_count = await getContributors(item.path);
           
@@ -294,28 +206,14 @@ export async function listTools(request?: NextRequest): Promise<CommunityTool[]>
       })
     ).then(results => results.filter(tool => tool !== null));
 
-    // Only cache if we have valid results
-    if (tools.length > 0) {
-      setCache(cacheKey, tools);
-    }
-
     return tools;
   } catch (error) {
     console.error('Error listing tools:', error);
-    
-    // Try to return stale cache on error
-    const staleCache = cache.get(cacheKey);
-    if (staleCache?.data) {
-      console.log('Returning stale cache due to error');
-      return staleCache.data;
-    }
-
-    // Return empty array instead of throwing
     return [];
   }
 }
 
 export async function getToolMetadata(path: string, request?: NextRequest): Promise<any> {
   const url = `https://github.com/kubiyabot/community-tools/tree/main/${path}`;
-  return loadSource(url, request);
+  return fetchSource(url, request);
 } 
