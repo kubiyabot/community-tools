@@ -6,6 +6,7 @@ import base64
 from typing import Dict, Any, Optional
 from kubiya_sdk.tools.registry import tool_registry
 
+
 def get_opa_policy_template(config: Dict[str, Any]) -> str:
     policy_template = '''package kubiya.tool_manager
 
@@ -112,6 +113,7 @@ metadata := {
     else:
         raise ConfigurationError("No configuration provided is required.")
 
+
 class ConfigurationError(Exception):
     """Custom exception for configuration related errors"""
     pass
@@ -137,9 +139,14 @@ class EnforcerConfigBuilder:
 
         print(f"📝 Processing configuration: {config}")
 
+        opa_policy = config.get('opa_policy')
         settings.org = os.getenv("KUBIYA_USER_ORG")
         settings.runner = config.get('opa_runner_name')
-        settings.policy = get_opa_policy_template(config)
+        opa_policy_enabled = config.get('opa_policy_enabled')
+        if not opa_policy_enabled or opa_policy_enabled.lower() == 'false':
+            settings.policy = opa_policy
+        else:
+            settings.policy = get_opa_policy_template(config)
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint',
