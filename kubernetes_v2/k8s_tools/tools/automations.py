@@ -290,24 +290,258 @@ find_suspicious_errors_tool = KubernetesTool(
 
 network_policy_analyzer_tool = KubernetesTool(
     name="network_policy_analyzer",
-    description="Analyzes network policies in the cluster",
+    description="Advanced network policy analyzer with pagination, output limiting and deep inspection capabilities",
     content="""
     #!/bin/bash
     set -e
-    echo "🔒 Network Policy Analysis:"
-    echo "========================"
-    kubectl get networkpolicies --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,PODS:.spec.podSelector.matchLabels | 
-    kubectl get networkpolicies --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,PODS:.spec.podSelector.matchLabels
-    echo "\nPods without Network Policies:"
-    kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,LABELS:.metadata.labels | 
-    awk 'NR>1 {print $1, $2}' | 
-    while read ns pod; do
-        if ! kubectl get networkpolicies -n $ns -o jsonpath='{.items[*].spec.podSelector.matchLabels}' | grep -q $(kubectl get pod $pod -n $ns -o jsonpath='{.metadata.labels}'); then
-            echo "$ns/$pod"
+
+    # Constants for output limiting
+    MAX_POLICIES_PER_PAGE=10
+    MAX_PODS_PER_PAGE=20
+    MAX_RULES_PER_POLICY=5
+    MAX_TOTAL_OUTPUT=5000
+    MAX_OUTPUT_WIDTH=120
+
+    # Function to handle cleanup
+    cleanup() {
+        rm -f "${temp_files[@]}" 2>/dev/null
+        exit "${1:-0}"
+    }
+    trap 'cleanup $?' EXIT INT TERM
+
+    # Array to track temporary files
+    declare -a temp_files
+    temp_dir=$(mktemp -d)
+    temp_files+=("$temp_dir")
+
+    # Function to create temp file
+    create_temp_file() {
+        local tmp="${temp_dir}/$(uuidgen || date +%s.%N)"
+        temp_files+=("$tmp")
+        echo "$tmp"
+    }
+
+    # Function to paginate output
+    paginate_output() {
+        local input_file=$1
+        local page=${2:-1}
+        local page_size=${3:-$MAX_POLICIES_PER_PAGE}
+        local total_lines=$(wc -l < "$input_file")
+        local total_pages=$(( (total_lines + page_size - 1) / page_size ))
+
+        # Validate page number
+        if [ "$page" -lt 1 ]; then
+            page=1
+        elif [ "$page" -gt "$total_pages" ]; then
+            page=$total_pages
         fi
-    done
+
+        # Calculate start and end lines
+        local start_line=$(( (page - 1) * page_size + 1 ))
+        local end_line=$(( page * page_size ))
+
+        # Show pagination info
+        echo "📄 Page $page of $total_pages (Items $start_line-$end_line of $total_lines)"
+        echo "------------------------------------------------"
+
+        # Extract and show the page
+        sed -n "${start_line},${end_line}p" "$input_file"
+
+        # Show navigation help if more than one page
+        if [ "$total_pages" -gt 1 ]; then
+            echo -e "\n📌 Use --page N to view different pages"
+        fi
+    }
+
+    # Function to format network policy
+    format_network_policy() {
+        local policy_file=$1
+        local temp_file=$(create_temp_file)
+
+        jq -r --arg max_rules "$MAX_RULES_PER_POLICY" '
+        . | 
+        "Policy: \(.metadata.name)\n" +
+        "Namespace: \(.metadata.namespace)\n" +
+        "Pod Selector: \(.spec.podSelector | tostring)\n" +
+        if .spec.policyTypes then "Types: \(.spec.policyTypes | join(", "))\n" else "" end +
+        "\nIngress Rules:" + 
+        if .spec.ingress then
+            (.spec.ingress[0:($max_rules|tonumber)] | map(
+                "\n  • From: " + 
+                (if .[].from then
+                    (.[].from | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
+                        end
+                    ) | join(""))
+                else "\n    - Any"
+                end) +
+                if .[].ports then
+                    "\n    Ports: " + (.[].ports | map("\(.port)/\(.protocol)") | join(", "))
+                else ""
+                end
+            ) | join("\n")) +
+            if (.spec.ingress|length) > ($max_rules|tonumber) then
+                "\n  ... \((.spec.ingress|length) - ($max_rules|tonumber)) more rules truncated ..."
+            else ""
+            end
+        else "\n  None"
+        end +
+        "\n\nEgress Rules:" +
+        if .spec.egress then
+            (.spec.egress[0:($max_rules|tonumber)] | map(
+                "\n  • To: " +
+                (if .[].to then
+                    (.[].to | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
+                        end
+                    ) | join(""))
+                else "\n    - Any"
+                end) +
+                if .[].ports then
+                    "\n    Ports: " + (.[].ports | map("\(.port)/\(.protocol)") | join(", "))
+                else ""
+                end
+            ) | join("\n")) +
+            if (.spec.egress|length) > ($max_rules|tonumber) then
+                "\n  ... \((.spec.egress|length) - ($max_rules|tonumber)) more rules truncated ..."
+            else ""
+            end
+        else "\n  None"
+        end' "$policy_file" > "$temp_file"
+
+        # Add emojis and indentation
+        sed 's/^Policy: /🔒 Policy: /;
+             s/^Namespace: /📁 Namespace: /;
+             s/^Pod Selector: /🎯 Pod Selector: /;
+             s/^Types: /📋 Types: /;
+             s/^Ingress Rules:/📥 Ingress Rules:/;
+             s/^Egress Rules:/📤 Egress Rules:/;
+             s/^/  /' "$temp_file"
+    }
+
+    # Function to analyze pods without policies
+    analyze_pods_without_policies() {
+        local namespace=${1:-}
+        local page=${2:-1}
+        local temp_file=$(create_temp_file)
+        local ns_flag=""
+        [ -n "$namespace" ] && ns_flag="-n $namespace"
+
+        # Get all pods and their labels
+        kubectl get pods $ns_flag -o json | jq -r --arg ns "$namespace" '
+        .items[] | 
+        select(.metadata.namespace as $pod_ns | 
+            if $ns then $pod_ns == $ns else true end
+        ) |
+        {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            labels: (.metadata.labels // {}),
+            status: .status.phase
+        }' > "$temp_file"
+
+        # Get network policies
+        local policies_file=$(create_temp_file)
+        kubectl get networkpolicies $ns_flag -o json | jq -r '.items[]' > "$policies_file"
+
+        # Process pods and check if they're covered by any policy
+        local output_file=$(create_temp_file)
+        jq -r --slurpfile policies "$policies_file" '
+        . | 
+        select(.labels != null) |
+        . as $pod |
+        if ($policies | map(
+            select(.spec.podSelector.matchLabels as $policy_labels |
+                ($pod.labels | to_entries | all(
+                    . as $label |
+                    $policy_labels[$label.key] == $label.value
+                ))
+            )
+        ) | length) == 0 then
+            "🔓 Pod: \(.name)\n" +
+            "  📁 Namespace: \(.namespace)\n" +
+            "  🏷️  Labels: \(.labels | to_entries | map("\(.key)=\(.value)") | join(", "))\n" +
+            "  📊 Status: \(.status)\n"
+        else empty end
+        ' "$temp_file" > "$output_file"
+
+        # Show statistics
+        local total_pods=$(jq -r '. | length' "$temp_file")
+        local unprotected_pods=$(grep -c "🔓 Pod:" "$output_file" || echo 0)
+        local protected_pods=$(( total_pods - unprotected_pods ))
+        
+        echo "📊 Network Policy Coverage:"
+        echo "========================="
+        echo "  ✅ Protected Pods: $protected_pods"
+        echo "  ⚠️  Unprotected Pods: $unprotected_pods"
+        echo "  📈 Coverage: $(( (protected_pods * 100) / total_pods ))%"
+        echo
+
+        if [ "$unprotected_pods" -gt 0 ]; then
+            echo "🔍 Pods Without Network Policies:"
+            echo "=============================="
+            paginate_output "$output_file" "$page" "$MAX_PODS_PER_PAGE"
+        else
+            echo "✅ All pods are covered by network policies"
+        fi
+    }
+
+    # Set namespace flag if provided
+    namespace_flag=""
+    [ -n "${namespace:-}" ] && namespace_flag="-n $namespace"
+
+    # Get network policies
+    echo "🔍 Analyzing Network Policies"
+    echo "=========================="
+    
+    # Create temporary files for policies
+    policies_file=$(create_temp_file)
+    formatted_policies=$(create_temp_file)
+
+    # Get and process policies
+    if [ -n "$namespace" ]; then
+        kubectl get networkpolicies -n "$namespace" -o json > "$policies_file"
+    else
+        kubectl get networkpolicies --all-namespaces -o json > "$policies_file"
+    fi
+
+    # Format each policy
+    jq -r '.items[]' "$policies_file" | while read -r policy; do
+        echo "$policy" | format_network_policy "$(create_temp_file)"
+        echo
+    done > "$formatted_policies"
+
+    # Show policies with pagination
+    if [ -s "$formatted_policies" ]; then
+        paginate_output "$formatted_policies" "${page:-1}" "$MAX_POLICIES_PER_PAGE"
+    else
+        echo "⚠️  No network policies found"
+    fi
+
+    echo -e "\n🔍 Analyzing Pods Without Network Policies"
+    echo "======================================="
+    analyze_pods_without_policies "${namespace:-}" "${page:-1}"
     """,
-    args=[],
+    args=[
+        Arg(
+            name="namespace",
+            type="str",
+            description="Kubernetes namespace to analyze. If omitted, analyzes all namespaces.",
+            required=False
+        ),
+        Arg(
+            name="page",
+            type="int",
+            description="Page number for paginated output",
+            required=False
+        )
+    ]
 )
 
 persistent_volume_usage_tool = KubernetesTool(
