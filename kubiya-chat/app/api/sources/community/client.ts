@@ -1,14 +1,22 @@
 'use server';
 
 import { CommunityTool, CommitInfo } from './types';
-import fs from 'fs/promises';
-import path from 'path';
-import { execSync } from 'child_process';
-import { fetchSource } from './utils';
 import { NextRequest } from 'next/server';
 import { REPO_PATH, updateRepo } from './git-utils';
+import { fetchSource } from './utils';
+
+// Import Node.js modules dynamically
+const getNodeModules = async () => {
+  const [fs, path, childProcess] = await Promise.all([
+    import('fs/promises'),
+    import('path'),
+    import('child_process')
+  ]);
+  return { fs, path, execSync: childProcess.execSync };
+};
 
 async function readDir(dirPath: string) {
+  const { fs, path } = await getNodeModules();
   try {
     await updateRepo();
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
@@ -60,6 +68,7 @@ async function getRepoMetadata() {
 }
 
 async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
+  const { path, execSync } = await getNodeModules();
   try {
     await updateRepo();
     const fullPath = path.join(REPO_PATH, dirPath);
@@ -85,6 +94,7 @@ async function getLastCommit(dirPath: string): Promise<CommitInfo | null> {
 }
 
 async function getContributors(dirPath: string): Promise<number> {
+  const { path, execSync } = await getNodeModules();
   try {
     await updateRepo();
     const fullPath = path.join(REPO_PATH, dirPath);
@@ -119,6 +129,7 @@ function generateReadmeSummary(readme: string): string {
 }
 
 export async function listTools(request?: NextRequest): Promise<CommunityTool[]> {
+  const { fs, path } = await getNodeModules();
   try {
     const contents = await readDir(REPO_PATH);
     const repoMetadata = await getRepoMetadata();
