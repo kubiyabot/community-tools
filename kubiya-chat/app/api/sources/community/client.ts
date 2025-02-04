@@ -1,49 +1,12 @@
 'use server';
 
-import { GitHubContentsResponse } from './types';
+import { CommunityTool, CommitInfo } from './types';
 import fs from 'fs/promises';
 import path from 'path';
-import os from 'os';
 import { execSync } from 'child_process';
 import { fetchSource } from './utils';
 import { NextRequest } from 'next/server';
-import { formatDistanceToNow } from 'date-fns';
-import { REPO_PATH, REPO_URL, updateRepo } from './git-utils';
-
-const KUBIYA_API_URL = process.env.KUBIYA_API_URL || 'https://api.kubiya.ai';
-
-interface ErrorResponse {
-  error?: string;
-  message?: string;
-}
-
-interface CommitInfo {
-  sha: string;
-  date: string;
-  message: string;
-  author: {
-    name: string;
-    avatar?: string;
-  };
-}
-
-interface CommunityTool {
-  name: string;
-  path: string;
-  description: string;
-  tools_count: number;
-  icon_url?: string;
-  readme?: string;
-  readme_summary?: string;
-  tools?: any[];
-  isDiscovering?: boolean;
-  error?: string;
-  lastUpdated?: string;
-  stars?: number;
-  lastCommit?: CommitInfo;
-  contributors_count?: number;
-  loadingState: 'idle' | 'loading' | 'success' | 'error';
-}
+import { REPO_PATH, updateRepo } from './git-utils';
 
 async function readDir(dirPath: string) {
   try {
