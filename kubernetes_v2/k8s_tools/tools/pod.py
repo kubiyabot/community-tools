@@ -4,216 +4,34 @@ from kubiya_sdk.tools.registry import tool_registry
 
 pod_management_tool = KubernetesTool(
     name="pod_management",
-    description="Advanced pod management tool with log streaming, status monitoring, and detailed pod information",
-    content="""
+    description="Creates, deletes, or retrieves information on a Kubernetes pod.",
+    content='''
     #!/bin/bash
     set -e
 
-    # Constants for output limiting
-    MAX_LOG_LINES=1000
-    MAX_LOG_SIZE="10MB"
-    MAX_OUTPUT_WIDTH=120
-    MAX_TOTAL_OUTPUT=5000
-
-    # Function to handle cleanup
-    cleanup() {
-        rm -f "${temp_files[@]}" 2>/dev/null
-        exit "${1:-0}"
-    }
-    trap 'cleanup $?' EXIT INT TERM
-
-    # Array to track temporary files
-    declare -a temp_files
-    temp_dir=$(mktemp -d)
-    temp_files+=("$temp_dir")
-
-    # Function to create temp file
-    create_temp_file() {
-        local tmp="${temp_dir}/$(uuidgen || date +%s.%N)"
-        temp_files+=("$tmp")
-        echo "$tmp"
-    }
-
-    # Function to stream logs with size limit
-    stream_logs() {
-        local pod=$1
-        local namespace=$2
-        local container=${3:-}
-        local since=${4:-}
-        local tail=${5:-$MAX_LOG_LINES}
-        local container_flag=""
-        local since_flag=""
-        
-        [ -n "$container" ] && container_flag="-c $container"
-        [ -n "$since" ] && since_flag="--since=$since"
-        
-        kubectl logs $pod -n $namespace $container_flag $since_flag --tail=$tail 2>/dev/null | \
-        awk -v max_width=$MAX_OUTPUT_WIDTH '{
-            if (length($0) > max_width) 
-                print substr($0, 1, max_width-3) "...";
-            else 
-                print;
-        }'
-    }
-
-    # Function to format pod description
-    format_pod_description() {
-        local pod=$1
-        local namespace=$2
-        
-        kubectl get pod $pod -n $namespace -o json | \
-        jq -r '{
-            name: .metadata.name,
-            namespace: .metadata.namespace,
-            status: .status.phase,
-            containers: [.spec.containers[].name],
-            node: .spec.nodeName,
-            ip: .status.podIP,
-            conditions: .status.conditions,
-            events: .metadata.name
-        }' | jq -r '. |
-        "Pod: \(.name)\n" +
-        "Namespace: \(.namespace)\n" +
-        "Status: \(.status)\n" +
-        "Node: \(.node)\n" +
-        "IP: \(.ip)\n" +
-        "Containers: \(.containers | join(", "))\n" +
-        "\nConditions:\n" +
-        (.conditions | map("  • \(.type): \(.status) (\(.reason))") | join("\n"))' | \
-        awk '
-        /^Pod:/ {printf "🔵 %s\n", $0}
-        /^Namespace:/ {printf "📁 %s\n", $0}
-        /^Status:/ {
-            status=$2;
-            emoji="❓";
-            if (status == "Running") emoji="✅";
-            else if (status == "Pending") emoji="⏳";
-            else if (status == "Succeeded") emoji="🎉";
-            else if (status == "Failed") emoji="❌";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Node:/ {printf "🖥️  %s\n", $0}
-        /^IP:/ {printf "🌐 %s\n", $0}
-        /^Containers:/ {printf "📦 %s\n", $0}
-        /^Conditions:/ {print "📋 Conditions:"}
-        /^  •/ {
-            if ($3 == "True") emoji="✅";
-            else if ($3 == "False") emoji="❌";
-            else emoji="❓";
-            printf "  %s %s\n", emoji, substr($0, 4);
-        }'
-    }
-
-    # Create output file
-    formatted_output=$(create_temp_file)
-
-    # Set namespace flag
-    namespace_flag=""
-    [ -n "${namespace:-}" ] && namespace_flag="-n $namespace" || namespace_flag="--all-namespaces"
-
-    {
-        case "${action:-describe}" in
-            "describe")
-                if [ -z "$pod_name" ]; then
-                    echo "❌ Pod name is required for describe action"
-                    exit 1
-                fi
-                
-                echo "🔍 Pod Details:"
-                echo "=============="
-                format_pod_description "$pod_name" "$namespace"
-                
-                echo -e "\n📜 Recent Events:"
-                echo "=============="
-                kubectl get events $namespace_flag --field-selector involvedObject.name=$pod_name \
-                    --sort-by='.lastTimestamp' | \
-                tail -n 10 | \
-                awk '{
-                    if ($7 ~ /Warning/) emoji="⚠️";
-                    else if ($7 ~ /Normal/) emoji="ℹ️";
-                    else emoji="📝";
-                    print "  " emoji " " $0;
-                }'
-                ;;
-                
-            "logs")
-                if [ -z "$pod_name" ]; then
-                    echo "❌ Pod name is required for logs action"
-                    exit 1
-                fi
-                
-                echo "📜 Pod Logs:"
-                echo "==========="
-                stream_logs "$pod_name" "$namespace" "${container:-}" "${since:-}" "${tail:-$MAX_LOG_LINES}"
-                ;;
-                
-            "list")
-                echo "📋 Pod List:"
-                echo "==========="
-                kubectl get pods $namespace_flag -o wide | \
-                awk 'NR==1 {print "  " $0} NR>1 {
-                    status=$3;
-                    emoji="❓";
-                    if (status == "Running") emoji="✅";
-                    else if (status == "Pending") emoji="⏳";
-                    else if (status == "Succeeded") emoji="🎉";
-                    else if (status == "Failed") emoji="❌";
-                    print "  " emoji " " $0;
-                }'
-                ;;
-                
-            *)
-                echo "❌ Invalid action specified"
-                exit 1
-                ;;
-        esac
-    } > "$formatted_output"
-
-    # Show output with line limit
-    head -n $MAX_TOTAL_OUTPUT "$formatted_output"
-    
-    # Show truncation message if needed
-    if [ "$(wc -l < "$formatted_output")" -gt "$MAX_TOTAL_OUTPUT" ]; then
-        echo "⚠️  Output truncated. Use specific filters or actions to see more details."
+    # Ensure namespace is provided
+    if [ -z "${namespace}" ]; then
+        echo "❌ Error: Namespace is required for managing a specific pod."
+        exit 1
     fi
-    """,
+
+    # Set flags for optional parameters
+    namespace_flag="-n ${namespace}"
+    image_flag=$( [ "${action}" = "create" ] && [ -n "${image}" ] && echo "--image=${image}" || echo "" )
+
+    # Execute the kubectl command
+    if ! kubectl "${action}" pod "${name}" ${image_flag} ${namespace_flag}; then
+        echo "❌ Failed to ${action} pod ${name} in namespace ${namespace}"
+        exit 1
+    fi
+
+    echo "✅ Successfully ${action}d pod ${name} in namespace ${namespace}"
+    ''',
     args=[
-        Arg(
-            name="action",
-            type="str",
-            description="Action to perform (describe, logs, list)",
-            required=False,
-        ),
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace. If omitted, uses all namespaces for list action",
-            required=False,
-        ),
-        Arg(
-            name="pod_name",
-            type="str",
-            description="Name of the pod (required for describe and logs actions)",
-            required=False,
-        ),
-        Arg(
-            name="container",
-            type="str",
-            description="Container name (only for logs action)",
-            required=False,
-        ),
-        Arg(
-            name="since",
-            type="str",
-            description="Show logs since timestamp (e.g. 1h, 5m) (only for logs action)",
-            required=False,
-        ),
-        Arg(
-            name="tail",
-            type="int",
-            description="Number of lines to show from the end of logs (only for logs action)",
-            required=False,
-        ),
+        Arg(name="action", type="str", description="Action to perform (create, delete, get)", required=True),
+        Arg(name="name", type="str", description="Name of the pod", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(name="image", type="str", description="Container image (for create)", required=False),
     ],
 )
 
