@@ -58,23 +58,56 @@ pod_restart_tool = KubernetesTool(
         
         # Analyze container states with truncation
         kubectl get pod $pod_name -n $namespace -o json | \
-        jq -r '.status.containerStatuses[] | {
-            name: .name,
-            ready: .ready,
-            restartCount: .restartCount,
-            state: .state,
-            lastState: .lastState
-        }' | jq -r '. |
-        "Container: \(.name)\n" +
-        "Ready: \(.ready)\n" +
-        "Restart Count: \(.restartCount)\n" +
-        "Current State: \(if .state then (.state | to_entries[0].key) else "Unknown" end)\n" +
-        if .lastState and (.lastState | length > 0) then
-            "Last State: \(.lastState | to_entries[0].key)\n" +
-            if .lastState[.lastState | to_entries[0].key].reason then
-                "Last State Reason: \(.lastState[.lastState | to_entries[0].key].reason)\n"
-            else "" end
-        else "" end' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        jq -r '
+        def get_state_info(state_obj):
+          if state_obj == null then
+            "Unknown"
+          else
+            (state_obj | to_entries | if length > 0 then .[0].key else "Unknown" end)
+          end;
+
+        def get_state_reason(state_obj):
+          if state_obj == null then
+            ""
+          else
+            (state_obj | to_entries | if length > 0 then 
+              (.[0].value.reason // "No reason provided")
+            else
+              ""
+            end)
+          end;
+
+        if .status.containerStatuses then
+          .status.containerStatuses[] | {
+            name: (.name // "unnamed"),
+            ready: (.ready // false),
+            restartCount: (.restartCount // 0),
+            state: (.state // null),
+            lastState: (.lastState // null)
+          } | (
+            "Container: \(.name)\n" +
+            "Ready: \(.ready)\n" +
+            "Restart Count: \(.restartCount)\n" +
+            "Current State: \(get_state_info(.state))" + 
+            if get_state_reason(.state) != "" then 
+              " (\(get_state_reason(.state)))"
+            else 
+              ""
+            end + "\n" +
+            if .lastState != null then
+              "Last State: \(get_state_info(.lastState))" +
+              if get_state_reason(.lastState) != "" then
+                " (\(get_state_reason(.lastState)))\n"
+              else
+                "\n"
+              end
+            else
+              ""
+            end
+          )
+        else
+          "No container status information available"
+        end' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
 
         # Get recent related events
         echo -e "\n📜 Recent Related Events:"
