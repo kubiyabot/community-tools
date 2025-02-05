@@ -178,39 +178,39 @@ pod_logs_tool = KubernetesTool(
     format_log_line() {
         awk -v width="$MAX_OUTPUT_WIDTH" '
         function colorize(line, level) {
-            if (level == "ERROR") return "\033[31m" line "\033[0m"     # Red
-            if (level == "WARN") return "\033[33m" line "\033[0m"      # Yellow
-            if (level == "INFO") return "\033[32m" line "\033[0m"      # Green
-            if (level == "DEBUG") return "\033[36m" line "\033[0m"     # Cyan
-            return line
+            if (level == "ERROR") return "\033[31m" line "\033[0m";     # Red
+            if (level == "WARN") return "\033[33m" line "\033[0m";      # Yellow
+            if (level == "INFO") return "\033[32m" line "\033[0m";      # Green
+            if (level == "DEBUG") return "\033[36m" line "\033[0m";     # Cyan
+            return line;
         }
         {
             # Extract timestamp if present
-            timestamp = ""
+            timestamp = "";
             if ($0 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}/) {
-                timestamp = substr($0, 1, 19)
-                msg = substr($0, 21)
+                timestamp = substr($0, 1, 19);
+                msg = substr($0, 21);
             } else {
-                msg = $0
+                msg = $0;
             }
 
             # Detect log level
-            level = "NONE"
-            if (tolower($0) ~ /error/) level = "ERROR"
-            else if (tolower($0) ~ /warn/) level = "WARN"
-            else if (tolower($0) ~ /info/) level = "INFO"
-            else if (tolower($0) ~ /debug/) level = "DEBUG"
+            level = "NONE";
+            if (tolower($0) ~ /error/) level = "ERROR";
+            else if (tolower($0) ~ /warn/) level = "WARN";
+            else if (tolower($0) ~ /info/) level = "INFO";
+            else if (tolower($0) ~ /debug/) level = "DEBUG";
 
             # Truncate long lines
             if (length(msg) > width) {
-                msg = substr(msg, 1, width-3) "..."
+                msg = substr(msg, 1, width-3) "...";
             }
 
             # Format output
             if (timestamp != "") {
-                printf "[CLOCK] %s | %s\n", timestamp, colorize(msg, level)
+                printf "[CLOCK] %s | %s\\n", timestamp, colorize(msg, level);
             } else {
-                print colorize(msg, level)
+                print colorize(msg, level);
             }
         }' | sed 's/\[CLOCK\]/🕒/g'
     }
@@ -481,15 +481,15 @@ pod_network_topology_tool = KubernetesTool(
         else "\n  None"
         end' | \
         awk '
-        /^Policy:/ {printf "\n[SHIELD]  %s\n", substr($0, 9)}
-        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
-        /^Pod Selector:/ {printf "[TARGET] %s\n", $0}
-        /^Policy Types:/ {printf "[CLIPBOARD] %s\n", $0}
+        /^Policy:/ {printf "\\n[SHIELD]  %s\\n", substr($0, 9)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^Pod Selector:/ {printf "[TARGET] %s\\n", $0}
+        /^Policy Types:/ {printf "[CLIPBOARD] %s\\n", $0}
         /^Ingress Rules:/ {print "[INBOX] Ingress Rules:"}
         /^Egress Rules:/ {print "[OUTBOX] Egress Rules:"}
-        /^  • From:/ {printf "  [ARROW_LEFT] From:\n"}
-        /^  • To:/ {printf "  [ARROW_RIGHT] To:\n"}
-        /^    -/ {printf "    %s\n", $0}
+        /^  • From:/ {printf "  [ARROW_LEFT] From:\\n"}
+        /^  • To:/ {printf "  [ARROW_RIGHT] To:\\n"}
+        /^    -/ {printf "    %s\\n", $0}
         ' | sed 's/\[SHIELD\]/🛡️/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g; s/\[CLIPBOARD\]/📋/g; s/\[INBOX\]/📥/g; s/\[OUTBOX\]/📤/g; s/\[ARROW_LEFT\]/⬅️/g; s/\[ARROW_RIGHT\]/➡️/g' > "$formatted_output"
 
         # Analyze service connections
@@ -507,10 +507,10 @@ pod_network_topology_tool = KubernetesTool(
         "Selector: \(.selector | to_entries | map("\(.key)=\(.value)") | join(", "))\n" +
         "Ports: \(.ports | map("\(.port):\(.targetPort) (\(.protocol))") | join(", ")))"' | \
         awk '
-        /^Service:/ {printf "\n[PLUG] %s\n", substr($0, 10)}
-        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
-        /^Selector:/ {printf "[TARGET] %s\n", $0}
-        /^Ports:/ {printf "[PLUG] %s\n", $0}
+        /^Service:/ {printf "\\n[PLUG] %s\\n", substr($0, 10)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^Selector:/ {printf "[TARGET] %s\\n", $0}
+        /^Ports:/ {printf "[PLUG] %s\\n", $0}
         ' | sed 's/\[PLUG\]/🔌/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g' >> "$formatted_output"
 
         # Show pod-to-pod connections based on labels
@@ -528,10 +528,10 @@ pod_network_topology_tool = KubernetesTool(
         "IP: \(.ip)\n" +
         "Labels: \(.labels | to_entries | map("\(.key)=\(.value)") | join(", "))"' | \
         awk '
-        /^Pod:/ {printf "\n[PACKAGE] %s\n", substr($0, 6)}
-        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
-        /^IP:/ {printf "[GLOBE] %s\n", $0}
-        /^Labels:/ {printf "[LABEL] %s\n", $0}
+        /^Pod:/ {printf "\\n[PACKAGE] %s\\n", substr($0, 6)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^IP:/ {printf "[GLOBE] %s\\n", $0}
+        /^Labels:/ {printf "[LABEL] %s\\n", $0}
         ' | sed 's/\[PACKAGE\]/📦/g; s/\[FOLDER\]/📁/g; s/\[GLOBE\]/🌐/g; s/\[LABEL\]/🏷️/g' >> "$formatted_output"
 
         # Calculate statistics
