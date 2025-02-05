@@ -27,6 +27,11 @@ generate_uuid() {
     echo "$(date +%s)-$(od -N 4 -t x4 /dev/urandom | head -1 | awk '{print $2}')"
 }
 
+# Alias uuidgen to our generate_uuid function for compatibility
+uuidgen() {
+    generate_uuid
+}
+
 # Helper functions
 truncate_output() {
     local max_items=${1:-$MAX_ITEMS}
@@ -74,11 +79,65 @@ parse_json() {
     
     # Try to parse with jq, fallback to raw JSON if it fails
     if ! output=$(echo "$json" | jq -r "$query" 2>/dev/null); then
-        echo "Warning: Failed to parse JSON with jq" >&2
-        echo "$json"
+        echo "Warning: Failed to parse JSON with query: $query" >&2
+        # Try to validate if it's valid JSON at least
+        if echo "$json" | jq '.' >/dev/null 2>&1; then
+            echo "$json"
+        else
+            echo "{}"
+        fi
     else
         echo "$output"
     fi
+}
+
+# Helper function to check if a pod exists
+check_pod_exists() {
+    local namespace="$1"
+    local pod_name="$2"
+    
+    if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
+        echo "❌ Namespace and pod name are required" >&2
+        return 1
+    fi
+    
+    if ! kubectl get pod -n "$namespace" "$pod_name" >/dev/null 2>&1; then
+        echo "❌ Pod '$pod_name' not found in namespace '$namespace'" >&2
+        return 1
+    fi
+    
+    return 0
+}
+
+# Helper function to wait for pod to be ready
+wait_for_pod() {
+    local namespace="$1"
+    local pod_name="$2"
+    local timeout="${3:-300}"  # Default 5 minutes timeout
+    
+    echo "⏳ Waiting for pod $pod_name to be ready (timeout: ${timeout}s)..."
+    
+    if ! kubectl wait --for=condition=ready pod -n "$namespace" "$pod_name" --timeout="${timeout}s" >/dev/null 2>&1; then
+        echo "❌ Timeout waiting for pod $pod_name to be ready" >&2
+        return 1
+    fi
+    
+    echo "✅ Pod $pod_name is ready"
+    return 0
+}
+
+# Helper function to get pod status
+get_pod_status() {
+    local namespace="$1"
+    local pod_name="$2"
+    
+    if ! check_pod_exists "$namespace" "$pod_name"; then
+        return 1
+    fi
+    
+    local status
+    status=$(kubectl get pod -n "$namespace" "$pod_name" -o json | parse_json '.status.phase')
+    echo "$status"
 }
 
 # Setup working directories
