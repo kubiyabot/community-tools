@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Dispatch, SetStateAction } from 'react';
 import type { FormState, CommunityTool } from '../types';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/app/components/ui/tabs';
-import { GitBranch, GitPullRequest } from 'lucide-react';
+import { GitBranch, GitPullRequest, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CategoriesSidebar } from './CategoriesSidebar';
 import { CommunityToolsSkeleton } from './CommunityToolsSkeleton';
@@ -10,6 +10,8 @@ import { ToolsLayout } from './ToolsLayout';
 import { TOOL_CATEGORIES } from '../../../../../constants/tools';
 import { useInstallToolContext } from '../context';
 import { CustomSourceTab } from './CustomSourceTab';
+import { Button } from '@/app/components/ui/button';
+import { useCommunityTools } from '@/app/hooks/useCommunityTools';
 
 // Convert TOOL_CATEGORIES to array format
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -45,6 +47,54 @@ export function SelectStep({
     setActiveCategory,
     methods
   } = useInstallToolContext();
+
+  // Use the community tools hook
+  const { 
+    data: tools,
+    isLoading,
+    error,
+    refetch
+  } = useCommunityTools();
+
+  // Update formState when tools are loaded
+  React.useEffect(() => {
+    if (tools) {
+      formState.communityTools.data = tools;
+      formState.communityTools.isLoading = false;
+    }
+  }, [tools, formState]);
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+        <p className="mt-4 text-sm text-slate-400">Loading community tools...</p>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12">
+        <div className="text-red-500 mb-4">
+          <AlertCircle className="h-8 w-8" />
+        </div>
+        <p className="text-sm text-red-400">
+          {error instanceof Error ? error.message : 'Failed to load community tools'}
+        </p>
+        <Button 
+          variant="outline" 
+          onClick={() => refetch()}
+          className="mt-4"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
 
   // When a tool is selected, ensure we use the full source URL
   const handleToolSelection = (tool: CommunityTool) => {

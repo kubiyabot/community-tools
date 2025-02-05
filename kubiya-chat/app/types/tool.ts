@@ -53,4 +53,30 @@ export interface SimpleIntegration {
   name: string;
   integration_type: string;
   metadata?: Record<string, string>;
+}
+
+export interface CommunityTool {
+  name: string;
+  path: string;
+  description: string;
+  category?: string;
+  icon_url?: string;
+  tools?: any[];
+  source?: ToolSource;
+  runner?: string;
+  tools_count?: number;
+  readme?: string;
+  lastCommit?: {
+    date: string;
+    message: string;
+    author: {
+      name: string;
+      avatar?: string;
+    };
+  };
+  stars?: number;
+  id: string;
+  type: string;
+  isDiscovering: boolean;
+  loadingState: 'idle' | 'loading' | 'error' | 'success';
 } 

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listTools } from '@/app/api/sources/community/client';
+import { fetchCommunityTools } from '@/app/api/sources/community/client';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const tools = await listTools(request);
+    const tools = await fetchCommunityTools();
     return NextResponse.json(tools);
   } catch (error) {
-    console.error('Error listing tools:', error);
-    return NextResponse.json({ error: 'Failed to list tools' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch community tools' },
+      { status: 500 }
+    );
   }
 } 

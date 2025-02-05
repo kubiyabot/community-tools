@@ -10,13 +10,33 @@ interface CommunityTool {
   path: string;
   description: string;
   tools_count: number;
-  icon?: string;
+  icon_url?: string;
   readme?: string;
-  tools?: any[];
-  isDiscovering?: boolean;
+  tools: CommunityTool[];
+  isDiscovering: boolean;
   error?: string;
   lastUpdated?: string;
   stars?: number;
+  source?: {
+    name: string;
+    url: string;
+    metadata: {
+      git_branch: string;
+      last_updated: string;
+    };
+  };
+  lastCommit?: {
+    sha: string;
+    date: string;
+    message: string;
+    author: {
+      name: string;
+      avatar?: string;
+    };
+  };
+  id: string;
+  type: string;
+  loadingState: 'idle' | 'loading' | 'error' | 'success';
 }
 
 const CACHE_KEY = 'community_tools_cache';
@@ -303,11 +323,32 @@ export async function GET(req: NextRequest) {
             path: dir.path,
             description: summary || (matchedTool ? TOOL_DESCRIPTIONS[matchedTool] : `Tools for ${dir.name}`),
             tools_count: 0,
-            icon: matchedTool ? TOOL_ICONS[matchedTool] : '',
+            icon_url: matchedTool ? TOOL_ICONS[matchedTool] : '',
             readme,
+            id: dir.name,
+            type: 'community',
             isDiscovering: false,
+            loadingState: 'idle' as const,
             lastUpdated: repoInfo?.updated_at,
-            stars: repoInfo?.stargazers_count
+            stars: repoInfo?.stargazers_count,
+            source: {
+              name: dir.name,
+              url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
+              metadata: {
+                git_branch: 'main',
+                last_updated: repoInfo?.updated_at
+              }
+            },
+            lastCommit: repoInfo?.commit ? {
+              sha: repoInfo.commit.sha,
+              date: repoInfo.updated_at,
+              message: repoInfo.commit.message,
+              author: {
+                name: repoInfo.commit.author?.name || 'Unknown',
+                avatar: repoInfo.commit.author?.avatar_url
+              }
+            } : undefined,
+            tools: []
           };
         } catch (error) {
           console.error(`Error processing ${dir.name}:`, error);
@@ -317,8 +358,29 @@ export async function GET(req: NextRequest) {
             path: dir.path,
             description: TOOL_DESCRIPTIONS[dirName] || `Tools for ${dir.name}`,
             tools_count: 0,
-            icon: TOOL_ICONS[dirName] || '',
-            isDiscovering: false
+            icon_url: TOOL_ICONS[dirName] || '',
+            id: dir.name,
+            type: 'community',
+            isDiscovering: false,
+            loadingState: 'idle' as const,
+            source: {
+              name: dir.name,
+              url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
+              metadata: {
+                git_branch: 'main',
+                last_updated: repoInfo?.updated_at
+              }
+            },
+            lastCommit: repoInfo?.commit ? {
+              sha: repoInfo.commit.sha,
+              date: repoInfo.updated_at,
+              message: repoInfo.commit.message,
+              author: {
+                name: repoInfo.commit.author?.name || 'Unknown',
+                avatar: repoInfo.commit.author?.avatar_url
+              }
+            } : undefined,
+            tools: []
           };
         }
       })

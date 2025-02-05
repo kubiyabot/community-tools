@@ -1,26 +1,20 @@
 'use server';
 
-import { CommunityTool } from './types';
+import type { CommunityTool } from '@/app/types/tool';
 import { NextRequest } from 'next/server';
 
-export async function listTools(request?: NextRequest): Promise<CommunityTool[]> {
-  try {
-    const response = await fetch('/api/sources/community', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch tools');
+export async function fetchCommunityTools(): Promise<CommunityTool[]> {
+  const response = await fetch('/api/v1/sources/community', {
+    headers: {
+      'Cache-Control': 'max-age=3600', // Cache for 1 hour
     }
-
-    return response.json();
-  } catch (error) {
-    console.error('Error listing tools:', error);
-    return [];
+  });
+  
+  if (!response.ok) {
+    throw new Error(`Failed to fetch community tools: ${response.statusText}`);
   }
+  
+  return response.json();
 }
 
 export async function getToolMetadata(path: string, request?: NextRequest): Promise<any> {
