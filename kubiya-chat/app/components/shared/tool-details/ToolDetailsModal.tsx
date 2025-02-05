@@ -305,7 +305,7 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
   const [isMermaidLoading, setIsMermaidLoading] = useState(false);
   const [mermaidRenderAttempts, setMermaidRenderAttempts] = useState(0);
   const [mermaidLoadingState, setMermaidLoadingState] = useState<'idle' | 'loading' | 'error' | 'success'>('idle');
-  const mermaidTimeoutRef = useRef<NodeJS.Timeout>();
+  const mermaidTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Debug logging for tool data
   useEffect(() => {
