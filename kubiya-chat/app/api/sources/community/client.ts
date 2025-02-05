@@ -3,9 +3,28 @@
 import { CommunityTool } from './types';
 import { NextRequest } from 'next/server';
 
+function getBaseUrl() {
+  // First try VERCEL_URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  // Then try NEXT_PUBLIC_APP_URL
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL;
+  }
+  
+  // Finally, fallback to localhost
+  return process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:3000'
+    : 'https://localhost:3000';
+}
+
 // Helper function to handle fetch with retries and timeouts
-async function safeFetch(url: string, options: RequestInit = {}, maxRetries = 3) {
+async function safeFetch(path: string, options: RequestInit = {}, maxRetries = 3) {
   let lastError;
+  const baseUrl = getBaseUrl();
+  const url = new URL(path, baseUrl).toString();
   
   for (let i = 0; i < maxRetries; i++) {
     try {
