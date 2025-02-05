@@ -95,18 +95,27 @@ parse_json() {
     
     # Try to parse with jq, handling null values
     local jq_script="
-        def handle_null:
-            if . == null then
+        # Helper to safely traverse paths
+        def get_path(p):
+            . as \$root |
+            try
+                reduce (p | split(\".\")) as \$key (
+                    \$root;
+                    if \$key == \"\" then .
+                    elif . == null then null
+                    else .[\$key] // null
+                    end
+                )
+            catch
                 null
-            elif type == \"object\" then
-                if length == 0 then null else . end
-            elif type == \"array\" then
-                if length == 0 then null else . end
-            else
-                .
             end;
-        
-        $query | handle_null
+
+        # Main query with safe traversal
+        if \"$query\" == \".\" then
+            .
+        else
+            get_path(\"$query\")
+        end
     "
     
     local result
