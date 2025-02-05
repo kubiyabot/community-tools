@@ -7,6 +7,8 @@ import { Button } from "@/app/components/ui/button";
 import { ScrollArea } from "@/app/components/ui/scroll-area";
 import { Badge } from "@/app/components/ui/badge";
 import Editor from '@monaco-editor/react';
+import type { EditorProps } from '@monaco-editor/react';
+import type { editor } from 'monaco-editor';
 import { cn } from "@/lib/utils";
 import {
   X,
@@ -49,7 +51,7 @@ import { toast } from '@/app/components/use-toast';
 import { Tool } from '@/app/types/tool';
 import { TeammateAPI } from '@/app/api/teammates/client';
 import { Separator } from "@/app/components/ui/separator";
-import type { SourceInfo } from "@/app/types/source";
+import type { SourceInfo, SourceError } from "@/app/types/source";
 import Mermaid from '@/app/components/ui/mermaid';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/app/components/ui/hover-card";
 import { format } from 'date-fns';
@@ -294,6 +296,26 @@ const MermaidErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   }
 
   return <>{children}</>;
+};
+
+// Update the editor options type
+const editorOptions: editor.IStandaloneEditorConstructionOptions = {
+  minimap: { enabled: false },
+  fontSize: 12,
+  lineNumbers: "on",
+  scrollBeyondLastLine: false,
+  wordWrap: "on",
+  wrappingIndent: "indent",
+  automaticLayout: true,
+  readOnly: true,
+  scrollbar: {
+    vertical: 'visible',
+    horizontal: 'visible',
+    verticalScrollbarSize: 10,
+    horizontalScrollbarSize: 10
+  },
+  fontFamily: 'JetBrains Mono, Menlo, Monaco, Consolas, monospace',
+  fontLigatures: true
 };
 
 export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, tool, source }: ToolDetailsModalProps) {
@@ -779,6 +801,84 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
 
               {/* Flow Diagram */}
               {tool.mermaid && renderMermaidDiagram()}
+
+              {/* Source Errors */}
+              {source?.errors && source.errors.length > 0 && (
+                <div className={cn(modalStyles.cards.container, "space-y-4")}>
+                  <h3 className={cn(modalStyles.text.subtitle, "flex items-center gap-2")}>
+                    <AlertCircle className="h-5 w-5 text-red-400" />
+                    Source Errors
+                  </h3>
+                  <div className="space-y-4">
+                    {source.errors.map((error: SourceError, idx: number) => (
+                      <div key={idx} className="bg-red-500/10 border border-red-500/20 rounded-lg overflow-hidden">
+                        <div className="p-4 space-y-3">
+                          {/* File Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {getFileIcon(error.file)}
+                              <span className="font-mono text-sm text-red-400">{error.file}</span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                              onClick={() => {
+                                // Find the file in the file tree and select it
+                                const fileNode = fileTree.children?.find(node => 
+                                  node.type === 'file' && node.path === error.file
+                                );
+                                if (fileNode) {
+                                  setSelectedFile(fileNode);
+                                  setActiveTab('code');
+                                }
+                              }}
+                            >
+                              <Code className="h-4 w-4 mr-1.5" />
+                              View Code
+                            </Button>
+                          </div>
+
+                          {/* Error Message */}
+                          <div className="space-y-2">
+                            <div className="text-sm text-red-400 font-medium">
+                              {error.error.split('\n').map((line: string, i: number) => (
+                                <div key={i} className="line-clamp-2">{line}</div>
+                              ))}
+                            </div>
+                            {error.details && (
+                              <div className="text-xs text-red-300/70 border-t border-red-500/20 pt-2 mt-2">
+                                {error.details}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Code Preview */}
+                        {fileTree.children?.find(node => 
+                          node.type === 'file' && 
+                          node.path === error.file && 
+                          node.content
+                        )?.content && (
+                          <div className="border-t border-red-500/20">
+                            <Editor
+                              height="150px"
+                              theme="vs-dark"
+                              defaultLanguage="plaintext"
+                              language={getLanguageFromExtension(error.file.split('.').pop()) || 'plaintext'}
+                              value={fileTree.children.find(node => 
+                                node.type === 'file' && 
+                                node.path === error.file
+                              )?.content || ''}
+                              options={editorOptions}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </ScrollArea>
         );

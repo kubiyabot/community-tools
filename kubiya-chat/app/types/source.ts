@@ -7,12 +7,18 @@ export interface KubiyaMetadata {
   user_last_updated: string;
 }
 
+export interface SourceError {
+  file: string;
+  error: string;
+  details?: string;
+}
+
 export interface SourceMeta {
   id: string;
   url: string;
-  commit: string;
-  committer: string;
-  branch: string;
+  commit?: string;
+  committer?: string;
+  branch?: string;
   repository?: string;
   owner?: string;
   repo?: string;
@@ -23,15 +29,19 @@ export interface DynamicConfig {
 }
 
 export interface SourceInfo {
+  id: string;
+  name: string;
+  url?: string;
+  source_meta?: SourceMeta;
+  errors?: SourceError[];
+  dynamic_config?: any;
+  runner?: string;
+  error?: string;
   uuid: string;
   sourceId: string;
-  name: string;
-  url: string;
   type: string;
-  runner: string;
   tools: any[];
   isLoading?: boolean;
-  error?: string;
   connected_agents_count: number;
   connected_tools_count: number;
   connected_workflows_count: number;
@@ -42,14 +52,6 @@ export interface SourceInfo {
     user_last_updated: string;
   };
   errors_count: number;
-  source_meta: {
-    id: string;
-    url: string;
-    branch: string;
-    commit: string;
-    committer: string;
-  };
-  dynamic_config: any;
   managed_by: string;
   task_id: string;
 } 
