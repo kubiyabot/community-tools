@@ -13,31 +13,16 @@ class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Add truncation helper functions
         truncation_helpers = """
-#!/bin/bash
-# Ensure we're running in bash
-if [ -z "$BASH_VERSION" ]; then
-    echo "❌ Error: This script requires bash" >&2
-    exit 1
-fi
-
-# Set global constants with proper error handling
-set -e  # Exit on error
-set -u  # Exit on undefined variables
-set -o pipefail  # Exit on pipe failures
-
-# Set proper field separator
-IFS=$'\\n\\t'
-
-# Export constants with proper quoting
-export MAX_ITEMS='50'
-export MAX_OUTPUT_WIDTH='120'
-export MAX_EVENTS='25'
-export MAX_LOGS='1000'
+# Set global constants
+export MAX_ITEMS=50
+export MAX_OUTPUT_WIDTH=120
+export MAX_EVENTS=25
+export MAX_LOGS=1000
 
 # Truncation helper functions
 truncate_output() {
-    local max_items="${1:-$MAX_ITEMS}"
-    local max_width="${2:-$MAX_OUTPUT_WIDTH}"
+    local max_items=${1:-$MAX_ITEMS}
+    local max_width=${2:-$MAX_OUTPUT_WIDTH}
     
     awk -v max_items="$max_items" -v max_width="$max_width" '
     NR <= max_items {
@@ -65,16 +50,16 @@ get_logs_with_range() {
     local previous="${8:-}"
     
     # Validate required parameters
-    if [[ -z "$namespace" || -z "$pod_name" ]]; then
+    if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
         echo "❌ Error: namespace and pod_name are required" >&2
         return 1
     fi
     
     # Build base log command with proper quoting
-    local log_cmd="kubectl logs \\"${pod_name}\\" -n \\"${namespace}\\""
-    [[ -n "$container" ]] && log_cmd="$log_cmd -c \\"${container}\\""
-    [[ -n "$since" ]] && log_cmd="$log_cmd --since=\\"${since}\\""
-    [[ -n "$previous" ]] && log_cmd="$log_cmd --previous"
+    local log_cmd="kubectl logs '$pod_name' -n '$namespace'"
+    [ -n "$container" ] && log_cmd="$log_cmd -c '$container'"
+    [ -n "$since" ] && log_cmd="$log_cmd --since='$since'"
+    [ -n "$previous" ] && log_cmd="$log_cmd --previous"
     
     # Verify pod exists before proceeding
     if ! kubectl get pod "$pod_name" -n "$namespace" >/dev/null 2>&1; then
@@ -83,25 +68,35 @@ get_logs_with_range() {
     fi
     
     # If tail_lines is specified, it takes precedence over start/end lines
-    if [[ -n "$tail_lines" ]]; then
-        if ! [[ "$tail_lines" =~ ^[0-9]+$ ]]; then
-            echo "❌ Error: tail_lines must be a positive integer" >&2
-            return 1
-        fi
+    if [ -n "$tail_lines" ]; then
+        case "$tail_lines" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: tail_lines must be a positive integer" >&2
+                return 1
+                ;;
+        esac
         log_cmd="$log_cmd --tail=$tail_lines"
         eval "$log_cmd" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return ${PIPESTATUS[0]}
+        return $?
     fi
     
     # If both start and end lines are specified, use sed to extract the range
-    if [[ -n "$start_line" ]] && [[ -n "$end_line" ]]; then
+    if [ -n "$start_line" ] && [ -n "$end_line" ]; then
         # Validate line numbers
-        if ! [[ "$start_line" =~ ^[0-9]+$ ]] || ! [[ "$end_line" =~ ^[0-9]+$ ]]; then
-            echo "❌ Error: start_line and end_line must be positive integers" >&2
-            return 1
-        fi
+        case "$start_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: start_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        case "$end_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: end_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
         
-        if [[ "$start_line" -gt "$end_line" ]]; then
+        if [ "$start_line" -gt "$end_line" ]; then
             echo "❌ Error: start_line ($start_line) cannot be greater than end_line ($end_line)" >&2
             return 1
         fi
@@ -110,56 +105,68 @@ get_logs_with_range() {
         local range_size=$((end_line - start_line + 1))
         
         # If range is larger than MAX_LOGS, warn and adjust
-        if [[ "$range_size" -gt "$MAX_LOGS" ]]; then
+        if [ "$range_size" -gt "$MAX_LOGS" ]; then
             echo "⚠️  Warning: Requested range ($range_size lines) exceeds maximum allowed ($MAX_LOGS lines)" >&2
             echo "    Showing first $MAX_LOGS lines of the range" >&2
             end_line=$((start_line + MAX_LOGS - 1))
         fi
         
         eval "$log_cmd" | sed -n "${start_line},${end_line}p" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return ${PIPESTATUS[0]}
+        return $?
     # If only start line is specified, show from that line to MAX_LOGS
-    elif [[ -n "$start_line" ]]; then
-        if ! [[ "$start_line" =~ ^[0-9]+$ ]]; then
-            echo "❌ Error: start_line must be a positive integer" >&2
-            return 1
-        fi
+    elif [ -n "$start_line" ]; then
+        case "$start_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: start_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
         eval "$log_cmd" | tail -n "+$start_line" | head -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return ${PIPESTATUS[0]}
+        return $?
     # If only end line is specified, show last N lines up to that line
-    elif [[ -n "$end_line" ]]; then
-        if ! [[ "$end_line" =~ ^[0-9]+$ ]]; then
-            echo "❌ Error: end_line must be a positive integer" >&2
-            return 1
-        fi
+    elif [ -n "$end_line" ]; then
+        case "$end_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: end_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
         eval "$log_cmd" | head -n "$end_line" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return ${PIPESTATUS[0]}
+        return $?
     # If no range specified, use default MAX_LOGS
     else
         eval "$log_cmd" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return ${PIPESTATUS[0]}
+        return $?
     fi
 }
 
 # Wrapper for kubectl commands with truncation and improved error handling
 kubectl_with_truncation() {
     local cmd="$1"
-    local max_items="${2:-$MAX_ITEMS}"
-    local max_width="${3:-$MAX_OUTPUT_WIDTH}"
+    local max_items=${2:-$MAX_ITEMS}
+    local max_width=${3:-$MAX_OUTPUT_WIDTH}
     
-    if [[ -z "$cmd" ]]; then
+    if [ -z "$cmd" ]; then
         echo "❌ Error: Command is required" >&2
         return 1
     fi
     
     # Validate numeric parameters
-    if ! [[ "$max_items" =~ ^[0-9]+$ ]] || ! [[ "$max_width" =~ ^[0-9]+$ ]]; then
-        echo "❌ Error: max_items and max_width must be positive integers" >&2
-        return 1
-    fi
+    case "$max_items" in
+        ''|*[!0-9]*) 
+            echo "❌ Error: max_items must be a positive integer" >&2
+            return 1
+            ;;
+    esac
+    case "$max_width" in
+        ''|*[!0-9]*) 
+            echo "❌ Error: max_width must be a positive integer" >&2
+            return 1
+            ;;
+    esac
     
     eval "$cmd" | truncate_output "$max_items" "$max_width"
-    return ${PIPESTATUS[0]}
+    return $?
 }
 
 # Helper function to format events with truncation and improved error handling
@@ -169,12 +176,12 @@ format_events() {
     local resource_type="$3"
     
     # Validate required parameters
-    if [[ -z "$namespace" || -z "$resource_name" || -z "$resource_type" ]]; then
+    if [ -z "$namespace" ] || [ -z "$resource_name" ] || [ -z "$resource_type" ]; then
         echo "❌ Error: namespace, resource_name, and resource_type are required" >&2
         return 1
     fi
     
-    echo -e "\\n📜 Recent Events:"
+    printf "\\n📜 Recent Events:\\n"
     echo "==============="
     kubectl get events --namespace "$namespace" \
         --field-selector "involvedObject.name=$resource_name,involvedObject.kind=$resource_type" \
@@ -188,7 +195,7 @@ format_events() {
         else if ($7 ~ /Normal/) emoji = "ℹ️"
         print emoji, $0
     }' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-    return ${PIPESTATUS[0]}
+    return $?
 }
 
 # Helper function to show resource status with truncation and improved error handling
@@ -198,12 +205,12 @@ show_resource_status() {
     local name="$3"
     
     # Validate required parameters
-    if [[ -z "$cmd" || -z "$resource_type" || -z "$name" ]]; then
+    if [ -z "$cmd" ] || [ -z "$resource_type" ] || [ -z "$name" ]; then
         echo "❌ Error: cmd, resource_type, and name are required" >&2
         return 1
     fi
     
-    echo -e "\\n📊 $resource_type Status:"
+    printf "\\n📊 %s Status:\\n" "$resource_type"
     echo "===================="
     if ! kubectl_with_truncation "$cmd" "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"; then
         echo "❌ Failed to get $resource_type status" >&2
@@ -214,49 +221,34 @@ show_resource_status() {
 """
 
         inject_kubernetes_context = """
-#!/bin/bash
-# Ensure we're running in bash
-if [ -z "$BASH_VERSION" ]; then
-    echo "❌ Error: This script requires bash" >&2
-    exit 1
-fi
-
-# Set strict error handling
-set -e  # Exit on error
-set -u  # Exit on undefined variables
-set -o pipefail  # Exit on pipe failures
-
-# Set proper field separator
-IFS=$'\\n\\t'
-
-# Define locations with proper quoting
+# Define locations
 TOKEN_LOCATION="/tmp/kubernetes_context_token"
 CERT_LOCATION="/tmp/kubernetes_context_cert"
 
 # Verify required files exist and are readable
-if [[ ! -f "$TOKEN_LOCATION" ]]; then
+if [ ! -f "$TOKEN_LOCATION" ]; then
     echo "❌ Error: Kubernetes token file not found at $TOKEN_LOCATION" >&2
     exit 1
 fi
 
-if [[ ! -f "$CERT_LOCATION" ]]; then
+if [ ! -f "$CERT_LOCATION" ]; then
     echo "❌ Error: Kubernetes certificate file not found at $CERT_LOCATION" >&2
     exit 1
 fi
 
-if [[ ! -r "$TOKEN_LOCATION" ]]; then
+if [ ! -r "$TOKEN_LOCATION" ]; then
     echo "❌ Error: Kubernetes token file is not readable at $TOKEN_LOCATION" >&2
     exit 1
 fi
 
-if [[ ! -r "$CERT_LOCATION" ]]; then
+if [ ! -r "$CERT_LOCATION" ]; then
     echo "❌ Error: Kubernetes certificate file is not readable at $CERT_LOCATION" >&2
     exit 1
 fi
 
 # Read token securely
-KUBE_TOKEN="$(cat "$TOKEN_LOCATION")"
-if [[ -z "$KUBE_TOKEN" ]]; then
+KUBE_TOKEN=$(cat "$TOKEN_LOCATION")
+if [ -z "$KUBE_TOKEN" ]; then
     echo "❌ Error: Kubernetes token file is empty" >&2
     exit 1
 fi
