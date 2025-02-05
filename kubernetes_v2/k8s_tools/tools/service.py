@@ -189,7 +189,6 @@ service_metrics_tool = KubernetesTool(
 
 # Register all tools
 for tool in [
-    service_tool,
     service_inspect_tool,
     service_test_tool,
     service_metrics_tool,

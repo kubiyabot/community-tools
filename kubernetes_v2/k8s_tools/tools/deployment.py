@@ -95,7 +95,6 @@ deployment_describe_tool = KubernetesTool(
 )
 
 for tool in [
-    deployment_tool,
     scale_deployment_tool,
     deployment_rollout_tool,
     deployment_describe_tool,

@@ -571,5 +571,5 @@ pod_network_topology_tool = KubernetesTool(
 )
 
 # Register tools
-for tool in [pod_management_tool, pod_restart_tool, pod_logs_tool, pod_network_topology_tool]:
+for tool in [pod_restart_tool, pod_logs_tool, pod_network_topology_tool]:
     tool_registry.register("kubernetes", tool)
