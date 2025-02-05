@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, useCallback } from 'react';
-import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Hash, Box, Dock, AlertCircle, Plus, Search, Info, Trash2 } from 'lucide-react';
+import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Hash, Box, Dock, AlertCircle, Plus, Search, Info, Trash2, FileCode, FileJson, FileText, File } from 'lucide-react';
 import type { Tool as SourceTool } from '@/app/types/tool';
 import type { TeammateDetails } from '@/app/types/teammate';
 import type { SourceInfo } from '@/app/types/source';
@@ -167,6 +167,26 @@ const sourceFormSchema = z.object({
 });
 
 type SourceFormValues = z.infer<typeof sourceFormSchema>;
+
+// Add helper functions before components
+function getFileIcon(filename: string) {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'py':
+    case 'js':
+    case 'ts':
+    case 'jsx':
+    case 'tsx':
+      return <FileCode className="h-4 w-4 text-blue-400" />;
+    case 'json':
+      return <FileJson className="h-4 w-4 text-yellow-400" />;
+    case 'md':
+    case 'txt':
+      return <FileText className="h-4 w-4 text-gray-400" />;
+    default:
+      return <File className="h-4 w-4 text-gray-400" />;
+  }
+}
 
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center h-[400px] p-6">
@@ -568,22 +588,45 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                             {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
                           </Badge>
                         </TooltipTrigger>
-                        <TooltipContent className="w-80 bg-[#1E293B] border border-red-500/20 p-3">
-                          <div className="space-y-2">
-                            <h5 className="text-sm font-medium text-white flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 text-red-400" />
-                              Source Errors
-                            </h5>
+                        <TooltipContent className="w-96 bg-[#1E293B] border border-red-500/20 p-3">
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between">
+                              <h5 className="text-sm font-medium text-white flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-red-400" />
+                                Source Errors
+                              </h5>
+                              <Badge variant="outline" className="bg-[#2A3347] border-[#2D3B4E] text-[#94A3B8]">
+                                Click tool card for code details
+                              </Badge>
+                            </div>
                             <div className="space-y-2 max-h-60 overflow-y-auto">
                               {source.errors?.map((error: any, index: number) => (
-                                <div key={index} className="text-xs bg-red-500/10 rounded-md p-2 border border-red-500/20">
-                                  <div className="font-medium text-red-400">{error.file}</div>
-                                  <div className="text-red-300">{error.error}</div>
+                                <div 
+                                  key={index} 
+                                  className="text-xs bg-red-500/10 rounded-md p-2 border border-red-500/20 space-y-1.5"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {getFileIcon(error.file)}
+                                    <span className="font-mono text-red-400">{error.file}</span>
+                                  </div>
+                                  <div className="text-red-300 pl-6">
+                                    {error.error.split('\n').map((line: string, i: number) => (
+                                      <div key={i} className="line-clamp-2">
+                                        {line}
+                                      </div>
+                                    ))}
+                                  </div>
                                   {error.details && (
-                                    <div className="mt-1 text-red-300/80 text-[11px]">{error.details}</div>
+                                    <div className="text-red-300/70 text-[11px] pl-6 pt-1 border-t border-red-500/20">
+                                      {error.details}
+                                    </div>
                                   )}
                                 </div>
                               ))}
+                            </div>
+                            <div className="text-[11px] text-[#94A3B8] flex items-center gap-1.5 pt-2 border-t border-[#2D3B4E]">
+                              <Info className="h-3.5 w-3.5" />
+                              Click on any tool card to view detailed code and error locations
                             </div>
                           </div>
                         </TooltipContent>
@@ -1161,29 +1204,20 @@ export function SourcesTab({
     try {
       setSyncingSourceIds(prev => new Set([...prev, sourceId]));
       
-      // Find the source to get its dynamic_config and runner
+      // Find the source to get its dynamic_config
       const source = sources.find(s => s.uuid === sourceId);
       if (!source) {
         throw new Error('Source not found');
       }
 
-      const payload: SyncPayload = {
-        name: source.name,
-        url: source.url,
-        ...(source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && {
-          dynamic_config: source.dynamic_config
-        }),
-        ...(source.runner && source.runner !== 'automatic' && {
-          runner: source.runner
-        })
-      };
-      
       const response = await fetch(`/api/sources/${source.uuid}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ 
+          dynamic_config: source.dynamic_config || null 
+        })
       });
 
       if (!response.ok) {

@@ -108,13 +108,13 @@ export async function POST(
       'X-Kubiya-Client': 'chat-ui'
     };
 
+    // Extract dynamic_config from body or default to null
+    const dynamic_config = body?.dynamic_config ?? null;
+
     const response = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}`, {
       method: 'PUT',
       headers: apiHeaders,
-      body: JSON.stringify({
-        ...body,
-        action: 'sync'
-      })
+      body: JSON.stringify({ dynamic_config })
     });
 
     if (!response.ok) {
