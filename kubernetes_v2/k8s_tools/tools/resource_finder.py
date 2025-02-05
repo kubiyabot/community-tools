@@ -1,4 +1,5 @@
 from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import FileSpec
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 import os
