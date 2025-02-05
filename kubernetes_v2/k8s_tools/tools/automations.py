@@ -2,13 +2,64 @@ from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# Constants for output limiting
+MAX_OUTPUT_LINES = 100
+MAX_EVENTS = 25
+MAX_LOG_LINES = 1000
+
+# Common function to handle output limiting and filtering
+COMMON_FUNCTIONS = '''
+# Function to handle output with limits and filtering
+show_output() {
+    local content="$1"
+    local description="$2"
+    local max_lines="$3"
+    local temp_file=$(mktemp)
+    
+    echo "$content" > "$temp_file"
+    
+    # Apply grep filter if provided
+    if [ ! -z "$grep_filter" ]; then
+        echo "🔍 Filtering $description with: $grep_filter"
+        filtered_output=$(cat "$temp_file" | grep -i "$grep_filter" || true)
+        if [ -z "$filtered_output" ]; then
+            echo "⚠️ No matches found for filter: $grep_filter"
+            rm "$temp_file"
+            return
+        fi
+        echo "$filtered_output" > "$temp_file"
+        filtered_lines=$(wc -l < "$temp_file")
+        echo "Found $filtered_lines matching entries"
+    fi
+    
+    # Show header if present
+    if head -n 1 "$temp_file" | grep -q "NAME\\|NAMESPACE\\|STATUS\\|AGE"; then
+        head -n 1 "$temp_file"
+        tail -n +2 "$temp_file" | head -n "$max_lines"
+    else
+        head -n "$max_lines" "$temp_file"
+    fi
+    
+    # Show truncation message if needed
+    total_lines=$(wc -l < "$temp_file")
+    if [ $total_lines -gt "$max_lines" ]; then
+        echo ""
+        echo "⚠️ Output truncated (showing $max_lines of $total_lines lines)"
+        echo "💡 Use grep_filter to narrow down results"
+    fi
+    
+    rm "$temp_file"
+}
+'''
 
 change_replicas_tool = KubernetesTool(
     name="change_replicas",
     description="Modifies the number of replicas for a specific Kubernetes resource like deployments or statefulsets. Use this to scale up or down a resource.",
-    content="""
+    content=f'''
     #!/bin/bash
     set -e
+
+    {COMMON_FUNCTIONS}
 
     # Check if namespace is provided, exit if not
     if [ -z "$namespace" ]; then
@@ -22,43 +73,38 @@ change_replicas_tool = KubernetesTool(
     # Attempt to scale the resource
     if kubectl scale "$resource_type/$resource_name" --replicas="$replicas" $namespace_flag; then
         echo "✅ Successfully changed replicas for $resource_type/$resource_name to $replicas in namespace $namespace"
+        
+        # Show current status
+        echo -e "\\n📊 Current Resource Status:"
+        status_output=$(kubectl get "$resource_type/$resource_name" $namespace_flag -o wide)
+        show_output "$status_output" "resource status" $MAX_OUTPUT_LINES
+        
+        # Show recent events
+        echo -e "\\n📅 Recent Events:"
+        events_output=$(kubectl get events $namespace_flag --field-selector "involvedObject.name=$resource_name,involvedObject.kind=$resource_type" --sort-by='.lastTimestamp')
+        show_output "$events_output" "events" $MAX_EVENTS
     else
         echo "❌ Failed to change replicas for $resource_type/$resource_name in namespace $namespace"
         exit 1
     fi
-    """,
+    ''',
     args=[
-        Arg(
-            name="resource_type",
-            type="str",
-            description="Type of resource (e.g., deployment, statefulset)",
-            required=True,
-        ),
-        Arg(
-            name="resource_name",
-            type="str",
-            description="Name of the resource",
-            required=True,
-        ),
-        Arg(
-            name="replicas", type="int", description="Number of replicas", required=True
-        ),
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace",
-            required=True,
-        ),
+        Arg(name="resource_type", type="str", description="Type of resource (e.g., deployment, statefulset)", required=True),
+        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
+        Arg(name="replicas", type="int", description="Number of replicas", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
     ],
 )
-
 
 get_resource_events_tool = KubernetesTool(
     name="get_resource_events",
     description="Fetches the last events for a Kubernetes resource in a specific namespace",
-    content="""
+    content=f'''
     #!/bin/bash
     set -e
+
+    {COMMON_FUNCTIONS}
 
     # Check if namespace is provided, exit if not
     if [ -z "$namespace" ]; then
@@ -71,45 +117,50 @@ get_resource_events_tool = KubernetesTool(
 
     # Check if resource exists and fetch events
     if kubectl get "$resource_type" "$resource_name" $namespace_flag > /dev/null 2>&1; then
-        events=$(kubectl describe "$resource_type" "$resource_name" $namespace_flag | sed -n '/Events:/,$p')
-        if [ -z "$events" ]; then
-            echo "📅 No events found for $resource_type/$resource_name in namespace $namespace"
-        else
-            echo "📅 Events for $resource_type/$resource_name in namespace $namespace:"
-            echo "$events" | sed 's/^/  /'
-        fi
+        echo "📅 Events for $resource_type/$resource_name in namespace $namespace:"
+        
+        # Get events with sorting and formatting
+        events_output=$(kubectl get events $namespace_flag \\
+            --field-selector "involvedObject.name=$resource_name,involvedObject.kind=$resource_type" \\
+            --sort-by='.lastTimestamp' | \\
+            awk '{{
+                if (NR==1) print $0;
+                else {{
+                    type=$7;
+                    emoji="ℹ️";
+                    if (type == "Warning") emoji="⚠️";
+                    else if (type == "Normal") emoji="✅";
+                    print "  " emoji " " $0;
+                }}
+            }}')
+        
+        show_output "$events_output" "events" $MAX_EVENTS
+        
+        # Show resource status
+        echo -e "\\n📊 Current Resource Status:"
+        status_output=$(kubectl get "$resource_type" "$resource_name" $namespace_flag -o wide)
+        show_output "$status_output" "resource status" $MAX_OUTPUT_LINES
     else
         echo "❗Error: $resource_type/$resource_name not found in namespace $namespace"
+        exit 1
     fi
-    """,
+    ''',
     args=[
-        Arg(
-            name="resource_type",
-            type="str",
-            description="Type of resource (e.g., pod, deployment)",
-            required=True,
-        ),
-        Arg(
-            name="resource_name",
-            type="str",
-            description="Name of the resource",
-            required=True,
-        ),
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace",
-            required=True,
-        ),  # Marked as required
+        Arg(name="resource_type", type="str", description="Type of resource (e.g., pod, deployment)", required=True),
+        Arg(name="resource_name", type="str", description="Name of the resource", required=True),
+        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
     ],
 )
 
 get_pod_logs_tool = KubernetesTool(
     name="get_pod_logs",
     description="Fetches logs for a Kubernetes pod with automatic fallback to previous logs if pod not found",
-    content="""
+    content=f'''
     #!/bin/bash
     set -e
+
+    {COMMON_FUNCTIONS}
 
     # Validate required inputs
     if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
@@ -117,68 +168,91 @@ get_pod_logs_tool = KubernetesTool(
         exit 1
     fi
 
-    # First attempt: Get current logs
-    logs=$(kubectl logs -n "$namespace" "$pod_name" 2>&1 || echo "Error: $?")
-
-    # Check for errors and try fallback if needed
-    if echo "$logs" | grep -q "Error from server (NotFound)" || echo "$logs" | grep -q "Error"; then
-        echo "⚠️ Could not fetch current logs, attempting to fetch previous logs..."
+    # Function to get and format logs
+    get_logs() {{
+        local cmd="$1"
+        local log_type="$2"
+        local temp_file=$(mktemp)
         
-        # Second attempt: Try with --previous flag
-        previous_logs=$(kubectl logs -n "$namespace" "$pod_name" --previous 2>&1 || echo "Error: $?")
-        
-        if echo "$previous_logs" | grep -q "Error from server (NotFound)"; then
-            echo "❗Pod '$pod_name' not found in namespace '$namespace' (both current and previous)"
-        elif echo "$previous_logs" | grep -q "Error"; then
-            echo "❗Error getting logs (both current and previous): $previous_logs"
+        if eval "$cmd" > "$temp_file" 2>/dev/null; then
+            echo "📜 $log_type logs for $pod_name in $namespace:"
+            show_output "$(cat "$temp_file")" "$log_type logs" $MAX_LOG_LINES
         else
-            echo "📜 Previous logs for $pod_name in $namespace:"
-            echo "$previous_logs" | sed 's/^/  /'
+            echo "❗Error getting $log_type logs: $(cat "$temp_file")"
         fi
+        
+        rm "$temp_file"
+    }}
+
+    # First attempt: Get current logs
+    if kubectl get pod -n "$namespace" "$pod_name" >/dev/null 2>&1; then
+        # Show pod status first
+        echo "📊 Pod Status:"
+        status_output=$(kubectl get pod -n "$namespace" "$pod_name" -o wide)
+        show_output "$status_output" "pod status" $MAX_OUTPUT_LINES
+        
+        echo -e "\\n📜 Pod Logs:"
+        get_logs "kubectl logs -n '$namespace' '$pod_name'" "current"
     else
-        echo "📜 Current logs for $pod_name in $namespace:"
-        echo "$logs" | sed 's/^/  /'
+        echo "⚠️ Pod '$pod_name' not found, attempting to fetch previous logs..."
+        get_logs "kubectl logs -n '$namespace' '$pod_name' --previous" "previous"
     fi
-    """,
+    ''',
     args=[
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace",
-            required=True,
-        ),
+        Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
         Arg(name="pod_name", type="str", description="Name of the pod", required=True),
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
     ],
 )
-
 
 node_status_tool = KubernetesTool(
     name="node_status",
     description="Lists Kubernetes nodes with their status and emojis",
-    content="""
+    content=f'''
     #!/bin/bash
     set -e
+
+    {COMMON_FUNCTIONS}
+
     echo "🖥️  Node Status:"
     echo "==============="
-    kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason | 
-    awk 'NR>1 {
-        status = $2;
-        emoji = "❓";
-        if (status == "Ready") emoji = "✅";
-        else if (status == "NotReady") emoji = "❌";
-        else if (status == "SchedulingDisabled") emoji = "🚫";
-        print "  " emoji " " $0;
-    }'
-    """,
-    args=[],
+    
+    # Get node status with detailed information
+    status_output=$(kubectl get nodes -o custom-columns=NAME:.metadata.name,STATUS:.status.conditions[-1].type,REASON:.status.conditions[-1].reason,CPU:.status.capacity.cpu,MEMORY:.status.capacity.memory | \\
+        awk '{{
+            if (NR==1) print $0;
+            else {{
+                status = $2;
+                emoji = "❓";
+                if (status == "Ready") emoji = "✅";
+                else if (status == "NotReady") emoji = "❌";
+                else if (status == "SchedulingDisabled") emoji = "🚫";
+                print "  " emoji " " $0;
+            }}
+        }}')
+    
+    show_output "$status_output" "node status" $MAX_OUTPUT_LINES
+    
+    # Show node conditions if any node is not ready
+    if echo "$status_output" | grep -q "NotReady\\|SchedulingDisabled"; then
+        echo -e "\\n⚠️  Node Conditions for Unhealthy Nodes:"
+        conditions_output=$(kubectl describe nodes | grep -A5 "Conditions:" | grep -B5 "NotReady=True")
+        show_output "$conditions_output" "node conditions" $MAX_OUTPUT_LINES
+    fi
+    ''',
+    args=[
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
+    ],
 )
 
 find_suspicious_errors_tool = KubernetesTool(
     name="find_suspicious_errors",
     description="Finds suspicious errors in a specific Kubernetes namespace or across all namespaces if 'all' is provided.",
-    content="""
-    #!/bin/sh
+    content=f'''
+    #!/bin/bash
     set -e
+
+    {COMMON_FUNCTIONS}
 
     # Namespace is required and either a specific namespace or 'all' for all namespaces
     if [ "$namespace" = "all" ]; then
@@ -190,41 +264,46 @@ find_suspicious_errors_tool = KubernetesTool(
     fi
 
     echo "========================================================="
-    kubectl get events $namespace_flag --sort-by=.metadata.creationTimestamp | 
-    grep -E "Error|Failed|CrashLoopBackOff|Evicted|OOMKilled" |
-    tail -n 20 | 
-    awk '{
-        if ($7 ~ /Error/) emoji = "❌";
-        else if ($7 ~ /Failed/) emoji = "💔";
-        else if ($7 ~ /CrashLoopBackOff/) emoji = "🔁";
-        else if ($7 ~ /Evicted/) emoji = "👉";
-        else if ($7 ~ /OOMKilled/) emoji = "💥";
-        else emoji = "⚠️";
-        print "  " emoji " " $0;
-    }'
+    
+    # Get and format error events
+    echo "⚠️  Recent Error Events:"
+    error_output=$(kubectl get events $namespace_flag --sort-by=.metadata.creationTimestamp | \\
+        grep -E "Error|Failed|CrashLoopBackOff|Evicted|OOMKilled" | \\
+        awk '{{
+            if ($7 ~ /Error/) emoji = "❌";
+            else if ($7 ~ /Failed/) emoji = "💔";
+            else if ($7 ~ /CrashLoopBackOff/) emoji = "🔁";
+            else if ($7 ~ /Evicted/) emoji = "👉";
+            else if ($7 ~ /OOMKilled/) emoji = "💥";
+            else emoji = "⚠️";
+            print "  " emoji " " $0;
+        }}')
+    
+    show_output "$error_output" "error events" $MAX_EVENTS
 
-    echo "\n⚠️  Pods with non-Running status:"
-    kubectl get pods $namespace_flag --field-selector status.phase!=Running | 
-    awk 'NR>1 {
-        status = $3;
-        emoji = "❓";
-        if (status == "Pending") emoji = "⏳";
-        else if (status == "Succeeded") emoji = "🎉";
-        else if (status == "Failed") emoji = "❌";
-        else if (status == "Unknown") emoji = "❔";
-        print "  " emoji " " $0;
-    }'
-    """,
+    # Get and format problematic pods
+    echo -e "\\n⚠️  Pods with non-Running status:"
+    pod_output=$(kubectl get pods $namespace_flag --field-selector status.phase!=Running | \\
+        awk '{{
+            if (NR==1) print $0;
+            else {{
+                status = $3;
+                emoji = "❓";
+                if (status == "Pending") emoji = "⏳";
+                else if (status == "Succeeded") emoji = "🎉";
+                else if (status == "Failed") emoji = "❌";
+                else if (status == "Unknown") emoji = "❔";
+                print "  " emoji " " $0;
+            }}
+        }}')
+    
+    show_output "$pod_output" "problematic pods" $MAX_OUTPUT_LINES
+    ''',
     args=[
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace to search for errors. Use 'all' to search in all namespaces.",
-            required=True,
-        ),
+        Arg(name="namespace", type="str", description="Kubernetes namespace to search for errors. Use 'all' to search in all namespaces.", required=True),
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
     ],
 )
-
 
 network_policy_analyzer_tool = KubernetesTool(
     name="network_policy_analyzer",
