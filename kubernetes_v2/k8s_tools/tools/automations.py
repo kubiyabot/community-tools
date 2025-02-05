@@ -2,68 +2,6 @@ from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
-find_resource_tool = KubernetesTool(
-    name="find_resource",
-    description="Searches for and lists Kubernetes resources based on type, namespace, labels, and other criteria. Use this for general resource discovery, not for checking specific deployment details.",
-    content="""
-    #!/bin/bash
-    set -e
-
-    # Ensure optional parameters are set to empty strings if not provided
-    namespace=${namespace:-}
-    label_selector=${label_selector:-}
-    field_selector=${field_selector:-}
-    search_term=${search_term:-}
-
-    # Use --all-namespaces if no specific namespace is provided
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
-
-    # Run kubectl command and filter by search_term if provided
-    result=$(kubectl get $resource_type $namespace_flag \
-    $( [ -n "$label_selector" ] && echo "-l $label_selector" ) \
-    $( [ -n "$field_selector" ] && echo "--field-selector=$field_selector" ) \
-    -o wide | { [ -z "$search_term" ] && cat || grep -i "$search_term"; } || true)
-
-    if [ -z "$result" ]; then
-        echo "🔍 No resources found matching the criteria"
-    else
-        echo "🔍 Found resources:"
-        echo "$result" | awk '{print "  • " $0}'
-    fi
-    """,
-    args=[
-        Arg(
-            name="resource_type",
-            type="str",
-            description="Type of resource to find (e.g., pods, services, deployments)",
-            required=True,
-        ),
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace",
-            required=False,
-        ),
-        Arg(
-            name="label_selector",
-            type="str",
-            description="Label selector for filtering resources",
-            required=False,
-        ),
-        Arg(
-            name="field_selector",
-            type="str",
-            description="Field selector for filtering resources",
-            required=False,
-        ),
-        Arg(
-            name="search_term",
-            type="str",
-            description="Search term to filter results",
-            required=False,
-        ),
-    ],
-)
 
 change_replicas_tool = KubernetesTool(
     name="change_replicas",
@@ -675,7 +613,6 @@ check_replicas_tool = KubernetesTool(
 
 # Register all tools
 for tool in [
-    find_resource_tool,
     change_replicas_tool,
     get_resource_events_tool,
     get_pod_logs_tool,
