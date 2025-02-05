@@ -31,6 +31,7 @@ MAX_ITEMS=50
 MAX_WIDTH=120
 MAX_EVENTS=25
 MAX_OUTPUT_LINES=50
+MAX_LOG_LINES=1000
 
 # Initialize common optional parameters with defaults
 grep_filter=${grep_filter:-}
@@ -42,6 +43,7 @@ tail=${tail:-}
 since=${since:-}
 previous=${previous:-}
 follow=${follow:-}
+max_lines=${max_lines:-$MAX_LOG_LINES}
 
 # Function to generate a unique ID without relying on uuidgen
 generate_uuid() {
@@ -245,10 +247,79 @@ setup_dirs() {
     mkdir -p "$WORK_DIR"
     echo "$WORK_DIR"
 }
-"""
 
-        # Simple and robust context injection without chmod
-        inject_kubernetes_context = """
+# Function to format pod logs with timestamps
+format_pod_logs() {
+    local input_file="$1"
+    local max_lines="${2:-$MAX_LOG_LINES}"
+    local show_time="${3:-false}"
+    local container_name="${4:-}"
+    
+    if [ ! -f "$input_file" ]; then
+        echo "Error: Input file not found" >&2
+        return 1
+    fi
+    
+    # Count total lines
+    local total_lines
+    total_lines=$(wc -l < "$input_file")
+    
+    # Show header with total line count
+    if [ "$total_lines" -gt "$max_lines" ]; then
+        printf "=== Showing last %d of %d lines" "$max_lines" "$total_lines"
+        [ -n "$container_name" ] && printf " for container %s" "$container_name"
+        printf " ===\\n"
+    fi
+    
+    # Process the logs
+    if [ "$show_time" = "true" ]; then
+        # Show timestamps
+        tail -n "$max_lines" "$input_file" | while IFS= read -r line; do
+            printf "[%s] %s\\n" "$(date +%H:%M:%S)" "$line"
+        done
+    else
+        # Show logs without timestamps
+        tail -n "$max_lines" "$input_file"
+    fi
+}
+
+# Function to format network topology
+format_network_topology() {
+    local input="$1"
+    local max_width="${2:-$MAX_WIDTH}"
+    
+    # Use sed for basic formatting instead of awk
+    echo "$input" | sed '
+        s/^/  /;                 # Add indentation
+        s/->/──>/g;             # Replace -> with ──>
+        s/|/│/g;                # Replace | with │
+        s/+/├/g;                # Replace + with ├
+        s/\\$/└/g;              # Replace \ with └
+    ' | cut -c1-"$max_width"    # Truncate to max width
+}
+
+# Function to format events
+format_events() {
+    local input_file="$1"
+    local max_events="${2:-$MAX_EVENTS}"
+    
+    if [ ! -f "$input_file" ]; then
+        echo "Error: Input file not found" >&2
+        return 1
+    fi
+    
+    echo "=== Recent Events ==="
+    tail -n "$max_events" "$input_file" | while IFS= read -r line; do
+        case "$line" in
+            *" Normal "*) printf "[INFO] %s\\n" "$line" ;;
+            *" Warning "*) printf "[WARN] %s\\n" "$line" ;;
+            *) printf "[INFO] %s\\n" "$line" ;;
+        esac
+    done
+}
+
+# Simple and robust context injection without chmod
+inject_kubernetes_context = """
 set -eu
 
 # Setup working directories and get the work dir path
@@ -280,31 +351,32 @@ cleanup() {
 }
 trap cleanup EXIT
 """
-        # Combine helpers and the actual content
-        full_content = f"{helpers}\n{inject_kubernetes_context}\n{content}"
 
-        # Mount service account files directly to their expected locations
-        file_specs = [
-            FileSpec(
-                source="/var/run/secrets/kubernetes.io/serviceaccount/token",
-                destination="/var/run/secrets/kubernetes.io/serviceaccount/token"
-            ),
-            FileSpec(
-                source="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-                destination="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-            )
-        ]
+# Mount service account files directly to their expected locations
+file_specs = [
+    FileSpec(
+        source="/var/run/secrets/kubernetes.io/serviceaccount/token",
+        destination="/var/run/secrets/kubernetes.io/serviceaccount/token"
+    ),
+    FileSpec(
+        source="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+        destination="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+    )
+]
 
-        super().__init__(
-            name=name,
-            description=description,
-            icon_url=KUBERNETES_ICON_URL,
-            type="docker",
-            image=image,
-            content=full_content,
-            args=args,
-            with_files=file_specs,
-        )
+# Combine helpers and the actual content
+full_content = f"{helpers}\n{inject_kubernetes_context}\n{content}"
+
+super().__init__(
+    name=name,
+    description=description,
+    icon_url=KUBERNETES_ICON_URL,
+    type="docker",
+    image=image,
+    content=full_content,
+    args=args,
+    with_files=file_specs,
+)
 
 # Example usage:
 kubectl_cli = KubernetesTool(
