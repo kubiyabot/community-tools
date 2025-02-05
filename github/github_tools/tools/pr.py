@@ -1,102 +1,30 @@
 from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import FileSpec
-from pathlib import Path
-
-
-# Common disclaimer for automated actions
-KUBIYA_DISCLAIMER = '''
-
----
-> **Note**: This action was performed by Kubiya.ai on behalf of @${GITHUB_ACTOR}
-> 
-> 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
-'''
 
 pr_create = GitHubCliTool(
     name="github_pr_create",
-    description="Create a new pull request in a GitHub repository",
-    content=f"""
-#!/bin/bash
-set -euo pipefail
-
-# Install gettext for envsubst if not present
-if ! command -v envsubst >/dev/null 2>&1; then
-    apk add --quiet gettext > /dev/null 2>&1
-fi
-
-echo "🚀 Creating new pull request in $repo..."
-echo "📝 Title: $title"
-echo "📄 Base branch: $base"
-echo "🔀 Head branch: $head"
-
-# Get current user
-GITHUB_ACTOR=$(gh api user --jq '.login')
-
-# Get the expanded disclaimer
-DISCLAIMER='{KUBIYA_DISCLAIMER}'
-EXPANDED_DISCLAIMER=$(echo "$DISCLAIMER" | envsubst)
-
-# Create full PR body with disclaimer
-FULL_BODY="$body
-
-$EXPANDED_DISCLAIMER"
-
-# Create PR with proper quoting
-PR_URL=$(gh pr create \
-    --repo "$repo" \
-    --title "$title" \
-    --body "$FULL_BODY" \
-    --base "$base" \
-    --head "$head" \
-    $([ -n "${{assignee:-}}" ] && echo "--assignee '$assignee'") \
-    $([ -n "${{reviewer:-}}" ] && echo "--reviewer '$reviewer'"))
-
-echo "✨ Pull request created successfully!"
-echo "📋 Details: $PR_URL"
-""",
+    description="Create a new pull request in a GitHub repository.",
+    content="gh pr create --repo $repo --title \"$title\" --body \"$body\" --base $base --head $head $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$reviewer\" ]] && echo \"--reviewer $reviewer\")",
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo). Example: 'octocat/Hello-World'", required=True),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="title", type="str", description="Pull request title. Example: 'Add new feature: Dark mode'", required=True),
-        Arg(name="body", type="str", description="Pull request description", required=True),
+        Arg(name="body", type="str", description="Pull request description. Example: 'This PR adds a dark mode feature to the app. It includes new styles and a toggle in the settings menu.'", required=True),
         Arg(name="base", type="str", description="The branch you want your changes pulled into. Example: 'main'", required=True),
         Arg(name="head", type="str", description="The branch that contains commits for your pull request. Example: 'feature/dark-mode'", required=True),
-        Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Use `@me` to self-assign", required=False),
-        Arg(name="reviewer", type="str", description="The github user's login that should review this pr", required=False),
+        Arg(name="assignee", type="str", description="The github user's login that this pr is to be assigned to. Example: joe_doe. Use `@me` to self-assign", required=False),
+        Arg(name="reviewer", type="str", description="The github user's login that should review this pr. Example: joe_doe.", required=False),
     ],
 )
 
 pr_list = GitHubRepolessCliTool(
-    name="github_pr_list", 
+    name="github_pr_list",
     description="List pull requests in a GitHub repository.",
-    content="""
-echo "🔍 Searching for pull requests..."
-if [ -n "$repo" ]; then
-    echo "📁 Repository: https://github.com/$repo"
-fi
-if [ -n "$state" ]; then
-    echo "📊 State: $state"
-fi
-if [ -n "$author" ]; then
-    echo "👤 Author: https://github.com/$author"
-fi
-if [ -n "$assignee" ]; then
-    echo "👥 Assignee: https://github.com/$assignee"
-fi
-if [ -n "$org" ]; then
-    echo "🏢 Organization: https://github.com/$org"
-fi
-
-RESULT=$(gh search prs $([[ -n "$repo" ]] && echo "--repo $repo") $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
-
-echo "✨ Found pull requests:"
-echo "$RESULT"
-""",
+    content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$org\" ]] && echo \"--owner $org\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
-        Arg(name="limit", type="str", description="Maximum number of pull requests to list. Example: 10", required=False),
+        Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
         Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
         Arg(name="org", type="str", description="The github organization to look for prs in. Example: octocat", required=False),
@@ -106,33 +34,20 @@ echo "$RESULT"
 pr_view = GitHubCliTool(
     name="github_pr_view",
     description="View details of a specific pull request.",
-    content="""
-echo "🔍 Viewing pull request #$number in $repo..."
-echo "📎 Link: https://github.com/$repo/pull/$number"
-gh pr view --repo $repo $number
-""",
+    content="gh pr view --repo $repo $number",
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
 pr_merge = GitHubCliTool(
     name="github_pr_merge",
     description="Merge a pull request.",
-    content="""
-echo "🔄 Attempting to merge pull request #$number in $repo..."
-echo "📝 Using merge method: $merge_method"
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-
-GITHUB_ACTOR=$(gh api user --jq '.login')
-gh pr merge --repo $repo $number --$merge_method -b "Merged via automated workflow${KUBIYA_DISCLAIMER}"
-
-echo "✅ Pull request merged successfully!"
-""",
+    content="gh pr merge --repo $repo $number --$merge_method",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
         Arg(name="merge_method", type="str", description="Merge method to use (merge, squash, rebase). Example: 'squash'", required=True),
     ],
 )
@@ -140,16 +55,10 @@ echo "✅ Pull request merged successfully!"
 pr_close = GitHubCliTool(
     name="github_pr_close",
     description="Close a pull request without merging.",
-    content="""
-echo "🚫 Closing pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-GITHUB_ACTOR=$(gh api user --jq '.login')
-gh pr close --repo $repo $number -c "Closed via automated workflow${KUBIYA_DISCLAIMER}"
-echo "✅ Pull request closed successfully!"
-""",
+    content="gh pr close --repo $repo $number",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
@@ -240,197 +149,18 @@ fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
-        Arg(name="body", type="str", description="Comment text. Example: 'Great work! Just a few minor suggestions.'", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
+        Arg(name="body", type="str", description="Comment text in markdown format. Example: '**Great work!** The changes look good.'", required=True),
     ],
 )
-
-
-github_pr_comment_workflow_failure = GitHubCliTool(
-    name="github_pr_comment_workflow_failure",
-    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
-    content="""
-#!/bin/bash
-set -euo pipefail
-
-echo "💬 Processing comment for pull request #$number in $repo..."
-
-# # Validate JSON inputs
-# for input in "$workflow_steps" "$failures_and_fixes" "$run_details"; do
-#     if ! printf '%s' "$input" | jq empty; then
-#         echo "❌ Invalid JSON input provided"
-#         exit 1
-#     fi
-# done
-
-# Export variables for the Python script
-export REPO="$repo"
-export PR_NUMBER="$number"
-export WORKFLOW_STEPS="$workflow_steps"
-export FAILURES_AND_FIXES="$failures_and_fixes"
-export ERROR_LOGS="$error_logs"
-export RUN_DETAILS="$run_details"
-
-# Generate comment using template
-echo "🔨 Generating analysis comment..."
-GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
-    echo "❌ Failed to generate comment"
-    exit 1
-}
-
-# Get GitHub actor
-GITHUB_ACTOR=$(gh api user --jq '.login') || {
-    echo "❌ Failed to get GitHub user information"
-    exit 1
-}
-
-# Get existing comments by the current user
-echo "🔍 Checking for existing comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
-  | sed -n 1p)
-
-
-if [ -n "$EXISTING_COMMENT_ID" ]; then
-    # Update existing comment
-    echo "🔄 Updating existing comment..."
-    
-    # Get current comment content
-    CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
-    
-    # Count existing edits
-    # echo "Calculating edit count... "
-    # EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
-    # EDIT_COUNT=$((EDIT_COUNT + 1))
-    # EDIT_COUNT="0"
-    
-    # Create updated comment with edit history
-    echo "🔨 Creating updated comment..."
-    UPDATED_COMMENT="$GENERATED_COMMENT
-
-<details><summary>Previous Comment</summary>
-
-$CURRENT_CONTENT
-
-</details>"
-
-    # Update the comment
-    echo "🔨 Updating comment in $repo..."
-    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
-        -X PATCH \
-        -f body="$UPDATED_COMMENT"; then
-        echo "❌ Failed to update comment"
-        exit 1
-    fi
-    echo "✅ Comment updated successfully!"
-else
-    # Add new comment
-    echo "➕ Adding new comment..."
-    if ! gh pr comment --repo "$repo" "$number" --body "$GENERATED_COMMENT"; then
-        echo "❌ Failed to add comment"
-        exit 1
-    fi
-    echo "✅ Comment added successfully!"
-fi
-""",
-    args=[
-        Arg(
-            name="repo", 
-            type="str", 
-            description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", 
-            required=True
-        ),
-        Arg(
-            name="number", 
-            type="str", 
-            description="Pull request number. Example: '123'", 
-            required=True
-        ),
-        Arg(
-            name="workflow_steps",
-            type="str",
-            description="""JSON array of workflow steps. Example:
-[
-    {
-        "name": "Install Dependencies",
-        "status": "success",
-        "conclusion": "success",
-        "number": 1
-    },
-    {
-        "name": "Run Tests",
-        "status": "failure",
-        "conclusion": "Summary of the failure",
-        "number": 2
-    }
-]""",
-            required=True
-        ),
-        Arg(
-            name="failures_and_fixes",
-            type="str",
-            description="""JSON array of workflow failures and suggested fixes. Example:
-[
-    {
-        "step": "Run Tests",
-        "error": "Test failed: expected 200 but got 404",
-        "file": "tests/api_test.go",
-        "line": "42",
-        "detailed_suggested_fix": "Update API test expected status code from 200 to 404.",
-        "suggested_fix_code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
-    }
-]""",
-            required=True
-        ),
-        Arg(
-            name="error_logs",
-            type="str",
-            description="Raw error logs from the workflow run",
-            required=True
-        ),
-        Arg(
-            name="run_details",
-            type="str",
-            description="""JSON object with workflow run details. Example:
-{
-    "id": "12345678",
-    "name": "CI Pipeline",
-    "status": "completed/failed",
-    "conclusion": "summary of the result of the workflow run",
-    "actor": "pr author",
-    "processed_at": "2024-01-20T10:00:00Z",
-}""",
-            required=True
-        ),
-    ],
-    with_files=[
-        FileSpec(
-            destination="/opt/scripts/comment_generator.py", 
-            content=open(Path(__file__).parent.parent / 'scripts' / 'comment_generator.py').read()
-        ),
-        FileSpec(
-            destination="/opt/scripts/templates/workflow_failure.jinja2",
-            content=open(Path(__file__).parent.parent / 'scripts' / 'templates' / 'workflow_failure.jinja2').read()
-        ),
-    ],
-)
-
 
 pr_review = GitHubCliTool(
     name="github_pr_review",
     description="Add a review to a pull request.",
-    content="""
-echo "👀 Adding review to pull request #$number in $repo..."
-echo "📝 Review type: $review_type"
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-GITHUB_ACTOR=$(gh api user --jq '.login')
-FULL_BODY="$body${KUBIYA_DISCLAIMER}"
-gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
-echo "✅ Review submitted successfully!"
-""",
+    content="gh pr review --repo $repo $number --$review_type $([[ -n \"$body\" ]] && echo \"--body \\\"$body\\\"\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
         Arg(name="review_type", type="str", description="Type of review (approve, request-changes, comment). Example: 'approve'", required=True),
         Arg(name="body", type="str", description="Review comment. Example: 'LGTM! Approved with some minor suggestions.'", required=False),
     ],
@@ -439,97 +169,70 @@ echo "✅ Review submitted successfully!"
 pr_diff = GitHubCliTool(
     name="github_pr_diff",
     description="View the diff of a pull request.",
-    content="""
-echo "📊 Showing diff for pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr diff --repo $repo $number
-""",
+    content="gh pr diff --repo $repo $number",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
 pr_ready = GitHubCliTool(
     name="github_pr_ready",
     description="Mark a pull request as ready for review.",
-    content="""
-echo "🎯 Marking pull request #$number in $repo as ready for review..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr ready --repo $repo $number
-echo "✅ Pull request is now ready for review!"
-""",
+    content="gh pr ready --repo $repo $number",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
 pr_checks = GitHubCliTool(
     name="github_pr_checks",
     description="View status checks for a pull request.",
-    content="""
-echo "🔍 Checking status for pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr checks --repo $repo $number
-""",
+    content="gh pr checks --repo $repo $number",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
 pr_files = GitHubCliTool(
     name="github_pr_files",
     description="List files changed in a pull request.",
-    content="""
-echo "📁 Listing changed files for pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-gh pr diff --repo $repo $number --name-only
-""",
+    content="gh pr diff --repo $repo $number --name-only",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
     ],
 )
 
+
 pr_assign = GitHubCliTool(
     name="github_pr_assign",
-    description="Assign a pull request to a github user",
-    content="""
-echo "👤 Assigning pull request #$number in $repo to $assignee..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-echo "👥 Assignee Profile: https://github.com/$assignee"
-gh pr edit --repo $repo $number --add-assignee $assignee
-echo "✅ Pull request assigned successfully!"
-""",
+    description="Assign a pull request to a github",
+    content="gh pr edit --repo $repo $number --add-assignee $assignee",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
         Arg(name="assignee", type="str", description="The github user's login to whom this pr is assigned to. Example: joe_doe. Use `@me` to self-assign", required=True),
     ],
 )
 
+
 pr_add_reviewer = GitHubCliTool(
     name="github_add_reviewer",
     description="Add a reviewer to a pull request",
-    content="""
-echo "👥 Adding reviewer $reviewer to pull request #$number in $repo..."
-echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-echo "👤 Reviewer Profile: https://github.com/$reviewer"
-gh pr edit --repo $repo $number --add-reviewer $reviewer
-echo "✅ Reviewer added successfully!"
-""",
+    content="gh pr edit --repo $repo $number --add-reviewer $reviewer",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
         Arg(name="reviewer", type="str", description="The github user's login that should be added as a reviewer to this pr. Example: joe_doe.", required=True),
     ],
 )
 
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
