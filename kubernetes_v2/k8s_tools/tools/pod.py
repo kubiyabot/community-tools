@@ -58,56 +58,23 @@ pod_restart_tool = KubernetesTool(
         
         # Analyze container states with truncation
         kubectl get pod $pod_name -n $namespace -o json | \
-        jq -r '
-        def get_state_info(state_obj):
-          if state_obj == null then
-            "Unknown"
-          else
-            (state_obj | to_entries | if length > 0 then .[0].key else "Unknown" end)
-          end;
-
-        def get_state_reason(state_obj):
-          if state_obj == null then
-            ""
-          else
-            (state_obj | to_entries | if length > 0 then 
-              (.[0].value.reason // "No reason provided")
-            else
-              ""
-            end)
-          end;
-
-        if .status.containerStatuses then
-          .status.containerStatuses[] | {
-            name: (.name // "unnamed"),
-            ready: (.ready // false),
-            restartCount: (.restartCount // 0),
-            state: (.state // null),
-            lastState: (.lastState // null)
-          } | (
-            "Container: \(.name)\n" +
-            "Ready: \(.ready)\n" +
-            "Restart Count: \(.restartCount)\n" +
-            "Current State: \(get_state_info(.state))" + 
-            if get_state_reason(.state) != "" then 
-              " (\(get_state_reason(.state)))"
-            else 
-              ""
-            end + "\n" +
-            if .lastState != null then
-              "Last State: \(get_state_info(.lastState))" +
-              if get_state_reason(.lastState) != "" then
-                " (\(get_state_reason(.lastState)))\n"
-              else
-                "\n"
-              end
-            else
-              ""
-            end
-          )
-        else
-          "No container status information available"
-        end' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        jq -r '.status.containerStatuses[] | {
+            name: .name,
+            ready: .ready,
+            restartCount: .restartCount,
+            state: .state,
+            lastState: .lastState
+        }' | jq -r '. |
+        "Container: \(.name)\n" +
+        "Ready: \(.ready)\n" +
+        "Restart Count: \(.restartCount)\n" +
+        "Current State: \(.state | to_entries[0].key)\n" +
+        if .lastState then
+            "Last State: \(.lastState | to_entries[0].key)\n" +
+            if .lastState[.lastState | to_entries[0].key].reason then
+                "Last State Reason: \(.lastState[.lastState | to_entries[0].key].reason)\n"
+            else "" end
+        else "" end' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
 
         # Get recent related events
         echo -e "\n📜 Recent Related Events:"
@@ -211,41 +178,41 @@ pod_logs_tool = KubernetesTool(
     format_log_line() {
         awk -v width="$MAX_OUTPUT_WIDTH" '
         function colorize(line, level) {
-            if (level == "ERROR") return "\033[31m" line "\033[0m";     # Red
-            if (level == "WARN") return "\033[33m" line "\033[0m";      # Yellow
-            if (level == "INFO") return "\033[32m" line "\033[0m";      # Green
-            if (level == "DEBUG") return "\033[36m" line "\033[0m";     # Cyan
-            return line;
+            if (level == "ERROR") return "\033[31m" line "\033[0m"     # Red
+            if (level == "WARN") return "\033[33m" line "\033[0m"      # Yellow
+            if (level == "INFO") return "\033[32m" line "\033[0m"      # Green
+            if (level == "DEBUG") return "\033[36m" line "\033[0m"     # Cyan
+            return line
         }
         {
             # Extract timestamp if present
-            timestamp = "";
+            timestamp = ""
             if ($0 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}/) {
-                timestamp = substr($0, 1, 19);
-                msg = substr($0, 21);
+                timestamp = substr($0, 1, 19)
+                msg = substr($0, 21)
             } else {
-                msg = $0;
+                msg = $0
             }
 
             # Detect log level
-            level = "NONE";
-            if (tolower($0) ~ /error/) level = "ERROR";
-            else if (tolower($0) ~ /warn/) level = "WARN";
-            else if (tolower($0) ~ /info/) level = "INFO";
-            else if (tolower($0) ~ /debug/) level = "DEBUG";
+            level = "NONE"
+            if (tolower($0) ~ /error/) level = "ERROR"
+            else if (tolower($0) ~ /warn/) level = "WARN"
+            else if (tolower($0) ~ /info/) level = "INFO"
+            else if (tolower($0) ~ /debug/) level = "DEBUG"
 
             # Truncate long lines
             if (length(msg) > width) {
-                msg = substr(msg, 1, width-3) "...";
+                msg = substr(msg, 1, width-3) "..."
             }
 
             # Format output
             if (timestamp != "") {
-                printf "[CLOCK] %s | %s\\n", timestamp, colorize(msg, level);
+                printf "🕒 %s | %s\n", timestamp, colorize(msg, level)
             } else {
-                print colorize(msg, level);
+                print colorize(msg, level)
             }
-        }' | sed 's/\[CLOCK\]/🕒/g'
+        }'
     }
 
     # Create output file
@@ -264,7 +231,7 @@ pod_logs_tool = KubernetesTool(
             exit 1
         fi
 
-        echo "[SCROLL] Pod Logs Analysis" | sed 's/\[SCROLL\]/📜/g'
+        echo "📜 Pod Logs Analysis"
         echo "=================="
 
         # Build kubectl logs command
@@ -286,7 +253,7 @@ pod_logs_tool = KubernetesTool(
 
         # Process logs based on line range if specified
         if [ -n "${start_line:-}" ] && [ -n "${end_line:-}" ]; then
-            echo "[PIN] Showing lines $start_line to $end_line:" | sed 's/\[PIN\]/📍/g'
+            echo "📍 Showing lines $start_line to $end_line:"
             echo "--------------------------------"
             sed -n "${start_line},${end_line}p" "$logs_file" | format_log_line
         else
@@ -298,20 +265,20 @@ pod_logs_tool = KubernetesTool(
         total_lines=$(wc -l < "$logs_file")
         log_size=$(ls -lh "$logs_file" | awk '{print $5}')
         
-        echo -e "\n[CHART] Log Statistics:" | sed 's/\[CHART\]/📊/g'
+        echo -e "\n📊 Log Statistics:"
         echo "================"
-        echo "  [PENCIL] Total Lines: $total_lines" | sed 's/\[PENCIL\]/📝/g'
-        echo "  [DISK] Log Size: $log_size" | sed 's/\[DISK\]/💾/g'
+        echo "  📝 Total Lines: $total_lines"
+        echo "  💾 Log Size: $log_size"
         
         # Show log level distribution
-        echo -e "\n[GRAPH] Log Level Distribution:" | sed 's/\[GRAPH\]/📈/g'
+        echo -e "\n📈 Log Level Distribution:"
         echo "======================="
         {
-            printf "  %-8s %s\\n" "❌" "Errors: $(grep -ci "error" "$logs_file")"
-            printf "  %-8s %s\\n" "⚠️" "Warnings: $(grep -ci "warn" "$logs_file")"
-            printf "  %-8s %s\\n" "ℹ️" "Info: $(grep -ci "info" "$logs_file")"
-            printf "  %-8s %s\\n" "🔍" "Debug: $(grep -ci "debug" "$logs_file")"
-        }
+            echo "  ❌ Errors: $(grep -ci "error" "$logs_file")"
+            echo "  ⚠️  Warnings: $(grep -ci "warn" "$logs_file")"
+            echo "  ℹ️  Info: $(grep -ci "info" "$logs_file")"
+            echo "  🔍 Debug: $(grep -ci "debug" "$logs_file")"
+        } | column -t
     } > "$formatted_output"
 
     # Show output with line limit
@@ -466,133 +433,106 @@ pod_network_topology_tool = KubernetesTool(
         # Analyze network policies
         echo "🔒 Network Policies:"
         echo "================="
-        if ! kubectl get networkpolicies $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No network policies found"
-        else
-            jq -r '
-            def format_selector(selector):
-              if selector == null then
-                "any"
-              elif selector | length == 0 then
-                "any"
-              else
-                selector | to_entries | map("\(.key)=\(.value)") | join(", ")
-              end;
-
-            def format_rules(rules):
-              if rules == null or (rules | length == 0) then
-                "  • None"
-              else
-                (rules | map(
-                  "  • " + (
-                    if .from then
-                      "From: " + (.from | map(
-                        if .namespaceSelector then "namespace[" + format_selector(.namespaceSelector) + "]"
-                        elif .podSelector then "pod[" + format_selector(.podSelector) + "]"
-                        elif .ipBlock then "CIDR[" + .ipBlock.cidr + "]"
-                        else "any"
+        kubectl get networkpolicies $namespace_flag -o json | \
+        jq -r '.items[] | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            pod_selector: .spec.podSelector,
+            ingress: .spec.ingress,
+            egress: .spec.egress,
+            policy_types: .spec.policyTypes
+        }' | jq -r '. |
+        "Policy: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "Pod Selector: \(.pod_selector | tostring)\n" +
+        "Policy Types: \(.policy_types | join(", "))\n" +
+        "\nIngress Rules:" +
+        if .ingress then
+            (.ingress | map(
+                "\n  • From:" +
+                (if .[].from then
+                    (.[].from | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
                         end
-                      ) | join(", "))
-                    elif .to then
-                      "To: " + (.to | map(
-                        if .namespaceSelector then "namespace[" + format_selector(.namespaceSelector) + "]"
-                        elif .podSelector then "pod[" + format_selector(.podSelector) + "]"
-                        elif .ipBlock then "CIDR[" + .ipBlock.cidr + "]"
-                        else "any"
+                    ) | join(""))
+                else "\n    - Any"
+                end)
+            ) | join("\n"))
+        else "\n  None"
+        end +
+        "\n\nEgress Rules:" +
+        if .egress then
+            (.egress | map(
+                "\n  • To:" +
+                (if .[].to then
+                    (.[].to | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
                         end
-                      ) | join(", "))
-                    else "any"
-                    end
-                  )
-                ) | join("\n"))
-              end;
-
-            if .items | length == 0 then
-              "No network policies found"
-            else
-              (.items[] | "Policy: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "Pod Selector: " + format_selector(.spec.podSelector) + "\n" +
-               "Policy Types: " + (.spec.policyTypes | join(", ")) + "\n\n" +
-               "Ingress Rules:\n" + format_rules(.spec.ingress) + "\n\n" +
-               "Egress Rules:\n" + format_rules(.spec.egress) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Policy:/ {printf "\n🛡️  %s\n", substr($0, 9)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^Pod Selector:/ {printf "🎯 %s\n", $0}
-            /^Policy Types:/ {printf "📋 %s\n", $0}
-            /^Ingress Rules:/ {print "📥 Ingress Rules:"}
-            /^Egress Rules:/ {print "📤 Egress Rules:"}
-            /^  •/ {print $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+                    ) | join(""))
+                else "\n    - Any"
+                end)
+            ) | join("\n"))
+        else "\n  None"
+        end' | \
+        awk '
+        /^Policy:/ {printf "\n🛡️  %s\n", substr($0, 9)}
+        /^Namespace:/ {printf "📁 %s\n", $0}
+        /^Pod Selector:/ {printf "🎯 %s\n", $0}
+        /^Policy Types:/ {printf "📋 %s\n", $0}
+        /^Ingress Rules:/ {print "📥 Ingress Rules:"}
+        /^Egress Rules:/ {print "📤 Egress Rules:"}
+        /^  • From:/ {printf "  ⬅️  From:\n"}
+        /^  • To:/ {printf "  ➡️  To:\n"}
+        /^    -/ {printf "    %s\n", $0}
+        ' > "$formatted_output"
 
         # Analyze service connections
         echo -e "\n🔌 Service Connections:"
         echo "===================="
-        if ! kubectl get services $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No services found"
-        else
-            jq -r '
-            def format_ports(ports):
-              if ports == null then "none"
-              else
-                ports | map("\(.port):\(.targetPort // .port) (\(.protocol // "TCP"))") | join(", ")
-              end;
-
-            if .items | length == 0 then
-              "No services found"
-            else
-              (.items[] | select(.spec.selector != null) |
-               "Service: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "Selector: " + (.spec.selector | to_entries | map("\(.key)=\(.value)") | join(", ")) + "\n" +
-               "Ports: " + format_ports(.spec.ports) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Service:/ {printf "\n🔌 %s\n", substr($0, 10)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^Selector:/ {printf "🎯 %s\n", $0}
-            /^Ports:/ {printf "🔌 %s\n", $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+        kubectl get services $namespace_flag -o json | \
+        jq -r '.items[] | select(.spec.selector) | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            selector: .spec.selector,
+            ports: .spec.ports
+        }' | jq -r '. |
+        "Service: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "Selector: \(.selector | to_entries | map("\(.key)=\(.value)") | join(", "))\n" +
+        "Ports: \(.ports | map("\(.port):\(.targetPort) (\(.protocol))") | join(", ")))"' | \
+        awk '
+        /^Service:/ {printf "\n🔌 %s\n", substr($0, 10)}
+        /^Namespace:/ {printf "📁 %s\n", $0}
+        /^Selector:/ {printf "🎯 %s\n", $0}
+        /^Ports:/ {printf "🔌 %s\n", $0}
+        ' >> "$formatted_output"
 
         # Show pod-to-pod connections based on labels
         echo -e "\n🔗 Pod-to-Pod Connections:"
         echo "======================="
-        if ! kubectl get pods $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No pods found"
-        else
-            jq -r '
-            def format_labels(labels):
-              if labels == null then "none"
-              else
-                labels | to_entries | map("\(.key)=\(.value)") | join(", ")
-              end;
-
-            if .items | length == 0 then
-              "No pods found"
-            else
-              (.items[] | select(.metadata.labels != null) |
-               "Pod: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "IP: \(.status.podIP // "pending")\n" +
-               "Labels: " + format_labels(.metadata.labels) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Pod:/ {printf "\n📦 %s\n", substr($0, 6)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^IP:/ {printf "🌐 %s\n", $0}
-            /^Labels:/ {printf "🏷️  %s\n", $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+        jq -r '.items[] | select(.metadata.labels) | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            labels: .metadata.labels,
+            ip: .status.podIP
+        }' "$pod_file" | \
+        jq -r '. |
+        "Pod: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "IP: \(.ip)\n" +
+        "Labels: \(.labels | to_entries | map("\(.key)=\(.value)") | join(", "))"' | \
+        awk '
+        /^Pod:/ {printf "\n📦 %s\n", substr($0, 6)}
+        /^Namespace:/ {printf "📁 %s\n", $0}
+        /^IP:/ {printf "🌐 %s\n", $0}
+        /^Labels:/ {printf "🏷️  %s\n", $0}
+        ' >> "$formatted_output"
 
         # Calculate statistics
         total_policies=$(kubectl get networkpolicies $namespace_flag -o json | jq '.items | length')
