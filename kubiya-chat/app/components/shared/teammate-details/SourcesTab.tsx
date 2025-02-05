@@ -131,6 +131,11 @@ type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
     user_last_updated: string;
   };
   errors_count: number;
+  errors?: Array<{
+    file: string;
+    error: string;
+    details?: string;
+  }>;
   source_meta: {
     id: string;
     url: string;
@@ -516,6 +521,7 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Badge variant="destructive" className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help">
+                            <AlertCircle className="h-3.5 w-3.5 mr-1" />
                             {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
                           </Badge>
                         </TooltipTrigger>
@@ -525,11 +531,17 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
                               <AlertCircle className="h-4 w-4 text-red-400" />
                               Source Errors
                             </h5>
-                            {source.error && (
-                              <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20">
-                                {source.error}
-                              </div>
-                            )}
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {source.errors?.map((error: any, index: number) => (
+                                <div key={index} className="text-xs bg-red-500/10 rounded-md p-2 border border-red-500/20">
+                                  <div className="font-medium text-red-400">{error.file}</div>
+                                  <div className="text-red-300">{error.error}</div>
+                                  {error.details && (
+                                    <div className="mt-1 text-red-300/80 text-[11px]">{error.details}</div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -1080,11 +1092,33 @@ export function SourcesTab({
     try {
       setSyncingSourceIds(prev => new Set([...prev, sourceId]));
       
+      // Find the source to get its dynamic_config and runner
+      const source = sources.find(s => s.uuid === sourceId);
+      if (!source) {
+        throw new Error('Source not found');
+      }
+
+      const payload: any = {
+        name: source.name,
+        url: source.url,
+      };
+
+      // Only include dynamic_config if it exists
+      if (source.dynamic_config && Object.keys(source.dynamic_config).length > 0) {
+        payload.dynamic_config = source.dynamic_config;
+      }
+
+      // Only include runner if it exists
+      if (source.runner) {
+        payload.runner = source.runner;
+      }
+      
       const response = await fetch(`/api/sources/${sourceId}/sync`, {
-        method: 'POST',
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
