@@ -7,6 +7,12 @@ class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Basic helper functions that don't interfere with the main script
         helpers = """
+#!/usr/bin/env bash
+# Force bash as shell
+if [ -z "$BASH" ]; then
+    exec /bin/bash "$0" "$@"
+fi
+
 # Set up temp directory first, before anything else runs
 export TMPDIR="/dev/shm"
 
@@ -32,12 +38,10 @@ get_param() {
     local param_name="$1"
     local default_value="${2:-}"
     
-    # Use eval to check if the parameter exists
-    if eval "[ ! -z \${$param_name+x} ]"; then
-        eval "echo \$$param_name"
-    else
-        echo "$default_value"
-    fi
+    # Use bash parameter expansion for safer variable handling
+    declare -g value
+    value=${!param_name:-$default_value}
+    echo "$value"
 }
 
 # Setup working directories
