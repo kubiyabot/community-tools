@@ -9,16 +9,20 @@ MAX_EVENTS = 25
 namespace_tool = KubernetesTool(
     name="list_namespaces",
     description="Lists and manages Kubernetes namespaces in the cluster",
-    content='''
+    content=f'''
     #!/bin/bash
     set -e
+
+    # Constants
+    MAX_OUTPUT_LINES={MAX_OUTPUT_LINES}
+    MAX_EVENTS={MAX_EVENTS}
 
     # Create temp file for output management
     temp_file=$(mktemp)
     trap 'rm -f "$temp_file"' EXIT
 
     # Function to show resource status with limits
-    show_resource_status() {
+    show_resource_status() {{
         local cmd="$1"
         local description="$2"
         
@@ -26,6 +30,9 @@ namespace_tool = KubernetesTool(
             echo "❌ Failed to get $description"
             exit 1
         fi
+        
+        # Get grep_filter value safely
+        grep_filter=$(get_param "grep_filter")
         
         # Apply grep filter if provided
         if [ ! -z "$grep_filter" ]; then
@@ -42,13 +49,13 @@ namespace_tool = KubernetesTool(
         
         # Show header and limited output
         head -n 1 "$temp_file"  # Show header
-        tail -n +2 "$temp_file" | head -n $MAX_OUTPUT_LINES | awk '{
+        tail -n +2 "$temp_file" | head -n $MAX_OUTPUT_LINES | awk '{{
             status=$2;
             emoji="ℹ️";
             if (status == "Active") emoji="✅";
             else if (status == "Terminating") emoji="🔄";
             print "  " emoji " " $0;
-        }'
+        }}'
         
         # Show truncation message if needed
         total_lines=$(( $(wc -l < "$temp_file") - 1 ))
@@ -60,15 +67,18 @@ namespace_tool = KubernetesTool(
             echo "   - Use labels: kubectl get ns -l key=value"
             echo "   - Use field selectors: --field-selector status.phase=Active"
         fi
-    }
+    }}
 
     # Function to show namespace details
-    show_namespace_details() {
+    show_namespace_details() {{
         local ns="$1"
         
         echo "📊 Namespace Details:"
         echo "=================="
         kubectl describe namespace "$ns" > "$temp_file"
+        
+        # Get grep_filter value safely
+        grep_filter=$(get_param "grep_filter")
         
         # Apply grep filter if provided
         if [ ! -z "$grep_filter" ]; then
@@ -107,10 +117,10 @@ namespace_tool = KubernetesTool(
         if [ -s "$temp_file" ]; then
             show_resource_status "kubectl top pod -n $ns" "resource usage"
         fi
-    }
+    }}
 
-    # Default action is list if not specified
-    action=${action:-list}
+    # Get action parameter with default value 'list'
+    action=$(get_param "action" "list")
 
     case "$action" in
         list)
@@ -119,6 +129,7 @@ namespace_tool = KubernetesTool(
             ;;
             
         describe)
+            name=$(get_param "name")
             if [ -z "$name" ]; then
                 echo "❌ Namespace name is required for describe action"
                 exit 1
@@ -127,6 +138,7 @@ namespace_tool = KubernetesTool(
             ;;
             
         create)
+            name=$(get_param "name")
             if [ -z "$name" ]; then
                 echo "❌ Namespace name is required for create action"
                 exit 1
@@ -142,6 +154,7 @@ namespace_tool = KubernetesTool(
             ;;
             
         delete)
+            name=$(get_param "name")
             if [ -z "$name" ]; then
                 echo "❌ Namespace name is required for delete action"
                 exit 1
