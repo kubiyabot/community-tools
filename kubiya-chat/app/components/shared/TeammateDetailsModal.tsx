@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogClose } from '../ui/dialog';
 import { toast } from '../ui/use-toast';
@@ -76,6 +76,39 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
   const [loadedTabs] = useState<Set<string>>(new Set(['overview']));
   const [tools, setTools] = useState<Tool[]>([]);
   const [sources, setSources] = useState<SourceInfo[]>([]);
+
+  // Move useMemo here, before any conditional logic
+  const extendedSources = useMemo(() => {
+    if (!teammate?.sources) return [];
+    return sources.map(source => ({
+      ...source,
+      teammate_id: teammate.id,
+      sourceId: source.sourceId || source.uuid,
+      type: source.type || 'unknown',
+      runner: source.runner || 'automatic',
+      connected_agents_count: source.connected_agents_count || 0,
+      connected_tools_count: source.connected_tools_count || 0,
+      connected_workflows_count: source.connected_workflows_count || 0,
+      kubiya_metadata: {
+        created_at: source.kubiya_metadata?.created_at || new Date().toISOString(),
+        last_updated: source.kubiya_metadata?.last_updated || new Date().toISOString(),
+        user_created: source.kubiya_metadata?.user_created || 'system',
+        user_last_updated: source.kubiya_metadata?.user_last_updated || 'system'
+      },
+      errors_count: source.errors_count || 0,
+      source_meta: {
+        id: source.source_meta?.id || source.uuid,
+        url: source.source_meta?.url || source.url,
+        branch: source.source_meta?.branch || 'main',
+        commit: source.source_meta?.commit || '',
+        committer: source.source_meta?.committer || ''
+      },
+      tools: source.tools || [],
+      dynamic_config: source.dynamic_config || null,
+      managed_by: source.managed_by || '',
+      task_id: source.task_id || ''
+    }));
+  }, [teammate?.id, teammate?.sources, sources]);
 
   // Function to load sources data
   const fetchSources = async () => {
@@ -258,8 +291,6 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
   // Initial load
   useEffect(() => {
     if (!teammate?.uuid || !isOpen) return;
-
-    // Load all data in parallel
     loadTabData('integrations');
     fetchSources();
   }, [teammate?.uuid, isOpen]);
@@ -324,7 +355,7 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
                     <ScrollArea className="flex-1">
                       <SourcesTab 
                         teammate={teammate} 
-                        sources={sources}
+                        sources={extendedSources}
                         isLoading={isLoadingSources} 
                       />
                     </ScrollArea>

@@ -116,48 +116,27 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
 
   const handleRefresh = useCallback(async () => {
     try {
-      setFormState((prev: InstallToolFormState) => ({
-        ...prev,
-        communityTools: {
-          ...prev.communityTools,
-          isLoading: true,
-          error: null
-        }
-      }));
-
-      // Clear cache and fetch fresh data
-      const response = await fetch('/api/sources/community/list', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache'
-        }
-      });
+      const currentUrl = methods.getValues('url');
+      const currentRunner = methods.getValues('runner') || 'automatic';
+      
+      // Check if we have a URL to refresh
+      if (!currentUrl) {
+        return null;
+      }
+      
+      const response = await fetch(`/api/v1/sources/load?url=${encodeURIComponent(currentUrl)}&runner=${encodeURIComponent(currentRunner)}`);
+      const data = await response.json();
       
       if (!response.ok) {
-        throw new Error('Failed to refresh tools');
+        throw new Error(data.error || 'Failed to refresh tools');
       }
 
-      const data = await response.json();
-      setFormState((prev: InstallToolFormState) => ({
-        ...prev,
-        communityTools: {
-          isLoading: false,
-          error: null,
-          data
-        }
-      }));
+      return data;
     } catch (error) {
       console.error('Error refreshing tools:', error);
-      setFormState((prev: InstallToolFormState) => ({
-        ...prev,
-        communityTools: {
-          ...prev.communityTools,
-          isLoading: false,
-          error: error instanceof Error ? error.message : 'Failed to refresh tools'
-        }
-      }));
+      throw new Error(error instanceof Error ? error.message : 'Failed to refresh tools');
     }
-  }, []);
+  }, [methods]);
 
   // Add initial fetch on mount
   React.useEffect(() => {

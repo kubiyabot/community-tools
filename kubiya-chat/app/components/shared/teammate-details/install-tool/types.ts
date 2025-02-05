@@ -53,22 +53,53 @@ export interface FormState {
 
 export interface Tool {
   name: string;
-  description: string;
+  path: string;
+  description?: string;
   type?: string;
   icon_url?: string;
-  tools: Array<{
+  category?: string;
+  tools?: Array<{
     name: string;
     description?: string;
     args?: Array<{
       name: string;
+      type: string;
+      description: string;
       required?: boolean;
     }>;
   }>;
   args?: Array<{
     name: string;
+    type: string;
+    description: string;
     required?: boolean;
   }>;
   image?: string;
+  source?: {
+    name: string;
+    url: string;
+    metadata?: {
+      git_branch?: string;
+      git_commit?: string;
+      last_updated?: string;
+    };
+  };
+  content?: string;
+  workdir?: string;
+  env?: string[];
+  secrets?: string[];
+  with_files?: Array<{
+    source: string;
+    target: string;
+    content?: string;
+  }>;
+  mounts?: Array<{
+    source: string;
+    target: string;
+  }>;
+  mermaid?: string;
+  uuid?: string;
+  alias?: string;
 }
 
 export interface InstallToolFormState {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@auth0/nextjs-auth0/edge';
+import { headers } from 'next/headers';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -66,114 +67,71 @@ export async function POST(
   { params }: { params: { sourceId: string } }
 ) {
   try {
+    const headersList = headers();
     const res = NextResponse.next();
     const session = await getSession(req, res);
-    
-    const sourceId = params.sourceId;
-    
+
     if (!session?.idToken) {
       console.error('Sources sync endpoint - No ID token found');
-      return new Response(JSON.stringify({ 
-        error: 'Not authenticated',
-        details: 'No ID token found'
-      }), { 
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
-    if (!sourceId) {
-      console.error('Sources sync endpoint - No source ID provided');
-      return new Response(JSON.stringify({ 
-        error: 'Source ID is required'
-      }), { 
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
-    }
+    const sourceId = params.sourceId;
+    const orgId = req.headers.get('x-organization-id');
 
-    // Log request details
     console.log('Sources sync endpoint - Request details:', {
       sourceId,
       hasToken: !!session.idToken,
-      orgId: session.user?.org_id
+      orgId
     });
 
-    // Call Kubiya API to sync the source
-    const response = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}/sync`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.idToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'X-Organization-ID': session.user?.org_id || '',
-        'X-Kubiya-Client': 'chat-ui'
-      }
-    });
+    // Get request body for dynamic configuration
+    const body = await req.json().catch(() => ({}));
 
-    const data: SourceResponse = await response.json();
+    const apiHeaders: Record<string, string> = {
+      'Authorization': `Bearer ${session.idToken}`,
+      'Content-Type': 'application/json'
+    };
+
+    if (orgId) {
+      apiHeaders['x-organization-id'] = orgId;
+    }
+
+    const response = await fetch(`${process.env.KUBIYA_API_URL}/api/v1/sources/${sourceId}`, {
+      method: 'PUT',
+      headers: apiHeaders,
+      body: JSON.stringify({
+        ...body,
+        action: 'sync'
+      })
+    });
 
     if (!response.ok) {
+      const errorText = await response.text();
       console.error('Sources sync endpoint - Failed to sync source:', {
         status: response.status,
         statusText: response.statusText,
-        error: data
+        error: errorText
       });
-      return new Response(JSON.stringify({ 
-        error: `Failed to sync source: ${response.statusText}`,
-        details: data
-      }), {
-        status: response.status,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store'
-        }
-      });
+
+      return NextResponse.json(
+        { error: 'Failed to sync source', details: errorText },
+        { status: response.status }
+      );
     }
 
-    // Log success
-    console.log('Sources sync endpoint - Successfully synced source:', {
-      sourceId,
-      errorsCount: data.errors_count
-    });
+    const data = await response.json();
+    return NextResponse.json(data);
 
-    const formattedResponse = formatSourceSummary(data);
-
-    return new Response(JSON.stringify({ 
-      synced: true,
-      source: formattedResponse,
-      timestamp: Date.now(),
-      success: true,
-      message: 'Source synced successfully'
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store'
-      }
-    });
-  } catch (err) {
-    console.error('Sources sync endpoint error:', {
-      error: err instanceof Error ? err.message : 'Unknown error',
-      stack: err instanceof Error ? err.stack : undefined
-    });
-    return new Response(JSON.stringify({ 
-      synced: false,
-      error: err instanceof Error ? err.message : 'Failed to sync source'
-    }), { 
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store'
-      }
-    });
+  } catch (error) {
+    console.error('Sources sync endpoint - Error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
