@@ -60,13 +60,18 @@ get_param() {
     echo "$value"
 }
 
-# Helper function to safely parse JSON using jq
+# Helper function to safely parse JSON using jq with null handling
 parse_json() {
     local json="$1"
     local query="${2:-.}"  # Default to returning entire JSON if no query specified
+    local default_value="${3:-}"  # Optional default value if result is null/missing
     
     if [ -z "$json" ]; then
-        echo "{}"
+        if [ -n "$default_value" ]; then
+            echo "$default_value"
+        else
+            echo "{}"
+        fi
         return
     fi
     
@@ -77,17 +82,45 @@ parse_json() {
         return
     fi
     
-    # Try to parse with jq, fallback to raw JSON if it fails
-    if ! output=$(echo "$json" | jq -r "$query" 2>/dev/null); then
-        echo "Warning: Failed to parse JSON with query: $query" >&2
-        # Try to validate if it's valid JSON at least
-        if echo "$json" | jq '.' >/dev/null 2>&1; then
-            echo "$json"
+    # First validate if input is valid JSON
+    if ! echo "$json" | jq '.' >/dev/null 2>&1; then
+        echo "Warning: Invalid JSON input" >&2
+        if [ -n "$default_value" ]; then
+            echo "$default_value"
+        else
+            echo "{}"
+        fi
+        return
+    fi
+    
+    # Try to parse with jq, handling null values
+    local jq_script="
+        def handle_null:
+            if . == null then
+                null
+            elif type == \"object\" then
+                if length == 0 then null else . end
+            elif type == \"array\" then
+                if length == 0 then null else . end
+            else
+                .
+            end;
+        
+        $query | handle_null
+    "
+    
+    local result
+    result=$(echo "$json" | jq -r "$jq_script" 2>/dev/null)
+    local jq_exit=$?
+    
+    if [ $jq_exit -ne 0 ] || [ "$result" = "null" ] || [ -z "$result" ]; then
+        if [ -n "$default_value" ]; then
+            echo "$default_value"
         else
             echo "{}"
         fi
     else
-        echo "$output"
+        echo "$result"
     fi
 }
 
@@ -126,17 +159,19 @@ wait_for_pod() {
     return 0
 }
 
-# Helper function to get pod status
+# Helper function to get pod status with default value
 get_pod_status() {
     local namespace="$1"
     local pod_name="$2"
+    local default_status="${3:-Unknown}"
     
     if ! check_pod_exists "$namespace" "$pod_name"; then
+        echo "$default_status"
         return 1
     fi
     
     local status
-    status=$(kubectl get pod -n "$namespace" "$pod_name" -o json | parse_json '.status.phase')
+    status=$(kubectl get pod -n "$namespace" "$pod_name" -o json | parse_json '.status.phase' "$default_status")
     echo "$status"
 }
 
