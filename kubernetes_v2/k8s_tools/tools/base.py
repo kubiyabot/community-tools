@@ -16,10 +16,21 @@ fi
 # Set up temp directory first, before anything else runs
 export TMPDIR="/dev/shm"
 
+# Set default values for common variables
+MAX_ITEMS=50
+MAX_WIDTH=120
+MAX_EVENTS=25
+MAX_OUTPUT_LINES=50
+
+# Function to generate a unique ID without relying on uuidgen
+generate_uuid() {
+    echo "$(date +%s)-$(od -N 4 -t x4 /dev/urandom | head -1 | awk '{print $2}')"
+}
+
 # Helper functions
 truncate_output() {
-    local max_items=${1:-50}
-    local max_width=${2:-120}
+    local max_items=${1:-$MAX_ITEMS}
+    local max_width=${2:-$MAX_WIDTH}
     awk -v max_items="$max_items" -v max_width="$max_width" '
     NR <= max_items {
         if (length($0) > max_width) {
@@ -39,15 +50,41 @@ get_param() {
     local default_value="${2:-}"
     
     # Use bash parameter expansion for safer variable handling
-    declare -g value
+    local value
     value=${!param_name:-$default_value}
     echo "$value"
+}
+
+# Helper function to safely parse JSON using jq
+parse_json() {
+    local json="$1"
+    local query="${2:-.}"  # Default to returning entire JSON if no query specified
+    
+    if [ -z "$json" ]; then
+        echo "{}"
+        return
+    fi
+    
+    # Check if jq is available
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "Warning: jq not available, returning raw JSON" >&2
+        echo "$json"
+        return
+    fi
+    
+    # Try to parse with jq, fallback to raw JSON if it fails
+    if ! output=$(echo "$json" | jq -r "$query" 2>/dev/null); then
+        echo "Warning: Failed to parse JSON with jq" >&2
+        echo "$json"
+    else
+        echo "$output"
+    fi
 }
 
 # Setup working directories
 setup_dirs() {
     # Create a unique working directory in our TMPDIR
-    WORK_DIR="$TMPDIR/kubectl-$(date +%s)-$$"
+    WORK_DIR="$TMPDIR/kubectl-$(generate_uuid)"
     mkdir -p "$WORK_DIR"
     echo "$WORK_DIR"
 }
