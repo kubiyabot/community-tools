@@ -8,8 +8,14 @@ class KubernetesTool(Tool):
         # Basic helper functions that don't interfere with the main script
         helpers = """
 #!/usr/bin/env bash
+
+# Set shell options for safety
+set -u                  # Error on undefined variables
+set -o pipefail        # Exit on pipe failures
+shopt -s nullglob      # Handle no glob matches safely
+
 # Force bash as shell
-if [ -z "$BASH" ]; then
+if [ -z "${BASH:-}" ]; then
     exec /bin/bash "$0" "$@"
 fi
 
@@ -21,6 +27,17 @@ MAX_ITEMS=50
 MAX_WIDTH=120
 MAX_EVENTS=25
 MAX_OUTPUT_LINES=50
+
+# Initialize common optional parameters with defaults
+: "${grep_filter:=}"
+: "${container:=}"
+: "${namespace:=default}"
+: "${label:=}"
+: "${selector:=}"
+: "${tail:=}"
+: "${since:=}"
+: "${previous:=}"
+: "${follow:=}"
 
 # Function to generate a unique ID without relying on uuidgen
 generate_uuid() {
@@ -47,6 +64,39 @@ truncate_output() {
     NR == max_items+1 {
         print "... output truncated ..."
     }'
+}
+
+# Helper function to format log lines safely
+format_logs() {
+    local input_file="$1"
+    local max_lines="${2:-$MAX_OUTPUT_LINES}"
+    local show_time="${3:-false}"
+    
+    if [ ! -f "$input_file" ]; then
+        echo "Error: Input file not found" >&2
+        return 1
+    fi
+    
+    # Count total lines
+    local total_lines
+    total_lines=$(wc -l < "$input_file")
+    
+    # Show header with total line count
+    if [ "$total_lines" -gt "$max_lines" ]; then
+        echo "Showing last $max_lines of $total_lines lines"
+        echo "----------------------------------------"
+    fi
+    
+    # Process the logs
+    if [ "$show_time" = "true" ]; then
+        # Show timestamps
+        tail -n "$max_lines" "$input_file" | while IFS= read -r line; do
+            printf "[%s] %s\\n" "$(date +%H:%M:%S)" "$line"
+        done
+    else
+        # Show logs without timestamps
+        tail -n "$max_lines" "$input_file"
+    fi
 }
 
 # Helper function to safely get parameter values with defaults
