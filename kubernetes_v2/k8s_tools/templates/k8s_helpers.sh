@@ -1,0 +1,208 @@
+#!/bin/bash
+# Kubernetes helper functions
+
+# Set global constants
+export MAX_ITEMS=50
+export MAX_OUTPUT_WIDTH=120
+export MAX_EVENTS=25
+export MAX_LOGS=1000
+
+# Truncation helper functions
+truncate_output() {
+    local max_items=${1:-$MAX_ITEMS}
+    local max_width=${2:-$MAX_OUTPUT_WIDTH}
+    
+    awk -v max_items="$max_items" -v max_width="$max_width" '
+    NR <= max_items {
+        if (length($0) > max_width) {
+            print substr($0, 1, max_width-3) "..."
+        } else {
+            print
+        }
+    }
+    NR == max_items+1 {
+        print "... output truncated ..."
+    }
+    '
+}
+
+# Enhanced log handling function with improved error handling
+get_logs_with_range() {
+    local namespace="$1"
+    local pod_name="$2"
+    local container="${3:-}"
+    local start_line="${4:-}"
+    local end_line="${5:-}"
+    local tail_lines="${6:-}"
+    local since="${7:-}"
+    local previous="${8:-}"
+    
+    # Validate required parameters
+    if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
+        echo "❌ Error: namespace and pod_name are required" >&2
+        return 1
+    fi
+    
+    # Build base log command with proper quoting
+    local log_cmd="kubectl logs '$pod_name' -n '$namespace'"
+    [ -n "$container" ] && log_cmd="$log_cmd -c '$container'"
+    [ -n "$since" ] && log_cmd="$log_cmd --since='$since'"
+    [ -n "$previous" ] && log_cmd="$log_cmd --previous"
+    
+    # Verify pod exists before proceeding
+    if ! kubectl get pod "$pod_name" -n "$namespace" >/dev/null 2>&1; then
+        echo "❌ Error: Pod '$pod_name' not found in namespace '$namespace'" >&2
+        return 1
+    fi
+    
+    # If tail_lines is specified, it takes precedence over start/end lines
+    if [ -n "$tail_lines" ]; then
+        case "$tail_lines" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: tail_lines must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        log_cmd="$log_cmd --tail=$tail_lines"
+        eval "$log_cmd" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        return ${PIPESTATUS[0]}
+    fi
+    
+    # If both start and end lines are specified, use sed to extract the range
+    if [ -n "$start_line" ] && [ -n "$end_line" ]; then
+        # Validate line numbers
+        case "$start_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: start_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        case "$end_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: end_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        
+        if [ "$start_line" -gt "$end_line" ]; then
+            echo "❌ Error: start_line ($start_line) cannot be greater than end_line ($end_line)" >&2
+            return 1
+        fi
+        
+        # Calculate range size
+        local range_size=$((end_line - start_line + 1))
+        
+        # If range is larger than MAX_LOGS, warn and adjust
+        if [ "$range_size" -gt "$MAX_LOGS" ]; then
+            echo "⚠️  Warning: Requested range ($range_size lines) exceeds maximum allowed ($MAX_LOGS lines)" >&2
+            echo "    Showing first $MAX_LOGS lines of the range" >&2
+            end_line=$((start_line + MAX_LOGS - 1))
+        fi
+        
+        eval "$log_cmd" | sed -n "${start_line},${end_line}p" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        return ${PIPESTATUS[0]}
+    # If only start line is specified, show from that line to MAX_LOGS
+    elif [ -n "$start_line" ]; then
+        case "$start_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: start_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        eval "$log_cmd" | tail -n "+$start_line" | head -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        return ${PIPESTATUS[0]}
+    # If only end line is specified, show last N lines up to that line
+    elif [ -n "$end_line" ]; then
+        case "$end_line" in
+            ''|*[!0-9]*) 
+                echo "❌ Error: end_line must be a positive integer" >&2
+                return 1
+                ;;
+        esac
+        eval "$log_cmd" | head -n "$end_line" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        return ${PIPESTATUS[0]}
+    # If no range specified, use default MAX_LOGS
+    else
+        eval "$log_cmd" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+        return ${PIPESTATUS[0]}
+    fi
+}
+
+# Wrapper for kubectl commands with truncation and improved error handling
+kubectl_with_truncation() {
+    local cmd="$1"
+    local max_items=${2:-$MAX_ITEMS}
+    local max_width=${3:-$MAX_OUTPUT_WIDTH}
+    
+    if [ -z "$cmd" ]; then
+        echo "❌ Error: Command is required" >&2
+        return 1
+    fi
+    
+    # Validate numeric parameters
+    case "$max_items" in
+        ''|*[!0-9]*) 
+            echo "❌ Error: max_items must be a positive integer" >&2
+            return 1
+            ;;
+    esac
+    case "$max_width" in
+        ''|*[!0-9]*) 
+            echo "❌ Error: max_width must be a positive integer" >&2
+            return 1
+            ;;
+    esac
+    
+    eval "$cmd" | truncate_output "$max_items" "$max_width"
+    return ${PIPESTATUS[0]}
+}
+
+# Helper function to format events with truncation and improved error handling
+format_events() {
+    local namespace="$1"
+    local resource_name="$2"
+    local resource_type="$3"
+    
+    # Validate required parameters
+    if [ -z "$namespace" ] || [ -z "$resource_name" ] || [ -z "$resource_type" ]; then
+        echo "❌ Error: namespace, resource_name, and resource_type are required" >&2
+        return 1
+    fi
+    
+    printf "\\n📜 Recent Events:\\n"
+    echo "==============="
+    kubectl get events --namespace "$namespace" \
+        --field-selector "involvedObject.name=$resource_name,involvedObject.kind=$resource_type" \
+        --sort-by='.lastTimestamp' | \
+    tail -n "$MAX_EVENTS" | \
+    awk '
+    BEGIN { OFS="  " }
+    {
+        emoji = "📝"
+        if ($7 ~ /Warning/) emoji = "⚠️"
+        else if ($7 ~ /Normal/) emoji = "ℹ️"
+        print emoji, $0
+    }' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
+    return ${PIPESTATUS[0]}
+}
+
+# Helper function to show resource status with truncation and improved error handling
+show_resource_status() {
+    local cmd="$1"
+    local resource_type="$2"
+    local name="$3"
+    
+    # Validate required parameters
+    if [ -z "$cmd" ] || [ -z "$resource_type" ] || [ -z "$name" ]; then
+        echo "❌ Error: cmd, resource_type, and name are required" >&2
+        return 1
+    fi
+    
+    printf "\\n📊 %s Status:\\n" "$resource_type"
+    echo "===================="
+    if ! kubectl_with_truncation "$cmd" "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"; then
+        echo "❌ Failed to get $resource_type status" >&2
+        return 1
+    fi
+    return 0
+} 

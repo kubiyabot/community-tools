@@ -9,29 +9,108 @@ pod_management_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Ensure namespace is provided
-    if [ -z "${namespace}" ]; then
-        echo "❌ Error: Namespace is required for managing a specific pod."
+    # Ensure required parameters are provided
+    if [ -z "${namespace}" ] || [ -z "${name}" ] || [ -z "${action}" ]; then
+        echo "❌ Error: namespace, name, and action are required."
         exit 1
     fi
 
-    # Set flags for optional parameters
-    namespace_flag="-n ${namespace}"
-    image_flag=$( [ "${action}" = "create" ] && [ -n "${image}" ] && echo "--image=${image}" || echo "" )
+    # Build base command
+    base_cmd="kubectl --namespace ${namespace}"
 
-    # Execute the kubectl command
-    if ! kubectl "${action}" pod "${name}" ${image_flag} ${namespace_flag}; then
-        echo "❌ Failed to ${action} pod ${name} in namespace ${namespace}"
-        exit 1
-    fi
-
-    echo "✅ Successfully ${action}d pod ${name} in namespace ${namespace}"
+    case "${action}" in
+        create)
+            if [ -z "${image}" ]; then
+                echo "❌ Error: image is required for create action"
+                exit 1
+            fi
+            
+            # Build create command
+            cmd="${base_cmd} run ${name} --image=${image} --restart=Never"
+            if ! eval "$cmd"; then
+                echo "❌ Failed to create pod ${name}"
+                exit 1
+            fi
+            echo "✅ Successfully created pod ${name}"
+            
+            # Show pod status with truncation
+            status_cmd="${base_cmd} get pod ${name}"
+            show_resource_status "$status_cmd" "Pod" "$name"
+            
+            # Show events
+            format_events "$namespace" "$name" "Pod"
+            ;;
+            
+        delete)
+            cmd="${base_cmd} delete pod ${name}"
+            if ! eval "$cmd"; then
+                echo "❌ Failed to delete pod ${name}"
+                exit 1
+            fi
+            echo "✅ Successfully deleted pod ${name}"
+            ;;
+            
+        get)
+            # Show pod details
+            cmd="${base_cmd} get pod ${name}"
+            show_resource_status "$cmd" "Pod" "$name"
+            
+            # Show events
+            format_events "$namespace" "$name" "Pod"
+            
+            # Show logs if pod is running
+            if kubectl get pod ${name} -n ${namespace} -o jsonpath='{.status.phase}' | grep -q "Running"; then
+                echo -e "\n📜 Pod Logs:"
+                echo "==========="
+                
+                # Get logs with flexible range options
+                get_logs_with_range "$namespace" "$name" \
+                    "${container:-}" \
+                    "${start_line:-}" \
+                    "${end_line:-}" \
+                    "${tail:-}" \
+                    "${since:-}" \
+                    "${previous:-}"
+            fi
+            ;;
+            
+        logs)
+            # Verify pod exists and get its status
+            if ! pod_status=$(kubectl get pod ${name} -n ${namespace} -o jsonpath='{.status.phase}' 2>/dev/null); then
+                echo "❌ Pod ${name} not found in namespace ${namespace}"
+                exit 1
+            fi
+            
+            echo "📜 Pod Logs (${pod_status}):"
+            echo "======================"
+            
+            # Get logs with flexible range options
+            get_logs_with_range "$namespace" "$name" \
+                "${container:-}" \
+                "${start_line:-}" \
+                "${end_line:-}" \
+                "${tail:-}" \
+                "${since:-}" \
+                "${previous:-}"
+            ;;
+            
+        *)
+            echo "❌ Error: Invalid action. Supported actions are create, delete, get, logs"
+            exit 1
+            ;;
+    esac
     ''',
     args=[
-        Arg(name="action", type="str", description="Action to perform (create, delete, get)", required=True),
+        Arg(name="action", type="str", description="Action to perform (create, delete, get, logs)", required=True),
         Arg(name="name", type="str", description="Name of the pod", required=True),
         Arg(name="namespace", type="str", description="Kubernetes namespace", required=True),
         Arg(name="image", type="str", description="Container image (for create)", required=False),
+        Arg(name="container", type="str", description="Container name (for logs, if pod has multiple containers)", required=False),
+        Arg(name="start_line", type="int", description="Start line number for logs", required=False),
+        Arg(name="end_line", type="int", description="End line number for logs", required=False),
+        Arg(name="tail", type="int", description="Number of lines to show from the end of logs", required=False),
+        Arg(name="since", type="str", description="Show logs since timestamp (e.g. 1h, 5m) or RFC3339 timestamp", required=False),
+        Arg(name="previous", type="bool", description="Show logs from previous container instance", required=False),
     ],
 )
 
@@ -81,9 +160,15 @@ pod_restart_tool = KubernetesTool(
         # Get pod details before restart
         echo "📊 Current Pod State:"
         echo "=================="
-        kubectl get pod $pod_name -n $namespace -o json > "$(create_temp_file)"
         
-        # Analyze container states
+        # Use kubectl_with_truncation for pod details
+        cmd="kubectl get pod $pod_name -n $namespace -o json"
+        if ! eval "$cmd" > "$(create_temp_file)"; then
+            echo "❌ Failed to get pod details"
+            exit 1
+        fi
+        
+        # Analyze container states with truncation
         kubectl get pod $pod_name -n $namespace -o json | \
         jq -r '.status.containerStatuses[] | {
             name: .name,
@@ -98,55 +183,10 @@ pod_restart_tool = KubernetesTool(
         "Current State: \(.state | to_entries[0].key)\n" +
         if .lastState then
             "Last State: \(.lastState | to_entries[0].key)\n" +
-            if .lastState.terminated then
-                "Exit Code: \(.lastState.terminated.exitCode)\n" +
-                "Reason: \(.lastState.terminated.reason)\n" +
-                "Started At: \(.lastState.terminated.startedAt)\n" +
-                "Finished At: \(.lastState.terminated.finishedAt)"
-            else ""
-            end
-        else ""
-        end' | \
-        awk '
-        /^Container:/ {printf "\n📦 %s\n", substr($0, 11)}
-        /^Ready:/ {
-            if ($2 == "true") emoji="✅";
-            else emoji="❌";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Restart Count:/ {
-            count=$3;
-            emoji="✅";
-            if (count > 10) emoji="🚨";
-            else if (count > 5) emoji="⚠️";
-            else if (count > 0) emoji="ℹ️";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Current State:/ {
-            state=$3;
-            emoji="❓";
-            if (state == "running") emoji="✅";
-            else if (state == "waiting") emoji="⏳";
-            else if (state == "terminated") emoji="⛔";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Last State:/ {
-            state=$3;
-            emoji="❓";
-            if (state == "running") emoji="✅";
-            else if (state == "waiting") emoji="⏳";
-            else if (state == "terminated") emoji="⛔";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Exit Code:/ {
-            code=$3;
-            emoji="✅";
-            if (code != "0") emoji="❌";
-            printf "%s %s\n", emoji, $0;
-        }
-        /^Reason:/ {printf "📝 %s\n", $0}
-        /^Started At:/ {printf "🕒 %s\n", $0}
-        /^Finished At:/ {printf "🏁 %s\n", $0}'
+            if .lastState[.lastState | to_entries[0].key].reason then
+                "Last State Reason: \(.lastState[.lastState | to_entries[0].key].reason)\n"
+            else "" end
+        else "" end' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
 
         # Get recent related events
         echo -e "\n📜 Recent Related Events:"

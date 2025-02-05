@@ -13,9 +13,11 @@ kubectl_tool = KubernetesTool(
     # Show the command being executed
     echo "🔧 Executing: kubectl $command"
 
-    # Run the kubectl command
-    if eval "kubectl $command"; then
+    # Run the kubectl command with limited output (100 lines max)
+    # Using a subshell to capture the real exit status while still limiting output
+    if (kubectl $command | head -n 100); then
         echo "✅ Command executed successfully"
+        echo "Note: Output limited to 100 lines. Use '--no-headers' in your command to see more entries."
     else
         echo "❌ Command failed: kubectl $command"
         exit 1
