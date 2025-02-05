@@ -307,11 +307,11 @@ pod_logs_tool = KubernetesTool(
         echo -e "\n[GRAPH] Log Level Distribution:" | sed 's/\[GRAPH\]/📈/g'
         echo "======================="
         {
-            echo "  [CROSS] Errors: $(grep -ci "error" "$logs_file")" | sed 's/\[CROSS\]/❌/g'
-            echo "  [WARNING] Warnings: $(grep -ci "warn" "$logs_file")" | sed 's/\[WARNING\]/⚠️/g'
-            echo "  [INFO] Info: $(grep -ci "info" "$logs_file")" | sed 's/\[INFO\]/ℹ️/g'
-            echo "  [MAGNIFIER] Debug: $(grep -ci "debug" "$logs_file")" | sed 's/\[MAGNIFIER\]/🔍/g'
-        } | column -t
+            printf "  %-8s %s\\n" "❌" "Errors: $(grep -ci "error" "$logs_file")"
+            printf "  %-8s %s\\n" "⚠️" "Warnings: $(grep -ci "warn" "$logs_file")"
+            printf "  %-8s %s\\n" "ℹ️" "Info: $(grep -ci "info" "$logs_file")"
+            printf "  %-8s %s\\n" "🔍" "Debug: $(grep -ci "debug" "$logs_file")"
+        }
     } > "$formatted_output"
 
     # Show output with line limit
