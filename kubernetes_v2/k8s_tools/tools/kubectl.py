@@ -80,8 +80,4 @@ kubectl_tool = KubernetesTool(
     ],
 )
 
-try:
-    tool_registry.register("kubernetes", kubectl_tool)
-except Exception as e:
-    print(f"❌ Failed to register kubectl tool: {str(e)}", file=sys.stderr)
-    raise
+tool_registry.register("kubernetes", kubectl_tool)
