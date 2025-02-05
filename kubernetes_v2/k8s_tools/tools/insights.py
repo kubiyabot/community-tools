@@ -95,9 +95,45 @@ cluster_health_tool = KubernetesTool(
     args=[],
 )
 
+cluster_insights_tool = KubernetesTool(
+    name="cluster_insights",
+    description="Provides insights about the Kubernetes cluster",
+    content='''
+    #!/bin/bash
+    set -e
+
+    echo "🔍 Gathering cluster insights..."
+
+    # Get cluster info
+    if ! kubectl cluster-info; then
+        echo "❌ Failed to get cluster info"
+        exit 1
+    fi
+
+    # Get node status
+    echo -e "\n📊 Node Status:"
+    if ! kubectl get nodes -o wide; then
+        echo "❌ Failed to get node status"
+        exit 1
+    fi
+
+    # Get namespace usage
+    echo -e "\n📈 Namespace Resource Usage:"
+    if ! kubectl get ns --no-headers | while read ns _; do
+        echo "Namespace: ${ns}"
+        kubectl top pod -n "${ns}" 2>/dev/null || echo "  No metrics available"
+    done; then
+        echo "❌ Failed to get namespace usage"
+        exit 1
+    fi
+    ''',
+    args=[],
+)
+
 # Register all tools
 for tool in [
     resource_usage_tool,
     cluster_health_tool,
+    cluster_insights_tool,
 ]:
     tool_registry.register("kubernetes", tool)
