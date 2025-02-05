@@ -208,11 +208,11 @@ pod_logs_tool = KubernetesTool(
 
             # Format output
             if (timestamp != "") {
-                printf "🕒 %s | %s\n", timestamp, colorize(msg, level)
+                printf "[CLOCK] %s | %s\n", timestamp, colorize(msg, level)
             } else {
                 print colorize(msg, level)
             }
-        }'
+        }' | sed 's/\[CLOCK\]/🕒/g'
     }
 
     # Create output file
@@ -231,7 +231,7 @@ pod_logs_tool = KubernetesTool(
             exit 1
         fi
 
-        echo "📜 Pod Logs Analysis"
+        echo "[SCROLL] Pod Logs Analysis" | sed 's/\[SCROLL\]/📜/g'
         echo "=================="
 
         # Build kubectl logs command
@@ -253,7 +253,7 @@ pod_logs_tool = KubernetesTool(
 
         # Process logs based on line range if specified
         if [ -n "${start_line:-}" ] && [ -n "${end_line:-}" ]; then
-            echo "📍 Showing lines $start_line to $end_line:"
+            echo "[PIN] Showing lines $start_line to $end_line:" | sed 's/\[PIN\]/📍/g'
             echo "--------------------------------"
             sed -n "${start_line},${end_line}p" "$logs_file" | format_log_line
         else
@@ -265,19 +265,19 @@ pod_logs_tool = KubernetesTool(
         total_lines=$(wc -l < "$logs_file")
         log_size=$(ls -lh "$logs_file" | awk '{print $5}')
         
-        echo -e "\n📊 Log Statistics:"
+        echo -e "\n[CHART] Log Statistics:" | sed 's/\[CHART\]/📊/g'
         echo "================"
-        echo "  📝 Total Lines: $total_lines"
-        echo "  💾 Log Size: $log_size"
+        echo "  [PENCIL] Total Lines: $total_lines" | sed 's/\[PENCIL\]/📝/g'
+        echo "  [DISK] Log Size: $log_size" | sed 's/\[DISK\]/💾/g'
         
         # Show log level distribution
-        echo -e "\n📈 Log Level Distribution:"
+        echo -e "\n[GRAPH] Log Level Distribution:" | sed 's/\[GRAPH\]/📈/g'
         echo "======================="
         {
-            echo "  ❌ Errors: $(grep -ci "error" "$logs_file")"
-            echo "  ⚠️  Warnings: $(grep -ci "warn" "$logs_file")"
-            echo "  ℹ️  Info: $(grep -ci "info" "$logs_file")"
-            echo "  🔍 Debug: $(grep -ci "debug" "$logs_file")"
+            echo "  [CROSS] Errors: $(grep -ci "error" "$logs_file")" | sed 's/\[CROSS\]/❌/g'
+            echo "  [WARNING] Warnings: $(grep -ci "warn" "$logs_file")" | sed 's/\[WARNING\]/⚠️/g'
+            echo "  [INFO] Info: $(grep -ci "info" "$logs_file")" | sed 's/\[INFO\]/ℹ️/g'
+            echo "  [MAGNIFIER] Debug: $(grep -ci "debug" "$logs_file")" | sed 's/\[MAGNIFIER\]/🔍/g'
         } | column -t
     } > "$formatted_output"
 
