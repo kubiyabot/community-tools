@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     const res = NextResponse.next();
     const session = await getSession(req, res);
     
+    // Check for force refresh in the request
+    const forceRefresh = req.headers.get('x-force-refresh') === 'true';
+    
     // Add detailed session logging
     console.log('Teammates endpoint - Full session:', {
       hasAccessToken: !!session?.accessToken,
@@ -21,7 +24,8 @@ export async function GET(req: NextRequest) {
       userFields: session?.user ? Object.keys(session.user) : [],
       userEmail: session?.user?.email,
       userSub: session?.user?.sub,
-      tokenPrefix: session?.accessToken ? session.accessToken.substring(0, 50) + '...' : null
+      tokenPrefix: session?.accessToken ? session.accessToken.substring(0, 50) + '...' : null,
+      forceRefresh
     });
 
     if (!session?.idToken) {
@@ -51,15 +55,14 @@ export async function GET(req: NextRequest) {
         'Authorization': `Bearer ${session.idToken}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        'Cache-Control': forceRefresh ? 'no-cache' : 'max-age=300',
+        'Pragma': forceRefresh ? 'no-cache' : 'cache',
         'X-Organization-ID': session.user?.org_id || '',
         'X-Kubiya-Client': 'chat-ui'
       },
       next: {
         tags: [TEAMMATES_CACHE_TAG],
-        // Cache for 5 minutes
-        revalidate: 300
+        revalidate: forceRefresh ? 0 : 300
       }
     });
 
@@ -117,6 +120,24 @@ export async function GET(req: NextRequest) {
     let data;
     try {
       data = await kubiyaResponse.json();
+      
+      // Ensure each teammate has the required metadata field
+      if (Array.isArray(data)) {
+        data = data.map(teammate => ({
+          ...teammate,
+          metadata: teammate.metadata || {}  // Ensure metadata exists
+        }));
+      }
+      
+      console.log('Teammates endpoint - Successfully fetched teammates:', {
+        count: Array.isArray(data) ? data.length : 'not an array',
+        firstTeammate: Array.isArray(data) && data[0] ? {
+          uuid: data[0].uuid,
+          name: data[0].name,
+          metadata: data[0].metadata
+        } : null,
+        responseType: typeof data
+      });
     } catch (e) {
       console.error('Teammates endpoint - Failed to parse response:', e);
       return new Response(JSON.stringify({ 
@@ -131,15 +152,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    console.log('Teammates endpoint - Successfully fetched teammates:', {
-      count: Array.isArray(data) ? data.length : 'not an array',
-      firstTeammate: Array.isArray(data) && data[0] ? {
-        uuid: data[0].uuid,
-        name: data[0].name
-      } : null,
-      responseType: typeof data
-    });
-    
     return new Response(JSON.stringify(data), {
       status: 200,
       headers: {

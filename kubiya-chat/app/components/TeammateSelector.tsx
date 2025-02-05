@@ -21,13 +21,18 @@ const AVATAR_IMAGES = [
   'capitan-3.png'
 ];
 
-interface Teammate {
+interface TeammateDetails {
   uuid: string;
   id: string;
   name: string;
   description?: string;
   llm_model?: string;
   instruction_type?: string;
+  metadata: any;
+}
+
+interface Teammate extends TeammateDetails {
+  // Additional fields specific to Teammate if any
 }
 
 // Export the generateAvatarUrl function
@@ -50,6 +55,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   const [capabilities, setCapabilities] = useState<any>(null);
   const [integrations, setIntegrations] = useState<any>(null);
   const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const sortedUsers = useMemo(() => {
     if (!users || !Array.isArray(users)) return [];
@@ -57,25 +63,45 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   }, [users]);
 
   useEffect(() => {
-    setMounted(true);
-    
-    // Only proceed if we have teammates
-    if (teammates.length === 0) return;
+    const initializeTeammates = async () => {
+      try {
+        setMounted(true);
+        
+        // Only proceed if we have teammates
+        if (teammates.length === 0) {
+          // Try to force refresh teammates if none are found
+          const response = await fetch('/api/teammates', {
+            headers: {
+              'x-force-refresh': 'true'
+            }
+          });
+          if (!response.ok) {
+            throw new Error('Failed to fetch teammates');
+          }
+          return;
+        }
 
-    const storedTeammate = localStorage.getItem('selectedTeammate');
-    
-    if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
-      // If we have a valid stored teammate, select it
-      setSelectedTeammate(storedTeammate);
-      // Fetch integrations for the stored teammate
-      fetchIntegrations(storedTeammate);
-    } else {
-      // Otherwise select the first teammate and store it
-      setSelectedTeammate(teammates[0].uuid);
-      localStorage.setItem('selectedTeammate', teammates[0].uuid);
-      // Fetch integrations for the first teammate
-      fetchIntegrations(teammates[0].uuid);
-    }
+        const storedTeammate = localStorage.getItem('selectedTeammate');
+        
+        if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
+          // If we have a valid stored teammate, select it
+          setSelectedTeammate(storedTeammate);
+          // Fetch integrations for the stored teammate
+          fetchIntegrations(storedTeammate);
+        } else if (teammates.length > 0) {
+          // Otherwise select the first teammate and store it
+          setSelectedTeammate(teammates[0].uuid);
+          localStorage.setItem('selectedTeammate', teammates[0].uuid);
+          // Fetch integrations for the first teammate
+          fetchIntegrations(teammates[0].uuid);
+        }
+      } catch (error) {
+        console.error('Failed to initialize teammates:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load teammates');
+      }
+    };
+
+    initializeTeammates();
   }, [teammates, setSelectedTeammate]); // Add setSelectedTeammate to dependencies
 
   const fetchIntegrations = async (teammateId: string) => {
@@ -128,6 +154,23 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm text-slate-400">Loading teammates...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if loading failed
+  if (loadError) {
+    return (
+      <div className="h-full bg-gray-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 p-4 text-center">
+          <p className="text-red-400">Failed to load teammates</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-sm transition-colors"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

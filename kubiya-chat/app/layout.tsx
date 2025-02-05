@@ -2,9 +2,10 @@ import './globals.css';
 import { GeistSans } from 'geist/font/sans';
 import { Metadata } from 'next';
 import { Toaster } from "sonner";
-import { Providers } from './providers/client-providers';
+import { Providers } from './providers';
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/react";
+import { MyRuntimeProvider } from './MyRuntimeProvider';
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -33,11 +34,13 @@ export default function RootLayout({
       </head>
       <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`}>
         <Providers>
-          {children}
+          <MyRuntimeProvider>
+            {children}
+            <Toaster />
+            <SpeedInsights />
+            <Analytics />
+          </MyRuntimeProvider>
         </Providers>
-        <Toaster />
-        <SpeedInsights />
-        <Analytics />
       </body>
     </html>
   );
