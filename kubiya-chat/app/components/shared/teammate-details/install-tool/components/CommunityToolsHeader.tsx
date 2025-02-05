@@ -68,7 +68,7 @@ export function CommunityToolsHeader({ onRefresh }: CommunityToolsHeaderProps) {
             className="h-8 bg-slate-900 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-300"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Syncing...' : 'Sync Tools'}
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
         </div>
         <p className="text-slate-400 mt-1">

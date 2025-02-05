@@ -16,8 +16,9 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/app/components/ui/alert';
 import { Button } from '@/app/components/ui/button';
 import { InstallationProgress } from './components/InstallationProgress';
-import type { InstallationStep, InstallToolFormState, CommunityTool, FormValues } from './types';
-import { useInstallTool } from './useInstallTool';
+import type { InstallationStep, InstallToolFormState, FormValues } from './types';
+import type { ExtendedCommunityTool } from './types';
+import { useInstallTool } from './hooks/useInstallTool';
 import type { Step, UseInstallToolReturn } from './types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/app/components/ui/tooltip';
 import { Textarea } from '@/app/components/ui/textarea';
@@ -27,6 +28,9 @@ import { ScrollArea } from '@/app/components/ui/scroll-area';
 import { StepIndicator } from './components/StepIndicator';
 import { StepContent } from './components/StepContent';
 import { DialogFooter as BaseDialogFooter } from '@/app/components/ui/dialog';
+import { DialogFooter } from './components/DialogFooter';
+import { SelectStep } from './components/SelectStep';
+import { PreviewStep } from './components/PreviewStep';
 
 interface InstallToolFormProps {
   isOpen: boolean;
@@ -46,13 +50,13 @@ interface InstallToolFormContentProps {
   installationSteps: InstallationStep[];
   setInstallationSteps: React.Dispatch<React.SetStateAction<InstallationStep[]>>;
   methods: ReturnType<typeof useForm<FormValues>>;
-  transformedTools: CommunityTool[];
+  transformedTools: ExtendedCommunityTool[];
   rowVirtualizer: Virtualizer<HTMLDivElement, Element>;
   parentRef: React.RefObject<HTMLDivElement>;
   handleSearch: (value: string) => void;
   communityToolsLoading: boolean;
   communityToolsError: unknown;
-  filteredTools: CommunityTool[];
+  filteredTools: ExtendedCommunityTool[];
 }
 
 function InstallToolFormContent({

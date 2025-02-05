@@ -1,12 +1,15 @@
 import type { UseFormReturn } from 'react-hook-form';
 import type { TeammateDetails } from '@/app/types/teammate';
 import type { ReactNode, ReactElement } from 'react';
-import type { ToolArgument, ToolSource } from '@/app/types/tool';
+import type { ToolArgument, ToolSource, CommunityTool as BaseCommunityTool } from '@/app/types/tool';
 import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
 import { sourceFormSchema } from './schema';
 import { useForm } from 'react-hook-form';
 import type { FormValues } from './schema';
+
+// Re-export the base type
+export type { BaseCommunityTool as CommunityTool };
 
 interface CommitInfo {
   sha: string;
@@ -18,39 +21,14 @@ interface CommitInfo {
   };
 }
 
-export interface CommunityTool {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  icon_url?: string;
-  path: string;
-  runner?: string;
-  image?: string;
-  content?: string;
-  workdir?: string;
-  args?: ToolArgument[];
-  env?: string[];
-  secrets?: string[];
-  with_volumes?: Array<{ path: string; name: string; } | string>;
-  with_files?: Array<{ source?: string; target?: string; destination?: string; content?: string; } | string>;
-  mounts?: Array<{ source: string; target: string; } | string>;
-  mermaid?: string;
-  source?: ToolSource;
-  uuid?: string;
-  alias?: string;
-  readme_summary?: string;
-  lastCommit?: CommitInfo;
-  contributors_count?: number;
-  isDiscovering: boolean;
-  loadingState: 'idle' | 'loading' | 'success' | 'error';
-  tools: CommunityTool[];
-  error?: string;
-  lastUpdated?: string;
-  stars?: number;
-  created_by?: string;
-  created_at?: string;
-  updated_at?: string;
+export interface CommunityToolCardProps {
+  tool: ExtendedCommunityTool;
+  isSelected: boolean;
+  onSelect: () => void;
+  failedIcons: Set<string>;
+  onIconError: (url: string) => void;
+  expandedTools: Set<string>;
+  setExpandedTools: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 export interface FormState {
@@ -58,7 +36,7 @@ export interface FormState {
   communityTools: {
     isLoading: boolean;
     error: string | null;
-    data: CommunityTool[];
+    data: ExtendedCommunityTool[];
   };
   preview: {
     isLoading: boolean;
@@ -98,7 +76,7 @@ export interface InstallToolFormState {
   communityTools: {
     isLoading: boolean;
     error: string | null;
-    data: CommunityTool[];
+    data: ExtendedCommunityTool[];
   };
   preview: {
     isLoading: boolean;
@@ -127,16 +105,6 @@ export interface CategoryInfo {
   icon?: string;
 }
 
-export interface CommunityToolCardProps {
-  tool: CommunityTool;
-  isSelected: boolean;
-  onSelect: () => void;
-  failedIcons?: Set<string>;
-  onIconError?: (url: string) => void;
-  expandedTools?: Set<string>;
-  setExpandedTools?: React.Dispatch<React.SetStateAction<Set<string>>>;
-}
-
 export interface DialogFooterProps {
   currentStep: string;
   onClose: () => void;
@@ -161,17 +129,17 @@ export interface InstallToolFormProps {
 
 export interface InstallToolState {
   formState: InstallToolFormState;
-  selectedTool: CommunityTool | null;
+  selectedTool: ExtendedCommunityTool | null;
   methods: UseFormReturn<FormValues>;
   currentStep: string;
   activeCategory: string | null;
   setActiveCategory: (category: string) => void;
-  handleToolSelect: (tool: CommunityTool) => void;
+  handleToolSelect: (tool: ExtendedCommunityTool) => void;
   failedIcons: Set<string>;
   handleIconError: (url: string) => void;
   expandedTools: Set<string>;
   setExpandedTools: React.Dispatch<React.SetStateAction<Set<string>>>;
-  handleCommunityToolSelect: (tool: CommunityTool) => Promise<void>;
+  handleCommunityToolSelect: (tool: ExtendedCommunityTool) => Promise<void>;
   handleRefresh: () => Promise<void>;
   handleSubmit: () => Promise<void>;
   goToNextStep: () => void;
@@ -190,13 +158,13 @@ export interface UseInstallToolReturn {
   currentStep: string;
   activeCategory: string | null;
   setActiveCategory: (category: string | null) => void;
-  selectedTool: CommunityTool | null;
-  handleToolSelect: (tool: CommunityTool) => void;
+  selectedTool: ExtendedCommunityTool | null;
+  handleToolSelect: (tool: ExtendedCommunityTool) => void;
   failedIcons: Set<string>;
   handleIconError: (url: string) => void;
   expandedTools: Set<string>;
   setExpandedTools: React.Dispatch<React.SetStateAction<Set<string>>>;
-  handleCommunityToolSelect: (tool: CommunityTool) => void;
+  handleCommunityToolSelect: (tool: ExtendedCommunityTool) => void;
   handleRefresh: () => Promise<void>;
   handleSubmit: (data: FormValues) => Promise<void>;
   goToNextStep: () => void;
@@ -227,9 +195,20 @@ export interface UseInstallToolProps {
   onClose?: () => void;
 }
 
-export type ExtendedCommunityTool = CommunityTool & {
-  runner: string;
-};
+export interface SourceMetadata {
+  git_branch: string;
+  git_commit?: string;
+  last_updated: string;
+}
+
+export interface ExtendedCommunityTool extends BaseCommunityTool {
+  runner?: string;
+  source?: {
+    name: string;
+    url: string;
+    metadata: SourceMetadata;
+  };
+}
 
 export type InstallationStep = {
   id: string;

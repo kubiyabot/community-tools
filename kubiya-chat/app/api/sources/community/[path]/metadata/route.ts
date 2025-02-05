@@ -8,18 +8,16 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: { path: string } }
 ) {
   try {
-    if (!params.path) {
-      return NextResponse.json({ error: 'Path is required' }, { status: 400 });
-    }
-
-    const metadata = await getToolMetadata(params.path, request);
+    const metadata = await getToolMetadata(params.path);
     return NextResponse.json(metadata);
   } catch (error) {
-    console.error('Error getting tool metadata:', error);
-    return NextResponse.json({ error: 'Failed to get tool metadata' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch tool metadata' },
+      { status: 500 }
+    );
   }
 } 

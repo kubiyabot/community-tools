@@ -2,10 +2,11 @@ import * as React from 'react';
 import { Card, CardHeader } from '@/app/components/ui/card';
 import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
-import { FolderGit, Star, Clock, ChevronRight, Code, Users, GitCommit } from 'lucide-react';
+import { FolderGit, Star, Clock, ChevronRight, Code, Users, GitCommit, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CommunityToolCardProps } from '../types';
 import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from '@/app/components/ui/skeleton';
 
 export function CommunityToolCard({
   tool,
@@ -32,7 +33,7 @@ export function CommunityToolCard({
         !hasTools && "opacity-50 cursor-not-allowed",
         isSelected && "ring-2 ring-purple-500 border-purple-500",
         hasTools && "hover:border-purple-500/30",
-        tool.error && "border-red-500/30"
+        hasError && "border-red-500/30"
       )}
       onClick={() => hasTools && onSelect()}
     >
@@ -42,61 +43,119 @@ export function CommunityToolCard({
           <div className={cn(
             "p-2 rounded-md transition-colors",
             isSelected ? "bg-purple-500/20" : "bg-purple-500/10",
-            "border border-purple-500/20"
+            "border border-purple-500/20",
+            "relative min-w-[48px] min-h-[48px] flex items-center justify-center"
           )}>
-            {toolIcon && !failedIcons?.has(toolIcon) ? (
+            {isLoading ? (
+              <Loader2 className="h-6 w-6 text-purple-500 animate-spin" />
+            ) : hasError ? (
+              <AlertCircle className="h-6 w-6 text-red-500" />
+            ) : toolIcon && !failedIcons?.has(toolIcon) ? (
               <img 
                 src={toolIcon} 
                 alt={tool.name} 
-                className="w-8 h-8"
-                onError={() => onIconError?.(toolIcon)}
+                className="h-6 w-6 object-contain"
+                onError={() => onIconError(toolIcon)}
               />
             ) : (
-              <Code className="w-8 h-8 text-purple-400" />
+              <FolderGit className="h-6 w-6 text-purple-500" />
             )}
           </div>
+
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-medium text-slate-200 truncate">{tool.name}</h3>
-            <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{tool.description}</p>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-slate-200 truncate">
+                {tool.name}
+              </h3>
+              {tool.tools_count > 0 && (
+                <Badge variant="secondary" className="shrink-0">
+                  {tool.tools_count} {tool.tools_count === 1 ? 'tool' : 'tools'}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 line-clamp-2 mt-1">
+              {tool.description || 'No description available'}
+            </p>
           </div>
         </div>
 
         {/* Metadata */}
-        <div className="flex items-center gap-3 text-xs text-slate-400">
+        <div className="flex flex-wrap gap-3 text-xs text-slate-400">
           {tool.stars !== undefined && (
             <div className="flex items-center gap-1">
-              <Star className="w-3.5 h-3.5" />
+              <Star className="h-3.5 w-3.5" />
               <span>{tool.stars}</span>
             </div>
           )}
-          {tool.contributors_count !== undefined && (
+          {tool.lastUpdated && (
             <div className="flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" />
-              <span>{tool.contributors_count}</span>
+              <Clock className="h-3.5 w-3.5" />
+              <span>Updated {formatDistanceToNow(new Date(tool.lastUpdated))} ago</span>
             </div>
           )}
           {tool.lastCommit && (
-            <div className="flex items-center gap-1" title={tool.lastCommit.message}>
-              <GitCommit className="w-3.5 h-3.5" />
-              <span>{formatDistanceToNow(new Date(tool.lastCommit.date), { addSuffix: true })}</span>
+            <div className="flex items-center gap-1">
+              <GitCommit className="h-3.5 w-3.5" />
+              <span className="truncate max-w-[150px]">{tool.lastCommit.message}</span>
             </div>
           )}
         </div>
 
-        {/* Tools Count */}
+        {/* Tools Preview */}
         {hasTools && (
-          <div className="flex items-center justify-between">
-            <Badge variant="secondary" className="bg-purple-500/10 text-purple-400 border-purple-500/20">
-              {tool.tools.length} tool{tool.tools.length !== 1 ? 's' : ''}
-            </Badge>
-            <ChevronRight className="w-4 h-4 text-slate-400" />
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-slate-300">Available Tools:</div>
+            <div className="space-y-1">
+              {tool.tools.slice(0, expandedTools.has(tool.id) ? undefined : 3).map((subTool: any) => (
+                <div key={subTool.name} className="flex items-center gap-2 text-xs text-slate-400 p-1.5 rounded-md bg-slate-800/50">
+                  <Code className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{subTool.name}</span>
+                  {subTool.description && (
+                    <span className="hidden sm:inline text-slate-500 truncate">
+                      - {subTool.description}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {tool.tools.length > 3 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setExpandedTools(prev => {
+                    const next = new Set(prev);
+                    if (next.has(tool.id)) {
+                      next.delete(tool.id);
+                    } else {
+                      next.add(tool.id);
+                    }
+                    return next;
+                  });
+                }}
+              >
+                {expandedTools.has(tool.id) ? 'Show Less' : `Show ${tool.tools.length - 3} More`}
+              </Button>
+            )}
           </div>
         )}
 
-        {/* Error State */}
-        {hasError && tool.error && (
-          <div className="text-xs text-red-400 mt-2">
-            {tool.error}
+        {/* Error Message */}
+        {hasError && (
+          <div className="text-xs text-red-400 flex items-center gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5" />
+            <span>{tool.error || 'Failed to load tools'}</span>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-full" />
           </div>
         )}
       </div>

@@ -3,7 +3,8 @@ import { Loader2, AlertCircle, Box, RefreshCw } from 'lucide-react';
 import { Button } from '@/app/components/ui/button';
 import { styles } from '../styles';
 import { CommunityToolCard } from './CommunityToolCard';
-import type { CommunityTool, FormState } from '../types';
+import type { FormState } from '../types';
+import type { CommunityTool } from '@/app/types/tool';
 
 interface CommunityToolsTabProps {
   formState: FormState;

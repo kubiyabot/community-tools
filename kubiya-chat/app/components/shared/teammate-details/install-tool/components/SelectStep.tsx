@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Dispatch, SetStateAction } from 'react';
-import type { FormState, CommunityTool } from '../types';
+import type { FormState } from '../types';
+import type { CommunityTool } from '@/app/types/tool';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/app/components/ui/tabs';
 import { GitBranch, GitPullRequest, AlertCircle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ import { useInstallToolContext } from '../context';
 import { CustomSourceTab } from './CustomSourceTab';
 import { Button } from '@/app/components/ui/button';
 import { useCommunityTools } from '@/app/hooks/useCommunityTools';
+import { CommunityToolsTab } from './CommunityToolsTab';
 
 // Convert TOOL_CATEGORIES to array format
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -59,8 +61,11 @@ export function SelectStep({
   // Update formState when tools are loaded
   React.useEffect(() => {
     if (tools) {
-      formState.communityTools.data = tools;
-      formState.communityTools.isLoading = false;
+      formState.communityTools = {
+        data: Array.isArray(tools) ? tools : [],
+        isLoading: false,
+        error: null
+      };
     }
   }, [tools, formState]);
 

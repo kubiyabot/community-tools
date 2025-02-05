@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/app/components/ui/alert';
 import { cn } from '@/lib/utils';
-import type { CommunityTool } from '../types';
+import type { ExtendedCommunityTool } from '../types';
 import {
   Tooltip,
   TooltipContent,
@@ -46,7 +46,7 @@ import { format } from 'date-fns';
 import { Separator } from '@/app/components/ui/separator';
 
 interface PreviewStepProps {
-  selectedTool: CommunityTool | null;
+  selectedTool: ExtendedCommunityTool | null;
   isLoading?: boolean;
 }
 

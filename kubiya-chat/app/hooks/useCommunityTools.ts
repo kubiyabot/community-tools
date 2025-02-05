@@ -1,10 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryOptions } from '@tanstack/react-query';
 import { CommunityTool } from '@/app/types/tool';
 
 async function fetchCommunityTools(): Promise<CommunityTool[]> {
-  const response = await fetch('/api/sources/community/list');
+  const response = await fetch('/api/v1/sources/community', {
+    headers: {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  });
   if (!response.ok) {
-    throw new Error('Failed to fetch community tools');
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || 'Failed to fetch community tools');
   }
   const data = await response.json();
   return data.map((tool: any) => ({
@@ -18,10 +24,13 @@ async function fetchCommunityTools(): Promise<CommunityTool[]> {
 }
 
 export function useCommunityTools(initialData?: CommunityTool[]) {
-  return useQuery({
+  const queryOptions: UseQueryOptions<CommunityTool[], Error> = {
     queryKey: ['community-tools'],
     queryFn: fetchCommunityTools,
     initialData: initialData ? () => initialData : undefined,
     staleTime: 1000 * 60 * 5, // 5 minutes
-  });
+    retry: 2
+  };
+
+  return useQuery(queryOptions);
 } 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Component, type ReactNode, type ErrorInfo } from 'react';
+import { Component, ReactNode } from 'react';
 import { Button } from '@/app/components/button';
 
 interface Props {
@@ -24,11 +24,11 @@ export class ErrorBoundary extends Component<Props, State> {
     };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
+  public componentDidCatch(error: Error) {
+    console.error('Uncaught error:', error);
   }
 
-  render = (): React.ReactElement => {
+  public render() {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -58,6 +58,6 @@ export class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return <>{this.props.children}</>;
+    return this.props.children;
   }
 } 

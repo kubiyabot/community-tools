@@ -2,10 +2,10 @@ import './globals.css';
 import { GeistSans } from 'geist/font/sans';
 import { Metadata } from 'next';
 import { Toaster } from "sonner";
-import { Providers } from './providers';
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/react";
-import { MyRuntimeProvider } from './MyRuntimeProvider';
+import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/react';
+import type { ReactNode } from 'react';
+import { Providers } from './providers/Providers';
 
 export const metadata: Metadata = {
   title: 'Kubiya Chat',
@@ -22,8 +22,8 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
-}) {
+  children: ReactNode;
+}): JSX.Element {
   return (
     <html lang="en" className="h-full">
       <head>
@@ -34,12 +34,10 @@ export default function RootLayout({
       </head>
       <body className={`${GeistSans.className} h-full bg-[#0A0F1E] text-white antialiased`}>
         <Providers>
-          <MyRuntimeProvider>
-            {children}
-            <Toaster />
-            <SpeedInsights />
-            <Analytics />
-          </MyRuntimeProvider>
+          {children}
+          <Toaster />
+          <SpeedInsights />
+          <Analytics />
         </Providers>
       </body>
     </html>

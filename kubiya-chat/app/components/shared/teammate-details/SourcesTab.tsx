@@ -881,6 +881,36 @@ export function SourcesTab({
   onSourcesChange
 }: SourcesTabProps) {
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [syncingSourceIds, setSyncingSourceIds] = useState<Set<string>>(new Set());
+
+  const handleSync = async (sourceId: string) => {
+    try {
+      setSyncingSourceIds(prev => new Set([...prev, sourceId]));
+      
+      const response = await fetch(`/api/sources/${sourceId}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync source');
+      }
+
+      if (onSourcesChange) {
+        await onSourcesChange();
+      }
+    } catch (error) {
+      console.error('Error syncing source:', error);
+    } finally {
+      setSyncingSourceIds(prev => {
+        const next = new Set(prev);
+        next.delete(sourceId);
+        return next;
+      });
+    }
+  };
 
   const handleInstall = async (
     values: SourceFormValues,
@@ -893,10 +923,6 @@ export function SourcesTab({
 
       updateProgress('validate', 'loading');
 
-      // add print statement
-      console.log('values', values);
-
-      // Only include required fields in the request
       const sourceData = {
         name: values.name,
         url: values.url,
@@ -943,7 +969,7 @@ export function SourcesTab({
     }
   };
 
-  // Early return if loading or no teammate
+  // Early return if loading
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -954,57 +980,225 @@ export function SourcesTab({
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header with Install Button */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-[#2D3B4E] flex items-center justify-center">
-            {teammate.avatar_url ? (
-            <img 
-              src={teammate.avatar_url} 
-              alt={teammate.name || 'Assistant'} 
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            <Bot className="h-6 w-6 text-[#7C3AED]" />
-          )}
-        </div>
-        <div>
-          <h2 className="text-xl font-semibold text-white">
-              {teammate.name || 'Unknown Teammate'}
-          </h2>
-          <p className="text-sm text-[#94A3B8]">
-              {teammate.description || 'No description available'}
-          </p>
+      {/* Tools Information Header */}
+      <div className="bg-[#1E293B] rounded-xl p-6">
+        <div className="flex items-start justify-between">
+          <div className="space-y-4 max-w-3xl">
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <Code className="h-6 w-6 text-[#7C3AED]" />
+              Tools
+            </h2>
+            <p className="text-[#94A3B8] leading-relaxed">
+              Tools are stateless functions you can attach to your teammates. They are version controlled and are part of tool sources which is a reference to a source control ref with Python code or YAML.
+            </p>
+            <div className="flex items-center gap-2">
+              <a 
+                href="https://docs.kubiya.ai/docs/kubiya-resources/tools" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[#7C3AED] hover:text-[#6D28D9] flex items-center gap-1.5 text-sm font-medium"
+              >
+                Learn more about tools
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
           </div>
+          <Button
+            onClick={() => setShowInstallModal(true)}
+            className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Install Tool
+          </Button>
         </div>
-
-        <Button
-          onClick={() => setShowInstallModal(true)}
-          className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Install Tool
-        </Button>
       </div>
-
-      <Separator className="bg-[#2D3B4E]" />
 
       {/* Sources Grid */}
       {!sources.length ? (
         <EmptyState />
       ) : (
-      <div className="space-y-8">
-        {sources.map((source: SourceInfo) => (
-          <SourceGroup key={source.uuid} source={source} />
-        ))}
-      </div>
+        <div className="space-y-8">
+          {sources.map((source: SourceInfo) => (
+            <div key={source.uuid} className="bg-[#1E293B] rounded-xl p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-md bg-[#2A3347] border border-[#2A3347]">
+                    {source.tools[0]?.icon_url ? (
+                      <img src={source.tools[0].icon_url} alt={source.name} className="h-5 w-5" />
+                    ) : (
+                      <Code className="h-5 w-5 text-[#7C3AED]" />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
+                        {source.name}
+                        {source.type === 'github' && (
+                          <img 
+                            src="https://cdn-icons-png.flaticon.com/512/25/25231.png" 
+                            alt="GitHub" 
+                            className="h-3.5 w-3.5 opacity-50"
+                          />
+                        )}
+                        {source.errors_count > 0 && (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="destructive" className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help">
+                                  {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent className="w-80 bg-[#1E293B] border border-red-500/20 p-3">
+                                <div className="space-y-2">
+                                  <h5 className="text-sm font-medium text-white flex items-center gap-2">
+                                    <AlertCircle className="h-4 w-4 text-red-400" />
+                                    Source Errors
+                                  </h5>
+                                  {source.error && (
+                                    <div className="text-xs text-red-400 bg-red-500/10 p-2 rounded border border-red-500/20">
+                                      {source.error}
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        )}
+                      </h3>
+                      
+                      {/* Source Control Links */}
+                      {source.url && (
+                        <div className="flex flex-col gap-1 mt-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            <a
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[#94A3B8] hover:text-[#7C3AED] flex items-center gap-1 transition-colors"
+                            >
+                              <FolderGit className="h-3 w-3" />
+                              {getSourceDisplayName(source.url, source.name)}
+                            </a>
+                            {source.source_meta.branch && (
+                              <>
+                                <span className="text-[#4B5563]">/</span>
+                                <div className="flex items-center gap-1 text-[#94A3B8]">
+                                  <GitBranch className="h-3 w-3" />
+                                  {source.source_meta.branch}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          {source.source_meta.commit && (
+                            <div className="flex items-center gap-2 text-xs">
+                              <div className="text-[#94A3B8] flex items-center gap-1">
+                                <Hash className="h-3 w-3" />
+                                <span className="font-mono">{source.source_meta.commit.slice(0, 7)}</span>
+                                <span className="text-[#4B5563]">by</span>
+                                <span>{source.source_meta.committer}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Source Metadata */}
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-xs text-[#94A3B8]">
+                          <Package className="h-3.5 w-3.5" />
+                          <span>{source.connected_tools_count} tools</span>
+                        </div>
+                        {source.connected_workflows_count > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-[#94A3B8]">
+                            <Terminal className="h-3.5 w-3.5" />
+                            <span>{source.connected_workflows_count} workflows</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dynamic Configuration */}
+                    {source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && (
+                      <HoverCard>
+                        <HoverCardTrigger asChild>
+                          <div className="flex items-center gap-2 text-xs text-[#94A3B8] hover:text-[#7C3AED] cursor-help mt-2">
+                            <Settings className="h-3.5 w-3.5" />
+                            <span>Dynamic Configuration Available</span>
+                          </div>
+                        </HoverCardTrigger>
+                        <HoverCardContent className="w-80">
+                          <div className="space-y-2">
+                            <h5 className="text-sm font-medium text-white">Dynamic Configuration</h5>
+                            <pre className="text-xs text-[#94A3B8] bg-[#1E293B] p-2 rounded-md overflow-auto max-h-60">
+                              {JSON.stringify(source.dynamic_config, null, 2)}
+                            </pre>
+                          </div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    )}
+
+                    {/* Creation Info */}
+                    <div className="text-xs text-[#94A3B8] mt-2">
+                      <div className="flex items-center gap-1">
+                        <span>Created by</span>
+                        <span className="font-medium">{source.kubiya_metadata.user_created}</span>
+                        <span>on</span>
+                        <span>{new Date(source.kubiya_metadata.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>Updated by</span>
+                        <span className="font-medium">{source.kubiya_metadata.user_last_updated}</span>
+                        <span>on</span>
+                        <span>{new Date(source.kubiya_metadata.last_updated).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {source.isLoading || syncingSourceIds.has(source.uuid) ? (
+                    <div className="flex items-center gap-2 text-[#94A3B8]">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-xs">Syncing...</span>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSync(source.uuid)}
+                      className="text-[#94A3B8] hover:text-[#7C3AED] border-[#2D3B4E] hover:border-[#7C3AED]/50"
+                    >
+                      <GitBranch className="h-3.5 w-3.5 mr-1.5" />
+                      Sync
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <Separator className="bg-[#2D3B4E]" />
+
+              {source.error ? (
+                <div className="bg-red-500/10 text-red-400 rounded-lg p-3 text-sm">
+                  {source.error}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {source.tools.map((tool, toolIndex) => (
+                    <ToolCard key={`${tool.name}-${toolIndex}`} tool={tool} source={source} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       )}
 
       <InstallToolForm
         isOpen={showInstallModal}
         onClose={() => setShowInstallModal(false)}
         onInstall={handleInstall}
-        teammate={teammate}
+        teammate={teammate!}
       />
     </div>
   );

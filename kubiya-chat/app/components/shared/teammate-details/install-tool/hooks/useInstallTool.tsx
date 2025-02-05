@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { useForm, UseFormReturn } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import type { 
   InstallToolFormState,
   CommunityTool, 
@@ -24,6 +24,7 @@ import { sourceFormSchema } from '../schema';
 import { toast } from '@/app/components/ui/use-toast';
 import * as z from 'zod';
 import type { FormValues } from '../schema';
+import type { CommunityTool as CommunityToolType } from '@/app/types/tool';
 
 // Convert TOOL_CATEGORIES from Record to Array
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -32,7 +33,7 @@ const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]
 }));
 
 // At the top of the file, add this type
-type ExtendedCommunityTool = CommunityTool & {
+type ExtendedCommunityTool = CommunityToolType & {
   runner: string;
 };
 
@@ -65,7 +66,7 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
 
   const [currentStep, setCurrentStep] = useState('select');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [selectedTool, setSelectedTool] = useState<CommunityTool | null>(null);
+  const [selectedTool, setSelectedTool] = useState<CommunityToolType | null>(null);
   const [failedIcons, setFailedIcons] = useState<Set<string>>(new Set());
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [selectedTools, setSelectedTools] = useState<Set<string>>(new Set());
@@ -163,7 +164,7 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
     handleRefresh();
   }, [handleRefresh]);
 
-  const handleToolSelect = useCallback((tool: CommunityTool) => {
+  const handleToolSelect = useCallback((tool: CommunityToolType) => {
     setSelectedTool(tool);
     // Set the name if not already set
     if (!methods.getValues('name')) {
@@ -176,7 +177,7 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
     setFailedIcons(prev => new Set(prev).add(url));
   }, []);
 
-  const handleCommunityToolSelect = useCallback((tool: CommunityTool) => {
+  const handleCommunityToolSelect = useCallback((tool: CommunityToolType) => {
     setSelectedTool(tool);
   }, []);
 
@@ -284,9 +285,9 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
 
   const calculateCanProceed = useCallback((): boolean => {
     switch (currentStep) {
-      case 'source':
-        return Boolean(selectedTool !== null && 
-          (!selectedTool.runner || teammate?.runners?.includes(selectedTool.runner)));
+     // case 'source':
+       // return Boolean(selectedTool !== null && 
+          //(teammate?.runners?.includes(selectedTool.runner)));
       case 'select':
         return Boolean(selectedTool);
       case 'preview':

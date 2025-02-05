@@ -55,18 +55,38 @@ export interface SimpleIntegration {
   metadata?: Record<string, string>;
 }
 
+export interface CommitInfo {
+  sha: string;
+  date: string;
+  message: string;
+  author: {
+    name: string;
+    avatar?: string;
+  };
+}
+
 export interface CommunityTool {
   name: string;
   path: string;
   description: string;
-  category?: string;
+  tools_count: number;
   icon_url?: string;
-  tools?: any[];
-  source?: ToolSource;
-  runner?: string;
-  tools_count?: number;
   readme?: string;
+  tools: any[];
+  isDiscovering: boolean;
+  error?: string;
+  lastUpdated?: string;
+  stars?: number;
+  source?: {
+    name: string;
+    url: string;
+    metadata: {
+      git_branch: string;
+      last_updated: string;
+    };
+  };
   lastCommit?: {
+    sha: string;
     date: string;
     message: string;
     author: {
@@ -74,9 +94,7 @@ export interface CommunityTool {
       avatar?: string;
     };
   };
-  stars?: number;
   id: string;
   type: string;
-  isDiscovering: boolean;
   loadingState: 'idle' | 'loading' | 'error' | 'success';
 } 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { sourceFormSchema } from './schema';
@@ -11,6 +11,7 @@ import type {
   Step,
   FormValues
 } from './types';
+import type { CommunityTool as CommunityToolType } from '@/app/types/tool';
 
 const STEPS: Step[] = [
   {
@@ -108,7 +109,7 @@ export function useInstallTool({ onInstall, teammate }: UseInstallToolProps): Us
     setSelectedTools(new Set([tool.name]));
     methods.setValue('name', tool.name);
     methods.setValue('url', tool.path);
-    methods.setValue('runner', tool.runner || 'automatic');
+    methods.setValue('runner', teammate.runners?.[0] || 'default (inherited from teammate)');
   }, [methods]);
 
   const handleIconError = useCallback((url: string) => {

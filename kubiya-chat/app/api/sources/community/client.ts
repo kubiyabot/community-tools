@@ -1,39 +1,44 @@
-'use server';
-
-import type { CommunityTool } from '@/app/types/tool';
-import { NextRequest } from 'next/server';
+import { CommunityTool } from '@/app/types/tool';
 
 export async function fetchCommunityTools(): Promise<CommunityTool[]> {
   const response = await fetch('/api/v1/sources/community', {
     headers: {
-      'Cache-Control': 'max-age=3600', // Cache for 1 hour
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
     }
   });
   
   if (!response.ok) {
-    throw new Error(`Failed to fetch community tools: ${response.statusText}`);
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || 'Failed to fetch community tools');
   }
   
-  return response.json();
+  const data = await response.json();
+  return data.map((tool: any) => ({
+    ...tool,
+    id: tool.path || tool.name,
+    type: 'community',
+    isDiscovering: false,
+    loadingState: 'idle',
+    tools: tool.tools || []
+  }));
 }
 
-export async function getToolMetadata(path: string, request?: NextRequest): Promise<any> {
-  try {
-    const response = await fetch('/api/sources/community', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ path }),
-    });
+export async function getToolMetadata(path: string): Promise<any> {
+  const response = await fetch('/api/v1/sources/community', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    },
+    body: JSON.stringify({ path }),
+  });
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch tool metadata');
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error('Error getting tool metadata:', error);
-    throw error;
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || 'Failed to fetch tool metadata');
   }
+
+  return response.json();
 } 

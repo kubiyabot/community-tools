@@ -1,18 +1,36 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function SessionExpiredPage() {
   const router = useRouter();
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
-    // Clear any existing auth state if needed
-    // This depends on how you're managing auth state
-  }, []);
+    // Clear any existing auth state
+    localStorage.removeItem('user');
+    sessionStorage.clear();
+    
+    // Setup countdown timer
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          router.push('/api/auth/login');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000) as unknown as number;
+
+    return () => clearInterval(timer);
+  }, [router]);
 
   const handleLogin = () => {
-    router.push('/api/auth/login');
+    const loginUrl = new URL('/api/auth/login', window.location.origin);
+    loginUrl.searchParams.set('returnTo', '/chat');
+    router.push(loginUrl.toString());
   };
 
   return (
@@ -73,7 +91,7 @@ export default function SessionExpiredPage() {
         {/* Timer */}
         <p className="text-sm text-gray-400">
           Redirecting to login in 
-          <span className="font-mono text-white"> 5 </span> 
+          <span className="font-mono text-white"> {countdown} </span> 
           seconds...
         </p>
       </div> 
