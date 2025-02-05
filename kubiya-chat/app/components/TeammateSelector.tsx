@@ -21,6 +21,9 @@ const AVATAR_IMAGES = [
   'capitan-3.png'
 ];
 
+// Cache for integrations
+const integrationsCache = new Map<string, any>();
+
 interface TeammateDetails {
   uuid: string;
   id: string;
@@ -47,7 +50,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   onSelect: (id: string) => void;
   selectedId?: string;
 }) {
-  const { users, groups, isLoading } = useEntity();
+  const { users, groups, isLoading: entityLoading } = useEntity();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -56,59 +59,75 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   const [integrations, setIntegrations] = useState<any>(null);
   const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const sortedUsers = useMemo(() => {
     if (!users || !Array.isArray(users)) return [];
     return [...users].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [users]);
 
+  // Separate effect for initial mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Separate effect for teammate initialization
   useEffect(() => {
     const initializeTeammates = async () => {
-      try {
-        setMounted(true);
-        
-        // Only proceed if we have teammates
-        if (teammates.length === 0) {
-          // Try to force refresh teammates if none are found
-          const response = await fetch('/api/teammates', {
-            headers: {
-              'x-force-refresh': 'true'
-            }
-          });
-          if (!response.ok) {
-            throw new Error('Failed to fetch teammates');
-          }
-          return;
-        }
+      if (!mounted || teammates.length > 0) return;
 
-        const storedTeammate = localStorage.getItem('selectedTeammate');
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/teammates', {
+          headers: { 'x-force-refresh': 'true' },
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
         
-        if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
-          // If we have a valid stored teammate, select it
-          setSelectedTeammate(storedTeammate);
-          // Fetch integrations for the stored teammate
-          fetchIntegrations(storedTeammate);
-        } else if (teammates.length > 0) {
-          // Otherwise select the first teammate and store it
-          setSelectedTeammate(teammates[0].uuid);
-          localStorage.setItem('selectedTeammate', teammates[0].uuid);
-          // Fetch integrations for the first teammate
-          fetchIntegrations(teammates[0].uuid);
+        if (!response.ok) {
+          throw new Error('Failed to fetch teammates');
         }
       } catch (error) {
         console.error('Failed to initialize teammates:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load teammates');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     initializeTeammates();
-  }, [teammates, setSelectedTeammate]); // Add setSelectedTeammate to dependencies
+  }, [mounted, teammates]);
+
+  // Separate effect for teammate selection
+  useEffect(() => {
+    if (!mounted || teammates.length === 0 || isLoading) return;
+
+    const storedTeammate = localStorage.getItem('selectedTeammate');
+    const validTeammate = storedTeammate && teammates.some(t => t.uuid === storedTeammate)
+      ? storedTeammate
+      : teammates[0]?.uuid;
+
+    if (validTeammate) {
+      setSelectedTeammate(validTeammate);
+      localStorage.setItem('selectedTeammate', validTeammate);
+      fetchIntegrations(validTeammate);
+    }
+  }, [mounted, teammates, isLoading, setSelectedTeammate]);
 
   const fetchIntegrations = async (teammateId: string) => {
     try {
-      const response = await fetch(`/api/teammates/${teammateId}/integrations`);
+      // Check cache first
+      if (integrationsCache.has(teammateId)) {
+        setIntegrations(integrationsCache.get(teammateId));
+        return;
+      }
+
+      const response = await fetch(`/api/teammates/${teammateId}/integrations`, {
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
       if (response.ok) {
         const data = await response.json();
+        integrationsCache.set(teammateId, data);
         setIntegrations(data);
       }
     } catch (error) {
@@ -148,7 +167,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
     }
   };
 
-  if (!mounted || isLoading) {
+  if (!mounted || isLoading || entityLoading) {
     return (
       <div className="h-full bg-gray-900 animate-pulse flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
