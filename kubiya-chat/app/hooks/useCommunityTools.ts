@@ -1,14 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-
-interface CommunityTool {
-  name: string;
-  path: string;
-  description: string;
-  category: string;
-  icon: string;
-  runner: string;
-}
+import { CommunityTool } from '@/app/api/sources/community/types';
 
 interface UseCommunityToolsOptions {
   enabled?: boolean;
@@ -27,7 +19,11 @@ const fetchCommunityTools = async (): Promise<CommunityTool[]> => {
     throw new Error('Failed to fetch community tools');
   }
   
-  return response.json();
+  const data = await response.json();
+  return data.map((tool: any) => ({
+    ...tool,
+    loadingState: tool.loadingState || 'idle'
+  }));
 };
 
 export function useCommunityTools(options: UseCommunityToolsOptions = {}) {
