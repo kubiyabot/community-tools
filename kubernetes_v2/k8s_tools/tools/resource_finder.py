@@ -1,6 +1,16 @@
 from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
+import os
+
+def read_file_content(path):
+    """Helper function to read file content"""
+    try:
+        with open(path, 'r') as f:
+            return f.read()
+    except Exception as e:
+        print(f"Warning: Could not read file {path}: {e}")
+        return None
 
 resource_finder_tool = KubernetesTool(
     name="resource_finder",
@@ -8,9 +18,7 @@ resource_finder_tool = KubernetesTool(
     content='''#!/bin/bash
 set -e
 
-# Source helper scripts
-. /tmp/k8s_helpers.sh
-. /tmp/k8s_context.sh
+# Source the resource finder script
 . /tmp/resource_finder.sh
 
 # Call the main function with provided arguments
@@ -55,6 +63,18 @@ search_resources "$pattern" "$namespace" "$kind" "$label_selector" "$show_labels
             required=False
         ),
     ],
+)
+
+# Get the directory of the current file
+current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+templates_dir = os.path.join(current_dir, 'templates')
+
+# Add the resource finder script to file specs
+resource_finder_tool.with_files.append(
+    FileSpec(
+        content=read_file_content(os.path.join(templates_dir, 'resource_finder.sh')),
+        destination="/tmp/resource_finder.sh"
+    )
 )
 
 # Register the tool
