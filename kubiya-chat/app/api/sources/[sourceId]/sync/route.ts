@@ -82,31 +82,39 @@ export async function POST(
     const sourceId = params.sourceId;
     const orgId = req.headers.get('x-organization-id');
 
+    // Get request body for dynamic configuration
+    let body;
+    try {
+      body = await req.json();
+    } catch (error) {
+      console.error('Sources sync endpoint - Failed to parse request body:', error);
+      return NextResponse.json(
+        { error: 'Invalid request body', details: 'Failed to parse JSON payload' },
+        { status: 400 }
+      );
+    }
+
     console.log('Sources sync endpoint - Request details:', {
       sourceId,
       hasToken: !!session.idToken,
-      orgId
+      orgId,
+      body
     });
-
-    // Get request body for dynamic configuration
-    const body = await req.json().catch(() => ({}));
 
     const apiHeaders: Record<string, string> = {
       'Authorization': `Bearer ${session.idToken}`,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'X-Organization-ID': orgId || '',
+      'X-Kubiya-Client': 'chat-ui'
     };
 
-    if (orgId) {
-      apiHeaders['x-organization-id'] = orgId;
-    }
+    // Extract dynamic_config from body or default to null
+    const dynamic_config = body?.dynamic_config ?? null;
 
-    const response = await fetch(`${process.env.KUBIYA_API_URL}/api/v1/sources/${sourceId}`, {
+    const response = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}`, {
       method: 'PUT',
       headers: apiHeaders,
-      body: JSON.stringify({
-        ...body,
-        action: 'sync'
-      })
+      body: JSON.stringify({ dynamic_config })
     });
 
     if (!response.ok) {
@@ -129,7 +137,10 @@ export async function POST(
   } catch (error) {
     console.error('Sources sync endpoint - Error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

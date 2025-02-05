@@ -145,6 +145,13 @@ type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
   };
 };
 
+interface SyncPayload {
+  name: string;
+  url: string;
+  dynamic_config?: any;
+  runner?: string;
+}
+
 const sourceFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   url: z.string().url("Must be a valid URL"),
@@ -442,7 +449,11 @@ const getGitHubInfo = (url: string) => {
   }
 };
 
-const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; onSourcesChange?: () => void }) => {
+const SourceGroup = ({ source, onSourcesChange, allSources }: { 
+  source: ExtendedSourceInfo; 
+  onSourcesChange?: () => void;
+  allSources: ExtendedSourceInfo[];
+}) => {
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -454,15 +465,34 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
     try {
       setIsSyncing(true);
       
+      // Construct the base payload
+      const basePayload = {
+        name: source.name,
+        url: source.url
+      };
+
+      // Add optional fields
+      const fullPayload = {
+        ...basePayload,
+        ...(source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && {
+          dynamic_config: source.dynamic_config || {}
+        }),
+        ...(source.runner && source.runner !== 'automatic' && {
+          runner: source.runner
+        })
+      } satisfies SyncPayload;
+      
       const response = await fetch(`/api/sources/${source.uuid}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify(fullPayload)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to sync source');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync source');
       }
 
       if (onSourcesChange) {
@@ -470,6 +500,7 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
       }
     } catch (error) {
       console.error('Error syncing source:', error);
+      // TODO: Show error toast or notification
     } finally {
       setIsSyncing(false);
       setShowSyncDialog(false);
@@ -480,12 +511,24 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
     try {
       setIsRemoving(true);
       
-      const response = await fetch(`/api/teammates/${source.teammate_id}/sources/${source.uuid}`, {
-        method: 'DELETE',
+      // Get current teammate's sources
+      const currentSources = allSources.map((s: ExtendedSourceInfo) => s.uuid);
+      // Remove the current source from the list
+      const updatedSources = currentSources.filter((id: string) => id !== source.uuid);
+      
+      const response = await fetch(`/api/teammates/${source.teammate_id}/sources`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sources: updatedSources
+        })
       });
 
       if (!response.ok) {
-        throw new Error('Failed to remove source');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove source');
       }
 
       if (onSourcesChange) {
@@ -731,8 +774,25 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Source</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will remove the source and all its tools from this teammate. This action cannot be undone.
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                Are you sure you want to remove <span className="font-medium text-white">{source.name}</span> from this teammate?
+              </p>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-400 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-amber-400">This will:</p>
+                    <ul className="text-sm text-amber-300/90 list-disc list-inside space-y-1">
+                      <li>Remove {source.tools.length} tools from this teammate</li>
+                      {source.connected_workflows_count > 0 && (
+                        <li>Affect {source.connected_workflows_count} connected workflows</li>
+                      )}
+                      <li>This action cannot be undone</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -742,8 +802,17 @@ const SourceGroup = ({ source, onSourcesChange }: { source: ExtendedSourceInfo; 
               disabled={isRemoving}
               className="bg-red-500 hover:bg-red-600"
             >
-              {isRemoving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Remove Source
+              {isRemoving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Removing...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove Source
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1098,23 +1167,19 @@ export function SourcesTab({
         throw new Error('Source not found');
       }
 
-      const payload: any = {
+      const payload: SyncPayload = {
         name: source.name,
         url: source.url,
+        ...(source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && {
+          dynamic_config: source.dynamic_config
+        }),
+        ...(source.runner && source.runner !== 'automatic' && {
+          runner: source.runner
+        })
       };
-
-      // Only include dynamic_config if it exists
-      if (source.dynamic_config && Object.keys(source.dynamic_config).length > 0) {
-        payload.dynamic_config = source.dynamic_config;
-      }
-
-      // Only include runner if it exists
-      if (source.runner) {
-        payload.runner = source.runner;
-      }
       
-      const response = await fetch(`/api/sources/${sourceId}/sync`, {
-        method: 'PUT',
+      const response = await fetch(`/api/sources/${source.uuid}/sync`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
@@ -1122,7 +1187,8 @@ export function SourcesTab({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to sync source');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync source');
       }
 
       if (onSourcesChange) {
@@ -1326,6 +1392,7 @@ export function SourcesTab({
                 key={source.uuid} 
                 source={source}
                 onSourcesChange={onSourcesChange}
+                allSources={filteredSources}
               />
             ))}
           </div>
