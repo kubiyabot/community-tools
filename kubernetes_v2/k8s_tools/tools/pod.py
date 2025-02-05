@@ -466,133 +466,106 @@ pod_network_topology_tool = KubernetesTool(
         # Analyze network policies
         echo "🔒 Network Policies:"
         echo "================="
-        if ! kubectl get networkpolicies $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No network policies found"
-        else
-            jq -r '
-            def format_selector(selector):
-              if selector == null then
-                "any"
-              elif selector | length == 0 then
-                "any"
-              else
-                selector | to_entries | map("\(.key)=\(.value)") | join(", ")
-              end;
-
-            def format_rules(rules):
-              if rules == null or (rules | length == 0) then
-                "  • None"
-              else
-                (rules | map(
-                  "  • " + (
-                    if .from then
-                      "From: " + (.from | map(
-                        if .namespaceSelector then "namespace[" + format_selector(.namespaceSelector) + "]"
-                        elif .podSelector then "pod[" + format_selector(.podSelector) + "]"
-                        elif .ipBlock then "CIDR[" + .ipBlock.cidr + "]"
-                        else "any"
+        kubectl get networkpolicies $namespace_flag -o json | \
+        jq -r '.items[] | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            pod_selector: .spec.podSelector,
+            ingress: .spec.ingress,
+            egress: .spec.egress,
+            policy_types: .spec.policyTypes
+        }' | jq -r '. |
+        "Policy: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "Pod Selector: \(.pod_selector | tostring)\n" +
+        "Policy Types: \(.policy_types | join(", "))\n" +
+        "\nIngress Rules:" +
+        if .ingress then
+            (.ingress | map(
+                "\n  • From:" +
+                (if .[].from then
+                    (.[].from | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
                         end
-                      ) | join(", "))
-                    elif .to then
-                      "To: " + (.to | map(
-                        if .namespaceSelector then "namespace[" + format_selector(.namespaceSelector) + "]"
-                        elif .podSelector then "pod[" + format_selector(.podSelector) + "]"
-                        elif .ipBlock then "CIDR[" + .ipBlock.cidr + "]"
-                        else "any"
+                    ) | join(""))
+                else "\n    - Any"
+                end)
+            ) | join("\n"))
+        else "\n  None"
+        end +
+        "\n\nEgress Rules:" +
+        if .egress then
+            (.egress | map(
+                "\n  • To:" +
+                (if .[].to then
+                    (.[].to | map(
+                        if .namespaceSelector then "\n    - Namespace: \(.namespaceSelector)"
+                        elif .podSelector then "\n    - Pod: \(.podSelector)"
+                        elif .ipBlock then "\n    - IP Block: \(.ipBlock)"
+                        else "\n    - Any"
                         end
-                      ) | join(", "))
-                    else "any"
-                    end
-                  )
-                ) | join("\n"))
-              end;
-
-            if .items | length == 0 then
-              "No network policies found"
-            else
-              (.items[] | "Policy: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "Pod Selector: " + format_selector(.spec.podSelector) + "\n" +
-               "Policy Types: " + (.spec.policyTypes | join(", ")) + "\n\n" +
-               "Ingress Rules:\n" + format_rules(.spec.ingress) + "\n\n" +
-               "Egress Rules:\n" + format_rules(.spec.egress) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Policy:/ {printf "\n🛡️  %s\n", substr($0, 9)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^Pod Selector:/ {printf "🎯 %s\n", $0}
-            /^Policy Types:/ {printf "📋 %s\n", $0}
-            /^Ingress Rules:/ {print "📥 Ingress Rules:"}
-            /^Egress Rules:/ {print "📤 Egress Rules:"}
-            /^  •/ {print $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+                    ) | join(""))
+                else "\n    - Any"
+                end)
+            ) | join("\n"))
+        else "\n  None"
+        end' | \
+        awk '
+        /^Policy:/ {printf "\\n[SHIELD]  %s\\n", substr($0, 9)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^Pod Selector:/ {printf "[TARGET] %s\\n", $0}
+        /^Policy Types:/ {printf "[CLIPBOARD] %s\\n", $0}
+        /^Ingress Rules:/ {print "[INBOX] Ingress Rules:"}
+        /^Egress Rules:/ {print "[OUTBOX] Egress Rules:"}
+        /^  • From:/ {printf "  [ARROW_LEFT] From:\\n"}
+        /^  • To:/ {printf "  [ARROW_RIGHT] To:\\n"}
+        /^    -/ {printf "    %s\\n", $0}
+        ' | sed 's/\[SHIELD\]/🛡️/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g; s/\[CLIPBOARD\]/📋/g; s/\[INBOX\]/📥/g; s/\[OUTBOX\]/📤/g; s/\[ARROW_LEFT\]/⬅️/g; s/\[ARROW_RIGHT\]/➡️/g' > "$formatted_output"
 
         # Analyze service connections
         echo -e "\n🔌 Service Connections:"
         echo "===================="
-        if ! kubectl get services $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No services found"
-        else
-            jq -r '
-            def format_ports(ports):
-              if ports == null then "none"
-              else
-                ports | map("\(.port):\(.targetPort // .port) (\(.protocol // "TCP"))") | join(", ")
-              end;
-
-            if .items | length == 0 then
-              "No services found"
-            else
-              (.items[] | select(.spec.selector != null) |
-               "Service: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "Selector: " + (.spec.selector | to_entries | map("\(.key)=\(.value)") | join(", ")) + "\n" +
-               "Ports: " + format_ports(.spec.ports) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Service:/ {printf "\n🔌 %s\n", substr($0, 10)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^Selector:/ {printf "🎯 %s\n", $0}
-            /^Ports:/ {printf "🔌 %s\n", $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+        kubectl get services $namespace_flag -o json | \
+        jq -r '.items[] | select(.spec.selector) | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            selector: .spec.selector,
+            ports: .spec.ports
+        }' | jq -r '. |
+        "Service: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "Selector: \(.selector | to_entries | map("\(.key)=\(.value)") | join(", "))\n" +
+        "Ports: \(.ports | map("\(.port):\(.targetPort) (\(.protocol))") | join(", ")))"' | \
+        awk '
+        /^Service:/ {printf "\\n[PLUG] %s\\n", substr($0, 10)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^Selector:/ {printf "[TARGET] %s\\n", $0}
+        /^Ports:/ {printf "[PLUG] %s\\n", $0}
+        ' | sed 's/\[PLUG\]/🔌/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g' >> "$formatted_output"
 
         # Show pod-to-pod connections based on labels
         echo -e "\n🔗 Pod-to-Pod Connections:"
         echo "======================="
-        if ! kubectl get pods $namespace_flag -o json > "$temp_file" 2>/dev/null; then
-            echo "⚠️  No pods found"
-        else
-            jq -r '
-            def format_labels(labels):
-              if labels == null then "none"
-              else
-                labels | to_entries | map("\(.key)=\(.value)") | join(", ")
-              end;
-
-            if .items | length == 0 then
-              "No pods found"
-            else
-              (.items[] | select(.metadata.labels != null) |
-               "Pod: \(.metadata.name)\n" +
-               "Namespace: \(.metadata.namespace)\n" +
-               "IP: \(.status.podIP // "pending")\n" +
-               "Labels: " + format_labels(.metadata.labels) + "\n" +
-               "-------------------")
-            end' "$temp_file" | \
-            awk '
-            /^Pod:/ {printf "\n📦 %s\n", substr($0, 6)}
-            /^Namespace:/ {printf "📁 %s\n", $0}
-            /^IP:/ {printf "🌐 %s\n", $0}
-            /^Labels:/ {printf "🏷️  %s\n", $0}
-            /^-------------------/ {print ""}
-            '
-        fi
+        jq -r '.items[] | select(.metadata.labels) | {
+            name: .metadata.name,
+            namespace: .metadata.namespace,
+            labels: .metadata.labels,
+            ip: .status.podIP
+        }' "$pod_file" | \
+        jq -r '. |
+        "Pod: \(.name)\n" +
+        "Namespace: \(.namespace)\n" +
+        "IP: \(.ip)\n" +
+        "Labels: \(.labels | to_entries | map("\(.key)=\(.value)") | join(", "))"' | \
+        awk '
+        /^Pod:/ {printf "\\n[PACKAGE] %s\\n", substr($0, 6)}
+        /^Namespace:/ {printf "[FOLDER] %s\\n", $0}
+        /^IP:/ {printf "[GLOBE] %s\\n", $0}
+        /^Labels:/ {printf "[LABEL] %s\\n", $0}
+        ' | sed 's/\[PACKAGE\]/📦/g; s/\[FOLDER\]/📁/g; s/\[GLOBE\]/🌐/g; s/\[LABEL\]/🏷️/g' >> "$formatted_output"
 
         # Calculate statistics
         total_policies=$(kubectl get networkpolicies $namespace_flag -o json | jq '.items | length')
