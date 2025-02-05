@@ -7,16 +7,20 @@ class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Basic helper functions that don't interfere with the main script
         helpers = """
-#!/usr/bin/env bash
+#!/bin/sh
 
 # Set shell options for safety
-set -u                  # Error on undefined variables
-set -o pipefail        # Exit on pipe failures
-shopt -s nullglob      # Handle no glob matches safely
+set -e  # Exit on error
+set -u  # Error on undefined variables
 
-# Force bash as shell
-if [ -z "${BASH:-}" ]; then
-    exec /bin/bash "$0" "$@"
+# Switch to bash if available (for advanced features)
+if command -v bash >/dev/null 2>&1; then
+    if [ -z "${BASH_VERSION:-}" ]; then
+        exec bash "$0" "$@"
+    fi
+    # Enable bash-specific options
+    set -o pipefail
+    shopt -s nullglob >/dev/null 2>&1 || true
 fi
 
 # Set up temp directory first, before anything else runs
@@ -29,15 +33,15 @@ MAX_EVENTS=25
 MAX_OUTPUT_LINES=50
 
 # Initialize common optional parameters with defaults
-: "${grep_filter:=}"
-: "${container:=}"
-: "${namespace:=default}"
-: "${label:=}"
-: "${selector:=}"
-: "${tail:=}"
-: "${since:=}"
-: "${previous:=}"
-: "${follow:=}"
+grep_filter=${grep_filter:-}
+container=${container:-}
+namespace=${namespace:-default}
+label=${label:-}
+selector=${selector:-}
+tail=${tail:-}
+since=${since:-}
+previous=${previous:-}
+follow=${follow:-}
 
 # Function to generate a unique ID without relying on uuidgen
 generate_uuid() {
