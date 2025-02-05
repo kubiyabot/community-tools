@@ -13,8 +13,19 @@ class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Add truncation helper functions
         truncation_helpers = """
-# Set global constants
-set -euo pipefail
+#!/bin/bash
+# Ensure we're running in bash
+if [ -z "$BASH_VERSION" ]; then
+    echo "❌ Error: This script requires bash" >&2
+    exit 1
+fi
+
+# Set global constants with proper error handling
+set -e  # Exit on error
+set -u  # Exit on undefined variables
+set -o pipefail  # Exit on pipe failures
+
+# Set proper field separator
 IFS=$'\\n\\t'
 
 # Export constants with proper quoting
@@ -79,7 +90,7 @@ get_logs_with_range() {
         fi
         log_cmd="$log_cmd --tail=$tail_lines"
         eval "$log_cmd" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     fi
     
     # If both start and end lines are specified, use sed to extract the range
@@ -106,7 +117,7 @@ get_logs_with_range() {
         fi
         
         eval "$log_cmd" | sed -n "${start_line},${end_line}p" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If only start line is specified, show from that line to MAX_LOGS
     elif [[ -n "$start_line" ]]; then
         if ! [[ "$start_line" =~ ^[0-9]+$ ]]; then
@@ -114,7 +125,7 @@ get_logs_with_range() {
             return 1
         fi
         eval "$log_cmd" | tail -n "+$start_line" | head -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If only end line is specified, show last N lines up to that line
     elif [[ -n "$end_line" ]]; then
         if ! [[ "$end_line" =~ ^[0-9]+$ ]]; then
@@ -122,11 +133,11 @@ get_logs_with_range() {
             return 1
         fi
         eval "$log_cmd" | head -n "$end_line" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If no range specified, use default MAX_LOGS
     else
         eval "$log_cmd" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     fi
 }
 
@@ -148,7 +159,7 @@ kubectl_with_truncation() {
     fi
     
     eval "$cmd" | truncate_output "$max_items" "$max_width"
-    return $?
+    return ${PIPESTATUS[0]}
 }
 
 # Helper function to format events with truncation and improved error handling
@@ -177,7 +188,7 @@ format_events() {
         else if ($7 ~ /Normal/) emoji = "ℹ️"
         print emoji, $0
     }' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-    return $?
+    return ${PIPESTATUS[0]}
 }
 
 # Helper function to show resource status with truncation and improved error handling
@@ -203,8 +214,19 @@ show_resource_status() {
 """
 
         inject_kubernetes_context = """
-# Enable strict error handling
-set -euo pipefail
+#!/bin/bash
+# Ensure we're running in bash
+if [ -z "$BASH_VERSION" ]; then
+    echo "❌ Error: This script requires bash" >&2
+    exit 1
+fi
+
+# Set strict error handling
+set -e  # Exit on error
+set -u  # Exit on undefined variables
+set -o pipefail  # Exit on pipe failures
+
+# Set proper field separator
 IFS=$'\\n\\t'
 
 # Define locations with proper quoting
