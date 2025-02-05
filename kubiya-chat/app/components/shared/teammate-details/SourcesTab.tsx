@@ -63,6 +63,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/app/components/ui/alert-dialog";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface SourceMeta {
   id: string;
@@ -135,6 +137,8 @@ type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
     file: string;
     error: string;
     details?: string;
+    code?: string;
+    lineNumber?: number;
   }>;
   source_meta: {
     id: string;
@@ -469,6 +473,78 @@ const getGitHubInfo = (url: string) => {
   }
 };
 
+interface ErrorPreviewModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  error: {
+    file: string;
+    error: string;
+    details?: string;
+    code?: string;
+    lineNumber?: number;
+  };
+}
+
+function ErrorPreviewModal({ isOpen, onClose, error }: ErrorPreviewModalProps) {
+  const fileExtension = error.file.split('.').pop() || '';
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            {getFileIcon(error.file)}
+            <span>{error.file}</span>
+          </DialogTitle>
+          <DialogDescription className="text-red-400">
+            {error.error}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          {error.code && (
+            <div className="relative rounded-md overflow-hidden">
+              <div className="absolute top-2 right-2 z-10">
+                <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20">
+                  Line {error.lineNumber}
+                </Badge>
+              </div>
+              <SyntaxHighlighter
+                language={fileExtension}
+                style={vscDarkPlus}
+                showLineNumbers
+                wrapLines
+                lineProps={(lineNumber: number) => ({
+                  style: {
+                    backgroundColor: lineNumber === error.lineNumber ? 'rgba(239, 68, 68, 0.1)' : undefined,
+                    display: 'block',
+                    width: '100%',
+                  },
+                })}
+              >
+                {error.code}
+              </SyntaxHighlighter>
+            </div>
+          )}
+          
+          {error.details && (
+            <div className="bg-[#1E293B] rounded-md p-4 border border-[#2D3B4E]">
+              <h4 className="text-sm font-medium text-white mb-2">Additional Details</h4>
+              <p className="text-sm text-[#94A3B8] whitespace-pre-wrap">{error.details}</p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 const SourceGroup = ({ source, onSourcesChange, allSources }: { 
   source: ExtendedSourceInfo; 
   onSourcesChange?: () => void;
@@ -480,6 +556,15 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
   const [isRemoving, setIsRemoving] = useState(false);
   const gitHubInfo = useMemo(() => getGitHubInfo(source.url), [source.url]);
   const firstToolWithIcon = useMemo(() => source.tools.find(tool => tool.icon_url), [source.tools]);
+  
+  // Add state for error preview modal
+  const [selectedError, setSelectedError] = useState<{
+    file: string;
+    error: string;
+    details?: string;
+    code?: string;
+    lineNumber?: number;
+  } | null>(null);
 
   const handleSync = async () => {
     try {
@@ -580,58 +665,54 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                 <h3 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
                   {source.name}
                   {source.errors_count > 0 && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Badge variant="destructive" className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help">
-                            <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                            {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent className="w-96 bg-[#1E293B] border border-red-500/20 p-3">
-                          <div className="space-y-3">
-                            <div className="flex items-start justify-between">
-                              <h5 className="text-sm font-medium text-white flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 text-red-400" />
-                                Source Errors
-                              </h5>
-                              <Badge variant="outline" className="bg-[#2A3347] border-[#2D3B4E] text-[#94A3B8]">
-                                Click tool card for code details
-                              </Badge>
-                            </div>
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                              {source.errors?.map((error: any, index: number) => (
-                                <div 
-                                  key={index} 
-                                  className="text-xs bg-red-500/10 rounded-md p-2 border border-red-500/20 space-y-1.5"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {getFileIcon(error.file)}
-                                    <span className="font-mono text-red-400">{error.file}</span>
-                                  </div>
-                                  <div className="text-red-300 pl-6">
-                                    {error.error.split('\n').map((line: string, i: number) => (
-                                      <div key={i} className="line-clamp-2">
-                                        {line}
-                                      </div>
-                                    ))}
-                                  </div>
-                                  {error.details && (
-                                    <div className="text-red-300/70 text-[11px] pl-6 pt-1 border-t border-red-500/20">
-                                      {error.details}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                            <div className="text-[11px] text-[#94A3B8] flex items-center gap-1.5 pt-2 border-t border-[#2D3B4E]">
-                              <Info className="h-3.5 w-3.5" />
-                              Click on any tool card to view detailed code and error locations
-                            </div>
+                    <HoverCard>
+                      <HoverCardTrigger asChild>
+                        <Badge 
+                          variant="destructive" 
+                          className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help hover:bg-red-500/20 transition-colors"
+                        >
+                          <AlertCircle className="h-3.5 w-3.5 mr-1" />
+                          {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
+                        </Badge>
+                      </HoverCardTrigger>
+                      <HoverCardContent className="w-96 p-0">
+                        <div className="p-3 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <h5 className="text-sm font-medium text-white flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-red-400" />
+                              Source Errors
+                            </h5>
+                            <Badge variant="outline" className="bg-[#2A3347] border-[#2D3B4E] text-[#94A3B8]">
+                              Click to view details
+                            </Badge>
                           </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                          <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {source.errors?.map((error: any, index: number) => (
+                              <button
+                                key={index}
+                                onClick={() => setSelectedError({
+                                  file: error.file,
+                                  error: error.error,
+                                  details: error.details,
+                                  code: error.code,
+                                  lineNumber: error.lineNumber
+                                })}
+                                className="w-full text-left bg-red-500/10 rounded-md p-2 border border-red-500/20 space-y-1.5 hover:bg-red-500/20 transition-colors"
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getFileIcon(error.file)}
+                                  <span className="font-mono text-red-400 text-xs">{error.file}</span>
+                                </div>
+                                <div className="text-red-300 text-xs pl-6">
+                                  {error.error.split('\n')[0]}
+                                  {error.error.split('\n').length > 1 && '...'}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </HoverCardContent>
+                    </HoverCard>
                   )}
                 </h3>
                 
@@ -860,6 +941,15 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add ErrorPreviewModal */}
+      {selectedError && (
+        <ErrorPreviewModal
+          isOpen={!!selectedError}
+          onClose={() => setSelectedError(null)}
+          error={selectedError}
+        />
+      )}
     </>
   );
 };
