@@ -47,7 +47,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   onSelect: (id: string) => void;
   selectedId?: string;
 }) {
-  const { users, groups, isLoading } = useEntity();
+  const { users, groups, isLoading: isUsersLoading } = useEntity();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -56,6 +56,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
   const [integrations, setIntegrations] = useState<any>(null);
   const { teammates, selectedTeammate, setSelectedTeammate } = useTeammateContext();
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const sortedUsers = useMemo(() => {
     if (!users || !Array.isArray(users)) return [];
@@ -67,9 +68,7 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
       try {
         setMounted(true);
         
-        // Only proceed if we have teammates
         if (teammates.length === 0) {
-          // Try to force refresh teammates if none are found
           const response = await fetch('/api/teammates', {
             headers: {
               'x-force-refresh': 'true'
@@ -78,31 +77,32 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
           if (!response.ok) {
             throw new Error('Failed to fetch teammates');
           }
-          return;
+          // Wait for teammates context to update
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         const storedTeammate = localStorage.getItem('selectedTeammate');
         
         if (storedTeammate && teammates.some(t => t.uuid === storedTeammate)) {
-          // If we have a valid stored teammate, select it
           setSelectedTeammate(storedTeammate);
-          // Fetch integrations for the stored teammate
           fetchIntegrations(storedTeammate);
         } else if (teammates.length > 0) {
-          // Otherwise select the first teammate and store it
           setSelectedTeammate(teammates[0].uuid);
           localStorage.setItem('selectedTeammate', teammates[0].uuid);
-          // Fetch integrations for the first teammate
           fetchIntegrations(teammates[0].uuid);
         }
       } catch (error) {
         console.error('Failed to initialize teammates:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load teammates');
+      } finally {
+        setIsInitializing(false);
       }
     };
 
-    initializeTeammates();
-  }, [teammates, setSelectedTeammate]); // Add setSelectedTeammate to dependencies
+    if (!mounted) {
+      initializeTeammates();
+    }
+  }, [teammates, setSelectedTeammate, mounted]);
 
   const fetchIntegrations = async (teammateId: string) => {
     try {
@@ -148,7 +148,8 @@ export const TeammateSelector = memo(function TeammateSelector({ onSelect, selec
     }
   };
 
-  if (!mounted || isLoading) {
+  // Show loading state only during initial load
+  if (!mounted || isInitializing) {
     return (
       <div className="h-full bg-gray-900 animate-pulse flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">

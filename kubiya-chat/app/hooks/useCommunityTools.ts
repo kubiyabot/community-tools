@@ -1,36 +1,27 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchCommunityTools } from '@/app/api/sources/community/client';
+import { CommunityTool } from '@/app/types/tool';
 
-interface CommunityTool {
-  name: string;
-  path: string;
-  description: string;
-  category: string;
-  icon: string;
-  runner: string;
+async function fetchCommunityTools(): Promise<CommunityTool[]> {
+  const response = await fetch('/api/sources/community/list');
+  if (!response.ok) {
+    throw new Error('Failed to fetch community tools');
+  }
+  const data = await response.json();
+  return data.map((tool: any) => ({
+    ...tool,
+    id: tool.path || tool.name,
+    type: 'community',
+    isDiscovering: false,
+    loadingState: 'idle',
+    tools: tool.tools || []
+  }));
 }
 
-interface UseCommunityToolsOptions {
-  enabled?: boolean;
-  initialData?: CommunityTool[];
-  gcTime?: number;
-}
-
-export function useCommunityTools(options: UseCommunityToolsOptions = {}) {
-  const { 
-    enabled = true, 
-    initialData,
-    gcTime = 1000 * 60 * 60 // 1 hour default cache
-  } = options;
-
+export function useCommunityTools(initialData?: CommunityTool[]) {
   return useQuery({
     queryKey: ['community-tools'],
     queryFn: fetchCommunityTools,
-    enabled,
-    initialData,
-    gcTime,
-    staleTime: 1000 * 60 * 5, // Consider data stale after 5 minutes
-    refetchOnWindowFocus: false,
-    retry: 2
+    initialData: initialData ? () => initialData : undefined,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
 } 
