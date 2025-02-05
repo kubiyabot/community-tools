@@ -6,8 +6,7 @@ KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
         # Basic helper functions that don't interfere with the main script
-        helpers = """
-#!/bin/sh
+        helpers = """#!/bin/sh
 
 # Set shell options for safety
 set -e  # Exit on error
@@ -316,10 +315,9 @@ format_events() {
             *) printf "[INFO] %s\\n" "$line" ;;
         esac
     done
-}
+}"""
 
-# Simple and robust context injection without chmod
-inject_kubernetes_context = """
+        inject_kubernetes_context = """#!/bin/sh
 set -eu
 
 # Setup working directories and get the work dir path
@@ -349,34 +347,33 @@ fi
 cleanup() {
     rm -rf "$WORK_DIR"
 }
-trap cleanup EXIT
-"""
+trap cleanup EXIT"""
 
-# Mount service account files directly to their expected locations
-file_specs = [
-    FileSpec(
-        source="/var/run/secrets/kubernetes.io/serviceaccount/token",
-        destination="/var/run/secrets/kubernetes.io/serviceaccount/token"
-    ),
-    FileSpec(
-        source="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
-        destination="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-    )
-]
+        # Mount service account files directly to their expected locations
+        file_specs = [
+            FileSpec(
+                source="/var/run/secrets/kubernetes.io/serviceaccount/token",
+                destination="/var/run/secrets/kubernetes.io/serviceaccount/token"
+            ),
+            FileSpec(
+                source="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+                destination="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+            )
+        ]
 
-# Combine helpers and the actual content
-full_content = f"{helpers}\n{inject_kubernetes_context}\n{content}"
+        # Combine helpers and the actual content
+        full_content = f"{helpers}\n{inject_kubernetes_context}\n{content}"
 
-super().__init__(
-    name=name,
-    description=description,
-    icon_url=KUBERNETES_ICON_URL,
-    type="docker",
-    image=image,
-    content=full_content,
-    args=args,
-    with_files=file_specs,
-)
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=KUBERNETES_ICON_URL,
+            type="docker",
+            image=image,
+            content=full_content,
+            args=args,
+            with_files=file_specs,
+        )
 
 # Example usage:
 kubectl_cli = KubernetesTool(
