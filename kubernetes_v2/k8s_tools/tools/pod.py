@@ -481,16 +481,16 @@ pod_network_topology_tool = KubernetesTool(
         else "\n  None"
         end' | \
         awk '
-        /^Policy:/ {printf "\n🛡️  %s\n", substr($0, 9)}
-        /^Namespace:/ {printf "📁 %s\n", $0}
-        /^Pod Selector:/ {printf "🎯 %s\n", $0}
-        /^Policy Types:/ {printf "📋 %s\n", $0}
-        /^Ingress Rules:/ {print "📥 Ingress Rules:"}
-        /^Egress Rules:/ {print "📤 Egress Rules:"}
-        /^  • From:/ {printf "  ⬅️  From:\n"}
-        /^  • To:/ {printf "  ➡️  To:\n"}
+        /^Policy:/ {printf "\n[SHIELD]  %s\n", substr($0, 9)}
+        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
+        /^Pod Selector:/ {printf "[TARGET] %s\n", $0}
+        /^Policy Types:/ {printf "[CLIPBOARD] %s\n", $0}
+        /^Ingress Rules:/ {print "[INBOX] Ingress Rules:"}
+        /^Egress Rules:/ {print "[OUTBOX] Egress Rules:"}
+        /^  • From:/ {printf "  [ARROW_LEFT] From:\n"}
+        /^  • To:/ {printf "  [ARROW_RIGHT] To:\n"}
         /^    -/ {printf "    %s\n", $0}
-        ' > "$formatted_output"
+        ' | sed 's/\[SHIELD\]/🛡️/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g; s/\[CLIPBOARD\]/📋/g; s/\[INBOX\]/📥/g; s/\[OUTBOX\]/📤/g; s/\[ARROW_LEFT\]/⬅️/g; s/\[ARROW_RIGHT\]/➡️/g' > "$formatted_output"
 
         # Analyze service connections
         echo -e "\n🔌 Service Connections:"
@@ -507,11 +507,11 @@ pod_network_topology_tool = KubernetesTool(
         "Selector: \(.selector | to_entries | map("\(.key)=\(.value)") | join(", "))\n" +
         "Ports: \(.ports | map("\(.port):\(.targetPort) (\(.protocol))") | join(", ")))"' | \
         awk '
-        /^Service:/ {printf "\n🔌 %s\n", substr($0, 10)}
-        /^Namespace:/ {printf "📁 %s\n", $0}
-        /^Selector:/ {printf "🎯 %s\n", $0}
-        /^Ports:/ {printf "🔌 %s\n", $0}
-        ' >> "$formatted_output"
+        /^Service:/ {printf "\n[PLUG] %s\n", substr($0, 10)}
+        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
+        /^Selector:/ {printf "[TARGET] %s\n", $0}
+        /^Ports:/ {printf "[PLUG] %s\n", $0}
+        ' | sed 's/\[PLUG\]/🔌/g; s/\[FOLDER\]/📁/g; s/\[TARGET\]/🎯/g' >> "$formatted_output"
 
         # Show pod-to-pod connections based on labels
         echo -e "\n🔗 Pod-to-Pod Connections:"
@@ -528,11 +528,11 @@ pod_network_topology_tool = KubernetesTool(
         "IP: \(.ip)\n" +
         "Labels: \(.labels | to_entries | map("\(.key)=\(.value)") | join(", "))"' | \
         awk '
-        /^Pod:/ {printf "\n📦 %s\n", substr($0, 6)}
-        /^Namespace:/ {printf "📁 %s\n", $0}
-        /^IP:/ {printf "🌐 %s\n", $0}
-        /^Labels:/ {printf "🏷️  %s\n", $0}
-        ' >> "$formatted_output"
+        /^Pod:/ {printf "\n[PACKAGE] %s\n", substr($0, 6)}
+        /^Namespace:/ {printf "[FOLDER] %s\n", $0}
+        /^IP:/ {printf "[GLOBE] %s\n", $0}
+        /^Labels:/ {printf "[LABEL] %s\n", $0}
+        ' | sed 's/\[PACKAGE\]/📦/g; s/\[FOLDER\]/📁/g; s/\[GLOBE\]/🌐/g; s/\[LABEL\]/🏷️/g' >> "$formatted_output"
 
         # Calculate statistics
         total_policies=$(kubectl get networkpolicies $namespace_flag -o json | jq '.items | length')
