@@ -4,7 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 
 resource_finder_tool = KubernetesTool(
     name="resource_finder",
-    description="Advanced Kubernetes resource finder with powerful search, analysis, and troubleshooting capabilities",
+    description="Advanced Kubernetes resource finder with powerful search, analysis, and troubleshooting capabilities - use it to find resources in your cluster",
     content='''
     #!/bin/bash
     set -e
@@ -16,14 +16,33 @@ resource_finder_tool = KubernetesTool(
 
     # Function to normalize string for comparison
     normalize_string() {
-        echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-.'
+        echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]-._'
     }
 
-    # Function to check if string matches pattern (case insensitive, partial match)
+    # Enhanced pattern matching function with multiple patterns support
     string_matches() {
         local str=$(normalize_string "$1")
-        local pattern=$(normalize_string "$2")
-        [[ "$str" == *"$pattern"* ]]
+        local patterns="$2"
+        
+        # Split patterns by comma and check each one
+        IFS=',' read -ra PATTERNS <<< "$patterns"
+        for p in "${PATTERNS[@]}"; do
+            local pattern=$(normalize_string "$p")
+            # Support for wildcard patterns
+            if [[ "$pattern" == *"*"* ]]; then
+                [[ "$str" == ${pattern} ]] && return 0
+            # Support for exact matches with =
+            elif [[ "$pattern" == "="* ]]; then
+                [[ "$str" == "${pattern#=}" ]] && return 0
+            # Support for negative matches with !
+            elif [[ "$pattern" == "!"* ]]; then
+                [[ "$str" != *"${pattern#!}"* ]] && return 0
+            # Default partial match
+            else
+                [[ "$str" == *"$pattern"* ]] && return 0
+            fi
+        done
+        return 1
     }
 
     # Function to check if labels match
@@ -191,57 +210,78 @@ resource_finder_tool = KubernetesTool(
         fi
     }
 
-    # Function to search resources with pattern
+    # Function to get all resource types
+    get_resource_types() {
+        local filter="$1"
+        if [ -n "$filter" ]; then
+            kubectl api-resources --no-headers | awk '{print $1}' | grep -i "$filter"
+        else
+            kubectl api-resources --no-headers | awk '{print $1}'
+        fi
+    }
+
+    # Function to get resource aliases
+    get_resource_aliases() {
+        local resource="$1"
+        kubectl api-resources --no-headers | awk -v res="$resource" '$1 == res || $2 == res {print $1, $2}' | tr ' ' '/'
+    }
+
+    # Enhanced search function with better pattern matching
     search_resources() {
-        local pattern="$1"
+        local patterns="$1"
         local namespace="$2"
         local kind="$3"
         local matches=0
+        local total_matches=0
         
         # Build namespace flag
         local ns_flag=""
         [ -n "$namespace" ] && ns_flag="-n $namespace" || ns_flag="--all-namespaces"
         
-        # Build kind flag
-        local kind_flag=""
-        [ -n "$kind" ] && kind_flag="$kind" || kind_flag="all"
-        
-        # Get resources with labels
-        while IFS= read -r line; do
-            if [[ $line =~ ^[[:space:]]*NAME ]]; then
-                continue  # Skip header line
-            fi
-            
-            # Parse the line
-            if [ -n "$namespace" ]; then
-                read -r name status age labels <<< "$line"
-                ns="$namespace"
-            else
-                read -r ns name status age labels <<< "$line"
-            fi
-            
-            # Skip if empty line
-            [ -z "$name" ] && continue
+        # Function to process a single resource
+        process_resource() {
+            local kind="$1"
+            local name="$2"
+            local ns="$3"
+            local status="$4"
+            local age="$5"
+            local labels="$6"
+            local annotations="$7"
             
             # Apply filters
             if [ -n "$status_filter" ] && ! status_matches "$status" "$status_filter"; then
-                continue
+                return
             fi
             
             if [ -n "$min_age" ]; then
                 local age_seconds=$(get_age_seconds "$age")
                 local min_age_seconds=$(get_age_seconds "$min_age")
-                [ "$age_seconds" -lt "$min_age_seconds" ] && continue
+                [ "$age_seconds" -lt "$min_age_seconds" ] && return
             fi
             
             if [ -n "$label_selector" ] && ! labels_match "$labels" "$label_selector"; then
-                continue
+                return
             fi
             
-            # Check if name matches pattern
-            if string_matches "$name" "$pattern"; then
+            # Check if any pattern matches name, labels, or annotations
+            local matched=false
+            if string_matches "$name" "$patterns" || \
+               [ -n "$labels" ] && string_matches "$labels" "$patterns" || \
+               [ -n "$annotations" ] && string_matches "$annotations" "$patterns"; then
+                matched=true
+            fi
+            
+            # If matched, show the resource
+            if [ "$matched" = true ]; then
+                # Show header for first match of this kind
+                if [ "$matches" -eq 0 ]; then
+                    echo -e "\n📦 $kind matches:"
+                    echo "=================="
+                fi
+                
                 format_resource "$kind" "$name" "$ns" "$status" "$age" "$labels"
                 ((matches++))
+                ((total_matches++))
                 
                 # Show health analysis if requested
                 if [ "$analyze_health" = "true" ]; then
@@ -251,7 +291,11 @@ resource_finder_tool = KubernetesTool(
                 # Show additional details if specified
                 if [ "$show_details" = "true" ]; then
                     echo "  📋 Details:"
-                    kubectl describe "$kind" "$name" $ns_flag | grep -A$CONTEXT_LINES -B$CONTEXT_LINES -i "$pattern" | sed 's/^/    /'
+                    if [ "$show_yaml" = "true" ]; then
+                        kubectl get "$kind" "$name" $ns_flag -o yaml | sed 's/^/    /'
+                    else
+                        kubectl describe "$kind" "$name" $ns_flag | sed 's/^/    /'
+                    fi
                 fi
                 
                 # Show recent events
@@ -263,13 +307,38 @@ resource_finder_tool = KubernetesTool(
                 
                 echo
             fi
+        }
+        
+        # Process resources
+        if [ -n "$kind" ]; then
+            # Get aliases for the resource type
+            local aliases=$(get_resource_aliases "$kind")
+            if [ -z "$aliases" ]; then
+                echo "⚠️  Warning: Resource type '$kind' not found"
+                return
+            fi
             
-            # Check if we've reached max matches
-            [ $matches -ge $MAX_MATCHES ] && {
-                echo "⚠️  Reached maximum number of matches ($MAX_MATCHES). Use more specific search terms to see additional results."
-                break
-            }
-        done < <(kubectl get "$kind_flag" $ns_flag --show-labels 2>/dev/null | tail -n +2)
+            matches=0
+            kubectl get "$kind" $ns_flag --show-labels -o json | \
+            jq -r '.items[] | [.metadata.namespace, .metadata.name, .status.phase // .status.conditions[-1].type // "Unknown", .metadata.creationTimestamp, .metadata.labels, .metadata.annotations] | @tsv' | \
+            while IFS=$'\t' read -r ns name status timestamp labels annotations; do
+                local age=$(get_relative_time "$timestamp")
+                process_resource "$kind" "$name" "$ns" "$status" "$age" "$labels" "$annotations"
+            done
+        else
+            # Get all resource types if none specified
+            while read -r kind; do
+                matches=0
+                kubectl get "$kind" $ns_flag --show-labels -o json 2>/dev/null | \
+                jq -r '.items[] | [.metadata.namespace, .metadata.name, .status.phase // .status.conditions[-1].type // "Unknown", .metadata.creationTimestamp, .metadata.labels, .metadata.annotations] | @tsv' | \
+                while IFS=$'\t' read -r ns name status timestamp labels annotations; do
+                    local age=$(get_relative_time "$timestamp")
+                    process_resource "$kind" "$name" "$ns" "$status" "$age" "$labels" "$annotations"
+                done
+            done < <(get_resource_types "$resource_type_filter")
+        fi
+        
+        return $total_matches
     }
 
     # Main execution
@@ -278,9 +347,11 @@ resource_finder_tool = KubernetesTool(
         pattern="${pattern:-}"
         namespace="${namespace:-}"
         resource_type="${resource_type:-}"
+        resource_type_filter="${resource_type_filter:-}"
         show_details="${show_details:-false}"
         show_events="${show_events:-false}"
         show_labels="${show_labels:-false}"
+        show_yaml="${show_yaml:-false}"
         analyze_health="${analyze_health:-false}"
         status_filter="${status_filter:-}"
         label_selector="${label_selector:-}"
@@ -292,33 +363,24 @@ resource_finder_tool = KubernetesTool(
             exit 1
         fi
         
-        # If resource type provided, validate it
-        if [ -n "$resource_type" ]; then
-            if ! kubectl api-resources --no-headers | awk '{print $1}' | grep -iq "^${resource_type}s\?$"; then
-                echo "⚠️  Warning: Invalid resource type '${resource_type}'. Searching all resources instead."
-                resource_type=""
-            fi
-        fi
-        
-        echo "🔍 Searching for resources matching '${pattern}'"
+        echo "🔍 Searching for resources matching patterns: ${pattern}"
         [ -n "$namespace" ] && echo "📁 In namespace: ${namespace}"
         [ -n "$resource_type" ] && echo "📦 Resource type: ${resource_type}"
+        [ -n "$resource_type_filter" ] && echo "🔍 Resource type filter: ${resource_type_filter}"
         [ -n "$status_filter" ] && echo "🎯 Status filter: ${status_filter}"
         [ -n "$label_selector" ] && echo "🏷️  Label selector: ${label_selector}"
         [ -n "$min_age" ] && echo "⏰ Minimum age: ${min_age}"
         echo "========================================"
         
-        # If specific resource type provided, search only that
-        if [ -n "$resource_type" ]; then
-            search_resources "$pattern" "$namespace" "$resource_type"
-        else
-            # Search common resource types
-            for kind in Pod Deployment Service ConfigMap Secret PersistentVolume PersistentVolumeClaim Namespace Node; do
-                search_resources "$pattern" "$namespace" "$kind"
-            done
-        fi
+        # Perform the search
+        search_resources "$pattern" "$namespace" "$resource_type"
+        matches=$?
         
-        echo "✨ Search complete"
+        if [ "$matches" -eq 0 ]; then
+            echo "❌ No resources found matching the criteria"
+        else
+            echo "✨ Found $matches matching resources"
+        fi
     } | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
     ''',
     args=[
@@ -338,6 +400,12 @@ resource_finder_tool = KubernetesTool(
             name="resource_type",
             type="str",
             description="Specific resource type to search for (e.g., pod, deployment)",
+            required=False
+        ),
+        Arg(
+            name="resource_type_filter",
+            type="str",
+            description="Filter by resource type (e.g., pod, deployment)",
             required=False
         ),
         Arg(
@@ -374,6 +442,12 @@ resource_finder_tool = KubernetesTool(
             name="show_labels",
             type="bool",
             description="Show labels for matched resources",
+            required=False
+        ),
+        Arg(
+            name="show_yaml",
+            type="bool",
+            description="Show resource as YAML instead of description",
             required=False
         ),
         Arg(
