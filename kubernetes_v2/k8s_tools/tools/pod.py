@@ -2,6 +2,11 @@ from kubiya_sdk.tools import Arg
 from .base import KubernetesTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# Common constants for all tools
+MAX_OUTPUT_LINES = 100
+MAX_LOGS_LINES = 1000
+MAX_EVENTS = 25
+
 pod_management_tool = KubernetesTool(
     name="pod_management",
     description="Creates, deletes, or retrieves information on a Kubernetes pod.",
@@ -9,9 +14,137 @@ pod_management_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
+    # Create temp file for output management
+    temp_file=$(mktemp)
+    
+    # Function to show resource status with limits
+    show_resource_status() {
+        local cmd="$1"
+        local resource_type="$2"
+        local resource_name="$3"
+        
+        if ! eval "$cmd" > "$temp_file"; then
+            echo "❌ Failed to get $resource_type status"
+            rm "$temp_file"
+            exit 1
+        fi
+        
+        # Apply grep filter if provided
+        if [ ! -z "$grep_filter" ]; then
+            echo "🔍 Filtering output with: $grep_filter"
+            filtered_output=$(cat "$temp_file" | grep -i "$grep_filter" || true)
+            if [ -z "$filtered_output" ]; then
+                echo "⚠️ No matches found for filter: $grep_filter"
+                return
+            fi
+            echo "$filtered_output" > "$temp_file"
+        fi
+        
+        # Show limited output
+        head -n $MAX_OUTPUT_LINES "$temp_file"
+        
+        # Show truncation message if needed
+        total_lines=$(wc -l < "$temp_file")
+        if [ $total_lines -gt $MAX_OUTPUT_LINES ]; then
+            echo "⚠️ Output truncated (showing $MAX_OUTPUT_LINES of $total_lines lines)"
+            echo "💡 Use grep_filter to narrow down results"
+        fi
+    }
+    
+    # Function to format events with limits
+    format_events() {
+        local ns="$1"
+        local name="$2"
+        local kind="$3"
+        
+        echo -e "\n📅 Recent Events:"
+        echo "=============="
+        
+        kubectl get events -n "$ns" --field-selector "involvedObject.name=$name,involvedObject.kind=$kind" \
+            --sort-by='.lastTimestamp' > "$temp_file"
+            
+        # Apply grep filter if provided
+        if [ ! -z "$grep_filter" ]; then
+            filtered_output=$(cat "$temp_file" | grep -i "$grep_filter" || true)
+            if [ -z "$filtered_output" ]; then
+                echo "No matching events found"
+                return
+            fi
+            echo "$filtered_output" > "$temp_file"
+        fi
+        
+        # Show limited events with formatting
+        head -n 1 "$temp_file"  # Show header
+        tail -n +2 "$temp_file" | head -n $MAX_EVENTS | awk '{
+            if ($7 ~ /Warning/) emoji="⚠️";
+            else if ($7 ~ /Normal/) emoji="ℹ️";
+            else emoji="📝";
+            print "  " emoji " " $0;
+        }'
+        
+        total_events=$(( $(wc -l < "$temp_file") - 1 ))
+        if [ $total_events -gt $MAX_EVENTS ]; then
+            echo "⚠️ Event output truncated (showing $MAX_EVENTS of $total_events events)"
+        fi
+    }
+    
+    # Function to get logs with limits
+    get_logs_with_range() {
+        local ns="$1"
+        local name="$2"
+        local container="$3"
+        local start_line="$4"
+        local end_line="$5"
+        local tail_lines="$6"
+        local since="$7"
+        local previous="$8"
+        
+        # Build log command
+        local log_cmd="kubectl logs -n $ns $name"
+        [ ! -z "$container" ] && log_cmd="$log_cmd -c $container"
+        [ ! -z "$since" ] && log_cmd="$log_cmd --since=$since"
+        [ ! -z "$previous" ] && log_cmd="$log_cmd --previous"
+        
+        # Get logs
+        if ! eval "$log_cmd" > "$temp_file"; then
+            echo "❌ Failed to get logs"
+            return
+        fi
+        
+        # Apply grep filter if provided
+        if [ ! -z "$grep_filter" ]; then
+            filtered_output=$(cat "$temp_file" | grep -i "$grep_filter" || true)
+            if [ -z "$filtered_output" ]; then
+                echo "No matching log entries found"
+                return
+            fi
+            echo "$filtered_output" > "$temp_file"
+        fi
+        
+        # Show logs based on parameters
+        if [ ! -z "$start_line" ] && [ ! -z "$end_line" ]; then
+            sed -n "${start_line},${end_line}p" "$temp_file" | head -n $MAX_LOGS_LINES
+        elif [ ! -z "$tail_lines" ]; then
+            tail -n "$tail_lines" "$temp_file" | head -n $MAX_LOGS_LINES
+        else
+            head -n $MAX_LOGS_LINES "$temp_file"
+        fi
+        
+        total_lines=$(wc -l < "$temp_file")
+        if [ $total_lines -gt $MAX_LOGS_LINES ]; then
+            echo "⚠️ Log output truncated (showing $MAX_LOGS_LINES of $total_lines lines)"
+            echo "💡 Tips to narrow down results:"
+            echo "   - Use grep_filter to search for specific terms"
+            echo "   - Specify start_line and end_line"
+            echo "   - Use tail parameter"
+            echo "   - Use since parameter"
+        fi
+    }
+
     # Ensure required parameters are provided
     if [ -z "${namespace}" ] || [ -z "${name}" ] || [ -z "${action}" ]; then
         echo "❌ Error: namespace, name, and action are required."
+        rm "$temp_file"
         exit 1
     fi
 
@@ -22,6 +155,7 @@ pod_management_tool = KubernetesTool(
         create)
             if [ -z "${image}" ]; then
                 echo "❌ Error: image is required for create action"
+                rm "$temp_file"
                 exit 1
             fi
             
@@ -29,11 +163,12 @@ pod_management_tool = KubernetesTool(
             cmd="${base_cmd} run ${name} --image=${image} --restart=Never"
             if ! eval "$cmd"; then
                 echo "❌ Failed to create pod ${name}"
+                rm "$temp_file"
                 exit 1
             fi
             echo "✅ Successfully created pod ${name}"
             
-            # Show pod status with truncation
+            # Show pod status
             status_cmd="${base_cmd} get pod ${name}"
             show_resource_status "$status_cmd" "Pod" "$name"
             
@@ -45,6 +180,7 @@ pod_management_tool = KubernetesTool(
             cmd="${base_cmd} delete pod ${name}"
             if ! eval "$cmd"; then
                 echo "❌ Failed to delete pod ${name}"
+                rm "$temp_file"
                 exit 1
             fi
             echo "✅ Successfully deleted pod ${name}"
@@ -63,7 +199,7 @@ pod_management_tool = KubernetesTool(
                 echo -e "\n📜 Pod Logs:"
                 echo "==========="
                 
-                # Get logs with flexible range options
+                # Get logs with limits
                 get_logs_with_range "$namespace" "$name" \
                     "${container:-}" \
                     "${start_line:-}" \
@@ -75,16 +211,17 @@ pod_management_tool = KubernetesTool(
             ;;
             
         logs)
-            # Verify pod exists and get its status
+            # Verify pod exists
             if ! pod_status=$(kubectl get pod ${name} -n ${namespace} -o jsonpath='{.status.phase}' 2>/dev/null); then
                 echo "❌ Pod ${name} not found in namespace ${namespace}"
+                rm "$temp_file"
                 exit 1
             fi
             
             echo "📜 Pod Logs (${pod_status}):"
             echo "======================"
             
-            # Get logs with flexible range options
+            # Get logs with limits
             get_logs_with_range "$namespace" "$name" \
                 "${container:-}" \
                 "${start_line:-}" \
@@ -96,9 +233,13 @@ pod_management_tool = KubernetesTool(
             
         *)
             echo "❌ Error: Invalid action. Supported actions are create, delete, get, logs"
+            rm "$temp_file"
             exit 1
             ;;
     esac
+    
+    # Cleanup
+    rm "$temp_file"
     ''',
     args=[
         Arg(name="action", type="str", description="Action to perform (create, delete, get, logs)", required=True),
@@ -111,6 +252,7 @@ pod_management_tool = KubernetesTool(
         Arg(name="tail", type="int", description="Number of lines to show from the end of logs", required=False),
         Arg(name="since", type="str", description="Show logs since timestamp (e.g. 1h, 5m) or RFC3339 timestamp", required=False),
         Arg(name="previous", type="bool", description="Show logs from previous container instance", required=False),
+        Arg(name="grep_filter", type="str", description="Optional case-insensitive grep pattern to filter results", required=False),
     ],
 )
 
