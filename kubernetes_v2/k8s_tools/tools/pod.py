@@ -68,8 +68,8 @@ pod_restart_tool = KubernetesTool(
         "Container: \(.name)\n" +
         "Ready: \(.ready)\n" +
         "Restart Count: \(.restartCount)\n" +
-        "Current State: \(.state | to_entries[0].key)\n" +
-        if .lastState then
+        "Current State: \(if .state then (.state | to_entries[0].key) else "Unknown" end)\n" +
+        if .lastState and (.lastState | length > 0) then
             "Last State: \(.lastState | to_entries[0].key)\n" +
             if .lastState[.lastState | to_entries[0].key].reason then
                 "Last State Reason: \(.lastState[.lastState | to_entries[0].key].reason)\n"
