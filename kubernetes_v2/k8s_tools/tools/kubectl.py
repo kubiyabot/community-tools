@@ -13,15 +13,51 @@ kubectl_tool = KubernetesTool(
     # Show the command being executed
     echo "🔧 Executing: kubectl $command"
 
-    # Run the kubectl command with limited output (100 lines max)
-    # Using a subshell to capture the real exit status while still limiting output
-    if (kubectl $command | head -n 100); then
+    # Create a temporary file to store the full output
+    temp_file=$(mktemp)
+    
+    # Run the command and capture full output
+    if kubectl $command > "$temp_file"; then
+        total_lines=$(wc -l < "$temp_file")
+        
+        # Apply grep filter if provided
+        if [ ! -z "$grep_filter" ]; then
+            echo "🔍 Filtering results with: $grep_filter"
+            filtered_output=$(cat "$temp_file" | grep -i "$grep_filter" || true)
+            echo "$filtered_output" > "$temp_file"
+            filtered_lines=$(wc -l < "$temp_file")
+            if [ $filtered_lines -eq 0 ]; then
+                echo "⚠️ No results found matching filter: $grep_filter"
+                echo "💡 Try adjusting your filter criteria or check if the resource exists"
+                rm "$temp_file"
+                exit 0
+            fi
+        fi
+        
+        # Show limited output
+        head -n 100 "$temp_file"
+        
+        # Provide helpful feedback about results
+        if [ $total_lines -gt 100 ]; then
+            echo ""
+            echo "⚠️ Output was truncated (showing 100 of $total_lines lines)"
+            echo "💡 Tips to narrow down results:"
+            echo "   - Add a namespace: -n <namespace>"
+            echo "   - Use labels: -l key=value"
+            echo "   - Add field selectors: --field-selector=status.phase=Running"
+            echo "   - Use grep filter to search: add grep_filter parameter"
+            echo "   - Remove headers: --no-headers"
+        fi
+        
         echo "✅ Command executed successfully"
-        echo "Note: Output limited to 100 lines. Use '--no-headers' in your command to see more entries."
     else
         echo "❌ Command failed: kubectl $command"
+        rm "$temp_file"
         exit 1
     fi
+    
+    # Cleanup
+    rm "$temp_file"
     """,
     args=[
         Arg(
@@ -34,6 +70,12 @@ kubectl_tool = KubernetesTool(
                        "- 'get nodes'  # cluster-scoped resource, no namespace needed\n" +
                        "- 'describe node my-node-1'",
             required=True
+        ),
+        Arg(
+            name="grep_filter",
+            type="str",
+            description="Optional case-insensitive grep pattern to filter results (e.g., 'running' to show only running pods)",
+            required=False
         ),
     ],
 )
