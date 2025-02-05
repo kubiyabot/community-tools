@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Kubernetes context injection script
 
 # Define locations

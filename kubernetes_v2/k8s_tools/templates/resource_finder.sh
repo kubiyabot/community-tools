@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Resource finder helper script
 
 # Function to normalize string for comparison

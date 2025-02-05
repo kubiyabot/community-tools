@@ -5,21 +5,24 @@ from kubiya_sdk.tools.registry import tool_registry
 resource_finder_tool = KubernetesTool(
     name="resource_finder",
     description="Find Kubernetes resources across your cluster with powerful search capabilities",
-    content='''
-    #!/bin/sh
-    # Source the resource finder script
-    source /tmp/resource_finder.sh
-    
-    # Call the main function with provided arguments
-    pattern="{{.pattern}}"
-    namespace="{{.namespace}}"
-    kind="{{.resource_type}}"
-    label_selector="{{.label_selector}}"
-    show_labels="{{.show_labels}}"
-    
-    # Execute the search
-    search_resources "$pattern" "$namespace" "$kind" "$label_selector" "$show_labels"
-    ''',
+    content='''#!/bin/bash
+set -e
+
+# Source helper scripts
+. /tmp/k8s_helpers.sh
+. /tmp/k8s_context.sh
+. /tmp/resource_finder.sh
+
+# Call the main function with provided arguments
+pattern="{{.pattern}}"
+namespace="{{.namespace}}"
+kind="{{.resource_type}}"
+label_selector="{{.label_selector}}"
+show_labels="{{.show_labels}}"
+
+# Execute the search
+search_resources "$pattern" "$namespace" "$kind" "$label_selector" "$show_labels"
+''',
     args=[
         Arg(
             name="pattern",

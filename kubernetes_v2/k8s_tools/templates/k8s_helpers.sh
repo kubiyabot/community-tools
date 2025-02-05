@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Kubernetes helper functions
 
 # Set global constants
@@ -65,7 +65,7 @@ get_logs_with_range() {
         esac
         log_cmd="$log_cmd --tail=$tail_lines"
         eval "$log_cmd" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     fi
     
     # If both start and end lines are specified, use sed to extract the range
@@ -100,7 +100,7 @@ get_logs_with_range() {
         fi
         
         eval "$log_cmd" | sed -n "${start_line},${end_line}p" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If only start line is specified, show from that line to MAX_LOGS
     elif [ -n "$start_line" ]; then
         case "$start_line" in
@@ -110,7 +110,7 @@ get_logs_with_range() {
                 ;;
         esac
         eval "$log_cmd" | tail -n "+$start_line" | head -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If only end line is specified, show last N lines up to that line
     elif [ -n "$end_line" ]; then
         case "$end_line" in
@@ -120,11 +120,11 @@ get_logs_with_range() {
                 ;;
         esac
         eval "$log_cmd" | head -n "$end_line" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     # If no range specified, use default MAX_LOGS
     else
         eval "$log_cmd" | tail -n "$MAX_LOGS" | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-        return $?
+        return ${PIPESTATUS[0]}
     fi
 }
 
@@ -154,7 +154,7 @@ kubectl_with_truncation() {
     esac
     
     eval "$cmd" | truncate_output "$max_items" "$max_width"
-    return $?
+    return ${PIPESTATUS[0]}
 }
 
 # Helper function to format events with truncation and improved error handling
@@ -183,7 +183,7 @@ format_events() {
         else if ($7 ~ /Normal/) emoji = "ℹ️"
         print emoji, $0
     }' | truncate_output "$MAX_ITEMS" "$MAX_OUTPUT_WIDTH"
-    return $?
+    return ${PIPESTATUS[0]}
 }
 
 # Helper function to show resource status with truncation and improved error handling
