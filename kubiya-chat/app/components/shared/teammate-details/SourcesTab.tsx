@@ -1806,142 +1806,142 @@ export function SourcesTab({
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Tools Information Header */}
-      <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-xl overflow-hidden border border-[#2D3B4E]">
-        <div className="relative p-5">
-          {/* Background Pattern */}
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxIDAgNiAyLjY5IDYgNnMtMi42OSA2LTYgNi02LTIuNjktNi02IDIuNjktNiA2LTZ6IiBzdHJva2U9IiMyRDNCNEUiIG9wYWNpdHk9Ii4yIi8+PC9nPjwvc3ZnPg==')] opacity-5" />
-          
-          <div className="relative flex items-start gap-6">
-            {/* Icon Stack */}
-            <div className="flex flex-col items-center space-y-2">
-              <div className="relative w-12 h-12">
-                <div className="absolute inset-0 bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] opacity-20 rounded-xl blur-lg" />
-                <div className="relative w-full h-full rounded-xl bg-[#2A3347] border border-[#2D3B4E] flex items-center justify-center">
-                  <img 
-                    src="https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/97_Docker_logo_logos-512.png"
-                    alt="Docker" 
-                    className="h-6 w-6"
-                  />
+    <InstallToolProvider teammate={teammate} value={installToolState}>
+      <div className="p-6 space-y-6">
+        {/* Tools Information Header */}
+        <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-xl overflow-hidden border border-[#2D3B4E]">
+          <div className="relative p-5">
+            {/* Background Pattern */}
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxIDAgNiAyLjY5IDYgNnMtMi42OSA2LTYgNi02LTIuNjktNi02IDIuNjktNiA2LTZ6IiBzdHJva2U9IiMyRDNCNEUiIG9wYWNpdHk9Ii4yIi8+PC9nPjwvc3ZnPg==')] opacity-5" />
+            
+            <div className="relative flex items-start gap-6">
+              {/* Icon Stack */}
+              <div className="flex flex-col items-center space-y-2">
+                <div className="relative w-12 h-12">
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#7C3AED] to-[#4F46E5] opacity-20 rounded-xl blur-lg" />
+                  <div className="relative w-full h-full rounded-xl bg-[#2A3347] border border-[#2D3B4E] flex items-center justify-center">
+                    <img 
+                      src="https://cdn4.iconfinder.com/data/icons/logos-and-brands/512/97_Docker_logo_logos-512.png"
+                      alt="Docker" 
+                      className="h-6 w-6"
+                    />
+                  </div>
                 </div>
+                <div className="h-12 w-px bg-gradient-to-b from-[#2D3B4E] to-transparent" />
               </div>
-              <div className="h-12 w-px bg-gradient-to-b from-[#2D3B4E] to-transparent" />
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold text-white tracking-tight">Extend Your Teammate with Tools</h2>
-                  <p className="text-sm text-[#94A3B8] leading-relaxed max-w-3xl">
-                    Tools leverage LLM function calling with container orchestration to extend teammates to execute nearly any operation.
-                  </p>
-                </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-lg font-semibold text-white tracking-tight">Extend Your Teammate with Tools</h2>
+                    <p className="text-sm text-[#94A3B8] leading-relaxed max-w-3xl">
+                      Tools leverage LLM function calling with container orchestration to extend teammates to execute nearly any operation.
+                    </p>
+                  </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-3 ml-4">
-                  <Button
-                    onClick={() => setShowInstallModal(true)}
-                    size="sm"
-                    className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Install Tool
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    className="border-[#2D3B4E] text-[#94A3B8] hover:text-[#7C3AED] hover:border-[#7C3AED]/50"
-                  >
-                    <a 
-                      href="https://docs.kubiya.ai/docs/kubiya-resources/tools" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5"
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 ml-4">
+                    <Button
+                      onClick={() => setShowInstallModal(true)}
+                      size="sm"
+                      className="bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
                     >
-                      <ExternalLink className="h-4 w-4" />
-                      Learn More
-                    </a>
-                  </Button>
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Install Tool
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      className="border-[#2D3B4E] text-[#94A3B8] hover:text-[#7C3AED] hover:border-[#7C3AED]/50"
+                    >
+                      <a 
+                        href="https://docs.kubiya.ai/docs/kubiya-resources/tools" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Learn More
+                      </a>
+                    </Button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Feature Pills */}
-              <div className="flex items-center gap-4 mt-3">
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
-                  <Bot className="h-3.5 w-3.5 text-[#7C3AED]" />
-                  <span className="text-xs text-[#94A3B8]">LLM Integration</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
-                  <Package className="h-3.5 w-3.5 text-[#7C3AED]" />
-                  <span className="text-xs text-[#94A3B8]">Container Orchestration</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
-                  <GitBranch className="h-3.5 w-3.5 text-[#7C3AED]" />
-                  <span className="text-xs text-[#94A3B8]">Version Control</span>
+                {/* Feature Pills */}
+                <div className="flex items-center gap-4 mt-3">
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
+                    <Bot className="h-3.5 w-3.5 text-[#7C3AED]" />
+                    <span className="text-xs text-[#94A3B8]">LLM Integration</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
+                    <Package className="h-3.5 w-3.5 text-[#7C3AED]" />
+                    <span className="text-xs text-[#94A3B8]">Container Orchestration</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-[#2A3347] border border-[#2D3B4E]">
+                    <GitBranch className="h-3.5 w-3.5 text-[#7C3AED]" />
+                    <span className="text-xs text-[#94A3B8]">Version Control</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Search and Tools Section */}
-      <div className="space-y-4">
-        {/* Search Bar */}
-        <div className="flex items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Input
-              type="text"
-              placeholder="Search tools by name, description, or type..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#1E293B] border-[#2D3B4E] focus:border-[#7C3AED] text-white placeholder-[#94A3B8] pl-10"
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
-          </div>
-          <div className="text-sm text-[#94A3B8]">
-            {filteredSources.reduce((acc, source) => acc + source.tools.length, 0)} tools available
-          </div>
-        </div>
-
-        {/* Tools Grid */}
-        {!filteredSources.length ? (
-          searchQuery ? (
-            <div className="flex flex-col items-center justify-center h-[300px] p-6">
-              <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
-                <Search className="h-6 w-6 text-[#7C3AED]" />
-              </div>
-              <p className="text-sm font-medium text-[#94A3B8] mt-4">No tools found matching "{searchQuery}"</p>
-            </div>
-          ) : (
-            <EmptyState />
-          )
-        ) : (
-          <div className="space-y-8">
-            {filteredSources.map((source: ExtendedSourceInfo) => (
-              <SourceGroup 
-                key={source.uuid} 
-                source={source}
-                onSourcesChange={onSourcesChange}
-                allSources={filteredSources}
+        {/* Search and Tools Section */}
+        <div className="space-y-4">
+          {/* Search Bar */}
+          <div className="flex items-center justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Input
+                type="text"
+                placeholder="Search tools by name, description, or type..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#1E293B] border-[#2D3B4E] focus:border-[#7C3AED] text-white placeholder-[#94A3B8] pl-10"
               />
-            ))}
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
+            </div>
+            <div className="text-sm text-[#94A3B8]">
+              {filteredSources.reduce((acc, source) => acc + source.tools.length, 0)} tools available
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Install Tool Form */}
-      <InstallToolProvider teammate={teammate!} value={installToolState}>
+          {/* Tools Grid */}
+          {!filteredSources.length ? (
+            searchQuery ? (
+              <div className="flex flex-col items-center justify-center h-[300px] p-6">
+                <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
+                  <Search className="h-6 w-6 text-[#7C3AED]" />
+                </div>
+                <p className="text-sm font-medium text-[#94A3B8] mt-4">No tools found matching "{searchQuery}"</p>
+              </div>
+            ) : (
+              <EmptyState />
+            )
+          ) : (
+            <div className="space-y-8">
+              {filteredSources.map((source: ExtendedSourceInfo) => (
+                <SourceGroup 
+                  key={source.uuid} 
+                  source={source}
+                  onSourcesChange={onSourcesChange}
+                  allSources={filteredSources}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Install Tool Form */}
         <InstallToolForm
           isOpen={showInstallModal}
           onClose={() => setShowInstallModal(false)}
           onInstall={handleInstall}
-          teammate={teammate!}
+          teammate={teammate}
         />
-      </InstallToolProvider>
-    </div>
+      </div>
+    </InstallToolProvider>
   );
 } 

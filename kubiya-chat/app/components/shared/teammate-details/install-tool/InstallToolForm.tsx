@@ -159,7 +159,7 @@ function InstallToolFormContent({
   };
 
   return (
-    <DialogContent className="max-w-4xl h-[80vh] flex flex-col">
+    <DialogContent className="max-w-[900px] h-[600px] flex flex-col">
       <BaseDialogHeader className="p-6 pb-0">
         <DialogTitle>Install Tool</DialogTitle>
         <DialogDescription>
@@ -181,60 +181,43 @@ function InstallToolFormContent({
             />
           </div>
 
-          {communityToolsLoading ? (
-            <div className="flex items-center justify-center flex-1">
-              <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
-            </div>
-          ) : communityToolsError ? (
-            <div className="text-red-400 text-sm">Failed to load community tools</div>
-          ) : (
-            <div 
-              ref={parentRef} 
-              className="flex-1 overflow-auto"
-              style={{
-                height: `calc(100% - 48px)`, // Subtract search input height
-                width: '100%'
-              }}
-            >
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative'
-                }}
-              >
-                {rowVirtualizer.getVirtualItems().map((virtualRow: VirtualItem) => {
-                  const tool = filteredTools[virtualRow.index];
-                  return tool ? (
-                    <div
-                      key={virtualRow.index}
-                      data-index={virtualRow.index}
-                      ref={rowVirtualizer.measureElement}
-                      className={cn(
-                        "absolute top-0 left-0 w-full",
-                        "transform transition-transform"
-                      )}
-                      style={{
-                        transform: `translateY(${virtualRow.start}px)`
-                      }}
-                    >
-                      <ToolCard
-                        tool={tool}
-                        onSelect={() => {
-                          methods.setValue('name', tool.name);
-                          methods.setValue('url', tool.path);
-                        }}
-                      />
-                    </div>
-                  ) : null;
-                })}
+          <ScrollArea className="flex-1 w-full">
+            {communityToolsLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-400" />
               </div>
-            </div>
-          )}
+            ) : communityToolsError ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <AlertCircle className="h-8 w-8 text-red-400" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-red-400">Failed to load tools</p>
+                  <p className="text-xs text-red-300 mt-1">{String(communityToolsError)}</p>
+                </div>
+              </div>
+            ) : filteredTools.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <Search className="h-8 w-8 text-slate-400" />
+                <p className="text-sm text-slate-400">No tools found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 p-2">
+                {filteredTools.map((tool) => (
+                  <ToolCard
+                    key={tool.name}
+                    tool={tool}
+                    onSelect={() => {
+                      methods.setValue('name', tool.name);
+                      methods.setValue('url', tool.path);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </div>
 
         {/* Form Section */}
-        <div className="w-96 border-l border-slate-700 pl-6 overflow-y-auto">
+        <div className="w-80 border-l border-slate-700 pl-6 overflow-y-auto">
           <FormProvider {...methods}>
             <Form {...methods}>
               <form onSubmit={methods.handleSubmit(handleSubmit)} className="space-y-6">
@@ -248,132 +231,70 @@ function InstallToolFormContent({
 
                 {/* Show error if any */}
                 {error && (
-                  <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
-                    <AlertCircle className="h-5 w-5" />
-                    <AlertTitle>Installation Error</AlertTitle>
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
                 )}
 
+                {/* Form Fields */}
+                <FormField
+                  control={methods.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="my-awesome-tool" />
+                      </FormControl>
+                      <FormDescription>
+                        A unique name for this tool
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                {/* Configuration Form */}
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <FormField
-                      control={methods.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field}
-                              placeholder="Tool name"
-                              className="bg-slate-800/50"
-                              disabled={isLoading}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <FormField
+                  control={methods.control}
+                  name="url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Source URL</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="https://github.com/org/repo" />
+                      </FormControl>
+                      <FormDescription>
+                        URL to the Git repository containing the tool
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                    <FormField
-                      control={methods.control}
-                      name="url"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Source URL</FormLabel>
-                          <FormControl>
-                            <Input 
-                              {...field}
-                              placeholder="https://github.com/..."
-                              className="bg-slate-800/50"
-                              disabled={isLoading}
-                            />
-                          </FormControl>
-                          <FormDescription className="text-slate-400">
-                            Enter the GitHub repository URL for the tool
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <FormField
+                  control={methods.control}
+                  name="dynamic_config"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Dynamic Configuration (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="{}"
+                          className="font-mono"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        JSON configuration for the tool
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                    <FormField
-                      control={methods.control}
-                      name="dynamic_config"
-                      render={({ field: { onChange, value, ...field } }) => (
-                        <FormItem>
-                          <FormLabel>
-                            <span className="flex items-center gap-2">
-                              Configuration
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Info className="h-4 w-4 text-slate-400" />
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Optional configuration in JSON format</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </span>
-                          </FormLabel>
-                          <FormControl>
-                            <Textarea 
-                              {...field}
-                              value={(() => {
-                                try {
-                                  if (!value) return '{}';
-                                  return typeof value === 'string' 
-                                    ? value 
-                                    : JSON.stringify(value, null, 2);
-                                } catch (err) {
-                                  console.error('Error stringifying value:', err);
-                                  return '{}';
-                                }
-                              })()}
-                              onChange={(e) => {
-                                const inputValue = e.target.value.trim();
-                                try {
-                                  // Handle empty input
-                                  if (!inputValue) {
-                                    onChange({});
-                                    return;
-                                  }
-                                  // Parse and validate JSON
-                                  const parsed = JSON.parse(inputValue);
-                                  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-                                    throw new Error('Configuration must be a JSON object');
-                                  }
-                                  onChange(parsed);
-                                } catch (err) {
-                                  // Set form error
-                                  methods.setError('dynamic_config', {
-                                    type: 'manual',
-                                    message: err instanceof Error ? err.message : 'Invalid JSON configuration'
-                                  });
-                                  // Keep empty object as value
-                                  onChange({});
-                                }
-                              }}
-                              placeholder="Enter JSON configuration..."
-                              className="min-h-[150px] bg-slate-800/50 font-mono"
-                              disabled={isLoading}
-                            />
-                          </FormControl>
-                          <FormDescription className="text-slate-400">
-                            Enter valid JSON configuration or leave empty for default settings
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-
-                <BaseDialogFooter>
+                <div className="flex items-center justify-end gap-2 pt-6">
                   <Button
                     type="button"
                     variant="outline"
@@ -384,7 +305,7 @@ function InstallToolFormContent({
                   </Button>
                   <Button 
                     type="submit"
-                    disabled={isLoading || !methods.formState.isValid}
+                    disabled={isLoading}
                   >
                     {isLoading ? (
                       <>
@@ -395,7 +316,7 @@ function InstallToolFormContent({
                       'Install Tool'
                     )}
                   </Button>
-                </BaseDialogFooter>
+                </div>
               </form>
             </Form>
           </FormProvider>
@@ -467,6 +388,8 @@ function CustomDialogFooter({
     await onSubmit(values);
   };
 
+  const isConfigureStep = currentStep === 'configure';
+
   return (
     <div className="border-t border-slate-700 p-6">
       <div className="flex justify-between">
@@ -489,15 +412,7 @@ function CustomDialogFooter({
               Back
             </Button>
           )}
-          {onNext ? (
-            <Button
-              type="button"
-              onClick={onNext}
-              disabled={!canProceed || formState.installation.isLoading}
-            >
-              Next
-            </Button>
-          ) : (
+          {isConfigureStep ? (
             <Button
               type="button"
               onClick={handleSubmit}
@@ -511,6 +426,14 @@ function CustomDialogFooter({
               ) : (
                 'Install Tool'
               )}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={onNext}
+              disabled={!canProceed || formState.installation.isLoading}
+            >
+              Next
             </Button>
           )}
         </div>
