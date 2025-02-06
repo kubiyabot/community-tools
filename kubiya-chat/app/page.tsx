@@ -2,27 +2,35 @@
 
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ArrowRight, Bot, Shield, Zap } from 'lucide-react';
+import { 
+  LockIcon, 
+  ChevronRightIcon,
+  ExternalLinkIcon,
+  GithubIcon,
+  BookOpenIcon,
+  HelpCircleIcon,
+  ArrowRightIcon
+} from 'lucide-react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useEffect } from 'react';
 
-const features = [
+const HELPFUL_LINKS = [
   {
-    icon: Bot,
-    title: 'AI-Powered Assistant',
-    description: 'Interact with your intelligent Kubiya teammate for seamless workflow automation.'
+    name: 'Documentation',
+    href: 'https://docs.kubiya.ai',
+    icon: BookOpenIcon,
   },
   {
-    icon: Shield,
-    title: 'Enterprise Security',
-    description: 'Bank-grade security with SSO integration and role-based access control.'
+    name: 'GitHub',
+    href: 'https://github.com/kubiya-ai',
+    icon: GithubIcon,
   },
   {
-    icon: Zap,
-    title: 'Instant Automation',
-    description: 'Automate your workflows and tasks with natural language commands.'
+    name: 'Support',
+    href: 'https://support.kubiya.ai',
+    icon: HelpCircleIcon,
   }
-];
+] as const;
 
 export default function LandingPage() {
   const router = useRouter();
@@ -49,71 +57,114 @@ export default function LandingPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col">
-      {/* Hero Section */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-        <div className="text-center space-y-8 max-w-3xl mx-auto">
-          {/* Logo */}
-          <div className="flex justify-center mb-8">
-            <div className="relative group cursor-pointer">
-              <Image
-                src="/favicon-32x32.png"
-                alt="Kubiya"
-                width={64}
-                height={64}
-                className="rounded-xl shadow-2xl ring-1 ring-white/10 transition-transform group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-[#7C3AED] rounded-xl opacity-0 group-hover:opacity-20 transition-opacity" />
-            </div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0A0F1E] to-[#1E293B]">
+      {/* Top Navigation */}
+      <nav className="fixed top-0 left-0 right-0 flex justify-between items-center px-6 py-4 bg-[#0A0F1E]/80 backdrop-blur-lg border-b border-white/5">
+        <div className="flex items-center gap-2 group cursor-pointer">
+          <div className="relative">
+            <Image
+              src="/favicon-32x32.png"
+              alt="Kubiya"
+              width={24}
+              height={24}
+              className="rounded-lg transition-transform group-hover:scale-110"
+            />
+            <div className="absolute inset-0 bg-[#7C3AED] rounded-lg opacity-0 group-hover:opacity-20 transition-opacity" />
           </div>
-
-          {/* Hero Text */}
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
-            Your AI-Powered Teammate
-          </h1>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Automate your workflows and interact with your systems using natural language.
-            Let Kubiya be your intelligent assistant.
-          </p>
-
-          {/* CTA Button */}
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={handleGetStarted}
-              className="group relative px-6 py-3 text-lg font-medium rounded-xl bg-[#7C3AED] text-white hover:bg-[#6D28D9] transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#7C3AED] shadow-lg hover:shadow-[#7C3AED]/25"
-            >
-              <span className="flex items-center">
-                Get Started
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </button>
-          </div>
+          <span className="text-white font-medium group-hover:text-[#7C3AED] transition-colors">Kubiya</span>
         </div>
+        <a
+          href="https://kubiya.ai"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center px-4 py-2 text-sm text-[#94A3B8] hover:text-white transition-all rounded-lg hover:bg-white/5 group"
+        >
+          <ExternalLinkIcon className="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" />
+          Visit Website
+          <ArrowRightIcon className="h-4 w-4 ml-1 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+        </a>
+      </nav>
 
-        {/* Features Grid */}
-        <div className="mt-24 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 max-w-7xl mx-auto px-4">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="relative group rounded-xl bg-white/5 p-6 hover:bg-white/10 transition-all duration-200 hover:scale-105"
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/10 to-transparent opacity-0 group-hover:opacity-100 rounded-xl transition-opacity" />
-              <div className="relative">
-                <feature.icon className="h-8 w-8 text-[#7C3AED] mb-4" />
-                <h3 className="text-xl font-semibold text-white mb-2">{feature.title}</h3>
-                <p className="text-gray-400">{feature.description}</p>
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="max-w-sm w-full">
+          {/* Sign In Card */}
+          <div className="text-center space-y-6 bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-2xl p-8 border border-white/5 shadow-xl relative group pointer-events-auto">
+            {/* Animated Border Effect */}
+            <div className="absolute -inset-[1px] bg-gradient-to-r from-[#7C3AED]/0 via-[#7C3AED]/20 to-[#7C3AED]/0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+            
+            {/* Logo */}
+            <div className="flex justify-center mb-2">
+              <div className="relative group/logo cursor-pointer">
+                <Image
+                  src="/favicon-32x32.png"
+                  alt="Kubiya"
+                  width={40}
+                  height={40}
+                  className="rounded-xl shadow-2xl ring-1 ring-white/10 transition-transform group-hover/logo:scale-110"
+                />
+                <div className="absolute inset-0 bg-[#7C3AED] rounded-xl opacity-0 group-hover/logo:opacity-20 transition-opacity" />
               </div>
             </div>
-          ))}
+            
+            {/* Title */}
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold text-white">
+                Welcome Back
+              </h1>
+              <p className="text-sm text-[#94A3B8]">
+                Sign in securely with your organization's credentials
+              </p>
+            </div>
+
+            {/* Sign In Button */}
+            <button
+              onClick={handleGetStarted}
+              className="w-full h-12 text-base font-medium transition-all duration-300
+                bg-[#7C3AED] hover:bg-[#6D28D9] text-white
+                rounded-xl shadow-lg hover:shadow-[#7C3AED]/25 hover:scale-[1.02]
+                flex items-center justify-center gap-3 group/btn
+                pointer-events-auto relative z-50"
+            >
+              <LockIcon className="h-5 w-5 group-hover/btn:scale-110 transition-transform" />
+              <span>Continue with SSO</span>
+              <ChevronRightIcon className="h-5 w-5 group-hover/btn:translate-x-1 transition-transform" />
+            </button>
+
+            {/* Security Badge */}
+            <div className="flex items-center justify-center gap-2 pt-4 border-t border-white/5 group/badge cursor-help">
+              <div className="w-4 h-4 rounded-full bg-[#7C3AED]/10 flex items-center justify-center">
+                <LockIcon className="h-2.5 w-2.5 text-[#7C3AED]" />
+              </div>
+              <p className="text-xs text-[#94A3B8] group-hover/badge:text-white transition-colors">
+                Enterprise-grade security with Auth0
+              </p>
+            </div>
+          </div>
+
+          {/* Footer with Helpful Links */}
+          <footer className="mt-8 space-y-4">
+            <div className="flex justify-center items-center gap-6">
+              {HELPFUL_LINKS.map((link) => (
+                <a
+                  key={link.name}
+                  href={link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-2 text-[#94A3B8] hover:text-white transition-all"
+                  title={link.name}
+                >
+                  <link.icon className="h-4 w-4 transition-transform group-hover:scale-110" />
+                  <span className="text-sm">{link.name}</span>
+                </a>
+              ))}
+            </div>
+            <p className="text-xs text-[#64748B] text-center hover:text-[#94A3B8] transition-colors cursor-default">
+              © {new Date().getFullYear()} Kubiya, Inc. All rights reserved.
+            </p>
+          </footer>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className="py-8 border-t border-white/10">
-        <div className="text-center text-sm text-gray-400">
-          © {new Date().getFullYear()} Kubiya, Inc. All rights reserved.
-        </div>
-      </footer>
-    </main>
+    </div>
   );
 }
