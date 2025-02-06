@@ -18,6 +18,14 @@ export interface SourceMeta {
   repo?: string;
 }
 
+export interface SourceError {
+  file: string;
+  error: string;
+  details?: string;
+  code?: string;
+  lineNumber?: number;
+}
+
 export interface DynamicConfig {
   [key: string]: any;
 }
@@ -32,6 +40,7 @@ export interface SourceInfo {
   tools: any[];
   isLoading?: boolean;
   error?: string;
+  errors?: SourceError[];
   connected_agents_count: number;
   connected_tools_count: number;
   connected_workflows_count: number;

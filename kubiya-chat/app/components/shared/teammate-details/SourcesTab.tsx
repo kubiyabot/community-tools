@@ -670,6 +670,12 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                         <Badge 
                           variant="destructive" 
                           className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help hover:bg-red-500/20 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (source.errors && source.errors[0]) {
+                              setSelectedError(source.errors[0]);
+                            }
+                          }}
                         >
                           <AlertCircle className="h-3.5 w-3.5 mr-1" />
                           {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
@@ -683,20 +689,17 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                               Source Errors
                             </h5>
                             <Badge variant="outline" className="bg-[#2A3347] border-[#2D3B4E] text-[#94A3B8]">
-                              Click to view details
+                              Click error to view details
                             </Badge>
                           </div>
                           <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {source.errors?.map((error: any, index: number) => (
+                            {source.errors?.map((error, index) => (
                               <button
                                 key={index}
-                                onClick={() => setSelectedError({
-                                  file: error.file,
-                                  error: error.error,
-                                  details: error.details,
-                                  code: error.code,
-                                  lineNumber: error.lineNumber
-                                })}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedError(error);
+                                }}
                                 className="w-full text-left bg-red-500/10 rounded-md p-2 border border-red-500/20 space-y-1.5 hover:bg-red-500/20 transition-colors"
                               >
                                 <div className="flex items-center gap-2">
@@ -704,9 +707,13 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                                   <span className="font-mono text-red-400 text-xs">{error.file}</span>
                                 </div>
                                 <div className="text-red-300 text-xs pl-6">
-                                  {error.error.split('\n')[0]}
-                                  {error.error.split('\n').length > 1 && '...'}
+                                  {error.error}
                                 </div>
+                                {error.details && (
+                                  <div className="text-red-300/70 text-[10px] pl-6 pt-1 border-t border-red-500/20">
+                                    {error.details}
+                                  </div>
+                                )}
                               </button>
                             ))}
                           </div>
@@ -721,13 +728,11 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                   <div className="flex flex-col gap-1 mt-1">
                     <div className="flex items-center gap-2 text-xs">
                       <div className="flex items-center gap-1.5">
-                        {source.type === 'github' && (
-                          <img 
-                            src="https://cdn-icons-png.flaticon.com/512/25/25231.png" 
-                            alt="GitHub" 
-                            className="h-3.5 w-3.5 opacity-60"
-                          />
-                        )}
+                        <img 
+                          src="https://cdn-icons-png.flaticon.com/512/25/25231.png" 
+                          alt="GitHub" 
+                          className="h-3.5 w-3.5 opacity-60"
+                        />
                         <a
                           href={gitHubInfo.repoUrl}
                           target="_blank"
