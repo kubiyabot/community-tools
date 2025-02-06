@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useEffect, useState, useCallback } from 'react';
-import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Hash, Box, Dock, AlertCircle, Plus, Search, Info, Trash2, FileCode, FileJson, FileText, File } from 'lucide-react';
+import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Hash, Box, Dock, AlertCircle, Plus, Search, Info, Trash2, FileCode, FileJson, FileText, File, User, Calendar } from 'lucide-react';
 import type { Tool as SourceTool } from '@/app/types/tool';
 import type { TeammateDetails } from '@/app/types/teammate';
 import type { SourceInfo } from '@/app/types/source';
@@ -52,7 +52,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Textarea } from "@/app/components/ui/textarea";
-import { InstallToolForm } from './InstallToolForm';
+import { InstallToolForm } from './install-tool/InstallToolForm';
+import { InstallToolProvider } from './install-tool/context';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +66,10 @@ import {
 } from "@/app/components/ui/alert-dialog";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useToast } from "@/app/components/ui/use-toast";
+import type { FormValues } from './install-tool/schema';
+import type { UseInstallToolReturn } from './install-tool/types';
+import { useInstallTool } from './install-tool/hooks/useInstallTool';
 
 interface SourceMeta {
   id: string;
@@ -117,7 +122,7 @@ interface SourceData {
   managed_by?: string;
 }
 
-type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
+interface ExtendedSourceInfo extends Omit<SourceInfo, 'tools'> {
   teammate_id: string;
   tools: SourceTool[];
   sourceId: string;
@@ -139,6 +144,7 @@ type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
     details?: string;
     code?: string;
     lineNumber?: number;
+    type?: string;
   }>;
   source_meta: {
     id: string;
@@ -147,7 +153,7 @@ type ExtendedSourceInfo = Omit<SourceInfo, 'tools'> & {
     commit: string;
     committer: string;
   };
-};
+}
 
 interface SyncPayload {
   name: string;
@@ -189,6 +195,76 @@ function getFileIcon(filename: string) {
       return <FileText className="h-4 w-4 text-gray-400" />;
     default:
       return <File className="h-4 w-4 text-gray-400" />;
+  }
+}
+
+// Add error type info helper
+function getErrorTypeInfo(type: string = 'Error') {
+  switch (type.toLowerCase()) {
+    case 'importerror':
+      return {
+        color: 'text-amber-400',
+        bgColor: 'bg-amber-500/10',
+        borderColor: 'border-amber-500/20',
+        icon: <Package className="h-4 w-4" />,
+        label: 'Import Error'
+      };
+    case 'syntaxerror':
+      return {
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10',
+        borderColor: 'border-red-500/20',
+        icon: <Code className="h-4 w-4" />,
+        label: 'Syntax Error'
+      };
+    case 'typeerror':
+      return {
+        color: 'text-purple-400',
+        bgColor: 'bg-purple-500/10',
+        borderColor: 'border-purple-500/20',
+        icon: <AlertCircle className="h-4 w-4" />,
+        label: 'Type Error'
+      };
+    case 'loading':
+      return {
+        color: 'text-blue-400',
+        bgColor: 'bg-blue-500/10',
+        borderColor: 'border-blue-500/20',
+        icon: <Loader2 className="h-4 w-4 animate-spin" />,
+        label: 'Loading'
+      };
+    case 'attributeerror':
+      return {
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/10',
+        borderColor: 'border-orange-500/20',
+        icon: <Settings className="h-4 w-4" />,
+        label: 'Attribute Error'
+      };
+    case 'valueerror':
+      return {
+        color: 'text-pink-400',
+        bgColor: 'bg-pink-500/10',
+        borderColor: 'border-pink-500/20',
+        icon: <AlertCircle className="h-4 w-4" />,
+        label: 'Value Error'
+      };
+    case 'nameerror':
+      return {
+        color: 'text-yellow-400',
+        bgColor: 'bg-yellow-500/10',
+        borderColor: 'border-yellow-500/20',
+        icon: <Hash className="h-4 w-4" />,
+        label: 'Name Error'
+      };
+    default:
+      return {
+        color: 'text-red-400',
+        bgColor: 'bg-red-500/10',
+        borderColor: 'border-red-500/20',
+        icon: <AlertCircle className="h-4 w-4" />,
+        label: type || 'Error'
+      };
   }
 }
 
@@ -482,63 +558,238 @@ interface ErrorPreviewModalProps {
     details?: string;
     code?: string;
     lineNumber?: number;
+    type?: string;
   };
+  source: ExtendedSourceInfo;
+  allErrors: Array<{
+    file: string;
+    error: string;
+    details?: string;
+    code?: string;
+    lineNumber?: number;
+    type?: string;
+  }>;
 }
 
-function ErrorPreviewModal({ isOpen, onClose, error }: ErrorPreviewModalProps) {
-  const fileExtension = error.file.split('.').pop() || '';
+function ErrorPreviewModal({ isOpen, onClose, error: focusedError, source, allErrors }: ErrorPreviewModalProps) {
+  // Group errors by file
+  const errorsByFile = useMemo(() => {
+    return allErrors.reduce((acc, error) => {
+      if (!acc[error.file]) {
+        acc[error.file] = [];
+      }
+      acc[error.file].push(error);
+      return acc;
+    }, {} as Record<string, typeof allErrors>);
+  }, [allErrors]);
+
+  // Get current file's errors
+  const currentFileErrors = errorsByFile[focusedError.file] || [];
+  
+  // State for selected file
+  const [selectedFile, setSelectedFile] = useState(focusedError.file);
+  
+  // Get file info for the selected file
+  const fileExtension = selectedFile.split('.').pop()?.toLowerCase() || '';
+  const fileName = selectedFile.split('/').pop() || '';
+  const filePath = selectedFile.split('/').slice(0, -1).join('/');
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {getFileIcon(error.file)}
-            <span>{error.file}</span>
-          </DialogTitle>
-          <DialogDescription className="text-red-400">
-            {error.error}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          {error.code && (
-            <div className="relative rounded-md overflow-hidden">
-              <div className="absolute top-2 right-2 z-10">
-                <Badge variant="outline" className="bg-red-500/10 text-red-400 border-red-500/20">
-                  Line {error.lineNumber}
-                </Badge>
+      <DialogContent className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto bg-[#0A0F1E] border-[#1E293B]">
+        <div className="flex h-full">
+          {/* Left Sidebar - File List */}
+          <div className="w-72 border-r border-[#1E293B] pr-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-[#EF4444]" />
+                Source Files
+              </h3>
+              <Badge variant="outline" className="bg-[#1E293B] border-[#2D3B4E] text-[#94A3B8]">
+                {allErrors.length} {allErrors.length === 1 ? 'error' : 'errors'}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              {Object.entries(errorsByFile).map(([file, errors]) => {
+                const isSelected = file === selectedFile;
+                const fileErrorTypeInfo = getErrorTypeInfo(errors[0].type);
+                return (
+                  <button
+                    key={file}
+                    onClick={() => setSelectedFile(file)}
+                    className={cn(
+                      "w-full text-left rounded-lg p-2 border transition-colors",
+                      isSelected ? "bg-[#2D3B4E] border-[#7C3AED]" : "border-[#2D3B4E] hover:bg-[#2D3B4E]/50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {getFileIcon(file)}
+                        <span className="font-mono text-xs text-white truncate">
+                          {file.split('/').pop()}
+                        </span>
+                      </div>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-[10px]",
+                          fileErrorTypeInfo.bgColor,
+                          fileErrorTypeInfo.color,
+                          fileErrorTypeInfo.borderColor
+                        )}
+                      >
+                        {errors.length}
+                      </Badge>
+                    </div>
+                    {isSelected && (
+                      <div className="mt-2 text-[10px] text-[#94A3B8] truncate">
+                        {filePath}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 pl-4 space-y-4 min-h-0 overflow-y-auto">
+            {/* Source Info */}
+            <div className="bg-[#1E293B] rounded-lg p-3 border border-[#2D3B4E] space-y-2">
+              <h4 className="text-xs font-medium text-white flex items-center gap-2">
+                <GitBranch className="h-3.5 w-3.5 text-[#7C3AED]" />
+                Source Information
+              </h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Hash className="h-3.5 w-3.5 text-[#94A3B8]" />
+                    <span className="text-[#94A3B8]">Commit:</span>
+                    <span className="font-mono text-white">{source.source_meta.commit.slice(0, 7)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <GitBranch className="h-3.5 w-3.5 text-[#94A3B8]" />
+                    <span className="text-[#94A3B8]">Branch:</span>
+                    <span className="font-mono text-white">{source.source_meta.branch}</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <User className="h-3.5 w-3.5 text-[#94A3B8]" />
+                    <span className="text-[#94A3B8]">Author:</span>
+                    <span className="font-mono text-white">{source.source_meta.committer}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Calendar className="h-3.5 w-3.5 text-[#94A3B8]" />
+                    <span className="text-[#94A3B8]">Last Updated:</span>
+                    <span className="font-mono text-white">
+                      {new Date(source.kubiya_metadata.last_updated).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <SyntaxHighlighter
-                language={fileExtension}
-                style={vscDarkPlus}
-                showLineNumbers
-                wrapLines
-                lineProps={(lineNumber: number) => ({
-                  style: {
-                    backgroundColor: lineNumber === error.lineNumber ? 'rgba(239, 68, 68, 0.1)' : undefined,
-                    display: 'block',
-                    width: '100%',
-                  },
-                })}
-              >
-                {error.code}
-              </SyntaxHighlighter>
             </div>
-          )}
-          
-          {error.details && (
-            <div className="bg-[#1E293B] rounded-md p-4 border border-[#2D3B4E]">
-              <h4 className="text-sm font-medium text-white mb-2">Additional Details</h4>
-              <p className="text-sm text-[#94A3B8] whitespace-pre-wrap">{error.details}</p>
+
+            {/* File Errors */}
+            <div className="space-y-4">
+              {errorsByFile[selectedFile]?.map((error, index) => {
+                const errorTypeInfo = getErrorTypeInfo(error.type);
+                const isFocused = error === focusedError;
+                return (
+                  <div 
+                    key={index}
+                    className={cn(
+                      "rounded-lg p-4 border transition-colors",
+                      isFocused ? "border-[#7C3AED] bg-[#2D3B4E]" : "border-[#2D3B4E] bg-[#1E293B]"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      {errorTypeInfo.icon}
+                      <div className="space-y-2 flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <h4 className={cn("font-medium", errorTypeInfo.color)}>
+                            {error.error}
+                          </h4>
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "font-mono text-xs",
+                              errorTypeInfo.bgColor,
+                              errorTypeInfo.color,
+                              errorTypeInfo.borderColor
+                            )}
+                          >
+                            {errorTypeInfo.label}
+                          </Badge>
+                        </div>
+                        {error.details && (
+                          <p className={cn("text-sm", errorTypeInfo.color, "opacity-90")}>
+                            {error.details}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+
+            {/* Troubleshooting Tips */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                <Info className="h-4 w-4 text-[#7C3AED]" />
+                Troubleshooting Tips
+              </h4>
+              <div className="bg-[#1E293B] rounded-lg p-4 border border-[#2D3B4E] space-y-3">
+                {focusedError.type?.toLowerCase() === 'importerror' && (
+                  <>
+                    <p className="text-sm text-[#94A3B8]">This error occurs when Python cannot find or import a module. Common causes:</p>
+                    <ul className="text-sm text-[#94A3B8] list-disc list-inside space-y-1.5 ml-2">
+                      <li>The module is not installed in the environment</li>
+                      <li>The module name is misspelled</li>
+                      <li>The module is not in the Python path</li>
+                      <li>The module has dependencies that are not installed</li>
+                    </ul>
+                  </>
+                )}
+                {focusedError.type?.toLowerCase() === 'syntaxerror' && (
+                  <>
+                    <p className="text-sm text-[#94A3B8]">This error indicates invalid Python syntax. Common causes:</p>
+                    <ul className="text-sm text-[#94A3B8] list-disc list-inside space-y-1.5 ml-2">
+                      <li>Missing or extra parentheses, brackets, or braces</li>
+                      <li>Invalid indentation</li>
+                      <li>Missing colons after control statements</li>
+                      <li>Invalid string formatting</li>
+                    </ul>
+                  </>
+                )}
+                {(!focusedError.type || !['importerror', 'syntaxerror'].includes(focusedError.type.toLowerCase())) && (
+                  <p className="text-sm text-[#94A3B8]">
+                    Review the error message and code context carefully. Check the documentation for the correct usage and ensure all dependencies are properly installed and configured.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+        <DialogFooter className="gap-2 pt-6 border-t border-[#1E293B]">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="gap-2 border-[#2D3B4E] text-[#94A3B8] hover:text-white hover:bg-[#2D3B4E]"
+          >
             Close
           </Button>
+          {selectedFile.includes('github.com') && (
+            <Button
+              onClick={() => window.open(`https://github.com/${selectedFile}`, '_blank')}
+              className="gap-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white"
+            >
+              <ExternalLink className="h-4 w-4" />
+              View on GitHub
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -550,10 +801,13 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
   onSourcesChange?: () => void;
   allSources: ExtendedSourceInfo[];
 }) => {
+  const { toast } = useToast();
   const [showSyncDialog, setShowSyncDialog] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [sourceMetadata, setSourceMetadata] = useState<any>(null);
+  const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
   const gitHubInfo = useMemo(() => getGitHubInfo(source.url), [source.url]);
   const firstToolWithIcon = useMemo(() => source.tools.find(tool => tool.icon_url), [source.tools]);
   
@@ -564,11 +818,83 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
     details?: string;
     code?: string;
     lineNumber?: number;
+    type?: string;
   } | null>(null);
+
+  // Get source errors from metadata
+  const sourceErrors = useMemo(() => {
+    // Debug log to see what we're getting
+    console.log('Source metadata for', source.name, ':', sourceMetadata);
+
+    // The errors are directly in the metadata response
+    if (!sourceMetadata?.errors || !Array.isArray(sourceMetadata.errors)) {
+      // If no metadata yet but we know there are errors, show loading state
+      if (source.errors_count > 0 && isLoadingMetadata) {
+        return [{
+          file: 'Loading...',
+          error: 'Loading error details...',
+          details: '',
+          type: 'loading'
+        }];
+      }
+      return [];
+    }
+    
+    // Map the errors to our expected format
+    return sourceMetadata.errors.map((error: { 
+      file: string;
+      error: string;
+      details?: string;
+      type?: string;
+    }) => ({
+      file: error.file,
+      error: error.error,
+      details: error.details || '',
+      type: error.type
+    }));
+  }, [sourceMetadata, source.errors_count, isLoadingMetadata, source.name]);
+
+  // Fetch source metadata when component mounts or source changes
+  useEffect(() => {
+    const fetchSourceMetadata = async () => {
+      // Only fetch if we know there are errors or haven't fetched yet
+      if (!source.uuid || (!source.errors_count && sourceMetadata !== null)) return;
+      
+      try {
+        setIsLoadingMetadata(true);
+        console.log('Fetching metadata for source:', source.name, source.uuid);
+        const response = await fetch(`/api/v1/sources/${source.uuid}/metadata`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch source metadata');
+        }
+        const data = await response.json();
+        console.log('Received metadata for', source.name, ':', data);
+        setSourceMetadata(data);
+      } catch (error) {
+        console.error('Error fetching metadata for', source.name, ':', error);
+        toast({
+          title: "Failed to load error details",
+          description: error instanceof Error ? error.message : 'An unexpected error occurred',
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingMetadata(false);
+      }
+    };
+
+    fetchSourceMetadata();
+  }, [source.uuid, source.errors_count, source.name, toast]);
 
   const handleSync = async () => {
     try {
       setIsSyncing(true);
+      
+      // Show syncing toast
+      const syncingToast = toast({
+        title: "Syncing source...",
+        description: `Syncing ${source.name} with the latest changes`,
+        duration: Infinity,
+      });
       
       // Construct the payload with dynamic_config if it exists
       const payload = {
@@ -593,13 +919,34 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
       // Get the updated data
       const data = await response.json();
 
+      // Fetch updated metadata after sync
+      const metadataResponse = await fetch(`/api/v1/sources/${source.uuid}/metadata`);
+      if (metadataResponse.ok) {
+        const metadataData = await metadataResponse.json();
+        setSourceMetadata(metadataData);
+      }
+
       // Call onSourcesChange to trigger a re-render with the latest data
       if (onSourcesChange) {
         await onSourcesChange();
       }
+
+      // Dismiss syncing toast and show success
+      syncingToast.dismiss();
+      toast({
+        title: "Source synced successfully",
+        description: `${source.name} has been synced with the latest changes`,
+        variant: "default",
+      });
     } catch (error) {
       console.error('Error syncing source:', error);
-      // TODO: Show error toast or notification
+      
+      // Show error toast
+      toast({
+        title: "Failed to sync source",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: "destructive",
+      });
     } finally {
       setIsSyncing(false);
       setShowSyncDialog(false);
@@ -609,6 +956,13 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
   const handleRemove = async () => {
     try {
       setIsRemoving(true);
+      
+      // Show removing toast
+      const removingToast = toast({
+        title: "Removing source...",
+        description: `Removing ${source.name} from teammate`,
+        duration: Infinity,
+      });
       
       // Get current teammate's sources
       const currentSources = allSources.map((s: ExtendedSourceInfo) => s.uuid);
@@ -633,8 +987,23 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
       if (onSourcesChange) {
         await onSourcesChange();
       }
+
+      // Dismiss removing toast and show success
+      removingToast.dismiss();
+      toast({
+        title: "Source removed successfully",
+        description: `${source.name} has been removed from teammate`,
+        variant: "default",
+      });
     } catch (error) {
       console.error('Error removing source:', error);
+      
+      // Show error toast
+      toast({
+        title: "Failed to remove source",
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: "destructive",
+      });
     } finally {
       setIsRemoving(false);
       setShowRemoveDialog(false);
@@ -658,7 +1027,7 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
               <div>
                 <h3 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
                   {source.name}
-                  {source.errors_count > 0 && (
+                  {sourceErrors.length > 0 && (
                     <HoverCard>
                       <HoverCardTrigger asChild>
                         <Badge 
@@ -666,50 +1035,71 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
                           className="bg-red-500/10 text-red-400 border-red-500/20 cursor-help hover:bg-red-500/20 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (source.errors && source.errors[0]) {
-                              setSelectedError(source.errors[0]);
+                            if (sourceErrors[0]) {
+                              setSelectedError(sourceErrors[0]);
                             }
                           }}
                         >
                           <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                          {source.errors_count} {source.errors_count === 1 ? 'error' : 'errors'}
+                          {sourceErrors.length} {sourceErrors.length === 1 ? 'error' : 'errors'}
                         </Badge>
                       </HoverCardTrigger>
                       <HoverCardContent className="w-96 p-0">
                         <div className="p-3 space-y-3">
                           <div className="flex items-start justify-between">
                             <h5 className="text-sm font-medium text-white flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 text-red-400" />
+                              <AlertCircle className="h-4 w-4 text-[#EF4444]" />
                               Source Errors
                             </h5>
-                            <Badge variant="outline" className="bg-[#2A3347] border-[#2D3B4E] text-[#94A3B8]">
+                            <Badge variant="outline" className="bg-[#1E293B] border-[#2D3B4E] text-[#94A3B8]">
                               Click error to view details
                             </Badge>
                           </div>
                           <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {source.errors?.map((error, index) => (
-                              <button
-                                key={index}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedError(error);
-                                }}
-                                className="w-full text-left bg-red-500/10 rounded-md p-2 border border-red-500/20 space-y-1.5 hover:bg-red-500/20 transition-colors"
-                              >
-                                <div className="flex items-center gap-2">
-                                  {getFileIcon(error.file)}
-                                  <span className="font-mono text-red-400 text-xs">{error.file}</span>
-                                </div>
-                                <div className="text-red-300 text-xs pl-6">
-                                  {error.error}
-                                </div>
-                                {error.details && (
-                                  <div className="text-red-300/70 text-[10px] pl-6 pt-1 border-t border-red-500/20">
-                                    {error.details}
+                            {sourceErrors.map((error: {
+                              file: string;
+                              error: string;
+                              details?: string;
+                              type?: string;
+                            }, index: number) => {
+                              const errorTypeInfo = getErrorTypeInfo(error.type);
+                              return (
+                                <button
+                                  key={index}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedError(error);
+                                  }}
+                                  className={cn(
+                                    "w-full text-left rounded-md p-2 border space-y-1.5 transition-colors",
+                                    errorTypeInfo.bgColor,
+                                    errorTypeInfo.borderColor,
+                                    "hover:bg-opacity-20"
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      {getFileIcon(error.file)}
+                                      <span className="font-mono text-xs text-[#94A3B8]">{error.file}</span>
+                                    </div>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={cn(
+                                        "text-[10px]",
+                                        errorTypeInfo.bgColor,
+                                        errorTypeInfo.color,
+                                        errorTypeInfo.borderColor
+                                      )}
+                                    >
+                                      {errorTypeInfo.label}
+                                    </Badge>
                                   </div>
-                                )}
-                              </button>
-                            ))}
+                                  <div className={cn("text-xs pl-6", errorTypeInfo.color)}>
+                                    {error.error}
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       </HoverCardContent>
@@ -947,6 +1337,8 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
           isOpen={!!selectedError}
           onClose={() => setSelectedError(null)}
           error={selectedError}
+          source={source}
+          allErrors={sourceMetadata?.errors || []}
         />
       )}
     </>
@@ -1275,63 +1667,10 @@ export function SourcesTab({
   const [syncingSourceIds, setSyncingSourceIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return sources;
-    
-    const query = searchQuery.toLowerCase();
-    return sources.map(source => ({
-      ...source,
-      tools: source.tools.filter(tool => 
-        tool.name.toLowerCase().includes(query) ||
-        tool.description?.toLowerCase().includes(query) ||
-        tool.type?.toLowerCase().includes(query)
-      )
-    })).filter(source => source.tools.length > 0);
-  }, [sources, searchQuery]);
-
-  const handleSync = async (sourceId: string) => {
-    try {
-      setSyncingSourceIds(prev => new Set([...prev, sourceId]));
-      
-      // Find the source to get its dynamic_config
-      const source = sources.find(s => s.uuid === sourceId);
-      if (!source) {
-        throw new Error('Source not found');
-      }
-
-      const response = await fetch(`/api/sources/${source.uuid}/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          dynamic_config: source.dynamic_config || null 
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync source');
-      }
-
-      if (onSourcesChange) {
-        await onSourcesChange();
-      }
-    } catch (error) {
-      console.error('Error syncing source:', error);
-    } finally {
-      setSyncingSourceIds(prev => {
-        const next = new Set(prev);
-        next.delete(sourceId);
-        return next;
-      });
-    }
-  };
-
   const handleInstall = async (
-    values: SourceFormValues,
+    values: FormValues,
     updateProgress: (stepId: string, status: 'pending' | 'loading' | 'success' | 'error', error?: string) => void
-  ) => {
+  ): Promise<void> => {
     try {
       updateProgress('validate', 'loading');
 
@@ -1389,13 +1728,71 @@ export function SourcesTab({
       if (onSourcesChange) {
         await onSourcesChange();
       }
-
-      return data;
     } catch (error) {
       console.error('Installation error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Installation failed';
       updateProgress('validate', 'error', errorMessage);
       throw error;
+    }
+  };
+
+  // Add useInstallTool hook after handleInstall is defined
+  const installToolState = useInstallTool({
+    onInstall: handleInstall,
+    teammate: teammate!,
+    onClose: () => setShowInstallModal(false)
+  });
+
+  const filteredSources = useMemo(() => {
+    if (!searchQuery.trim()) return sources;
+    
+    const query = searchQuery.toLowerCase();
+    return sources.map(source => ({
+      ...source,
+      tools: source.tools.filter(tool => 
+        tool.name.toLowerCase().includes(query) ||
+        tool.description?.toLowerCase().includes(query) ||
+        tool.type?.toLowerCase().includes(query)
+      )
+    })).filter(source => source.tools.length > 0);
+  }, [sources, searchQuery]);
+
+  const handleSync = async (sourceId: string) => {
+    try {
+      setSyncingSourceIds(prev => new Set([...prev, sourceId]));
+      
+      // Find the source to get its dynamic_config
+      const source = sources.find(s => s.uuid === sourceId);
+      if (!source) {
+        throw new Error('Source not found');
+      }
+
+      const response = await fetch(`/api/sources/${source.uuid}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          dynamic_config: source.dynamic_config || null 
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to sync source');
+      }
+
+      if (onSourcesChange) {
+        await onSourcesChange();
+      }
+    } catch (error) {
+      console.error('Error syncing source:', error);
+    } finally {
+      setSyncingSourceIds(prev => {
+        const next = new Set(prev);
+        next.delete(sourceId);
+        return next;
+      });
     }
   };
 
@@ -1536,12 +1933,15 @@ export function SourcesTab({
         )}
       </div>
 
-      <InstallToolForm
-        isOpen={showInstallModal}
-        onClose={() => setShowInstallModal(false)}
-        onInstall={handleInstall}
-        teammate={teammate!}
-      />
+      {/* Install Tool Form */}
+      <InstallToolProvider teammate={teammate!} value={installToolState}>
+        <InstallToolForm
+          isOpen={showInstallModal}
+          onClose={() => setShowInstallModal(false)}
+          onInstall={handleInstall}
+          teammate={teammate!}
+        />
+      </InstallToolProvider>
     </div>
   );
 } 

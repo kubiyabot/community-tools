@@ -86,7 +86,8 @@ export async function GET(
       tools: metadata.tools || [],
       workflows: metadata.workflows || [],
       created_at: metadata.created_at || new Date().toISOString(),
-      updated_at: metadata.updated_at || new Date().toISOString()
+      updated_at: metadata.updated_at || new Date().toISOString(),
+      errors: metadata.errors || [] // Include errors from metadata
     };
 
     return new Response(JSON.stringify(response), {
