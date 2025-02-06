@@ -17,7 +17,7 @@ kubectl_tool = KubernetesTool(
     output=$(kubectl $command)
     if [ $? -eq 0 ]; then
         echo "$output" | head -n 100
-        echo "Note: Output limited to 100 lines. For more focused results, consider using grep or more specific selectors."
+        echo "-- > For more focused results, consider refining your command or using more specific selectors"
     else
         echo "❌ Command failed: kubectl $command"
         exit 1
