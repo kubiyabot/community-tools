@@ -20,14 +20,11 @@ export function StepContent() {
     handleRefresh,
     handleCommunityToolSelect,
     isLoading,
-    isInstallationComplete,
-    teammate
+    isInstallationComplete
   } = useInstallToolContext();
 
   const renderStep = () => {
     switch (currentStep) {
-      case 'source':
-        return <CustomSourceTab methods={methods} />;
       case 'select':
         const selectProps: SelectStepProps = {
           formState: formState as FormState,
@@ -39,10 +36,20 @@ export function StepContent() {
           setExpandedTools
         };
         return <SelectStep {...selectProps} />;
-      case 'preview':
-        return <PreviewStep selectedTool={selectedTool} isLoading={isLoading} />;
       case 'configure':
-        return <ConfigureStep isInstallationComplete={isInstallationComplete} />;
+        return <CustomSourceTab methods={methods} />;
+      case 'install':
+        return (
+          <PreviewStep 
+            selectedTool={selectedTool || {
+              name: methods.getValues('name'),
+              description: 'Custom source',
+              tools: formState.preview.data?.tools || [],
+              type: 'custom'
+            }} 
+            isLoading={isLoading} 
+          />
+        );
       default:
         return null;
     }

@@ -283,48 +283,46 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
   const goToNextStep = useCallback(() => {
     setCurrentStep(prev => {
       switch(prev) {
-        case 'source': return 'select';
-        case 'select': return 'preview';
-        case 'preview': return 'configure';
-        case 'configure': return 'installing';
+        case 'select':
+          if (selectedTool) {
+            return 'configure';
+          }
+          return prev;
+        case 'configure':
+          if (methods.formState.isValid && (formState.preview.data?.tools?.length > 0 || (selectedTool?.tools && selectedTool.tools.length > 0))) {
+            return 'install';
+          }
+          return prev;
+        default:
+          return prev;
+      }
+    });
+  }, [selectedTool, methods.formState.isValid, formState.preview.data?.tools?.length]);
+
+  const goToPreviousStep = useCallback(() => {
+    setCurrentStep(prev => {
+      switch(prev) {
+        case 'configure': return 'select';
+        case 'install': return 'configure';
         default: return prev;
       }
     });
   }, []);
 
-  const goToPreviousStep = useCallback(() => {
-    // If we're on the first step (select), close the modal
-    if (currentStep === 'select') {
-      if (onClose) {
-        onClose();
-      }
-      return;
-    }
-
-    // Otherwise, go to the previous step
-    setCurrentStep(prev => {
-      switch(prev) {
-        case 'preview': return 'select';
-        case 'configure': return 'preview';
-        case 'installing': return 'configure';
-        default: return prev;
-      }
-    });
-  }, [currentStep, onClose]);
-
   const calculateCanProceed = useCallback((): boolean => {
     switch (currentStep) {
       case 'select':
         return !!selectedTool;
-      case 'preview':
-        // Check for tools in the selectedTool, ensure boolean return
-        return !!(selectedTool?.tools && selectedTool.tools.length > 0);
       case 'configure':
         // For custom source, check if we have valid preview data with tools
         if (formState.preview.data?.tools) {
           return formState.preview.data.tools.length > 0 && methods.formState.isValid;
         }
-        return methods.formState.isValid;
+        // For community tools, check if we have tools in the selected tool
+        if (selectedTool?.tools) {
+          return selectedTool.tools.length > 0 && methods.formState.isValid;
+        }
+        return false;
       case 'install':
         return !formState.installation.isLoading;
       default:
@@ -346,8 +344,6 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
     }
 
     switch (currentStep) {
-      case 'source':
-        return null;
       case 'select':
         return (
           <div className="space-y-8">
@@ -377,50 +373,20 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
             )}
           </div>
         );
-      case 'preview':
+      case 'configure':
+        return null; // This is handled by CustomSourceTab
+      case 'install':
         return (
           <div className="p-6">
-            <PreviewStep selectedTool={selectedTool} />
-          </div>
-        );
-      case 'configure':
-        return null;
-      case 'installing':
-        return (
-          <div className="p-6 space-y-6">
-            <div className="space-y-4">
-              {steps.map((step) => (
-                <div key={step.id} className="flex items-center gap-3">
-                  {step.status === 'loading' && (
-                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
-                  )}
-                  {step.status === 'success' && (
-                    <CheckCircle className="h-4 w-4 text-green-400" />
-                  )}
-                  {step.status === 'error' && (
-                    <XCircle className="h-4 w-4 text-red-400" />
-                  )}
-                  {step.status === 'pending' && (
-                    <Circle className="h-4 w-4 text-slate-400" />
-                  )}
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-200">{step.description}</p>
-                    {step.error && (
-                      <p className="text-xs text-red-400 mt-1">{step.error}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {formState.installation.error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Installation Failed</AlertTitle>
-                <AlertDescription>
-                  {formState.installation.error}
-                </AlertDescription>
-              </Alert>
-            )}
+            <PreviewStep 
+              selectedTool={selectedTool || {
+                name: methods.getValues('name'),
+                description: 'Custom source',
+                tools: formState.preview.data?.tools || [],
+                type: 'custom'
+              }} 
+              isLoading={formState.installation.isLoading}
+            />
           </div>
         );
       default:
@@ -430,7 +396,8 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
     formState.communityTools.error,
     formState.communityTools.isLoading,
     formState.communityTools.data,
-    formState.installation.error,
+    formState.installation.isLoading,
+    formState.preview.data,
     currentStep,
     activeCategory,
     selectedTool,
@@ -441,7 +408,7 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
     expandedTools,
     setExpandedTools,
     teammate?.runners,
-    steps,
+    methods,
     setActiveCategory
   ]);
 
