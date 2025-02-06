@@ -13,10 +13,10 @@ kubectl_tool = KubernetesTool(
     # Show the command being executed
     echo "🔧 Executing: kubectl $command"
 
-    # Run the kubectl command with limited output (100 lines max)
-    # Using a subshell to capture the real exit status while still limiting output
-    if (kubectl $command | head -n 100); then
-        echo "✅ Command executed successfully"
+    # Run the kubectl command and ensure output is displayed
+    output=$(kubectl $command)
+    if [ $? -eq 0 ]; then
+        echo "$output" | head -n 100
         echo "Note: Output limited to 100 lines. For more focused results, consider using grep or more specific selectors."
     else
         echo "❌ Command failed: kubectl $command"
@@ -31,7 +31,7 @@ kubectl_tool = KubernetesTool(
                        "- 'get pod my-pod-name -n my-namespace'  # target specific pod\n" +
                        "- 'get pods -n default | grep my-app'    # filter pods by name\n" +
                        "- 'get pods -l app=my-app -n prod'       # use labels for precise filtering\n" +
-                       "- 'get nodes --selector=node-role=worker' # target specific node types",
+                       "- 'get nodes --selector=node-role=worker' # target specific node types\n\nTry to use grep to filter the output if possible as well as more specific selectors",
             required=True
         ),
     ],
