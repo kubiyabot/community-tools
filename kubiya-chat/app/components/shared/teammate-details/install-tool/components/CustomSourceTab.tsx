@@ -71,8 +71,8 @@ export function CustomSourceTab({ methods, teammate }: CustomSourceTabProps) {
     if (!teammate || !Array.isArray(teammate.runners) || teammate.runners.length === 0) {
       return null;
     }
-    const firstRunner = teammate.runners[0] as string;
-    return firstRunner;
+    // According to TeammateDetails interface, runners is string[]
+    return teammate.runners[0];
   };
 
   // Function to load preview data
