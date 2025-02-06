@@ -567,7 +567,6 @@ check_replicas_tool = KubernetesTool(
 for tool in [
     change_replicas_tool,
     get_resource_events_tool,
-    get_pod_logs_tool,
     node_status_tool,
     find_suspicious_errors_tool,
     network_policy_analyzer_tool,
