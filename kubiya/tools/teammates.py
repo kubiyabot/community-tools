@@ -1,19 +1,15 @@
 from kubiya_sdk.tools import Arg
-from .base import create_tool
+from .base import KubiyaCliBase
 
 # List Teammates Tool
-teammate_list = create_tool(
+teammate_list = KubiyaCliBase(
     name="teammate_list",
     description="List all available virtual teammates and their capabilities",
-    cli_command='''
-echo "📋 Listing teammates..."
-
-kubiya teammate list \\
+    cli_command='''teammate list \\
     --output ${format} \\
     $([ -n "${filter}" ] && echo "--filter ${filter}") \\
     $([ -n "${sort}" ] && echo "--sort ${sort}") \\
-    $([ -n "${limit}" ] && echo "--limit ${limit}")
-''',
+    $([ -n "${limit}" ] && echo "--limit ${limit}")''',
     args=[
         Arg(name="format", type="str", description="Output format (json|text)", required=False, default="json"),
         Arg(name="filter", type="str", description="Filter by expertise or domain", required=False),
@@ -39,17 +35,13 @@ graph TD
 )
 
 # Get Teammate Details Tool
-teammate_get = create_tool(
+teammate_get = KubiyaCliBase(
     name="teammate_get",
     description="Get detailed information about a virtual teammate's capabilities and expertise",
-    cli_command='''
-echo "🔍 Getting teammate details..."
-
-kubiya teammate get \\
+    cli_command='''teammate get \\
     $([ -n "${id}" ] && echo "--id ${id}") \\
     $([ -n "${name}" ] && echo "--name ${name}") \\
-    --output ${format}
-''',
+    --output ${format}''',
     args=[
         Arg(name="id", type="str", description="Virtual teammate ID", required=False),
         Arg(name="name", type="str", description="Virtual teammate name", required=False),
@@ -75,19 +67,15 @@ graph TD
 )
 
 # Search Teammates Tool
-teammate_search = create_tool(
+teammate_search = KubiyaCliBase(
     name="teammate_search",
     description="Find virtual teammates based on their expertise and capabilities",
-    cli_command='''
-echo "🔎 Searching teammates..."
-
-kubiya teammate search \\
+    cli_command='''teammate search \\
     --query "${query}" \\
     $([ -n "${capability}" ] && echo "--capability ${capability}") \\
     $([ -n "${expertise}" ] && echo "--expertise ${expertise}") \\
     $([ -n "${limit}" ] && echo "--limit ${limit}") \\
-    --output ${format}
-''',
+    --output ${format}''',
     args=[
         Arg(name="query", type="str", description="Search for specific skills or domains", required=True),
         Arg(name="capability", type="str", description="Filter by technical capability", required=False),
@@ -112,16 +100,12 @@ graph TD
 )
 
 # List Teammate Capabilities Tool
-teammate_capabilities = create_tool(
+teammate_capabilities = KubiyaCliBase(
     name="teammate_capabilities",
     description="List all available capabilities and domains of expertise for virtual teammates",
-    cli_command='''
-echo "📋 Listing capabilities..."
-
-kubiya teammate capabilities \\
+    cli_command='''teammate capabilities \\
     --output ${format} \\
-    $([ -n "${category}" ] && echo "--category ${category}")
-''',
+    $([ -n "${category}" ] && echo "--category ${category}")''',
     args=[
         Arg(name="format", type="str", description="Output format (json|text)", required=False, default="json"),
         Arg(name="category", type="str", description="Filter by capability domain", required=False),
@@ -141,6 +125,10 @@ graph TD
     H --> I
     '''
 )
+
+# Register all tools
+for tool in [teammate_list, teammate_get, teammate_search, teammate_capabilities]:
+    KubiyaCliBase.register(tool)
 
 __all__ = [
     'teammate_list',

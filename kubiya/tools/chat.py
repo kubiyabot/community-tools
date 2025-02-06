@@ -1,8 +1,8 @@
 from kubiya_sdk.tools import Arg
-from .base import create_tool
+from .base import KubiyaCliBase
 
 # Send Message Tool
-teammate_message = create_tool(
+teammate_message = KubiyaCliBase(
     name="teammate_message",
     description="Send a message to a virtual teammate to request assistance or automation",
     cli_command='''
@@ -14,7 +14,7 @@ if [ -n "${context}" ]; then
     CONTEXT_ARG="--context $CONTEXT_FILE"
 fi
 
-kubiya chat \\
+chat \\
     $([ -n "${id}" ] && echo "--id ${id}") \\
     $([ -n "${name}" ] && echo "--name ${name}") \\
     --message "${message}" \\
@@ -52,7 +52,7 @@ graph TD
 )
 
 # Stream Chat Tool
-teammate_stream = create_tool(
+teammate_stream = KubiyaCliBase(
     name="teammate_stream",
     description="Start a real-time conversation with a virtual teammate for complex tasks",
     cli_command='''
@@ -64,7 +64,7 @@ if [ -n "${context}" ]; then
     CONTEXT_ARG="--context $CONTEXT_FILE"
 fi
 
-kubiya chat \\
+chat \\
     $([ -n "${id}" ] && echo "--id ${id}") \\
     $([ -n "${name}" ] && echo "--name ${name}") \\
     --message "${message}" \\
@@ -100,7 +100,7 @@ graph TD
 )
 
 # Continue Chat Tool
-teammate_continue = create_tool(
+teammate_continue = KubiyaCliBase(
     name="teammate_continue",
     description="Continue an existing conversation or task with a virtual teammate",
     cli_command='''
@@ -112,7 +112,7 @@ if [ -n "${context}" ]; then
     CONTEXT_ARG="--context $CONTEXT_FILE"
 fi
 
-kubiya chat \\
+chat \\
     $([ -n "${id}" ] && echo "--id ${id}") \\
     $([ -n "${name}" ] && echo "--name ${name}") \\
     --message "${message}" \\
@@ -146,6 +146,10 @@ graph TD
     L --> M[Update Session]
     '''
 )
+
+# Register all tools
+for tool in [teammate_message, teammate_stream, teammate_continue]:
+    KubiyaCliBase.register(tool)
 
 __all__ = [
     'teammate_message',

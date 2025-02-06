@@ -12,16 +12,50 @@ class KubiyaCliBase(Tool):
     def __init__(self, name, description, cli_command, args=None, mermaid=None):
         enhanced_command = f'''
 #!/bin/sh
-set -e
+set -ex
 
-apk add curl --silent > /dev/null 2>&1
+echo "Starting Kubiya CLI setup..."
 
-# Get CLI binary
-curl -L {CLI_URL} -o /usr/local/bin/kubiya
-chmod +x /usr/local/bin/kubiya
+# Create directories
+mkdir -p /usr/local/bin
 
-# Execute command with full path
-/usr/local/bin/kubiya {cli_command}
+# Install required packages
+echo "Installing required packages..."
+apk update
+apk add --no-cache curl jq gcompat || {{
+    echo "Failed to install required packages"
+    exit 1
+}}
+
+# Download CLI binary
+echo "Downloading Kubiya CLI from {CLI_URL}..."
+if ! curl -L -f {CLI_URL} -o {CLI_PATH}; then
+    echo "Failed to download CLI binary"
+    exit 1
+fi
+
+echo "Setting executable permissions..."
+chmod +x {CLI_PATH}
+
+# Create symbolic link for library compatibility
+ln -sf /lib/ld-linux-x86-64.so.2 /lib64/ld-linux-x86-64.so.2 || true
+
+# Verify CLI installation
+echo "Verifying CLI installation..."
+if ! {CLI_PATH} --help >/dev/null 2>&1; then
+    echo "Failed to verify CLI installation"
+    exit 1
+fi
+
+echo "Environment setup complete. Executing command..."
+echo "Command to execute: {cli_command}"
+
+# Execute command with API key
+export KUBIYA_API_KEY="${{KUBIYA_API_KEY}}"
+{CLI_PATH} {cli_command} || {{
+    echo "Command failed with exit code $?"
+    exit 1
+}}
 '''
 
         super().__init__(
