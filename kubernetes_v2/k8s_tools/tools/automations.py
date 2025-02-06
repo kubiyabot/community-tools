@@ -104,54 +104,6 @@ get_resource_events_tool = KubernetesTool(
     ],
 )
 
-get_pod_logs_tool = KubernetesTool(
-    name="get_pod_logs",
-    description="Fetches logs for a Kubernetes pod with automatic fallback to previous logs if pod not found",
-    content="""
-    #!/bin/bash
-    set -e
-
-    # Validate required inputs
-    if [ -z "$namespace" ] || [ -z "$pod_name" ]; then
-        echo "❌ Both namespace and pod_name are required"
-        exit 1
-    fi
-
-    # First attempt: Get current logs
-    logs=$(kubectl logs -n "$namespace" "$pod_name" 2>&1 || echo "Error: $?")
-
-    # Check for errors and try fallback if needed
-    if echo "$logs" | grep -q "Error from server (NotFound)" || echo "$logs" | grep -q "Error"; then
-        echo "⚠️ Could not fetch current logs, attempting to fetch previous logs..."
-        
-        # Second attempt: Try with --previous flag
-        previous_logs=$(kubectl logs -n "$namespace" "$pod_name" --previous 2>&1 || echo "Error: $?")
-        
-        if echo "$previous_logs" | grep -q "Error from server (NotFound)"; then
-            echo "❗Pod '$pod_name' not found in namespace '$namespace' (both current and previous)"
-        elif echo "$previous_logs" | grep -q "Error"; then
-            echo "❗Error getting logs (both current and previous): $previous_logs"
-        else
-            echo "📜 Previous logs for $pod_name in $namespace:"
-            echo "$previous_logs" | sed 's/^/  /'
-        fi
-    else
-        echo "📜 Current logs for $pod_name in $namespace:"
-        echo "$logs" | sed 's/^/  /'
-    fi
-    """,
-    args=[
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace",
-            required=True,
-        ),
-        Arg(name="pod_name", type="str", description="Name of the pod", required=True),
-    ],
-)
-
-
 node_status_tool = KubernetesTool(
     name="node_status",
     description="Lists Kubernetes nodes with their status and emojis",
