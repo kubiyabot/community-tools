@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../src/types/Unsubscribe.tsx"],"sourcesContent":["export type Unsubscribe = () => void;\n"],"mappings":";;;;;;;;;;;;;;;;AAAA;AAAA;","names":[]}

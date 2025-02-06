@@ -1,0 +1,1 @@
+{"version":3,"file":"auth0-request-cookies.d.ts","sourceRoot":"","sources":["../../../src/auth0-session/http/auth0-request-cookies.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,OAAO,CAAC,QAAQ,OAAO,mBAAmB;aAC/B,UAAU,IAAI,MAAM,CAAC,MAAM,EAAE,MAAM,CAAC;CACrD"}

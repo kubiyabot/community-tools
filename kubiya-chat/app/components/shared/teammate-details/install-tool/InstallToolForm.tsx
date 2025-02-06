@@ -590,7 +590,7 @@ export function InstallToolForm({ isOpen, onClose, onInstall, teammate }: Instal
           />
         );
       case 'configure':
-        return <CustomSourceTab methods={methods} teammate={teammate} />;
+        return <CustomSourceTab methods={methods} />;
       case 'install':
         return <PreviewStep selectedTool={selectedTool} isLoading={isLoading} />;
       default:

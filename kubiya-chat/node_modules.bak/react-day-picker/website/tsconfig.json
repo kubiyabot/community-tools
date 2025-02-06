@@ -1,0 +1,13 @@
+{
+  // This file is not used in compilation. It is here just for a nice editor experience.
+  "extends": "@docusaurus/tsconfig",
+  "compilerOptions": {
+    "target": "ES2018",
+    "lib": ["DOM", "ESNext", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "strict": true,
+    "types": ["node", "@docusaurus/module-type-aliases"]
+  },
+  "include": ["src", "examples-v8"]
+}

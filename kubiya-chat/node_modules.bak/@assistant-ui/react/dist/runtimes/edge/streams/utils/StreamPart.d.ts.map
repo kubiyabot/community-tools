@@ -1,0 +1,1 @@
+{"version":3,"file":"StreamPart.d.ts","sourceRoot":"","sources":["../../../../../src/runtimes/edge/streams/utils/StreamPart.ts"],"names":[],"mappings":"AAAA,MAAM,MAAM,UAAU,CAAC,CAAC,SAAS,MAAM,CAAC,MAAM,EAAE,OAAO,CAAC,IAAI;KACzD,CAAC,IAAI,MAAM,CAAC,GAAG;QAAE,IAAI,EAAE,CAAC,CAAC;QAAC,KAAK,EAAE,CAAC,CAAC,CAAC,CAAC,CAAA;KAAE;CACzC,CAAC,MAAM,CAAC,CAAC,CAAC"}

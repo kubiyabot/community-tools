@@ -1,0 +1,1 @@
+{"version":3,"file":"auth0-request.js","sourceRoot":"","sources":["../../../src/auth0-session/http/auth0-request.ts"],"names":[],"mappings":";;;AAAA,4FAA0D;AAE1D,MAA8B,YAAwB,SAAQ,+BAAmB;IAC/E,YAA6B,GAAQ;QACnC,KAAK,EAAE,CAAC;QADmB,QAAG,GAAH,GAAG,CAAK;IAErC,CAAC;CAKF;AARD,+BAQC"}

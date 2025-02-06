@@ -1,0 +1,161 @@
+---
+sidebar_position: 2
+---
+
+# Custom Selections
+
+:::info Draft
+
+This documentation is still a work in progress. If you have any questions, please visit the [discussions](https://github.com/gpbl/react-day-picker/discussions) page on GitHub.
+
+:::
+
+If the built-in [selection modes](../docs/selection-modes.mdx) do not satisfy your app’s requirements, you can control the selection behavior using the [`onDayClick`](../api/interfaces/PropsBase.md#ondayclick) and [`modifiers`](../api
+
+| Prop         | Type                                                        | Description                               |
+| ------------ | ----------------------------------------------------------- | ----------------------------------------- |
+| `onDayClick` | [`DayEventHandler`](../api/type-aliases/DayEventHandler.md) | Callback when a day is clicked.           |
+| `modifiers`  | [`Modifiers`](../api/type-aliases/Modifiers.md)             | An object with the modifiers of the days. |
+
+This prop is a function that receives the clicked day and its modifiers as arguments.
+
+## Examples
+
+### Week Selection
+
+The following example demonstrates how to select an entire week when a day is clicked.
+
+Note the use of the `startOfWeek` and `endOfWeek` functions from [date-fns](https://date-fns.org), and how the `selectedWeek` state is passed to the `modifiers` prop.
+
+```tsx
+import React, { useState } from "react";
+
+import { endOfWeek, startOfWeek } from "date-fns";
+import { DateRange, DayPicker, isDateInRange } from "react-day-picker";
+
+/** Select the whole week when the day is clicked. */
+export function CustomWeek() {
+  const [selectedWeek, setSelectedWeek] = useState<DateRange | undefined>();
+
+  return (
+    <DayPicker
+      showWeekNumber
+      showOutsideDays
+      modifiers={{
+        selected: selectedWeek,
+        range_start: selectedWeek?.from,
+        range_end: selectedWeek?.to,
+        range_middle: (date: Date) =>
+          selectedWeek
+            ? isDateInRange(date, selectedWeek, { excludeEnds: true })
+            : false
+      }}
+      onDayClick={(day, modifiers) => {
+        if (modifiers.selected) {
+          setSelectedWeek(undefined); // clear the selection if the day is already selected
+          return;
+        }
+        setSelectedWeek({
+          from: startOfWeek(day),
+          to: endOfWeek(day)
+        });
+      }}
+      footer={
+        selectedWeek &&
+        `Week from ${selectedWeek?.from?.toLocaleDateString()} to
+            ${selectedWeek?.to?.toLocaleDateString()}`
+      }
+    />
+  );
+}
+```
+
+<BrowserWindow>
+  <Examples.CustomWeek />
+</BrowserWindow>
+
+### Single Selection
+
+For example, to implement the "single selection" behavior (similar to when `mode="single"`):
+
+```tsx
+import { useState } from "react";
+
+import { DayPicker, DayPickerProps } from "react-day-picker";
+
+export function CustomSingle() {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+
+  const modifiers: DayPickerProps["modifiers"] = {};
+  if (selectedDate) {
+    modifiers.selected = selectedDate;
+  }
+  return (
+    <DayPicker
+      modifiers={modifiers}
+      onDayClick={(day, modifiers) => {
+        if (modifiers.selected) {
+          setSelectedDate(undefined);
+        } else {
+          setSelectedDate(day);
+        }
+      }}
+      footer={selectedDate && `You selected ${selectedDate.toDateString()}`}
+    />
+  );
+}
+```
+
+<BrowserWindow>
+  <Examples.CustomSingle />
+</BrowserWindow>
+
+### Multi Selections
+
+Selecting multiple days is a bit more complex as it involves handling an array of dates. The following example replicates the `mode="multiple"` selection mode:
+
+```tsx
+import { useState } from "react";
+
+import { isSameDay } from "date-fns";
+import { DayMouseEventHandler, DayPicker } from "react-day-picker";
+
+export function CustomMultiple() {
+  const [value, setValue] = useState<Date[]>([]);
+
+  const handleDayClick: DayMouseEventHandler = (day, modifiers) => {
+    const newValue = [...value];
+    if (modifiers.selected) {
+      const index = value.findIndex((d) => isSameDay(day, d));
+      newValue.splice(index, 1);
+    } else {
+      newValue.push(day);
+    }
+    setValue(newValue);
+  };
+
+  const handleResetClick = () => setValue([]);
+
+  let footer = <>Please pick one or more days.</>;
+
+  if (value.length > 0)
+    footer = (
+      <>
+        You selected {value.length} days.{" "}
+        <button onClick={handleResetClick}>Reset</button>
+      </>
+    );
+
+  return (
+    <DayPicker
+      onDayClick={handleDayClick}
+      modifiers={{ selected: value }}
+      footer={footer}
+    />
+  );
+}
+```
+
+<BrowserWindow>
+  <Examples.CustomMultiple />
+</BrowserWindow>

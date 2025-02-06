@@ -27,7 +27,7 @@ export function StepContent() {
   const renderStep = () => {
     switch (currentStep) {
       case 'source':
-        return <CustomSourceTab methods={methods} teammate={teammate} />;
+        return <CustomSourceTab methods={methods} />;
       case 'select':
         const selectProps: SelectStepProps = {
           formState: formState as FormState,

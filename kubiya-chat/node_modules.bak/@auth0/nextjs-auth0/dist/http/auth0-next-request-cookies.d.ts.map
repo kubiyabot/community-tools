@@ -1,0 +1,1 @@
+{"version":3,"file":"auth0-next-request-cookies.d.ts","sourceRoot":"","sources":["../../src/http/auth0-next-request-cookies.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,mBAAmB,EAAE,MAAM,uBAAuB,CAAC;AAE5D,MAAM,CAAC,OAAO,OAAO,uBAAwB,SAAQ,mBAAmB;;IAK/D,UAAU,IAAI,MAAM,CAAC,MAAM,EAAE,MAAM,CAAC;CAY5C"}

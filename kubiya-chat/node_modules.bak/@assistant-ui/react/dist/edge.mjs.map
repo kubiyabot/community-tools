@@ -1,0 +1,1 @@
+{"version":3,"sources":["../src/edge.ts"],"sourcesContent":["export {\n  createEdgeRuntimeAPI,\n  getEdgeRuntimeResponse,\n} from \"./runtimes/edge/createEdgeRuntimeAPI\";\n"],"mappings":";AAAA;AAAA,EACE;AAAA,EACA;AAAA,OACK;","names":[]}

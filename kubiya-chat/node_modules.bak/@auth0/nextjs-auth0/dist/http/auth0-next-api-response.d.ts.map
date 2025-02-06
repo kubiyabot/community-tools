@@ -1,0 +1,1 @@
+{"version":3,"file":"auth0-next-api-response.d.ts","sourceRoot":"","sources":["../../src/http/auth0-next-api-response.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,MAAM,uBAAuB,CAAC;AACrD,OAAO,EAAE,eAAe,EAAE,MAAM,MAAM,CAAC;AAEvC,MAAM,CAAC,OAAO,OAAO,oBAAqB,SAAQ,YAAY,CAAC,eAAe,CAAC;IACtE,QAAQ,CAAC,QAAQ,EAAE,MAAM,EAAE,MAAM,SAAM,GAAG,IAAI;CAMtD"}

@@ -320,13 +320,17 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
         // Check for tools in the selectedTool, ensure boolean return
         return !!(selectedTool?.tools && selectedTool.tools.length > 0);
       case 'configure':
+        // For custom source, check if we have valid preview data with tools
+        if (formState.preview.data?.tools) {
+          return formState.preview.data.tools.length > 0 && methods.formState.isValid;
+        }
         return methods.formState.isValid;
       case 'install':
         return !formState.installation.isLoading;
       default:
         return false;
     }
-  }, [currentStep, selectedTool, methods.formState.isValid, formState.installation.isLoading]);
+  }, [currentStep, selectedTool, methods.formState.isValid, formState.installation.isLoading, formState.preview.data]);
 
   // Calculate canProceed value whenever dependencies change
   const canProceed = useMemo(() => calculateCanProceed(), [calculateCanProceed]);

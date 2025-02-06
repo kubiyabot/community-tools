@@ -1,0 +1,243 @@
+---
+sidebar_position: 4
+---
+
+# Selection Modes
+
+DayPicker offers predefined rules for day selection:
+
+- [Single mode](#single-mode): allows the selection of a single day.
+- [Multiple mode](#multiple-mode): allows the selection of multiple individual days.
+- [Range mode](#range-mode): allows the selection of a continuous range of days.
+
+The `mode` prop determines the selection mode. Use the `disabled` prop to prevent the selection of specific days. The `selected` and `onSelect` props provide customization options for the selection process.
+
+| Prop Name  | Type                                                                                 | Description                             |
+| ---------- | ------------------------------------------------------------------------------------ | --------------------------------------- |
+| `mode`     | `"single"` \| `"multiple"` \| `"range"`                                              | Enter a selection mode.                 |
+| `disabled` | [`Matcher`](../api/type-aliases/Matcher.md) \| `Matcher[]`                           | Disabled days that cannot be selected.  |
+| `selected` | `Date` \| `Date[]` \| [`DateRange`](../api/type-aliases/DateRange.md) \| `undefined` | The selected day(s).                    |
+| `required` | `boolean`                                                                            | When `true`, the selection is required. |
+| `onSelect` | [`OnSelectHandler`](../api/type-aliases/OnSelectHandler.md)                          | Event callback when a date is selected. |
+
+## Single Mode
+
+When the `mode` prop is set to `"single"`, only one day can be selected at a time.
+
+```tsx
+<DayPicker mode="single" />
+```
+
+<BrowserWindow>
+  <Examples.Single />
+</BrowserWindow>
+
+### Single Mode Props
+
+| Prop Name  | Type                                                                           | Description                             |
+| ---------- | ------------------------------------------------------------------------------ | --------------------------------------- |
+| `selected` | `Date \| undefined`                                                            | The selected date.                      |
+| `onSelect` | [`OnSelectHandler<Date \| undefined>`](../api/type-aliases/OnSelectHandler.md) | Event callback when a date is selected. |
+| `required` | `boolean`                                                                      | Make the selection required.            |
+
+### Controlled Selections
+
+Use the `selected` and `onSelect` props to control the selected date:
+
+```tsx
+export function App() {
+  const [selected, setSelected] = React.useState<Date | undefined>();
+  return <DayPicker mode="single" selected={selected} onSelect={setSelected} />;
+}
+```
+
+<BrowserWindow>
+  <Examples.SingleControlled />
+</BrowserWindow>
+
+### Required Selection
+
+By setting the `required` prop, DayPicker ensures that the user cannot unselect the selected date.
+
+```tsx
+<DayPicker mode="single" required />
+```
+
+<BrowserWindow>
+  <Examples.SingleRequired />
+</BrowserWindow>
+
+## Multiple Mode
+
+Set the `mode` prop to `"multiple"` to enable the selection of multiple days in DayPicker.
+
+```tsx
+<DayPicker mode="multiple" />
+```
+
+<BrowserWindow>
+  <Examples.Multiple />
+</BrowserWindow>
+
+### Multiple Mode Props
+
+| Prop Name  | Type                                                                             | Description                             |
+| ---------- | -------------------------------------------------------------------------------- | --------------------------------------- |
+| `selected` | `Date[] \| undefined`                                                            | The selected dates.                     |
+| `onSelect` | [`OnSelectHandler<Date[] \| undefined>`](../api/type-aliases/OnSelectHandler.md) | Event callback when a date is selected. |
+| `min`      | `number`                                                                         | The minimum dates that can be selected. |
+| `max`      | `number`                                                                         | The maximum dates that can be selected. |
+| `required` | `boolean`                                                                        | Make the selection required.            |
+
+Use the `selected` and `onSelect` props to manage the selected date:
+
+```tsx
+export function App() {
+  const [selected, setSelected] = React.useState<Date[] | undefined>();
+
+  return (
+    <DayPicker mode="multiple" selected={selected} onSelect={setSelected} />
+  );
+}
+```
+
+### Min and Max Dates
+
+Use the `min` and `max` props to limit the number of selectable dates.
+
+```tsx
+<DayPicker mode="multiple" min={2} max={5} />
+```
+
+<BrowserWindow>
+  <Examples.MultipleMinMax />
+</BrowserWindow>
+
+### Required Selection
+
+By setting the `required` prop, DayPicker ensures that the selected dates cannot be unselected.
+
+```tsx
+<DayPicker mode="multiple" required selected={[new Date()]} />
+```
+
+<BrowserWindow>
+  <Examples.MultipleRequired />
+</BrowserWindow>
+
+## Range Mode
+
+Set the `mode` prop to `"range"` to enable the selection of a continuous range of dates in DayPicker.
+
+```tsx
+<DayPicker mode="range" />
+```
+
+<BrowserWindow>
+  <Examples.Range />
+</BrowserWindow>
+
+### Range Mode Props
+
+| Prop Name         | Type                                                                                | Description                             |
+| ----------------- | ----------------------------------------------------------------------------------- | --------------------------------------- |
+| `selected`        | [`DateRange`](../api/type-aliases/DateRange.md)                                     | The selected range.                     |
+| `onSelect`        | [`OnSelectHandler<DateRange \| undefined>`](../api/type-aliases/OnSelectHandler.md) | Event callback when a date is selected. |
+| `required`        | `boolean`                                                                           | Make the selection required.            |
+| `min`             | `number`                                                                            | The minimum dates that can be selected. |
+| `max`             | `number`                                                                            | The maximum dates that can be selected. |
+| `excludeDisabled` | `boolean`                                                                           | Exclude disabled dates from the range.  |
+
+### Min and Max Dates
+
+By default, a range can have a length of 0 nights, meaning the start date can be the same as the end date. Use the `min` prop to set the minimum number of nights. The range will remain "open" until at least the `min` number of nights are selected.
+
+Similarly, use the `max` prop to set the maximum number of nights.
+
+```tsx
+<DayPicker mode="range" min={1} max={6} />
+```
+
+<BrowserWindow bodyStyle={{ justifyContent: "start" }}>
+  <Examples.RangeMinMax />
+</BrowserWindow>
+
+### Required Ranges
+
+By setting the `required` prop, DayPicker ensures that the selected range cannot be unselected.
+
+```tsx
+<DayPicker mode="range" required />
+```
+
+<BrowserWindow>
+  <Examples.RangeRequired />
+</BrowserWindow>
+
+## Disabling Dates
+
+To disable specific days, use the `disabled` prop. Disabled dates cannot be selected.
+
+The prop accepts a [`Matcher`](../api/type-aliases/Matcher.md) or an array of matchers to specify which days should be disabled.
+
+### Disabling Specific Dates
+
+```tsx
+// disable weekends
+<DayPicker mode="range" disabled={{ dayOfWeek: [0, 6] }} />
+```
+
+<BrowserWindow>
+  <Examples.ModifiersDisabled />
+</BrowserWindow>
+
+### Disabling Dates in the Past
+
+```tsx
+<DayPicker mode="single" disabled={{ before: new Date() }} />
+```
+
+<BrowserWindow>
+  <Examples.PastDatesDisabled />
+</BrowserWindow>
+
+### Excluding Disabled Dates from Range {#exclude-disabled}
+
+In `range` mode, disabled dates are included in the selected range by default. To exclude disabled dates from the range, use the `excludeDisabled` prop. If a disabled date is selected, the range will reset.
+
+```tsx
+<DayPicker
+  mode="range"
+  // Disable weekends
+  disabled={{ dayOfWeek: [0, 6] }}
+  // Reset range when a disabled date is included
+  excludeDisabled
+/>
+```
+
+<BrowserWindow>
+  <Examples.RangeExcludeDisabled />
+</BrowserWindow>
+
+## Customizing Selections
+
+To customize the behavior of a selection mode, use the `select` and `onSelect` props to handle the selection event and update the selected dates according to your application's requirements:
+
+```jsx
+import { useState } from "react";
+
+import { DayPicker } from "react-day-picker";
+
+export function App() {
+  const [selected, setSelected] = useState<Date[] | undefined>();
+  const handleSelect = (newSelected) => {
+    // Update the selected dates
+    setSelected(newSelected);
+  };
+  return (
+    <DayPicker mode="multiple" selected={selected} onSelect={handleSelect} />
+  );
+}
+```
+
+You can also set the selection mode to `default` and implement your own mode using `modifiers` and `onDayClick`. For more information, read the [Custom Selections](../guides/custom-selections.mdx) guide.

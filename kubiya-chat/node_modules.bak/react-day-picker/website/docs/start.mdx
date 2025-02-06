@@ -1,0 +1,69 @@
+---
+pagination_next: docs/styling
+---
+
+# Getting Started
+
+## Install the Package
+
+DayPicker is available as the `react-day-picker` npm package.
+
+```bash npm2yarn
+npm install react-day-picker
+```
+
+## Basic Usage
+
+To add a simple date picker to your app:
+
+1. Import the component and styles from `react-day-picker`.
+2. Choose a [selection mode](./docs/selection-modes) using the `mode` prop.
+3. Use the `selected` and `onSelect` props to control the selected date.
+
+```tsx
+import { useState } from "react";
+
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
+
+export function MyDatePicker() {
+  const [selected, setSelected] = useState<Date>();
+
+  return (
+    <DayPicker
+      mode="single"
+      selected={selected}
+      onSelect={setSelected}
+      footer={
+        selected ? `Selected: ${selected.toLocaleDateString()}` : "Pick a day."
+      }
+    />
+  );
+}
+```
+
+<BrowserWindow>
+  <Examples.Start />
+</BrowserWindow>
+
+## Learn More
+
+- 📘 [DayPicker Anatomy](./docs/anatomy.mdx) - Understand the parts that make up a DayPicker component.
+- 🎮 [DayPicker Playground](/playground) - Experiment with props to explore different customization options.
+
+### Using DayPicker
+
+- 🎨 [Styling](./docs/styling.mdx) - Customize the style to match DayPicker with your app's look and feel.
+- ⚙️ [Customization](./docs/customization.mdx) - Discover the options available to customize the calendar.
+- 🗓 [Months Navigation](./docs/navigation.mdx) - Change how users can navigate between months and years.
+- 📅 [Selection Modes](./docs/selection-modes.mdx) - Enable users to select days with single, multiple, or range selections.
+- 🌍 [Localization](./docs/localization.mdx) - Configure DayPicker to display the calendar in different languages and date formats.
+- 🈳 [Translating DayPicker](./docs/translation.mdx) - Translate the labels and messages of the calendar.
+- 🦮 [Accessible Date Pickers](./guides/accessibility.mdx) - Make your date picker accessible to all users.
+
+### Guides
+
+- 🔤 [Input Fields](./guides/input-fields) - Learn how to use DayPicker with input fields and form libraries.
+- 📏 [Custom Selections](./guides/custom-selections) - Create custom selection rules.
+- 🏷️ [Custom Modifiers](./guides/custom-modifiers) - Create custom modifiers to highlight specific days in the calendar.
+- 🛠 [Custom Components](./guides/custom-components) - Use custom components to create a fully customized date picker.

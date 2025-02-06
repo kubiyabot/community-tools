@@ -1,0 +1,25 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Session = exports.SessionCache = exports.ApplicationError = exports.IdentityProviderError = exports.MissingStateParamError = exports.MalformedStateCookieError = exports.MissingStateCookieError = exports.ProfileHandlerError = exports.LogoutHandlerError = exports.LoginHandlerError = exports.CallbackHandlerError = exports.HandlerError = exports.AccessTokenError = exports.AccessTokenErrorCode = exports.AuthError = exports.telemetry = void 0;
+const tslib_1 = require("tslib");
+const session_1 = require("./session/");
+Object.defineProperty(exports, "SessionCache", { enumerable: true, get: function () { return session_1.SessionCache; } });
+Object.defineProperty(exports, "Session", { enumerable: true, get: function () { return session_1.Session; } });
+const version_1 = tslib_1.__importDefault(require("./version"));
+exports.telemetry = { name: 'nextjs-auth0', version: version_1.default };
+var errors_1 = require("./utils/errors");
+Object.defineProperty(exports, "AuthError", { enumerable: true, get: function () { return errors_1.AuthError; } });
+Object.defineProperty(exports, "AccessTokenErrorCode", { enumerable: true, get: function () { return errors_1.AccessTokenErrorCode; } });
+Object.defineProperty(exports, "AccessTokenError", { enumerable: true, get: function () { return errors_1.AccessTokenError; } });
+Object.defineProperty(exports, "HandlerError", { enumerable: true, get: function () { return errors_1.HandlerError; } });
+Object.defineProperty(exports, "CallbackHandlerError", { enumerable: true, get: function () { return errors_1.CallbackHandlerError; } });
+Object.defineProperty(exports, "LoginHandlerError", { enumerable: true, get: function () { return errors_1.LoginHandlerError; } });
+Object.defineProperty(exports, "LogoutHandlerError", { enumerable: true, get: function () { return errors_1.LogoutHandlerError; } });
+Object.defineProperty(exports, "ProfileHandlerError", { enumerable: true, get: function () { return errors_1.ProfileHandlerError; } });
+var auth0_session_1 = require("./auth0-session");
+Object.defineProperty(exports, "MissingStateCookieError", { enumerable: true, get: function () { return auth0_session_1.MissingStateCookieError; } });
+Object.defineProperty(exports, "MalformedStateCookieError", { enumerable: true, get: function () { return auth0_session_1.MalformedStateCookieError; } });
+Object.defineProperty(exports, "MissingStateParamError", { enumerable: true, get: function () { return auth0_session_1.MissingStateParamError; } });
+Object.defineProperty(exports, "IdentityProviderError", { enumerable: true, get: function () { return auth0_session_1.IdentityProviderError; } });
+Object.defineProperty(exports, "ApplicationError", { enumerable: true, get: function () { return auth0_session_1.ApplicationError; } });
+//# sourceMappingURL=shared.js.map

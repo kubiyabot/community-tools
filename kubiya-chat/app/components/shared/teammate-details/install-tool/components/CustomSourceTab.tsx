@@ -26,10 +26,10 @@ import type { TeammateDetails } from '@/app/types/teammate';
 import { Switch } from '@/app/components/ui/switch';
 import { Label } from '@/app/components/ui/label';
 import { Textarea } from '@/app/components/ui/textarea';
+import { useInstallToolContext } from '../context';
 
 interface CustomSourceTabProps {
   methods: UseFormReturn<any>;
-  teammate: TeammateDetails;
 }
 
 interface PreviewTool {
@@ -57,7 +57,8 @@ interface PreviewData {
   }>;
 }
 
-export function CustomSourceTab({ methods, teammate }: CustomSourceTabProps) {
+export function CustomSourceTab({ methods }: CustomSourceTabProps) {
+  const { teammate, setState } = useInstallToolContext();
   const [isLoading, setIsLoading] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,23 +84,75 @@ export function CustomSourceTab({ methods, teammate }: CustomSourceTabProps) {
       setIsLoading(true);
       setError(null);
       setPreviewData(null);
+      
+      // Update form state to show loading
+      setState(prev => ({
+        ...prev,
+        preview: {
+          ...prev.preview,
+          isLoading: true,
+          error: null,
+          data: null
+        }
+      }));
 
       const runner = getTeammateRunner();
       if (!runner) {
-        throw new Error('No runner available for this teammate. Please configure a runner first.');
+        const error = 'No runner configured. Please configure a runner in the Runtime tab before installing tools.';
+        setError(error);
+        setState(prev => ({
+          ...prev,
+          preview: {
+            ...prev.preview,
+            isLoading: false,
+            error,
+            data: null
+          }
+        }));
+        return;
       }
 
       const response = await fetch(`/api/v1/sources/load?url=${encodeURIComponent(url)}&runner=${encodeURIComponent(runner)}`);
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || `Failed to load source preview`);
+        const error = data.error || `Failed to load source preview`;
+        setError(error);
+        setState(prev => ({
+          ...prev,
+          preview: {
+            ...prev.preview,
+            isLoading: false,
+            error,
+            data: null
+          }
+        }));
+        return;
       }
 
-      const data = await response.json();
       setPreviewData(data);
+      // Update form state with preview data
+      setState(prev => ({
+        ...prev,
+        preview: {
+          isLoading: false,
+          error: null,
+          data
+        }
+      }));
     } catch (err) {
       console.error('Error loading preview:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load source preview');
+      const error = err instanceof Error ? err.message : 'Failed to load source preview';
+      setError(error);
+      setState(prev => ({
+        ...prev,
+        preview: {
+          ...prev.preview,
+          isLoading: false,
+          error,
+          data: null
+        }
+      }));
     } finally {
       setIsLoading(false);
     }
