@@ -9,6 +9,7 @@ import { RuntimeTab } from './RuntimeTab';
 import { AccessControlTab } from './AccessControlTab';
 import { KnowledgeTab } from './KnowledgeTab';
 import { SourcesTab } from './SourcesTab';
+import type { ExtendedSourceInfo } from './SourcesTab';
 
 interface TeammateDetailsProps {
   teammate: TeammateDetailsType | null;
@@ -16,9 +17,21 @@ interface TeammateDetailsProps {
   onTabChange: (tab: string) => void;
   children?: React.ReactNode;
   integrations?: any;
+  sources?: ExtendedSourceInfo[];
+  isLoadingSources?: boolean;
+  onSourcesChange?: () => void;
 }
 
-export function TeammateDetails({ teammate, activeTab, onTabChange, children, integrations }: TeammateDetailsProps) {
+export function TeammateDetails({ 
+  teammate, 
+  activeTab, 
+  onTabChange, 
+  children, 
+  integrations,
+  sources,
+  isLoadingSources,
+  onSourcesChange
+}: TeammateDetailsProps) {
   if (!teammate) {
     return (
       <div className="flex items-center justify-center h-full bg-[#0F172A]">
@@ -37,7 +50,14 @@ export function TeammateDetails({ teammate, activeTab, onTabChange, children, in
             {activeTab === 'overview' && <OverviewTab teammate={teammate} />}
             {activeTab === 'integrations' && <IntegrationsTab teammate={{ ...teammate, integrations: integrations || [] }} />}
             {activeTab === 'knowledge' && <KnowledgeTab teammateId={teammate.id} />}
-            {activeTab === 'tools' && <SourcesTab teammate={teammate} />}
+            {activeTab === 'sources' && (
+              <SourcesTab 
+                teammate={teammate}
+                sources={sources}
+                isLoading={isLoadingSources}
+                onSourcesChange={onSourcesChange}
+              />
+            )}
             {activeTab === 'runtime' && <RuntimeTab teammate={teammate} />}
             {activeTab === 'access' && <AccessControlTab teammate={teammate} />}
           </div>

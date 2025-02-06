@@ -1,99 +1,62 @@
-export interface SimpleIntegration {
-  name: string;
-  integration_type: IntegrationType;
-  auth_type: 'global' | 'per_user';
-  description?: string;
+export type IntegrationType = 'aws' | 'github' | 'jira' | 'slack' | 'generic';
+
+export interface AWSVendorSpecific {
+  region?: string;
+  account_id?: string;
+  role_name?: string;
+  arn?: string;
+  external_id?: string;
+  session_name?: string;
+  capabilities?: string[];
+  supported_fields?: string[];
 }
 
-export interface Integration extends SimpleIntegration {
-  uuid?: string;
-  task_id?: string;
-  managed_by: string;
-  configs: Array<IntegrationConfigItem>;
-  kubiya_metadata: {
-    created_at: string;
-    last_updated: string;
-    user_created?: string;
-    user_last_updated?: string;
-    icon_url?: string;
-    capabilities?: string[];
-    config_fields?: string[];
-  };
+export interface GitHubVendorSpecific {
+  repository?: string;
+  owner?: string;
+  branch?: string;
+  installation_id?: string;
+  capabilities?: string[];
+  supported_fields?: string[];
+}
+
+export interface JiraVendorSpecific {
+  site?: string;
+  cloud_id?: string;
+  project_key?: string;
+  capabilities?: string[];
+  supported_fields?: string[];
+}
+
+export type VendorSpecific = AWSVendorSpecific | GitHubVendorSpecific | JiraVendorSpecific;
+
+export interface KubiyaMetadata {
+  created_at: string;
+  last_updated: string;
+  user_created?: string;
+  user_last_updated?: string;
+  created_by?: string;
+  icon_url?: string;
+  capabilities?: string[];
+  config_fields?: string[];
 }
 
 export interface IntegrationConfigItem {
   name: string;
   is_default?: boolean;
-  vendor_specific?: {
-    arn?: string;
-    region?: string;
-    secret_name?: string;
-    account_id?: string;
-    role_name?: string;
-    capabilities?: string[];
-    supported_fields?: string[];
-  };
-  kubiya_metadata?: {
-    created_at?: string;
-    created_by?: string;
-    last_updated?: string;
-    updated_by?: string;
-  };
+  vendor_specific?: VendorSpecific;
+  kubiya_metadata?: KubiyaMetadata;
 }
 
-export interface IntegrationConfig {
-  clientId?: string;
-  clientSecret?: string;
-  redirectUri?: string;
-  scopes?: string[];
-  apiKey?: string;
-  webhookUrl?: string;
-  customFields?: Record<string, any>;
+export interface SimpleIntegration {
+  name: string;
+  description?: string;
+  integration_type: IntegrationType;
+  auth_type?: string;
+  configs: IntegrationConfigItem[];
+  kubiya_metadata: KubiyaMetadata;
 }
 
-export type IntegrationType = 
-  | 'jira'
-  | 'slack'
-  | 'github'
-  | 'gitlab'
-  | 'aws'
-  | 'aws-serviceaccount'
-  | 'kubernetes'
-  | 'webhook'
-  | 'custom';
-
-// Utility type for AWS-specific configuration
-export interface AWSIntegrationConfig extends IntegrationConfig {
-  region: string;
-  arn: string;
-  accountId: string;
-  roleName: string;
-}
-
-// Utility type for GitHub-specific configuration
-export interface GitHubIntegrationConfig extends IntegrationConfig {
-  repositoryUrl?: string;
-  accessToken?: string;
-  webhookSecret?: string;
-}
-
-// Utility type for Slack-specific configuration
-export interface SlackIntegrationConfig extends IntegrationConfig {
-  botToken?: string;
-  signingSecret?: string;
-  appId?: string;
-}
-
-// Utility type for Jira-specific configuration
-export interface JiraIntegrationConfig extends IntegrationConfig {
-  baseUrl: string;
-  projectKey?: string;
-  username?: string;
-}
-
-// Utility type for Kubernetes-specific configuration
-export interface KubernetesIntegrationConfig extends IntegrationConfig {
-  clusterUrl?: string;
-  namespace?: string;
-  serviceAccount?: string;
+export interface Integration extends SimpleIntegration {
+  uuid?: string;
 } 

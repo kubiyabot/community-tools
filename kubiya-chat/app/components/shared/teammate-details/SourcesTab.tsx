@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FolderGit, Link as LinkIcon, GitBranch, ExternalLink, Loader2, Bot, Package, Database, Code, Terminal, Settings, Hash, Box, Dock, AlertCircle, Plus, Search, Info, Trash2, FileCode, FileJson, FileText, File, User, Calendar } from 'lucide-react';
 import type { Tool as SourceTool } from '@/app/types/tool';
 import type { TeammateDetails } from '@/app/types/teammate';
@@ -40,7 +40,7 @@ import {
   FormLabel,
   FormMessage,
 } from "../../ui/form";
-import { Input } from "../../ui/input";
+import { Input } from "@/app/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -122,7 +122,7 @@ interface SourceData {
   managed_by?: string;
 }
 
-interface ExtendedSourceInfo extends Omit<SourceInfo, 'tools'> {
+export interface ExtendedSourceInfo extends Omit<SourceInfo, 'tools'> {
   teammate_id: string;
   tools: SourceTool[];
   sourceId: string;
@@ -270,10 +270,62 @@ function getErrorTypeInfo(type: string = 'Error') {
 
 const LoadingSpinner = () => (
   <div className="flex flex-col items-center justify-center h-[400px] p-6">
-    <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
-      <Loader2 className="h-6 w-6 text-[#7C3AED] animate-spin" />
+    <div className="relative">
+      {/* Animated gradient background */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#7C3AED]/20 to-[#4F46E5]/20 rounded-full blur-xl animate-pulse" />
+      
+      {/* Wrench container with rotation animation */}
+      <div className="relative p-4 rounded-full bg-[#1E293B] border border-[#2D3B4E] shadow-xl">
+        <div className="animate-[spin_3s_linear_infinite]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-[#7C3AED]"
+          >
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+          </svg>
+        </div>
+      </div>
     </div>
-    <p className="text-sm font-medium text-[#94A3B8] mt-4">Loading tool sources attached to this teammate...</p>
+    
+    {/* Loading text with shimmer effect */}
+    <div className="mt-6 space-y-2 text-center">
+      <h3 className="text-base font-medium text-white">
+        Discovering Tools
+      </h3>
+      <p className="text-sm text-[#94A3B8] max-w-[250px] leading-relaxed">
+        Scanning repositories and analyzing available tools for your teammate...
+      </p>
+      
+      {/* Animated progress bar */}
+      <div className="mt-4 h-1 w-48 bg-[#1E293B] rounded-full overflow-hidden">
+        <div className="h-full bg-gradient-to-r from-[#7C3AED] to-[#4F46E5] animate-[shimmer_2s_infinite]" 
+             style={{
+               width: '100%',
+               backgroundSize: '200% 100%',
+               animation: 'shimmer 2s infinite linear'
+             }}
+        />
+      </div>
+    </div>
+    
+    <style jsx>{`
+      @keyframes shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+    `}</style>
   </div>
 );
 
@@ -1771,10 +1823,19 @@ export function SourcesTab({
   });
 
   const filteredSources = useMemo(() => {
-    if (!searchQuery.trim()) return sources;
+    console.log('Filtering sources:', {
+      searchQuery,
+      sourcesBeforeFilter: sources,
+      sourcesLength: sources.length
+    });
+
+    if (!searchQuery.trim()) {
+      console.log('No search query, returning all sources:', sources);
+      return sources;
+    }
     
     const query = searchQuery.toLowerCase();
-    return sources.map(source => ({
+    const filtered = sources.map(source => ({
       ...source,
       tools: source.tools.filter(tool => 
         tool.name.toLowerCase().includes(query) ||
@@ -1782,55 +1843,34 @@ export function SourcesTab({
         tool.type?.toLowerCase().includes(query)
       )
     })).filter(source => source.tools.length > 0);
+
+    console.log('Filtered sources result:', filtered);
+    return filtered;
   }, [sources, searchQuery]);
-
-  const handleSync = async (sourceId: string) => {
-    try {
-      setSyncingSourceIds(prev => new Set([...prev, sourceId]));
-      
-      // Find the source to get its dynamic_config
-      const source = sources.find(s => s.uuid === sourceId);
-      if (!source) {
-        throw new Error('Source not found');
-      }
-
-      const response = await fetch(`/api/sources/${source.uuid}/sync`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          dynamic_config: source.dynamic_config || null 
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync source');
-      }
-
-      if (onSourcesChange) {
-        await onSourcesChange();
-      }
-    } catch (error) {
-      console.error('Error syncing source:', error);
-    } finally {
-      setSyncingSourceIds(prev => {
-        const next = new Set(prev);
-        next.delete(sourceId);
-        return next;
-      });
-    }
-  };
 
   // Early return if loading
   if (isLoading) {
-    return <LoadingSpinner />;
+    console.log('SourcesTab: Showing loading spinner');
+    return (
+      <div className="p-6">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (!teammate) {
+    console.log('SourcesTab: No teammate data');
     return <ErrorState message="No teammate data available" />;
   }
+
+  // Log the current state
+  console.log('SourcesTab: Rendering with', {
+    sourcesCount: sources.length,
+    filteredSourcesCount: filteredSources.length,
+    isLoading,
+    hasTeammate: !!teammate,
+    searchQuery
+  });
 
   return (
     <InstallToolProvider teammate={teammate!} value={installToolState}>
@@ -1931,35 +1971,37 @@ export function SourcesTab({
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
             </div>
             <div className="text-sm text-[#94A3B8]">
-              {filteredSources.reduce((acc, source) => acc + source.tools.length, 0)} tools available
+              {filteredSources.length} sources with {filteredSources.reduce((acc, source) => acc + (Array.isArray(source.tools) ? source.tools.length : 0), 0)} tools available
             </div>
           </div>
 
           {/* Tools Grid */}
-          {!filteredSources.length ? (
-            searchQuery ? (
-              <div className="flex flex-col items-center justify-center h-[300px] p-6">
-                <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
-                  <Search className="h-6 w-6 text-[#7C3AED]" />
+          <div className="space-y-8">
+            {isLoading ? (
+              <LoadingSpinner />
+            ) : !filteredSources.length ? (
+              searchQuery ? (
+                <div className="flex flex-col items-center justify-center h-[300px] p-6">
+                  <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
+                    <Search className="h-6 w-6 text-[#7C3AED]" />
+                  </div>
+                  <p className="text-sm font-medium text-[#94A3B8] mt-4">No tools found matching "{searchQuery}"</p>
                 </div>
-                <p className="text-sm font-medium text-[#94A3B8] mt-4">No tools found matching "{searchQuery}"</p>
-              </div>
+              ) : (
+                <EmptyState />
+              )
             ) : (
-              <EmptyState />
-            )
-          ) : (
-            <div className="space-y-8">
-              {filteredSources.map((source: ExtendedSourceInfo) => (
+              filteredSources.map((source: ExtendedSourceInfo) => (
                 <SourceGroup 
                   key={source.uuid} 
                   source={source}
                   onSourcesChange={onSourcesChange}
-                  allSources={sources}  /* Use original sources instead of filteredSources */
+                  allSources={sources}
                   teammate={teammate!}
                 />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
 
         {/* Install Tool Form */}

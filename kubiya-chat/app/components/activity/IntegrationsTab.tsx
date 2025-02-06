@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Settings, AlertCircle, ExternalLink, Plus, Cloud, Key, Shield, User, Database, Globe, GitBranch, Terminal, Bot, Lock, FileKey, Webhook, Boxes, Clock, RefreshCw, Zap } from 'lucide-react';
 import type { TeammateInfo } from '@/app/types/teammate';
-import type { Integration, IntegrationConfigItem } from '@/app/types/integration';
+import type { 
+  Integration, 
+  IntegrationConfigItem, 
+  AWSVendorSpecific,
+  VendorSpecific 
+} from '@/app/types/integration';
 import { Button } from '@/app/components/ui/button';
 import { Separator } from '@/app/components/ui/separator';
 import {
@@ -17,7 +22,25 @@ import {
   TooltipTrigger,
 } from "@/app/components/ui/tooltip";
 
-// Reuse the IntegrationIcon component from SourcesTab
+const formatDate = (dateString: string) => {
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '';
+  }
+};
+
+const formatDateSafe = (date: string | undefined | null) => {
+  if (!date) return '';
+  return formatDate(date);
+};
+
 const IntegrationIcon = ({ type }: { type: string }) => {
   const normalizedType = type?.toLowerCase?.() || '';
   
@@ -25,11 +48,11 @@ const IntegrationIcon = ({ type }: { type: string }) => {
     switch (normalizedType) {
       case 'aws':
       case 'aws-serviceaccount':
-        return 'https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg';
+        return 'https://static-00.iconduck.com/assets.00/aws-icon-2048x1224-tyr5ef11.png';
       case 'github':
-        return 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png';
+        return 'https://cdn-icons-png.flaticon.com/512/25/25231.png';
       case 'jira':
-        return 'https://wac-cdn.atlassian.com/assets/img/favicons/atlassian/favicon-32x32.png';
+        return 'https://static-00.iconduck.com/assets.00/jira-icon-2048x2048-nmec2job.png';
       case 'slack':
         return 'https://a.slack-edge.com/80588/marketing/img/meta/slack_hash_256.png';
       case 'gitlab':
@@ -50,6 +73,7 @@ const IntegrationIcon = ({ type }: { type: string }) => {
         src={iconUrl} 
         alt={type} 
         className="h-6 w-6 object-contain"
+        style={{ filter: normalizedType === 'github' ? 'brightness(0) invert(1)' : undefined }}
       />
     );
   }
@@ -70,11 +94,47 @@ const IntegrationIcon = ({ type }: { type: string }) => {
 };
 
 const LoadingSpinner = () => (
-  <div className="flex flex-col items-center justify-center h-[400px] p-6">
-    <div className="p-3 rounded-full bg-[#1E293B] border border-[#1E293B]">
-      <Loader2 className="h-6 w-6 text-[#7C3AED] animate-spin" />
+  <div className="p-6 space-y-6">
+    {/* Header Skeleton */}
+    <div className="flex items-center justify-between mb-6">
+      <div className="h-8 w-48 bg-[#2A3347] rounded-md animate-pulse" />
+      <div className="h-10 w-36 bg-[#2A3347] rounded-md animate-pulse" />
     </div>
-    <p className="text-sm font-medium text-[#94A3B8] mt-4">Loading integrations...</p>
+
+    <div className="h-px bg-[#2D3B4E]" />
+
+    {/* Integration Card Skeletons */}
+    <div className="space-y-6">
+      {[1, 2].map((i) => (
+        <div key={i} className="bg-gradient-to-br from-[#1E293B] to-[#161e2e] rounded-xl p-6 space-y-4 border border-[#2D3B4E]">
+          {/* Header */}
+          <div className="flex items-start gap-4">
+            <div className="flex-1 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-5 w-40 bg-[#2A3347] rounded animate-pulse" />
+                <div className="h-5 w-24 bg-[#2A3347] rounded-full animate-pulse" />
+              </div>
+              <div className="h-4 w-3/4 bg-[#2A3347] rounded animate-pulse" />
+              <div className="flex gap-4">
+                <div className="h-4 w-32 bg-[#2A3347] rounded animate-pulse" />
+                <div className="h-4 w-32 bg-[#2A3347] rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+
+          <div className="h-px bg-[#2D3B4E]" />
+
+          {/* Details */}
+          <div className="space-y-4">
+            <div className="h-5 w-40 bg-[#2A3347] rounded animate-pulse" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="h-32 bg-[#2A3347] rounded-lg animate-pulse" />
+              <div className="h-32 bg-[#2A3347] rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
   </div>
 );
 
@@ -108,26 +168,16 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const renderAWSDetails = (config: IntegrationConfigItem) => {
+    const vendorSpecific = config.vendor_specific as AWSVendorSpecific;
     const {
       arn,
       region,
       account_id,
       role_name,
-      secret_name,
       capabilities = [],
       supported_fields = []
-    } = config.vendor_specific || {};
+    } = vendorSpecific || {};
 
     return (
       <div className="space-y-4">
@@ -202,7 +252,7 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
                 <span className="text-sm font-medium text-white">Capabilities</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {capabilities.map((cap, idx) => (
+                {capabilities.map((cap: string, idx: number) => (
                   <Badge 
                     key={idx}
                     variant="outline" 
@@ -222,7 +272,7 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
                 <span className="text-sm font-medium text-white">Supported Fields</span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {supported_fields.map((field, idx) => (
+                {supported_fields.map((field: string, idx: number) => (
                   <Badge 
                     key={idx}
                     variant="outline" 
@@ -235,20 +285,6 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
             </div>
           )}
         </div>
-
-        {/* Secrets Section */}
-        {secret_name && (
-          <div className="bg-gradient-to-br from-[#1E293B] to-[#161e2e] rounded-lg p-4 border border-[#2D3B4E] shadow-md">
-            <div className="flex items-center gap-2 mb-3">
-              <Lock className="h-4 w-4 text-red-400" />
-              <span className="text-sm font-medium text-white">Secrets Configuration</span>
-            </div>
-            <div className="flex items-center justify-between text-xs bg-[#1a1f36] p-2 rounded border border-[#2D3B4E]">
-              <span className="text-[#94A3B8] font-medium">Secret Name:</span>
-              <span className="font-mono text-red-400">{secret_name}</span>
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -377,7 +413,7 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
                 variant="outline" 
                 className="bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20 transition-colors"
               >
-                {getAuthTypeLabel(integration.auth_type)}
+                {getAuthTypeLabel(integration.auth_type || '')}
               </Badge>
             </h3>
             
@@ -389,7 +425,7 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
               <div className="flex items-center gap-2">
                 <Clock className="h-3.5 w-3.5 text-[#7C3AED]" />
                 <span className="font-medium">Created:</span>
-                <span>{formatDate(integration.kubiya_metadata.created_at)}</span>
+                <span>{formatDateSafe(integration.kubiya_metadata?.created_at)}</span>
                 {integration.kubiya_metadata.user_created && (
                   <span className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5 text-[#7C3AED]" />
@@ -400,7 +436,7 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
               <div className="flex items-center gap-2">
                 <RefreshCw className="h-3.5 w-3.5 text-[#7C3AED]" />
                 <span className="font-medium">Updated:</span>
-                <span>{formatDate(integration.kubiya_metadata.last_updated)}</span>
+                <span>{formatDateSafe(integration.kubiya_metadata?.last_updated)}</span>
                 {integration.kubiya_metadata.user_last_updated && (
                   <span className="flex items-center gap-1">
                     <User className="h-3.5 w-3.5 text-[#7C3AED]" />
@@ -446,11 +482,11 @@ const IntegrationCard = ({ integration }: { integration: Integration }) => {
                         <div className="text-xs space-y-1">
                           <div className="flex items-center gap-2">
                             <Clock className="h-3.5 w-3.5" />
-                            Created: {formatDate(config.kubiya_metadata.created_at || '')}
+                            Created: {formatDateSafe(config.kubiya_metadata?.created_at)}
                           </div>
                           <div className="flex items-center gap-2">
                             <RefreshCw className="h-3.5 w-3.5" />
-                            Updated: {formatDate(config.kubiya_metadata.last_updated || '')}
+                            Updated: {formatDateSafe(config.kubiya_metadata?.last_updated)}
                           </div>
                         </div>
                       </TooltipContent>

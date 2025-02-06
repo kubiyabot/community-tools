@@ -11,7 +11,7 @@ export function TeammateNavigation({ activeTab, onTabChange }: TeammateNavigatio
     { value: 'overview', icon: Info, text: 'Overview' },
     { value: 'integrations', icon: LinkIcon, text: 'Integrations' },
     { value: 'knowledge', icon: BookOpen, text: 'Knowledge' },
-    { value: 'tools', icon: Wrench, text: 'Tools' },
+    { value: 'sources', icon: Wrench, text: 'Tools' },
     { value: 'runtime', icon: Settings, text: 'Runtime' },
     { value: 'access', icon: Lock, text: 'Access Control' }
   ];

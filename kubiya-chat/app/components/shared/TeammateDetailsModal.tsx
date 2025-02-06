@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Package } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
 import { toast } from '../ui/use-toast';
 import { ScrollArea } from '../ui/scroll-area';
@@ -13,6 +13,7 @@ import type { Integration } from '@/app/types/integration';
 import type { Tool } from '@/app/types/tool';
 import { generateAvatarUrl } from '@/app/components/TeammateSelector';
 import type { SourceInfo } from '@/app/types/source';
+import type { ExtendedSourceInfo } from './teammate-details/SourcesTab';
 
 // Import components from teammate-details folder
 import { TeammateDetails } from './teammate-details/TeammateDetails';
@@ -75,7 +76,59 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const [loadedTabs] = useState<Set<string>>(new Set(['overview']));
   const [tools, setTools] = useState<Tool[]>([]);
-  const [sources, setSources] = useState<SourceInfo[]>([]);
+  const [sources, setSources] = useState<ExtendedSourceInfo[]>([]);
+
+  // Handle tab changes with proper state updates
+  const handleTabChange = (tab: string) => {
+    console.log('Tab changed to:', tab);
+    setActiveTab(tab);
+    
+    // Only fetch sources if we're switching to the tools tab or sources tab
+    if (tab === 'tools' || tab === 'sources') {
+      console.log('Switching to tools/sources tab, fetching sources...');
+      setIsLoadingSources(true);
+      fetchSources().catch(error => {
+        console.error('Error fetching sources:', error);
+        toast({
+          title: "Error loading sources",
+          description: error instanceof Error ? error.message : "Failed to load sources data. Please try again.",
+          variant: "destructive"
+        });
+      }).finally(() => {
+        setIsLoadingSources(false);
+      });
+    }
+  };
+
+  // Initial load effect
+  useEffect(() => {
+    if (!teammate?.uuid || !isOpen) return;
+    
+    // Reset state when modal opens
+    if (isOpen) {
+      console.log('Modal opened, resetting state for teammate:', teammate.uuid);
+      setTools([]);
+      setSources([]);
+      loadedTabs.clear();
+      loadedTabs.add('overview');
+      
+      // If tools or sources tab is active on open, fetch sources
+      if (activeTab === 'tools' || activeTab === 'sources') {
+        console.log('Tools/Sources tab is active, fetching sources...');
+        setIsLoadingSources(true);
+        fetchSources().catch(error => {
+          console.error('Error fetching sources:', error);
+          toast({
+            title: "Error loading sources",
+            description: error instanceof Error ? error.message : "Failed to load sources data. Please try again.",
+            variant: "destructive"
+          });
+        }).finally(() => {
+          setIsLoadingSources(false);
+        });
+      }
+    }
+  }, [teammate?.uuid, isOpen]);
 
   // Move useMemo here, before any conditional logic
   const extendedSources = useMemo(() => {
@@ -113,13 +166,17 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
   // Function to load sources data
   const fetchSources = async () => {
     if (!teammate?.sources?.length) {
+      console.log('No sources found for teammate:', teammate);
       setSources([]);
+      setTools([]);
       return;
     }
 
-    setIsLoadingSources(true);
+    console.log('Fetching sources for teammate:', teammate.id, 'Sources:', teammate.sources);
+    
     try {
       // First, fetch all sources and their metadata in parallel
+      console.log('Fetching sources and metadata...');
       const [allSourcesResponse, ...sourceResponses] = await Promise.all([
         // First, fetch all sources
         fetch('/api/v1/sources', {
@@ -155,17 +212,23 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
       ]);
 
       if (!allSourcesResponse.ok) {
-        console.error('Failed to fetch sources:', allSourcesResponse.status);
-        throw new Error('Failed to fetch sources');
+        const errorText = await allSourcesResponse.text();
+        console.error('Failed to fetch sources:', allSourcesResponse.status, errorText);
+        throw new Error(`Failed to fetch sources: ${allSourcesResponse.status} ${errorText}`);
       }
 
       const allSources = await allSourcesResponse.json();
+      console.log('All sources response:', allSources);
+      
       const sourcesArray = Array.isArray(allSources) ? allSources : Object.values(allSources);
       const relevantSources = sourcesArray.filter((s: any) => teammate?.sources?.includes(s.uuid));
+      console.log('Relevant sources:', relevantSources);
 
       // Split responses into source details and metadata responses
       const sourceDetailsResponses = sourceResponses.slice(0, teammate.sources.length);
       const metadataResponses = sourceResponses.slice(teammate.sources.length);
+
+      let allTools: Tool[] = [];
 
       // Process source responses and metadata in parallel
       const processPromises = sourceDetailsResponses.map(async (response, index) => {
@@ -173,94 +236,85 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
         const metadataResponse = metadataResponses[index];
 
         if (!response.ok) {
-          console.warn(`Source ${uuid} not found or inaccessible: ${response.status}`);
-          return {
-            sourceId: uuid,
-            uuid: uuid,
-            name: 'Unavailable Source',
-            url: '',
-            type: 'unknown',
-            tools: [],
-            isLoading: false,
-            error: 'This source is no longer available. It may have been deleted or you may not have access.',
-            connected_agents_count: 0,
-            connected_tools_count: 0,
-            connected_workflows_count: 0,
-            kubiya_metadata: {
-              created_at: '',
-              last_updated: '',
-              user_created: 'Unknown',
-              user_last_updated: 'Unknown'
-            },
-            errors_count: 1,
-            source_meta: {
-              id: uuid,
-              url: '',
-              commit: '',
-              committer: '',
-              branch: ''
-            },
-            dynamic_config: null,
-            runner: '',
-            managed_by: '',
-            task_id: ''
-          };
+          console.warn(`Source ${uuid} not found or inaccessible:`, response.status);
+          return null;
         }
 
-        const [sourceInfo, metadata] = await Promise.all([
-          response.json(),
-          metadataResponse.ok ? metadataResponse.json() : Promise.resolve(null)
-        ]);
+        try {
+          const [sourceInfo, metadata] = await Promise.all([
+            response.json(),
+            metadataResponse.ok ? metadataResponse.json() : Promise.resolve(null)
+          ]);
 
-        const tools = metadata?.tools || [];
-        setTools(prevTools => [...prevTools, ...tools]);
+          console.log(`Source info for ${uuid}:`, sourceInfo);
+          console.log(`Metadata for ${uuid}:`, metadata);
 
-        return {
-          sourceId: sourceInfo.uuid,
-          uuid: sourceInfo.uuid,
-          name: sourceInfo.name || getSourceNameFromUrl(sourceInfo.url),
-          url: sourceInfo.url,
-          type: getSourceType(sourceInfo.url),
-          tools,
-          isLoading: false,
-          connected_agents_count: sourceInfo.connected_agents_count || 0,
-          connected_tools_count: sourceInfo.connected_tools_count || 0,
-          connected_workflows_count: sourceInfo.connected_workflows_count || 0,
-          kubiya_metadata: {
-            created_at: sourceInfo.kubiya_metadata?.created_at || '',
-            last_updated: metadata?.kubiya_metadata?.last_updated || sourceInfo.kubiya_metadata?.last_updated || '',
-            user_created: sourceInfo.kubiya_metadata?.user_created || 'Unknown',
-            user_last_updated: metadata?.kubiya_metadata?.user_last_updated || sourceInfo.kubiya_metadata?.user_last_updated || 'Unknown'
-          },
-          errors_count: sourceInfo.errors_count || 0,
-          source_meta: {
-            id: metadata?.source_meta?.id || sourceInfo.source_meta?.id || sourceInfo.uuid,
-            url: metadata?.source_meta?.url || sourceInfo.source_meta?.url || sourceInfo.url,
-            commit: metadata?.source_meta?.commit || sourceInfo.source_meta?.commit || '',
-            committer: metadata?.source_meta?.committer || sourceInfo.source_meta?.committer || '',
-            branch: metadata?.source_meta?.branch || sourceInfo.source_meta?.branch || ''
-          },
-          dynamic_config: metadata?.dynamic_config || sourceInfo.dynamic_config || null,
-          runner: sourceInfo.runner || '',
-          managed_by: sourceInfo.managed_by || '',
-          task_id: sourceInfo.task_id || ''
-        };
+          const tools = metadata?.tools || [];
+          console.log(`Tools for ${uuid}:`, tools);
+          
+          // Add tools to our collection
+          allTools = [...allTools, ...tools];
+
+          return {
+            sourceId: sourceInfo.uuid,
+            uuid: sourceInfo.uuid,
+            name: sourceInfo.name || getSourceNameFromUrl(sourceInfo.url),
+            url: sourceInfo.url,
+            type: getSourceType(sourceInfo.url),
+            tools: tools,
+            isLoading: false,
+            connected_agents_count: sourceInfo.connected_agents_count || 0,
+            connected_tools_count: tools.length,
+            connected_workflows_count: sourceInfo.connected_workflows_count || 0,
+            kubiya_metadata: {
+              created_at: sourceInfo.kubiya_metadata?.created_at || '',
+              last_updated: metadata?.kubiya_metadata?.last_updated || sourceInfo.kubiya_metadata?.last_updated || '',
+              user_created: sourceInfo.kubiya_metadata?.user_created || 'Unknown',
+              user_last_updated: metadata?.kubiya_metadata?.user_last_updated || sourceInfo.kubiya_metadata?.user_last_updated || 'Unknown'
+            },
+            errors_count: sourceInfo.errors_count || 0,
+            source_meta: {
+              id: metadata?.source_meta?.id || sourceInfo.source_meta?.id || sourceInfo.uuid,
+              url: metadata?.source_meta?.url || sourceInfo.source_meta?.url || sourceInfo.url,
+              commit: metadata?.source_meta?.commit || sourceInfo.source_meta?.commit || '',
+              committer: metadata?.source_meta?.committer || sourceInfo.source_meta?.committer || '',
+              branch: metadata?.source_meta?.branch || sourceInfo.source_meta?.branch || ''
+            },
+            dynamic_config: metadata?.dynamic_config || sourceInfo.dynamic_config || null,
+            runner: sourceInfo.runner || '',
+            managed_by: sourceInfo.managed_by || '',
+            task_id: sourceInfo.task_id || ''
+          };
+        } catch (error) {
+          console.error(`Error processing source ${uuid}:`, error);
+          return null;
+        }
       });
 
-      const loadedSources = await Promise.all(processPromises);
-      setSources(loadedSources.map(source => {
+      const loadedSources = (await Promise.all(processPromises)).filter(Boolean);
+      console.log('Processed sources:', loadedSources);
+      
+      // Update sources state with the processed sources directly
+      const processedSources = loadedSources.map(source => {
+        if (!source) return null;
         const uuid = typeof source.uuid === 'object' ? source.uuid.id : source.uuid;
-        return { ...source, uuid } as SourceInfo;
-      }));
+        return {
+          ...source,
+          uuid,
+          teammate_id: teammate.id
+        } as ExtendedSourceInfo;
+      }).filter(Boolean) as ExtendedSourceInfo[];
+
+      console.log('Setting processed sources:', processedSources);
+      setSources(processedSources);
+
+      // Update tools state
+      console.log('Setting all tools:', allTools);
+      setTools(allTools);
+      
     } catch (err) {
       console.error('Error fetching sources:', err);
-      toast({
-        title: "Error loading sources",
-        description: "Failed to load sources data. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingSources(false);
+      throw err; // Re-throw to be handled by caller
     }
   };
 
@@ -287,20 +341,6 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
       }
     }
   };
-
-  // Initial load
-  useEffect(() => {
-    if (!teammate?.uuid || !isOpen) return;
-    loadTabData('integrations');
-    fetchSources();
-  }, [teammate?.uuid, isOpen]);
-
-  // Handle tab changes
-  useEffect(() => {
-    if (activeTab && !loadedTabs.has(activeTab)) {
-      loadTabData(activeTab);
-    }
-  }, [activeTab]);
 
   // Type guard to check if teammate exists
   if (!teammate) {
@@ -332,11 +372,18 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
               <TeammateDetails 
                 teammate={teammate} 
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
                 integrations={integrations}
+                sources={sources}
+                isLoadingSources={isLoadingSources}
+                onSourcesChange={async () => {
+                  setIsLoadingSources(true);
+                  await fetchSources();
+                  setIsLoadingSources(false);
+                }}
               >
                 <div className="flex-1 min-h-0">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+                  <Tabs value={activeTab} onValueChange={handleTabChange} className="h-full">
                     <TabsContent value="overview" className="h-full m-0 data-[state=active]:flex">
                       <ScrollArea className="flex-1">
                         <OverviewTab teammate={teammate} />
@@ -351,11 +398,44 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
                     </TabsContent>
                     <TabsContent value="tools" className="h-full m-0 data-[state=active]:flex">
                       <ScrollArea className="flex-1">
-                        <SourcesTab 
-                          teammate={teammate} 
-                          sources={extendedSources}
-                          isLoading={isLoadingSources} 
-                        />
+                        {isLoadingSources ? (
+                          <div className="flex items-center justify-center h-full p-6">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="relative">
+                                <div className="h-12 w-12 rounded-full border-2 border-purple-400/20 border-t-purple-400 animate-spin" />
+                                <div className="absolute inset-0 h-12 w-12 rounded-full border-2 border-purple-400/20 animate-pulse" />
+                              </div>
+                              <p className="text-sm font-medium text-purple-400">Loading tools...</p>
+                              <p className="text-xs text-purple-400/60">This may take a moment</p>
+                            </div>
+                          </div>
+                        ) : !sources.length ? (
+                          <div className="flex items-center justify-center h-full p-6">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="p-3 rounded-full bg-[#1E293B] border border-[#2D3B4E]">
+                                <Package className="h-6 w-6 text-purple-400" />
+                              </div>
+                              <p className="text-sm font-medium text-purple-400">No tools available</p>
+                              <p className="text-xs text-purple-400/60">This teammate has no tools installed</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <SourcesTab 
+                            teammate={teammate} 
+                            sources={sources}
+                            isLoading={isLoadingSources}
+                            onSourcesChange={async () => {
+                              setIsLoadingSources(true);
+                              await fetchSources();
+                              setIsLoadingSources(false);
+                            }}
+                          />
+                        )}
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="sources" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        {/* Remove duplicate SourcesTab since it's already rendered through TeammateDetails */}
                       </ScrollArea>
                     </TabsContent>
                     <TabsContent value="runtime" className="h-full m-0 data-[state=active]:flex">
