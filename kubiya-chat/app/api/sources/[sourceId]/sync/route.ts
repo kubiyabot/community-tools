@@ -81,14 +81,16 @@ export async function POST(
     const sourceId = params.sourceId;
     const orgId = req.headers.get('x-organization-id');
 
-    // Get request body for dynamic configuration
+    // Get dynamic_config from request body if it exists
     let dynamicConfig = null;
     try {
-      const body = await req.json();
-      dynamicConfig = body?.dynamic_config ?? null;
+      const body = await req.text();
+      if (body) {
+        const parsedBody = JSON.parse(body);
+        dynamicConfig = parsedBody?.dynamic_config ?? null;
+      }
     } catch (error) {
-      // If JSON parsing fails, we'll use null as default
-      console.log('Sources sync endpoint - No valid JSON body provided, using null dynamic_config');
+      console.log('Sources sync endpoint - No valid dynamic_config in request body');
     }
 
     console.log('Sources sync endpoint - Request details:', {
@@ -109,17 +111,22 @@ export async function POST(
       body: JSON.stringify({ dynamic_config: dynamicConfig })
     });
 
-    const data = await response.json();
+    const data = await response.json().catch(() => ({ error: response.statusText }));
 
     if (!response.ok) {
       console.error('Sources sync endpoint - Failed to sync source:', {
         status: response.status,
-        data
+        error: data
       });
       return NextResponse.json(data, { status: response.status });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store'
+      }
+    });
 
   } catch (error) {
     console.error('Sources sync endpoint - Error:', error);
@@ -128,7 +135,12 @@ export async function POST(
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-store'
+        }
+      }
     );
   }
 }

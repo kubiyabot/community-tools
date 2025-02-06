@@ -570,29 +570,19 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
     try {
       setIsSyncing(true);
       
-      // Construct the base payload
-      const basePayload = {
+      // Construct the payload with dynamic_config if it exists
+      const payload = {
         name: source.name,
-        url: source.url
+        url: source.url,
+        dynamic_config: source.dynamic_config || null
       };
 
-      // Add optional fields
-      const fullPayload = {
-        ...basePayload,
-        ...(source.dynamic_config && Object.keys(source.dynamic_config).length > 0 && {
-          dynamic_config: source.dynamic_config || {}
-        }),
-        ...(source.runner && source.runner !== 'automatic' && {
-          runner: source.runner
-        })
-      } satisfies SyncPayload;
-      
       const response = await fetch(`/api/sources/${source.uuid}/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(fullPayload)
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -600,6 +590,10 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
         throw new Error(errorData.error || 'Failed to sync source');
       }
 
+      // Get the updated data
+      const data = await response.json();
+
+      // Call onSourcesChange to trigger a re-render with the latest data
       if (onSourcesChange) {
         await onSourcesChange();
       }
