@@ -83,6 +83,7 @@ export interface TeammateDetails {
   avatar_url?: string;
   description?: string;
   integrations?: Integration[];
+  llm_model?: string;
   capabilities?: {
     llm_model?: string;
     instruction_type?: string;

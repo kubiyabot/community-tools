@@ -531,7 +531,7 @@ export function InstallToolForm({ isOpen, onClose, onInstall, teammate }: Instal
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl h-[600px] flex flex-col p-0 bg-slate-900 border border-slate-800">
+      <DialogContent className="max-w-2xl h-[500px] flex flex-col p-0 bg-slate-900 border border-slate-800">
         {showInstallationView ? (
           <div className="flex-1 flex flex-col">
             <CustomDialogHeader />

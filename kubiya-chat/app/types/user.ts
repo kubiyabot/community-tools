@@ -38,9 +38,10 @@ export interface Group {
 export interface EntityMetadata {
   uuid: string;
   name: string;
-  description?: string;
   image?: string;
-  type: 'user' | 'group';
+  description?: string;
+  type: 'user' | 'group' | 'unknown';
   status?: 'active' | 'pending';
   create_at?: string;
+  email?: string;
 } 

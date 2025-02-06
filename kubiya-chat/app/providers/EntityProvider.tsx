@@ -286,30 +286,35 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
   }, [authError, handleAuthError, groups, saveToSessionStorage]);
 
   const getEntityMetadata = useCallback((uuid: string): EntityMetadata | undefined => {
+    if (!uuid) return undefined;
+
     // Use cached data if available
     const cachedUsers = cache.current.users?.data || users;
     const cachedGroups = cache.current.groups?.data || groups;
 
+    // First try to find in users
     if (Array.isArray(cachedUsers)) {
       const foundUser = cachedUsers.find(u => u.uuid === uuid);
       if (foundUser) {
         return {
           uuid: foundUser.uuid,
-          name: foundUser.name || foundUser.email,
+          name: foundUser.name || foundUser.email || 'Unknown User',
           image: foundUser.image,
           type: 'user',
           status: foundUser.user_status,
-          create_at: foundUser.create_at
+          create_at: foundUser.create_at,
+          email: foundUser.email
         };
       }
     }
 
+    // Then try to find in groups
     if (Array.isArray(cachedGroups)) {
       const foundGroup = cachedGroups.find(g => g.uuid === uuid);
       if (foundGroup) {
         return {
           uuid: foundGroup.uuid,
-          name: foundGroup.name,
+          name: foundGroup.name || 'Unknown Group',
           description: foundGroup.description,
           type: 'group',
           create_at: foundGroup.create_at
@@ -317,8 +322,22 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    return undefined;
-  }, [users, groups]); // Dependencies still needed for state updates
+    // If not found, try to fetch the data
+    if (!isFetching.current.users) {
+      fetchUsers(true).catch(console.error);
+    }
+    if (!isFetching.current.groups) {
+      fetchGroups(true).catch(console.error);
+    }
+
+    // Return a placeholder while fetching
+    return {
+      uuid,
+      name: 'Loading...',
+      type: 'unknown',
+      status: 'pending'
+    };
+  }, [users, groups, fetchUsers, fetchGroups]);
 
   // Add debounce function
   const debounce = useCallback((fn: Function, delay: number) => {
@@ -338,14 +357,15 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
 
     const debouncedFetch = debounce(async () => {
       if (mounted && !authError) {
-        if (users.length === 0 && groups.length === 0) {
-          setIsLoading(true);
-          try {
-            await Promise.all([fetchUsers(), fetchGroups()]);
-          } finally {
-            if (mounted) {
-              setIsLoading(false);
-            }
+        setIsLoading(true);
+        try {
+          await Promise.all([
+            fetchUsers(users.length === 0),
+            fetchGroups(groups.length === 0)
+          ]);
+        } finally {
+          if (mounted) {
+            setIsLoading(false);
           }
         }
       }
@@ -357,14 +377,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       if (mounted && !authError) {
         refreshTimeout = setTimeout(() => {
           if (!document.hidden && !isFetching.current.users && !isFetching.current.groups) {
-            const now = Date.now();
-            const shouldRefreshUsers = !cache.current.users?.timestamp || 
-              (now - cache.current.users.timestamp >= REFRESH_INTERVAL);
-            const shouldRefreshGroups = !cache.current.groups?.timestamp || 
-              (now - cache.current.groups.timestamp >= REFRESH_INTERVAL);
-
-            if (shouldRefreshUsers) fetchUsers();
-            if (shouldRefreshGroups) fetchGroups();
+            debouncedFetch();
           }
           scheduleNextRefresh();
         }, REFRESH_INTERVAL);
@@ -373,15 +386,11 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
 
     scheduleNextRefresh();
 
-    const handleVisibilityChange = debounce(() => {
-      if (mounted && !document.hidden) {
-        const now = Date.now();
-        if (now - (cache.current.users?.timestamp || 0) >= REFRESH_INTERVAL) {
-          fetchUsers();
-          fetchGroups();
-        }
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        debouncedFetch();
       }
-    }, DEBOUNCE_DURATION);
+    };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
