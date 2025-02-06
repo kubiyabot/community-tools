@@ -1,5 +1,4 @@
-import { usePathname } from 'next/navigation';
-import { Info, Link as LinkIcon, Wrench, Settings, Lock } from 'lucide-react';
+import { Info, Link as LinkIcon, Wrench, Settings, Lock, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TeammateNavigationProps {
@@ -11,6 +10,7 @@ export function TeammateNavigation({ activeTab, onTabChange }: TeammateNavigatio
   const tabs = [
     { value: 'overview', icon: Info, text: 'Overview' },
     { value: 'integrations', icon: LinkIcon, text: 'Integrations' },
+    { value: 'knowledge', icon: BookOpen, text: 'Knowledge' },
     { value: 'tools', icon: Wrench, text: 'Tools' },
     { value: 'runtime', icon: Settings, text: 'Runtime' },
     { value: 'access', icon: Lock, text: 'Access Control' }
