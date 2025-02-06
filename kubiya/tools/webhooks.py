@@ -22,7 +22,7 @@ list_webhooks = KubiyaCliBase(
     name="list_webhooks",
     description="List all webhooks",
     cli_command='''webhook list \\
-    --output ${output_format} \\
+    $([ -n "${output_format}" ] && echo "--output ${output_format}") \\
     $([ -n "${filter}" ] && echo "--filter ${filter}")''',
     args=[
         Arg(name="output_format", type="str", description="Output format (json|text)", required=False, default="json"),

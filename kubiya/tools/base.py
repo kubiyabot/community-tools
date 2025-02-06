@@ -50,8 +50,7 @@ fi
 echo "Environment setup complete. Executing command..."
 echo "Command to execute: {cli_command}"
 
-# Execute command with API key
-export KUBIYA_API_KEY="${{KUBIYA_API_KEY}}"
+# Execute command
 {CLI_PATH} {cli_command} || {{
     echo "Command failed with exit code $?"
     exit 1
