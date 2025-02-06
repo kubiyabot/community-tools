@@ -317,7 +317,6 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
     <Dialog open={isOpen} onOpenChange={onCloseAction}>
       <DialogContent 
         className="max-w-[1200px] p-0 gap-0 bg-[#0A0F1E] border-[#1E293B] fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-h-[90vh] overflow-hidden rounded-lg shadow-xl"
-        hideCloseButton
       >
         <DialogTitle className="sr-only">
           {teammate?.name || 'Teammate'} Details

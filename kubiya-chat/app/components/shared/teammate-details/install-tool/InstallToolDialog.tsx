@@ -35,7 +35,6 @@ export function InstallToolDialog({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
         className="max-w-6xl h-[800px] flex flex-col p-0 bg-slate-900 border border-slate-800"
-        hideCloseButton
       >
         <DialogHeader onClose={handleClose} />
         <div className="flex-1 overflow-hidden">

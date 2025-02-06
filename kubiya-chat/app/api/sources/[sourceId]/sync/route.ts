@@ -67,7 +67,6 @@ export async function POST(
   { params }: { params: { sourceId: string } }
 ) {
   try {
-    const headersList = headers();
     const res = NextResponse.next();
     const session = await getSession(req, res);
 
@@ -83,55 +82,43 @@ export async function POST(
     const orgId = req.headers.get('x-organization-id');
 
     // Get request body for dynamic configuration
-    let body;
+    let dynamicConfig = null;
     try {
-      body = await req.json();
+      const body = await req.json();
+      dynamicConfig = body?.dynamic_config ?? null;
     } catch (error) {
-      console.error('Sources sync endpoint - Failed to parse request body:', error);
-      return NextResponse.json(
-        { error: 'Invalid request body', details: 'Failed to parse JSON payload' },
-        { status: 400 }
-      );
+      // If JSON parsing fails, we'll use null as default
+      console.log('Sources sync endpoint - No valid JSON body provided, using null dynamic_config');
     }
 
     console.log('Sources sync endpoint - Request details:', {
       sourceId,
       hasToken: !!session.idToken,
       orgId,
-      body
+      dynamicConfig
     });
-
-    const apiHeaders: Record<string, string> = {
-      'Authorization': `Bearer ${session.idToken}`,
-      'Content-Type': 'application/json',
-      'X-Organization-ID': orgId || '',
-      'X-Kubiya-Client': 'chat-ui'
-    };
-
-    // Extract dynamic_config from body or default to null
-    const dynamic_config = body?.dynamic_config ?? null;
 
     const response = await fetch(`https://api.kubiya.ai/api/v1/sources/${sourceId}`, {
       method: 'PUT',
-      headers: apiHeaders,
-      body: JSON.stringify({ dynamic_config })
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Content-Type': 'application/json',
+        'X-Organization-ID': orgId || '',
+        'X-Kubiya-Client': 'chat-ui'
+      },
+      body: JSON.stringify({ dynamic_config: dynamicConfig })
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      const errorText = await response.text();
       console.error('Sources sync endpoint - Failed to sync source:', {
         status: response.status,
-        statusText: response.statusText,
-        error: errorText
+        data
       });
-
-      return NextResponse.json(
-        { error: 'Failed to sync source', details: errorText },
-        { status: response.status }
-      );
+      return NextResponse.json(data, { status: response.status });
     }
 
-    const data = await response.json();
     return NextResponse.json(data);
 
   } catch (error) {
@@ -169,12 +156,15 @@ export async function PUT(
     }
 
     const { sourceId } = params;
-    const { dynamic_config } = await req.json();
+    const body = await req.json();
+
+    // get only the dynamic_config from the body
+    const dynamicConfig = body?.dynamic_config || {};
 
     // Log request details
     console.log('Sources update endpoint - Request details:', {
       sourceId,
-      hasConfig: !!dynamic_config,
+      hasConfig: !!dynamicConfig,
       hasToken: !!session.idToken,
       orgId: session.user?.org_id
     });
@@ -191,7 +181,7 @@ export async function PUT(
           'X-Organization-ID': session.user?.org_id || '',
           'X-Kubiya-Client': 'chat-ui'
         },
-        body: JSON.stringify({ dynamic_config }),
+        body: JSON.stringify({ "dynamic_config": dynamicConfig })
       }
     );
 

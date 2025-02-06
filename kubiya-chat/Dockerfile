@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm install && apk install git -y
 
 # Copy the rest of the application code to the working directory
 COPY . .
