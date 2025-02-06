@@ -965,15 +965,17 @@ const SourceGroup = ({ source, onSourcesChange, allSources, teammate }: {
         duration: Infinity,
       });
       
-      // Get the raw source UUIDs from the teammate
-      // The API expects an array of source UUIDs, not SourceInfo objects
-      const sourceUuids = teammate.sources?.map(s => typeof s === 'string' ? s : s.uuid) || [];
-      const updatedSourceUuids = sourceUuids.filter(uuid => uuid !== source.uuid);
+      // Get the source UUID to remove
+      const sourceToRemove = source.uuid;
+      
+      // Get the current sources from the teammate object directly
+      const currentSources = teammate.sources?.map(s => typeof s === 'string' ? s : s.uuid) || [];
+      const updatedSources = currentSources.filter(uuid => uuid !== sourceToRemove);
       
       console.log('Removing source:', {
-        sourceToRemove: source.uuid,
-        beforeRemoval: sourceUuids,
-        afterRemoval: updatedSourceUuids,
+        sourceToRemove,
+        currentSources,
+        updatedSources,
         teammate: teammate
       });
       
@@ -984,7 +986,7 @@ const SourceGroup = ({ source, onSourcesChange, allSources, teammate }: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          sources: updatedSourceUuids
+          sources: updatedSources
         })
       });
 
@@ -1002,7 +1004,7 @@ const SourceGroup = ({ source, onSourcesChange, allSources, teammate }: {
       }
 
       // Verify our source is not in the updated sources
-      if (responseData.updatedSources.includes(source.uuid)) {
+      if (responseData.updatedSources.includes(sourceToRemove)) {
         throw new Error('Source was not properly removed');
       }
 
@@ -1952,7 +1954,7 @@ export function SourcesTab({
                   key={source.uuid} 
                   source={source}
                   onSourcesChange={onSourcesChange}
-                  allSources={filteredSources}
+                  allSources={sources}  /* Use original sources instead of filteredSources */
                   teammate={teammate!}
                 />
               ))}
