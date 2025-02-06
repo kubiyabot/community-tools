@@ -21,12 +21,17 @@ create_webhook = KubiyaCliBase(
 list_webhooks = KubiyaCliBase(
     name="list_webhooks",
     description="List all webhooks",
-    cli_command='''webhook list \\
-    $([ -n "${output_format}" ] && echo "--output ${output_format}") \\
-    $([ -n "${filter}" ] && echo "--filter ${filter}")''',
+    cli_command="webhook list",
+    args=[],
+)
+
+# Get Webhook Tool
+get_webhook = KubiyaCliBase(
+    name="get_webhook",
+    description="Get details of a specific webhook",
+    cli_command="webhook get ${webhook_id}",
     args=[
-        Arg(name="output_format", type="str", description="Output format (json|text)", required=False, default="json"),
-        Arg(name="filter", type="str", description="Filter webhooks by name or source", required=False),
+        Arg(name="webhook_id", type="str", description="ID of the webhook to get", required=True),
     ],
 )
 
@@ -34,20 +39,19 @@ list_webhooks = KubiyaCliBase(
 delete_webhook = KubiyaCliBase(
     name="delete_webhook",
     description="Delete a webhook",
-    cli_command='''webhook delete \\
-    --id "${webhook_id}" \\
-    --output json''',
+    cli_command="webhook delete ${webhook_id}",
     args=[
         Arg(name="webhook_id", type="str", description="ID of the webhook to delete", required=True),
     ],
 )
 
 # Register all tools
-for tool in [create_webhook, list_webhooks, delete_webhook]:
+for tool in [create_webhook, list_webhooks, get_webhook, delete_webhook]:
     KubiyaCliBase.register(tool)
 
 __all__ = [
     'create_webhook',
     'list_webhooks',
+    'get_webhook',
     'delete_webhook',
 ]
