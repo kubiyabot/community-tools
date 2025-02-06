@@ -52,54 +52,32 @@ export function SelectStep({
 
   // Use the community tools hook
   const { 
-    data: tools,
-    isLoading,
-    error,
-    refetch
+    data: communityTools,
+    isLoading: communityToolsLoading,
+    error: communityToolsError,
+    refetch: refetchCommunityTools
   } = useCommunityTools();
 
   // Update formState when tools are loaded
   React.useEffect(() => {
-    if (tools) {
+    if (communityTools) {
       formState.communityTools = {
-        data: Array.isArray(tools) ? tools : [],
+        data: Array.isArray(communityTools) ? communityTools : [],
         isLoading: false,
         error: null
       };
     }
-  }, [tools, formState]);
+  }, [communityTools, formState]);
 
-  // Show loading state
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
-        <p className="mt-4 text-sm text-slate-400">Loading community tools...</p>
-      </div>
-    );
-  }
+  // Update formState when loading state changes
+  React.useEffect(() => {
+    formState.communityTools.isLoading = communityToolsLoading;
+  }, [communityToolsLoading, formState]);
 
-  // Show error state
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full py-12">
-        <div className="text-red-500 mb-4">
-          <AlertCircle className="h-8 w-8" />
-        </div>
-        <p className="text-sm text-red-400">
-          {error instanceof Error ? error.message : 'Failed to load community tools'}
-        </p>
-        <Button 
-          variant="outline" 
-          onClick={() => refetch()}
-          className="mt-4"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Retry
-        </Button>
-      </div>
-    );
-  }
+  // Update formState when error state changes
+  React.useEffect(() => {
+    formState.communityTools.error = communityToolsError?.message || null;
+  }, [communityToolsError, formState]);
 
   // When a tool is selected, ensure we use the full source URL
   const handleToolSelection = (tool: CommunityTool) => {
@@ -114,6 +92,14 @@ export function SelectStep({
       console.warn('Tool selected without source URL:', tool);
     }
     handleToolSelect(tool);
+  };
+
+  // Handle refresh
+  const handleRefreshTools = async () => {
+    await refetchCommunityTools();
+    if (onRefresh) {
+      await onRefresh();
+    }
   };
 
   return (
@@ -159,24 +145,16 @@ export function SelectStep({
 
             {/* Tools List */}
             <div className="p-6">
-              {formState.communityTools.isLoading ? (
-                <CommunityToolsSkeleton />
-              ) : (
-                <ToolsLayout 
-                  tools={formState.communityTools.data}
-                  categories={toolCategoriesArray}
-                  selectedTool={selectedTool}
-                  onToolSelect={handleToolSelection}
-                  failedIcons={failedIcons}
-                  onIconError={onIconError}
-                  expandedTools={expandedTools}
-                  setExpandedTools={setExpandedTools}
-                  handleRefresh={handleRefresh}
-                  runners={teammate?.runners || ['kubiya-hosted']}
-                  activeCategory={activeCategory}
-                  onCategorySelect={setActiveCategory}
-                />
-              )}
+              <CommunityToolsTab
+                formState={formState}
+                onRefresh={handleRefreshTools}
+                onToolSelect={handleToolSelection}
+                selectedTool={selectedTool}
+                failedIcons={failedIcons}
+                onIconError={onIconError}
+                expandedTools={expandedTools}
+                setExpandedTools={setExpandedTools}
+              />
             </div>
           </div>
         </TabsContent>

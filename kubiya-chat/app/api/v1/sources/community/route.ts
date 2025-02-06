@@ -22,7 +22,7 @@ interface CommunityTool {
     url: string;
     metadata: {
       git_branch: string;
-      last_updated: string;
+      last_updated?: string;
     };
   };
   lastCommit?: {
@@ -40,8 +40,8 @@ interface CommunityTool {
 }
 
 const CACHE_KEY = 'community_tools_cache';
-const CACHE_TTL = 60 * 5; // 5 minutes in seconds
-const STALE_TTL = 60 * 60; // 1 hour in seconds for stale-while-revalidate
+const CACHE_TTL = 60 * 30; // 30 minutes in seconds
+const STALE_TTL = 60 * 60 * 24; // 24 hours in seconds for stale-while-revalidate
 const HAS_KV_CONFIG = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
 const TOOL_DESCRIPTIONS: Record<string, string> = {
@@ -257,6 +257,134 @@ async function loadSourceTools(path: string, session: any): Promise<any> {
   }
 }
 
+interface GitHubRepoInfo {
+  updated_at: string;
+  stargazers_count: number;
+  commit?: {
+    sha: string;
+    message: string;
+    author?: {
+      name: string;
+      avatar_url?: string;
+    };
+  };
+}
+
+async function fetchCommunityTools(session: any): Promise<CommunityTool[]> {
+  // Fetch repository contents and info in parallel
+  const [contentsResponse, repoResponse] = await Promise.all([
+    fetchWithGitHub(`${GITHUB_API_URL}/repos/${REPO_PATH}/contents`),
+    fetchWithGitHub(`${GITHUB_API_URL}/repos/${REPO_PATH}`)
+  ]);
+
+  if (!contentsResponse) {
+    throw new Error('Failed to fetch repository contents');
+  }
+
+  const contents = await contentsResponse.json();
+  const repoInfo: GitHubRepoInfo | null = repoResponse ? await repoResponse.json() : null;
+  
+  if (!Array.isArray(contents)) {
+    throw new Error('Invalid response format: Expected an array of directory contents');
+  }
+
+  // Filter directories and exclude dotfiles
+  const toolDirs = contents.filter(item => 
+    item.type === 'dir' && !item.name.startsWith('.')
+  );
+
+  // Process each directory with improved error handling
+  const tools = await Promise.all(
+    toolDirs.map(async (dir) => {
+      try {
+        // Fetch README and tools metadata in parallel
+        const [readmeResponse, toolsData] = await Promise.all([
+          fetchWithGitHub(`${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}/README.md`),
+          loadSourceTools(dir.path, session)
+        ]);
+
+        let readme = '';
+        if (readmeResponse) {
+          const readmeData = await readmeResponse.json();
+          readme = readmeData.content ? atob(readmeData.content) : '';
+        }
+
+        const dirName = dir.name.toLowerCase();
+        const matchedTool = findMatchingTool(dirName, readme);
+        const summary = extractSummaryFromReadme(readme);
+
+        return {
+          name: dir.name,
+          path: dir.path,
+          description: summary || (matchedTool ? TOOL_DESCRIPTIONS[matchedTool] : `Tools for ${dir.name}`),
+          tools_count: toolsData.tools_count,
+          icon_url: matchedTool ? TOOL_ICONS[matchedTool] : '',
+          readme,
+          id: dir.name,
+          type: 'community',
+          isDiscovering: false,
+          loadingState: toolsData.loadingState,
+          lastUpdated: repoInfo?.updated_at,
+          stars: repoInfo?.stargazers_count,
+          source: {
+            name: dir.name,
+            url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
+            metadata: {
+              git_branch: 'main',
+              last_updated: repoInfo?.updated_at
+            }
+          },
+          lastCommit: repoInfo?.commit ? {
+            sha: repoInfo.commit.sha,
+            date: repoInfo.updated_at,
+            message: repoInfo.commit.message,
+            author: {
+              name: repoInfo.commit.author?.name || 'Unknown',
+              avatar: repoInfo.commit.author?.avatar_url
+            }
+          } : undefined,
+          tools: toolsData.tools,
+          error: toolsData.error
+        };
+      } catch (error) {
+        console.error(`Error processing ${dir.name}:`, error);
+        return {
+          name: dir.name,
+          path: dir.path,
+          description: TOOL_DESCRIPTIONS[dir.name.toLowerCase()] || `Tools for ${dir.name}`,
+          tools_count: 0,
+          icon_url: TOOL_ICONS[dir.name.toLowerCase()] || '',
+          id: dir.name,
+          type: 'community',
+          isDiscovering: false,
+          loadingState: 'error' as const,
+          error: error instanceof Error ? error.message : 'Failed to process tool',
+          source: {
+            name: dir.name,
+            url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
+            metadata: {
+              git_branch: 'main',
+              last_updated: repoInfo?.updated_at
+            }
+          },
+          lastCommit: repoInfo?.commit ? {
+            sha: repoInfo.commit.sha,
+            date: repoInfo.updated_at,
+            message: repoInfo.commit.message,
+            author: {
+              name: repoInfo.commit.author?.name || 'Unknown',
+              avatar: repoInfo.commit.author?.avatar_url
+            }
+          } : undefined,
+          tools: []
+        };
+      }
+    })
+  );
+
+  return tools.filter(Boolean);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const res = NextResponse.next();
@@ -273,10 +401,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const forceRefresh = searchParams.get('refresh') === 'true';
 
-    let cachedTools = null;
     // Check cache first (unless force refresh)
     if (!forceRefresh) {
-      cachedTools = await getCachedTools();
+      const cachedTools = await getCachedTools();
       if (cachedTools && Array.isArray(cachedTools.data)) {
         return NextResponse.json(cachedTools.data, {
           headers: {
@@ -289,137 +416,14 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // If no cache or stale, fetch fresh data
+    // Fetch fresh data
     try {
-      const contentsResponse = await fetchWithGitHub(`${GITHUB_API_URL}/repos/${REPO_PATH}/contents`);
-      if (!contentsResponse) {
-        throw new Error('Failed to fetch repository contents');
-      }
-
-      const contents = await contentsResponse.json();
+      const tools = await fetchCommunityTools(session);
       
-      if (!Array.isArray(contents)) {
-        throw new Error('Invalid response format: Expected an array of directory contents');
-      }
+      // Cache the tools
+      await setCachedTools(tools);
 
-      // Filter directories and exclude dotfiles
-      const toolDirs = contents.filter(item => 
-        item.type === 'dir' && !item.name.startsWith('.')
-      );
-
-      // Get repository info with error handling
-      let repoInfo = null;
-      try {
-        const repoResponse = await fetchWithGitHub(`${GITHUB_API_URL}/repos/${REPO_PATH}`);
-        if (repoResponse) {
-          repoInfo = await repoResponse.json();
-        }
-      } catch (error) {
-        console.warn('Failed to fetch repo info:', error);
-        // Continue without repo info
-      }
-
-      // Process each directory
-      const tools = await Promise.all(
-        toolDirs.map(async (dir) => {
-          try {
-            let readme = '';
-            try {
-              const readmeResponse = await fetchWithGitHub(
-                `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}/README.md`
-              );
-              
-              if (readmeResponse) {
-                const readmeData = await readmeResponse.json();
-                readme = readmeData.content ? atob(readmeData.content) : '';
-              }
-            } catch (error) {
-              console.warn(`Failed to fetch README for ${dir.name}:`, error);
-            }
-
-            const dirName = dir.name.toLowerCase();
-            const matchedTool = findMatchingTool(dirName, readme);
-            const summary = extractSummaryFromReadme(readme);
-
-            // Load tools metadata
-            const toolsData = await loadSourceTools(dir.path, session);
-
-            return {
-              name: dir.name,
-              path: dir.path,
-              description: summary || (matchedTool ? TOOL_DESCRIPTIONS[matchedTool] : `Tools for ${dir.name}`),
-              tools_count: toolsData.tools_count,
-              icon_url: matchedTool ? TOOL_ICONS[matchedTool] : '',
-              readme,
-              id: dir.name,
-              type: 'community',
-              isDiscovering: false,
-              loadingState: toolsData.loadingState,
-              lastUpdated: repoInfo?.updated_at,
-              stars: repoInfo?.stargazers_count,
-              source: {
-                name: dir.name,
-                url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
-                metadata: {
-                  git_branch: 'main',
-                  last_updated: repoInfo?.updated_at
-                }
-              },
-              lastCommit: repoInfo?.commit ? {
-                sha: repoInfo.commit.sha,
-                date: repoInfo.updated_at,
-                message: repoInfo.commit.message,
-                author: {
-                  name: repoInfo.commit.author?.name || 'Unknown',
-                  avatar: repoInfo.commit.author?.avatar_url
-                }
-              } : undefined,
-              tools: toolsData.tools,
-              error: toolsData.error
-            };
-          } catch (error) {
-            console.error(`Error processing ${dir.name}:`, error);
-            return {
-              name: dir.name,
-              path: dir.path,
-              description: TOOL_DESCRIPTIONS[dir.name.toLowerCase()] || `Tools for ${dir.name}`,
-              tools_count: 0,
-              icon_url: TOOL_ICONS[dir.name.toLowerCase()] || '',
-              id: dir.name,
-              type: 'community',
-              isDiscovering: false,
-              loadingState: 'error' as const,
-              error: error instanceof Error ? error.message : 'Failed to process tool',
-              source: {
-                name: dir.name,
-                url: `${GITHUB_API_URL}/repos/${REPO_PATH}/contents/${dir.path}`,
-                metadata: {
-                  git_branch: 'main',
-                  last_updated: repoInfo?.updated_at
-                }
-              },
-              lastCommit: repoInfo?.commit ? {
-                sha: repoInfo.commit.sha,
-                date: repoInfo.updated_at,
-                message: repoInfo.commit.message,
-                author: {
-                  name: repoInfo.commit.author?.name || 'Unknown',
-                  avatar: repoInfo.commit.author?.avatar_url
-                }
-              } : undefined,
-              tools: []
-            };
-          }
-        })
-      );
-
-      // Filter out any null results from failed processing
-      const validTools = tools.filter(Boolean);
-
-      // Cache the valid tools
-      await setCachedTools(validTools);
-
-      return NextResponse.json(validTools, {
+      return NextResponse.json(tools, {
         headers: {
           'Cache-Control': `public, max-age=${CACHE_TTL}, stale-while-revalidate=${STALE_TTL - CACHE_TTL}`,
           'X-Cache': 'MISS'
@@ -428,7 +432,8 @@ export async function GET(req: NextRequest) {
     } catch (error) {
       console.error('Failed to fetch fresh data:', error);
       
-      // If we have stale data, return it on error
+      // Try to get stale data on error
+      const cachedTools = await getCachedTools();
       if (cachedTools && Array.isArray(cachedTools.data)) {
         return NextResponse.json(cachedTools.data, {
           headers: {
@@ -447,4 +452,4 @@ export async function GET(req: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
-} 
+}

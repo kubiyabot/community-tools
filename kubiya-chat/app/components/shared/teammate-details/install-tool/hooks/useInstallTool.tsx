@@ -21,10 +21,11 @@ import { ToolsLayout } from '../components/ToolsLayout';
 import { PreviewStep } from '../components/PreviewStep';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { sourceFormSchema } from '../schema';
-import { toast } from '@/app/components/ui/use-toast';
 import * as z from 'zod';
 import type { FormValues } from '../schema';
 import type { CommunityTool as CommunityToolType } from '@/app/types/tool';
+import { Loader2, CheckCircle, XCircle, Circle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/app/components/ui/alert';
 
 // Convert TOOL_CATEGORIES from Record to Array
 const toolCategoriesArray = Object.entries(TOOL_CATEGORIES).map(([key, category]) => ({
@@ -198,27 +199,60 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
 
   // Update handleSubmit to properly set completion status
   const handleSubmit = useCallback(async (data: { name: string; url: string; runner?: string; dynamic_config?: any }) => {
-    setFormState((prev: InstallToolFormState) => ({
-      ...prev,
-      installation: {
-        ...prev.installation,
-        isLoading: true,
-        error: null,
-        isComplete: false
-      }
-    }));
-
     try {
-      await onInstall(data as FormValues, updateStepStatus);
+      // Set initial loading state
+      setCurrentStep('installing');
       setFormState((prev: InstallToolFormState) => ({
         ...prev,
         installation: {
           ...prev.installation,
-          isLoading: false,
-          isComplete: true
+          isLoading: true,
+          error: null,
+          isComplete: false,
+          data: {
+            steps: steps
+          }
         }
       }));
+
+      // Reset all steps to pending
+      setSteps(steps.map(step => ({ ...step, status: 'pending', error: undefined })));
+
+      // Start the installation
+      updateStepStatus('validate', 'loading');
+      
+      try {
+        await onInstall(data as FormValues, updateStepStatus);
+        
+        // Update final state on success
+        setFormState((prev: InstallToolFormState) => ({
+          ...prev,
+          installation: {
+            ...prev.installation,
+            isLoading: false,
+            error: null,
+            isComplete: true
+          }
+        }));
+
+        // Mark all steps as complete
+        setSteps(prev => prev.map(step => ({ ...step, status: 'success' })));
+      } catch (error) {
+        console.error('Installation error:', error);
+        let errorMessage = 'Installation failed';
+        
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = String(error.message);
+        }
+
+        throw new Error(errorMessage);
+      }
     } catch (error) {
+      console.error('Installation error:', error);
+      
+      // Update error state
       setFormState((prev: InstallToolFormState) => ({
         ...prev,
         installation: {
@@ -228,8 +262,16 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
           isComplete: false
         }
       }));
+
+      // Mark current step as failed and go back to configure step
+      setSteps(prev => prev.map(step => 
+        step.status === 'loading' 
+          ? { ...step, status: 'error', error: error instanceof Error ? error.message : 'Installation failed' }
+          : step
+      ));
+      setCurrentStep('configure');
     }
-  }, [onInstall, updateStepStatus]);
+  }, [onInstall, updateStepStatus, steps]);
 
   // Add cleanup on dialog close
   useEffect(() => {
@@ -251,32 +293,40 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
   }, []);
 
   const goToPreviousStep = useCallback(() => {
+    // If we're on the first step (select), close the modal
+    if (currentStep === 'select') {
+      if (onClose) {
+        onClose();
+      }
+      return;
+    }
+
+    // Otherwise, go to the previous step
     setCurrentStep(prev => {
       switch(prev) {
-        case 'select': return 'source';
         case 'preview': return 'select';
         case 'configure': return 'preview';
         case 'installing': return 'configure';
         default: return prev;
       }
     });
-  }, []);
+  }, [currentStep, onClose]);
 
   const calculateCanProceed = useCallback((): boolean => {
     switch (currentStep) {
-     // case 'source':
-       // return Boolean(selectedTool !== null && 
-          //(teammate?.runners?.includes(selectedTool.runner)));
       case 'select':
-        return Boolean(selectedTool);
+        return !!selectedTool;
       case 'preview':
-        return Boolean(selectedTool);
+        // Check for tools in the selectedTool, ensure boolean return
+        return !!(selectedTool?.tools && selectedTool.tools.length > 0);
       case 'configure':
-        return true;
+        return methods.formState.isValid;
+      case 'install':
+        return !formState.installation.isLoading;
       default:
         return false;
     }
-  }, [currentStep, selectedTool, teammate?.runners]);
+  }, [currentStep, selectedTool, methods.formState.isValid, formState.installation.isLoading]);
 
   // Calculate canProceed value whenever dependencies change
   const canProceed = useMemo(() => calculateCanProceed(), [calculateCanProceed]);
@@ -332,22 +382,63 @@ export function useInstallTool({ onInstall, teammate, onClose }: UseInstallToolP
       case 'configure':
         return null;
       case 'installing':
-        return null;
+        return (
+          <div className="p-6 space-y-6">
+            <div className="space-y-4">
+              {steps.map((step) => (
+                <div key={step.id} className="flex items-center gap-3">
+                  {step.status === 'loading' && (
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                  )}
+                  {step.status === 'success' && (
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                  )}
+                  {step.status === 'error' && (
+                    <XCircle className="h-4 w-4 text-red-400" />
+                  )}
+                  {step.status === 'pending' && (
+                    <Circle className="h-4 w-4 text-slate-400" />
+                  )}
+                  <div className="flex-1">
+                    <p className="text-sm text-slate-200">{step.description}</p>
+                    {step.error && (
+                      <p className="text-xs text-red-400 mt-1">{step.error}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {formState.installation.error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Installation Failed</AlertTitle>
+                <AlertDescription>
+                  {formState.installation.error}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        );
       default:
         return null;
     }
   }, [
+    formState.communityTools.error,
+    formState.communityTools.isLoading,
+    formState.communityTools.data,
+    formState.installation.error,
     currentStep,
-    formState,
     activeCategory,
-    handleRefresh,
     selectedTool,
+    handleRefresh,
     handleToolSelect,
     failedIcons,
+    handleIconError,
     expandedTools,
     setExpandedTools,
-    setActiveCategory,
-    teammate
+    teammate?.runners,
+    steps,
+    setActiveCategory
   ]);
 
   const startInstallation = useCallback(() => {

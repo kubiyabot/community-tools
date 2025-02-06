@@ -1339,54 +1339,68 @@ export function SourcesTab({
     updateProgress: (stepId: string, status: 'pending' | 'loading' | 'success' | 'error', error?: string) => void
   ) => {
     try {
-      if (!teammate) {
-        throw new Error('No teammate selected');
-      }
-
       updateProgress('validate', 'loading');
 
-      const sourceData = {
-        name: values.name,
-        url: values.url,
-        ...(values.runner && { runner: values.runner }),
-        ...(Object.keys(values.dynamic_config || {}).length > 0 && {
-          dynamic_config: values.dynamic_config
-        })
-      };
-
-      updateProgress('validate', 'success');
-      updateProgress('prepare', 'loading');
-
-      const response = await fetch(`/api/teammates/${teammate.id}/sources`, {
+      // Use the correct endpoint for installing sources
+      const response = await fetch(`/api/v1/sources`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(sourceData)
+        body: JSON.stringify({
+          ...values,
+          teammate_id: teammate?.id
+        })
       });
 
-      const data = await response.json();
+      let errorMessage = 'Failed to install tool';
 
       if (!response.ok) {
-        throw new Error(data.message || `Failed to install tool: ${response.statusText}`);
+        if (response.status === 405) {
+          errorMessage = 'Installation method not allowed. Please check your permissions and try again.';
+        } else {
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorMessage;
+          } catch (e) {
+            console.error('Failed to parse error response:', e);
+            // Use status text if available
+            errorMessage = response.statusText ? `Installation failed: ${response.statusText}` : errorMessage;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      updateProgress('prepare', 'success');
-      updateProgress('install', 'loading');
+      // Try to parse the response as JSON if it exists
+      const contentType = response.headers.get('content-type');
+      let data = null;
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (e) {
+          console.error('Failed to parse response:', e);
+          // If JSON parsing fails but response was ok, we can still continue
+          if (response.ok) {
+            console.log('Response was successful but not JSON. Continuing...');
+          } else {
+            throw new Error('Failed to parse installation response');
+          }
+        }
+      }
 
-      setShowInstallModal(false);
+      updateProgress('validate', 'success');
       
       if (onSourcesChange) {
         await onSourcesChange();
       }
 
-      updateProgress('install', 'success');
-      updateProgress('configure', 'success');
-
+      return data;
     } catch (error) {
-      console.error('Error installing tool:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      updateProgress('prepare', 'error', errorMessage);
+      console.error('Installation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Installation failed';
+      updateProgress('validate', 'error', errorMessage);
       throw error;
     }
   };

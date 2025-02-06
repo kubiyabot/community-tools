@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle, DialogClose } from '../ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '../ui/dialog';
 import { toast } from '../ui/use-toast';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -315,7 +315,10 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
 
   return (
     <Dialog open={isOpen} onOpenChange={onCloseAction}>
-      <DialogContent className="max-w-[1200px] p-0 gap-0 bg-[#0A0F1E] border-[#1E293B] fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-h-[90vh] overflow-hidden rounded-lg shadow-xl">
+      <DialogContent 
+        className="max-w-[1200px] p-0 gap-0 bg-[#0A0F1E] border-[#1E293B] fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-h-[90vh] overflow-hidden rounded-lg shadow-xl"
+        hideCloseButton
+      >
         <DialogTitle className="sr-only">
           {teammate?.name || 'Teammate'} Details
         </DialogTitle>
@@ -326,57 +329,54 @@ export function TeammateDetailsModal({ isOpen, onCloseAction, teammate, integrat
         
         <div className="flex h-[calc(100vh-8rem)]">
           <div className="flex-1 flex flex-col min-w-0 bg-[#0A0F1E]">
-            <DialogClose className="absolute top-4 right-4 rounded-lg opacity-70 ring-offset-[#0A0F1E] transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-[#1A1F2E] p-2 hover:bg-[#7C3AED]/10">
-              <X className="h-4 w-4 text-[#94A3B8]" />
-              <span className="sr-only">Close</span>
-            </DialogClose>
-
-            <TeammateDetails 
-              teammate={teammate} 
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-              integrations={integrations}
-            >
-              <div className="flex-1 min-h-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
-                  <TabsContent value="overview" className="h-full m-0 data-[state=active]:flex">
-                    <ScrollArea className="flex-1">
-                      <OverviewTab teammate={teammate} />
-                    </ScrollArea>
-                  </TabsContent>
-                  <TabsContent value="integrations" className="h-full m-0 data-[state=active]:flex">
-                    <ScrollArea className="flex-1">
-                      <IntegrationsTab 
-                        teammate={teammateWithIntegrations}
-                      />
-                    </ScrollArea>
-                  </TabsContent>
-                  <TabsContent value="tools" className="h-full m-0 data-[state=active]:flex">
-                    <ScrollArea className="flex-1">
-                      <SourcesTab 
-                        teammate={teammate} 
-                        sources={extendedSources}
-                        isLoading={isLoadingSources} 
-                      />
-                    </ScrollArea>
-                  </TabsContent>
-                  <TabsContent value="runtime" className="h-full m-0 data-[state=active]:flex">
-                    <ScrollArea className="flex-1">
-                      <RuntimeTab 
-                        teammate={teammate}
-                      />
-                    </ScrollArea>
-                  </TabsContent>
-                  <TabsContent value="access" className="h-full m-0 data-[state=active]:flex">
-                    <ScrollArea className="flex-1">
-                      <AccessControlTab 
-                        teammate={teammate}
-                      />
-                    </ScrollArea>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </TeammateDetails>
+            <div className="flex-1 overflow-y-auto">
+              <TeammateDetails 
+                teammate={teammate} 
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                integrations={integrations}
+              >
+                <div className="flex-1 min-h-0">
+                  <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+                    <TabsContent value="overview" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        <OverviewTab teammate={teammate} />
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="integrations" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        <IntegrationsTab 
+                          teammate={teammateWithIntegrations}
+                        />
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="tools" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        <SourcesTab 
+                          teammate={teammate} 
+                          sources={extendedSources}
+                          isLoading={isLoadingSources} 
+                        />
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="runtime" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        <RuntimeTab 
+                          teammate={teammate}
+                        />
+                      </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="access" className="h-full m-0 data-[state=active]:flex">
+                      <ScrollArea className="flex-1">
+                        <AccessControlTab 
+                          teammate={teammate}
+                        />
+                      </ScrollArea>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </TeammateDetails>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -2,8 +2,6 @@ import * as React from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
-  DialogHeader as RadixDialogHeader,
 } from '@/app/components/ui/dialog';
 import { DialogHeader } from './components/DialogHeader';
 import { useForm } from "react-hook-form";
@@ -29,18 +27,16 @@ export function InstallToolDialog({
   onClose,
   children 
 }: InstallToolDialogProps) {
-  // Add handler to clear state when dialog closes
   const handleClose = () => {
-    // Clear any stored state here
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl h-[800px] flex flex-col p-0 bg-slate-900 border border-slate-800">
-        <RadixDialogHeader>
-          <DialogTitle>Install Tool</DialogTitle>
-        </RadixDialogHeader>
+      <DialogContent 
+        className="max-w-6xl h-[800px] flex flex-col p-0 bg-slate-900 border border-slate-800"
+        hideCloseButton
+      >
         <DialogHeader onClose={handleClose} />
         <div className="flex-1 overflow-hidden">
           {children}
@@ -175,7 +171,7 @@ export function InstallToolForm({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogTitle>Install New Tool</DialogTitle>
+        <DialogHeader onClose={onClose} />
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             {error && (

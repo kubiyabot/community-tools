@@ -9,7 +9,13 @@ import { useVirtualizer, VirtualItem, Virtualizer } from '@tanstack/react-virtua
 import { Loader2, Search, AlertCircle, CheckCircle2, Info, Settings, Download } from 'lucide-react';
 import { Input } from '@/app/components/ui/input';
 import { debounce } from 'lodash';
-import { Dialog, DialogContent, DialogHeader as BaseDialogHeader, DialogTitle, DialogDescription } from '@/app/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader as BaseDialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/app/components/ui/dialog';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from '@/app/components/ui/form';
 import { ToolCard } from './components/ToolCard';
 import { cn } from '@/lib/utils';

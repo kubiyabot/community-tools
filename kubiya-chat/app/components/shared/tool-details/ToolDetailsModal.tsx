@@ -1482,7 +1482,10 @@ export function ToolDetailsModal({ teammateId, toolId, isOpen, onCloseAction, to
 
   return (
     <Dialog open={isOpen} onOpenChange={onCloseAction}>
-      <DialogContent className={modalStyles.dialog.content}>
+      <DialogContent 
+        className={modalStyles.dialog.content}
+        hideCloseButton
+      >
         <DialogHeader className={modalStyles.dialog.header}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

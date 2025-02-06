@@ -3,20 +3,23 @@ import { Code } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Tool } from '../types';
-import type { ExtendedSourceInfo } from './SourceGroup';
 
 interface ToolCardProps {
   tool: Tool;
-  source: ExtendedSourceInfo;
+  source?: any;
+  onSelect?: () => void;
 }
 
-export function ToolCard({ tool, source }: ToolCardProps) {
+export function ToolCard({ tool, source, onSelect }: ToolCardProps) {
   const paramCount = tool.args?.length || 0;
   const secretCount = tool.secrets?.length || 0;
   const envCount = Number(tool.env?.length) || 0;
 
   return (
-    <div className="group relative bg-[#1E293B]/50 hover:bg-[#1E293B] rounded-lg border border-[#1E293B] hover:border-[#7C3AED]/50 transition-all duration-200 cursor-pointer overflow-hidden">
+    <div 
+      className="group relative bg-[#1E293B]/50 hover:bg-[#1E293B] rounded-lg border border-[#1E293B] hover:border-[#7C3AED]/50 transition-all duration-200 cursor-pointer overflow-hidden"
+      onClick={onSelect}
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-[#1E293B]/0 to-[#1E293B] opacity-0 group-hover:opacity-100 transition-opacity" />
       <div className="p-4 relative">
         <div className="flex items-start justify-between">

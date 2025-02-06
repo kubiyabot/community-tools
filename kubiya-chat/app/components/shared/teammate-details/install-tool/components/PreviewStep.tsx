@@ -26,7 +26,8 @@ import {
   Folder,
   FolderOpen,
   Loader2,
-  PackageSearch
+  PackageSearch,
+  ArrowLeft
 } from 'lucide-react';
 import { Alert, AlertTitle, AlertDescription } from '@/app/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -221,6 +222,30 @@ export function PreviewStep({ selectedTool, isLoading = false }: PreviewStepProp
             className="mt-4 bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-slate-200"
           >
             <AlertCircle className="mr-2 h-4 w-4" />
+            Go Back to Selection
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedTool?.tools?.length) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
+        <div className="p-3 rounded-full bg-amber-500/10 border border-amber-500/20">
+          <AlertCircle className="h-6 w-6 text-amber-400" />
+        </div>
+        <div className="text-center space-y-2">
+          <h3 className="text-lg font-medium text-slate-200">No Tools Found</h3>
+          <p className="text-sm text-slate-400 max-w-md">
+            No tools were found in this source. Please go back and select a different source.
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={() => window.history.back()}
+            className="mt-4 bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-slate-200"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Go Back to Selection
           </Button>
         </div>
