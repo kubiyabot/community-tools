@@ -796,10 +796,11 @@ function ErrorPreviewModal({ isOpen, onClose, error: focusedError, source, allEr
   );
 }
 
-const SourceGroup = ({ source, onSourcesChange, allSources }: { 
+const SourceGroup = ({ source, onSourcesChange, allSources, teammate }: { 
   source: ExtendedSourceInfo; 
   onSourcesChange?: () => void;
   allSources: ExtendedSourceInfo[];
+  teammate: TeammateDetails;
 }) => {
   const { toast } = useToast();
   const [showSyncDialog, setShowSyncDialog] = useState(false);
@@ -964,28 +965,45 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
         duration: Infinity,
       });
       
-      // Get current teammate's sources
-      const currentSources = allSources.map((s: ExtendedSourceInfo) => s.uuid);
-      // Remove the current source from the list
-      const updatedSources = currentSources.filter((id: string) => id !== source.uuid);
+      // Get the raw source UUIDs from the teammate
+      // The API expects an array of source UUIDs, not SourceInfo objects
+      const sourceUuids = teammate.sources?.map(s => typeof s === 'string' ? s : s.uuid) || [];
+      const updatedSourceUuids = sourceUuids.filter(uuid => uuid !== source.uuid);
       
-      const response = await fetch(`/api/teammates/${source.teammate_id}/sources`, {
+      console.log('Removing source:', {
+        sourceToRemove: source.uuid,
+        beforeRemoval: sourceUuids,
+        afterRemoval: updatedSourceUuids,
+        teammate: teammate
+      });
+      
+      // Use teammate's UUID instead of ID
+      const response = await fetch(`/api/teammates/${teammate.uuid}/sources`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          sources: updatedSources
+          sources: updatedSourceUuids
         })
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to remove source');
+        throw new Error(errorData.error || errorData.details || 'Failed to remove source');
       }
 
-      if (onSourcesChange) {
-        await onSourcesChange();
+      // Parse the response to verify the update
+      const responseData = await response.json();
+      
+      // Verify the source was actually removed
+      if (!responseData.success || !responseData.updatedSources) {
+        throw new Error('Failed to verify source removal');
+      }
+
+      // Verify our source is not in the updated sources
+      if (responseData.updatedSources.includes(source.uuid)) {
+        throw new Error('Source was not properly removed');
       }
 
       // Dismiss removing toast and show success
@@ -995,6 +1013,14 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
         description: `${source.name} has been removed from teammate`,
         variant: "default",
       });
+
+      // Force a re-fetch of sources to update the UI
+      if (onSourcesChange) {
+        await onSourcesChange();
+      }
+
+      // Close the dialog
+      setShowRemoveDialog(false);
     } catch (error) {
       console.error('Error removing source:', error);
       
@@ -1006,7 +1032,6 @@ const SourceGroup = ({ source, onSourcesChange, allSources }: {
       });
     } finally {
       setIsRemoving(false);
-      setShowRemoveDialog(false);
     }
   };
 
@@ -1806,7 +1831,7 @@ export function SourcesTab({
   }
 
   return (
-    <InstallToolProvider teammate={teammate} value={installToolState}>
+    <InstallToolProvider teammate={teammate!} value={installToolState}>
       <div className="p-6 space-y-6">
         {/* Tools Information Header */}
         <div className="bg-gradient-to-br from-[#1E293B] to-[#0F172A] rounded-xl overflow-hidden border border-[#2D3B4E]">
@@ -1928,6 +1953,7 @@ export function SourcesTab({
                   source={source}
                   onSourcesChange={onSourcesChange}
                   allSources={filteredSources}
+                  teammate={teammate!}
                 />
               ))}
             </div>

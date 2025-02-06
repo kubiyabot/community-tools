@@ -79,11 +79,11 @@ export interface TeammateDetails {
   name: string;
   runners?: string[];
   sources?: SourceInfo[];
+  llm_model?: string;
   tools?: any[];
   avatar_url?: string;
   description?: string;
   integrations?: Integration[];
-  llm_model?: string;
   capabilities?: {
     llm_model?: string;
     instruction_type?: string;

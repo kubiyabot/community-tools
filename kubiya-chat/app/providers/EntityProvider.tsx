@@ -138,6 +138,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
     if (!force) {
       // First check memory cache
       if (cache.current.users && (now - cache.current.users.timestamp < CACHE_DURATION)) {
+        console.log('Using cached users:', cache.current.users.data);
         return cache.current.users.data;
       }
       
@@ -149,6 +150,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
           const parsedData = JSON.parse(storedData);
           cache.current.users = { data: parsedData, timestamp: Number(timestamp) };
           setUsers(parsedData);
+          console.log('Using session storage users:', parsedData);
           return parsedData;
         }
       } catch (error) {
@@ -169,6 +171,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
     isFetching.current.users = true;
 
     try {
+      console.log('Fetching users from API...');
       const response = await fetch('/api/v2/users?limit=100&page=1');
       
       if (response.status === 401 || response.status === 403) {
@@ -180,7 +183,12 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Failed to fetch users');
       }
       
-      const data = await response.json();
+      const responseData = await response.json();
+      console.log('Users API response received');
+      
+      // Extract users from the paginated response
+      const data = responseData.items || [];
+      console.log('Extracted users count:', data.length);
       
       // Reset auth error state
       setAuthError(false);
@@ -191,6 +199,7 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
       saveToSessionStorage(SESSION_STORAGE_KEYS.USERS, data);
       saveToSessionStorage(SESSION_STORAGE_KEYS.TIMESTAMP, now);
       setUsers(data);
+      console.log('Users data stored in cache and state');
       return data;
     } catch (err) {
       console.error('Error fetching users:', err);
@@ -286,58 +295,68 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
   }, [authError, handleAuthError, groups, saveToSessionStorage]);
 
   const getEntityMetadata = useCallback((uuid: string): EntityMetadata | undefined => {
-    if (!uuid) return undefined;
-
     // Use cached data if available
     const cachedUsers = cache.current.users?.data || users;
     const cachedGroups = cache.current.groups?.data || groups;
 
-    // First try to find in users
+    console.log('getEntityMetadata called:', {
+      uuid,
+      cachedUsersCount: cachedUsers?.length,
+      cachedGroupsCount: cachedGroups?.length,
+      usersCount: users.length,
+      groupsCount: groups.length
+    });
+
     if (Array.isArray(cachedUsers)) {
-      const foundUser = cachedUsers.find(u => u.uuid === uuid);
+      console.log('Searching through users for uuid:', uuid);
+      const foundUser = cachedUsers.find(u => {
+        const matches = u.uuid === uuid;
+        if (matches) {
+          console.log('Found matching user:', u);
+        }
+        return matches;
+      });
+      
       if (foundUser) {
-        return {
+        const metadata: EntityMetadata = {
           uuid: foundUser.uuid,
-          name: foundUser.name || foundUser.email || 'Unknown User',
+          name: foundUser.name || foundUser.email,
           image: foundUser.image,
           type: 'user',
           status: foundUser.user_status,
-          create_at: foundUser.create_at,
-          email: foundUser.email
+          create_at: foundUser.create_at
         };
+        console.log('Returning user metadata:', metadata);
+        return metadata;
       }
     }
 
-    // Then try to find in groups
     if (Array.isArray(cachedGroups)) {
-      const foundGroup = cachedGroups.find(g => g.uuid === uuid);
+      console.log('Searching through groups for uuid:', uuid);
+      const foundGroup = cachedGroups.find(g => {
+        const matches = g.uuid === uuid;
+        if (matches) {
+          console.log('Found matching group:', g);
+        }
+        return matches;
+      });
+      
       if (foundGroup) {
-        return {
+        const metadata: EntityMetadata = {
           uuid: foundGroup.uuid,
-          name: foundGroup.name || 'Unknown Group',
+          name: foundGroup.name,
           description: foundGroup.description,
           type: 'group',
           create_at: foundGroup.create_at
         };
+        console.log('Returning group metadata:', metadata);
+        return metadata;
       }
     }
 
-    // If not found, try to fetch the data
-    if (!isFetching.current.users) {
-      fetchUsers(true).catch(console.error);
-    }
-    if (!isFetching.current.groups) {
-      fetchGroups(true).catch(console.error);
-    }
-
-    // Return a placeholder while fetching
-    return {
-      uuid,
-      name: 'Loading...',
-      type: 'unknown',
-      status: 'pending'
-    };
-  }, [users, groups, fetchUsers, fetchGroups]);
+    console.log('No entity found for uuid:', uuid);
+    return undefined;
+  }, [users, groups]); // Dependencies still needed for state updates
 
   // Add debounce function
   const debounce = useCallback((fn: Function, delay: number) => {
@@ -357,27 +376,39 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
 
     const debouncedFetch = debounce(async () => {
       if (mounted && !authError) {
-        setIsLoading(true);
-        try {
-          await Promise.all([
-            fetchUsers(users.length === 0),
-            fetchGroups(groups.length === 0)
-          ]);
-        } finally {
-          if (mounted) {
-            setIsLoading(false);
+        // Changed condition to fetch if we have no data
+        if (!cache.current.users?.data?.length || !cache.current.groups?.data?.length) {
+          console.log('Initial fetch triggered - no cached data');
+          setIsLoading(true);
+          try {
+            await Promise.all([fetchUsers(true), fetchGroups()]);
+          } finally {
+            if (mounted) {
+              setIsLoading(false);
+            }
           }
         }
       }
     }, DEBOUNCE_DURATION);
 
-    debouncedFetch();
+    // Immediate fetch if no data
+    if (!cache.current.users?.data?.length || !cache.current.groups?.data?.length) {
+      console.log('Triggering immediate fetch - no cached data');
+      debouncedFetch();
+    }
 
     const scheduleNextRefresh = () => {
       if (mounted && !authError) {
         refreshTimeout = setTimeout(() => {
           if (!document.hidden && !isFetching.current.users && !isFetching.current.groups) {
-            debouncedFetch();
+            const now = Date.now();
+            const shouldRefreshUsers = !cache.current.users?.timestamp || 
+              (now - cache.current.users.timestamp >= REFRESH_INTERVAL);
+            const shouldRefreshGroups = !cache.current.groups?.timestamp || 
+              (now - cache.current.groups.timestamp >= REFRESH_INTERVAL);
+
+            if (shouldRefreshUsers) fetchUsers();
+            if (shouldRefreshGroups) fetchGroups();
           }
           scheduleNextRefresh();
         }, REFRESH_INTERVAL);
@@ -386,11 +417,15 @@ export function EntityProvider({ children }: { children: React.ReactNode }) {
 
     scheduleNextRefresh();
 
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        debouncedFetch();
+    const handleVisibilityChange = debounce(() => {
+      if (mounted && !document.hidden) {
+        const now = Date.now();
+        if (now - (cache.current.users?.timestamp || 0) >= REFRESH_INTERVAL) {
+          fetchUsers();
+          fetchGroups();
+        }
       }
-    };
+    }, DEBOUNCE_DURATION);
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 

@@ -283,11 +283,19 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       });
     }
 
-    const teammateId = await context.params.id;
+    // Properly handle dynamic params
+    const { id: teammateUuid } = context.params;
     const { sources } = await request.json();
 
-    // First, get the current teammate data
-    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
+    // Log the current operation
+    console.log('Sources update endpoint - Updating sources for teammate:', {
+      teammateUuid,
+      newSourcesCount: sources.length,
+      newSources: sources
+    });
+
+    // First, get the current teammate data using UUID
+    const teammateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateUuid}`, {
       headers: {
         'Authorization': `Bearer ${session.idToken}`,
         'Accept': 'application/json',
@@ -300,7 +308,11 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
     });
 
     if (!teammateResponse.ok) {
-      console.error('Sources update endpoint - Failed to fetch teammate:', teammateResponse.statusText);
+      console.error('Sources update endpoint - Failed to fetch teammate:', {
+        status: teammateResponse.status,
+        statusText: teammateResponse.statusText,
+        uuid: teammateUuid
+      });
       return new Response(JSON.stringify({ 
         error: 'Failed to fetch teammate',
         details: await teammateResponse.text()
@@ -315,16 +327,30 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
 
     const teammate = await teammateResponse.json();
 
+    // Log current teammate state
+    console.log('Sources update endpoint - Current teammate state:', {
+      uuid: teammateUuid,
+      currentSourcesCount: teammate.sources?.length || 0,
+      currentSources: teammate.sources
+    });
+
     // Update only the sources field while preserving all other fields
-    // Omit the id field from the update payload
     const { id, ...teammateWithoutId } = teammate;
     const updatedTeammate = {
       ...teammateWithoutId,
-      sources: sources
+      sources: sources // This is the new sources array with the deleted source removed
     };
 
-    // Update the teammate with the new sources
-    const updateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateId}`, {
+    // Log the update payload
+    console.log('Sources update endpoint - Update payload:', {
+      uuid: teammateUuid,
+      updatedSourcesCount: updatedTeammate.sources.length,
+      updatedSources: updatedTeammate.sources,
+      removedSources: teammate.sources?.filter((s: string) => !updatedTeammate.sources.includes(s))
+    });
+
+    // Update the teammate with the new sources using UUID
+    const updateResponse = await fetch(`https://api.kubiya.ai/api/v1/agents/${teammateUuid}`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${session.idToken}`,
@@ -342,7 +368,8 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       const errorText = await updateResponse.text();
       console.error('Sources update endpoint - Failed to update teammate:', {
         status: updateResponse.status,
-        error: errorText
+        error: errorText,
+        uuid: teammateUuid
       });
       return new Response(JSON.stringify({ 
         error: 'Failed to update teammate sources',
@@ -356,11 +383,20 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       });
     }
 
-    // Revalidate the cache for this teammate's sources
-    revalidateTag(`teammate-${teammateId}-sources`);
-    revalidatePath(`/api/teammates/${teammateId}/sources`);
+    // Log successful update
+    console.log('Sources update endpoint - Successfully updated teammate sources:', {
+      uuid: teammateUuid,
+      newSourcesCount: sources.length
+    });
 
-    return new Response(JSON.stringify({ success: true }), {
+    // Revalidate the cache for this teammate's sources
+    revalidateTag(`teammate-${teammateUuid}-sources`);
+    revalidatePath(`/api/teammates/${teammateUuid}/sources`);
+
+    return new Response(JSON.stringify({ 
+      success: true,
+      updatedSources: sources
+    }), {
       status: 200,
       headers: {
         ...corsHeaders,
@@ -368,7 +404,10 @@ export async function PUT(request: NextRequest, context: { params: { id: string 
       }
     });
   } catch (error) {
-    console.error('Sources update endpoint error:', error);
+    console.error('Sources update endpoint error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'

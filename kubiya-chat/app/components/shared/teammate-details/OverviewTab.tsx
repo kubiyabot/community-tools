@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Calendar, User, Code, GitBranch, Settings, Brain } from 'lucide-react';
 import { Badge } from '@/app/components/ui/badge';
 import type { TeammateDetails } from './types';
@@ -17,8 +17,28 @@ export function OverviewTab({ teammate }: OverviewTabProps) {
   const { getEntityMetadata, isLoading: isEntityLoading } = useEntity();
 
   // Get owner metadata if available
-  const ownerMetadata = teammate.metadata?.user_created ? 
-    getEntityMetadata(teammate.metadata.user_created) : null;
+  const ownerMetadata = useMemo(() => {
+    console.log('Owner metadata check:', {
+      user_created: teammate.metadata?.user_created,
+      metadata: teammate.metadata
+    });
+    if (!teammate.metadata?.user_created) return null;
+    const metadata = getEntityMetadata(teammate.metadata.user_created);
+    console.log('Found owner metadata:', metadata);
+    return metadata;
+  }, [teammate.metadata?.user_created, getEntityMetadata]);
+
+  // Get last updated user metadata if available
+  const lastUpdatedByMetadata = useMemo(() => {
+    console.log('Last updated metadata check:', {
+      user_last_updated: teammate.metadata?.user_last_updated,
+      metadata: teammate.metadata
+    });
+    if (!teammate.metadata?.user_last_updated) return null;
+    const metadata = getEntityMetadata(teammate.metadata.user_last_updated);
+    console.log('Found last updated metadata:', metadata);
+    return metadata;
+  }, [teammate.metadata?.user_last_updated, getEntityMetadata]);
 
   useEffect(() => {
     mermaid.initialize({
@@ -88,7 +108,54 @@ export function OverviewTab({ teammate }: OverviewTabProps) {
           </p>
           {ownerMetadata.create_at && (
             <p className="text-xs text-slate-400">
-              Since {new Date(ownerMetadata.create_at).toLocaleDateString()}
+              Created at {new Date(ownerMetadata.create_at).toLocaleDateString()}
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Function to render last updated by information
+  const renderLastUpdatedInfo = () => {
+    if (isEntityLoading) {
+      return (
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      );
+    }
+
+    if (!lastUpdatedByMetadata) {
+      return (
+        <p className="text-sm font-medium text-slate-400">
+          Not available
+        </p>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Avatar className="h-8 w-8">
+          {lastUpdatedByMetadata.image ? (
+            <AvatarImage src={lastUpdatedByMetadata.image} alt={lastUpdatedByMetadata.name} />
+          ) : (
+            <AvatarFallback className="bg-purple-500/10 text-purple-400">
+              {lastUpdatedByMetadata.name?.charAt(0)?.toUpperCase() || '?'}
+            </AvatarFallback>
+          )}
+        </Avatar>
+        <div>
+          <p className="text-sm font-medium text-white">
+            {lastUpdatedByMetadata.name}
+          </p>
+          {teammate.metadata?.last_updated && (
+            <p className="text-xs text-slate-400">
+              Last updated {new Date(teammate.metadata.last_updated).toLocaleDateString()}
             </p>
           )}
         </div>
@@ -134,6 +201,18 @@ export function OverviewTab({ teammate }: OverviewTabProps) {
 
           <div className="flex items-start gap-3 p-4 rounded-lg bg-[#1E293B] border border-[#2A3347]">
             <div className="p-2 rounded-md bg-purple-500/10">
+              <User className="h-4 w-4 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Last Updated By</p>
+              <div className="mt-1">
+                {renderLastUpdatedInfo()}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-[#1E293B] border border-[#2A3347]">
+            <div className="p-2 rounded-md bg-purple-500/10">
               <Calendar className="h-4 w-4 text-purple-400" />
             </div>
             <div>
@@ -143,18 +222,6 @@ export function OverviewTab({ teammate }: OverviewTabProps) {
                   new Date(teammate.metadata.created_at).toLocaleDateString() : 
                   'Unknown'
                 }
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 rounded-lg bg-[#1E293B] border border-[#2A3347]">
-            <div className="p-2 rounded-md bg-purple-500/10">
-              <Brain className="h-4 w-4 text-purple-400" />
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">LLM Model</p>
-              <p className="text-sm font-medium text-white mt-1">
-                {teammate.llm_model || 'Not specified'}
               </p>
             </div>
           </div>
