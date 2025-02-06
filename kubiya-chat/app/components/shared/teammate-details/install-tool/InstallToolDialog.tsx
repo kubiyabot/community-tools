@@ -34,7 +34,7 @@ export function InstallToolDialog({
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent 
-        className="max-w-6xl h-[800px] flex flex-col p-0 bg-slate-900 border border-slate-800"
+        className="max-w-[90vw] w-[1400px] h-[90vh] flex flex-col p-0 bg-slate-900 border border-slate-800"
       >
         <DialogHeader onClose={handleClose} />
         <div className="flex-1 overflow-hidden">

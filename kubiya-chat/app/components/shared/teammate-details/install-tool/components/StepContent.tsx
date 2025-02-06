@@ -20,13 +20,14 @@ export function StepContent() {
     handleRefresh,
     handleCommunityToolSelect,
     isLoading,
-    isInstallationComplete
+    isInstallationComplete,
+    teammate
   } = useInstallToolContext();
 
   const renderStep = () => {
     switch (currentStep) {
       case 'source':
-        return <CustomSourceTab methods={methods} />;
+        return <CustomSourceTab methods={methods} teammate={teammate} />;
       case 'select':
         const selectProps: SelectStepProps = {
           formState: formState as FormState,

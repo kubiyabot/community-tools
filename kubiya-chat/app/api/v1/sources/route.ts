@@ -146,4 +146,54 @@ export async function DELETE(req: NextRequest) {
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
+}
+
+// Add POST handler for creating sources
+export async function POST(req: NextRequest) {
+  try {
+    const res = NextResponse.next();
+    const session = await getSession(req, res);
+
+    if (!session?.idToken) {
+      return NextResponse.json({ 
+        error: 'Not authenticated',
+        details: 'No ID token found'
+      }, { status: 401 });
+    }
+
+    const body = await req.json();
+    
+    // Simplify the request body, set dynamic_config to null if not provided
+    const sourceData = {
+      name: body.name,
+      url: body.url,
+      dynamic_config: body.dynamic_config || null
+    };
+
+    const response = await fetch('https://api.kubiya.ai/api/v1/sources', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.idToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'X-Organization-ID': session.user?.org_id || '',
+        'X-Kubiya-Client': 'chat-ui'
+      },
+      body: JSON.stringify(sourceData)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create source: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    await revalidateTag('sources');
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error creating source:', error);
+    return NextResponse.json({ 
+      error: 'Failed to create source',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
+  }
 } 

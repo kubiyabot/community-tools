@@ -37,6 +37,7 @@ import { DialogFooter as BaseDialogFooter } from '@/app/components/ui/dialog';
 import { DialogFooter } from './components/DialogFooter';
 import { SelectStep } from './components/SelectStep';
 import { PreviewStep } from './components/PreviewStep';
+import { CustomSourceTab } from './components/CustomSourceTab';
 
 interface InstallToolFormProps {
   isOpen: boolean;
@@ -472,6 +473,51 @@ export function InstallToolForm({ isOpen, onClose, onInstall, teammate }: Instal
     isLoading
   } = hookValues;
 
+  // Load community tools on initial render
+  useEffect(() => {
+    if (isOpen) {
+      const loadCommunityTools = async () => {
+        try {
+          setState(prev => ({
+            ...prev,
+            communityTools: {
+              ...prev.communityTools,
+              isLoading: true,
+              error: null
+            }
+          }));
+
+          const response = await fetch('/api/v1/sources/community');
+          if (!response.ok) {
+            throw new Error('Failed to load community tools');
+          }
+
+          const data = await response.json();
+          setState(prev => ({
+            ...prev,
+            communityTools: {
+              isLoading: false,
+              error: null,
+              data: data.tools || []
+            }
+          }));
+        } catch (error) {
+          console.error('Error loading community tools:', error);
+          setState(prev => ({
+            ...prev,
+            communityTools: {
+              ...prev.communityTools,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Failed to load community tools'
+            }
+          }));
+        }
+      };
+
+      loadCommunityTools();
+    }
+  }, [isOpen, setState]);
+
   // Reset form when dialog opens/closes
   useEffect(() => {
     if (!isOpen) {
@@ -529,9 +575,32 @@ export function InstallToolForm({ isOpen, onClose, onInstall, teammate }: Instal
   const showInstallationView = formState.installation.isLoading || 
     (formState.installation.data?.steps && formState.installation.data.steps.length > 0);
 
+  const StepContent = () => {
+    switch (currentStep) {
+      case 'select':
+        return (
+          <SelectStep 
+            formState={formState}
+            onToolSelect={handleCommunityToolSelect}
+            onRefresh={handleRefresh}
+            failedIcons={failedIcons}
+            onIconError={handleIconError}
+            expandedTools={expandedTools}
+            setExpandedTools={setExpandedTools}
+          />
+        );
+      case 'configure':
+        return <CustomSourceTab methods={methods} teammate={teammate} />;
+      case 'install':
+        return <PreviewStep selectedTool={selectedTool} isLoading={isLoading} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl h-[500px] flex flex-col p-0 bg-slate-900 border border-slate-800">
+      <DialogContent className="max-w-[90vw] w-[1400px] h-[90vh] flex flex-col p-0 bg-slate-900 border border-slate-800">
         {showInstallationView ? (
           <div className="flex-1 flex flex-col">
             <CustomDialogHeader />
