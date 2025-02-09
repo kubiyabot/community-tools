@@ -829,8 +829,9 @@ def main():
 
         if args.action == 'grant':
             # Handle SSO access
-            s3_policy = os.environ.get('S3_POLICY')
-            s3_managed_policies = os.environ.get('S3_MANAGED_POLICIES').split(',')
+            config = json.loads(os.environ.get('S3_CONFIG'))
+            s3_policy = config.get('policy')
+            s3_managed_policies = config.get('managed_policies')
             permission_set_name = os.environ.get('PERMISSION_SET_NAME', 'DefaultPermissionSet')
             actions: List[str] = []
             if s3_policy == "ReadOnly":
