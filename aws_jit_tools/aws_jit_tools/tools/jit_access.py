@@ -213,13 +213,12 @@ try:
 
         for access_type, config in S3_ACCESS_CONFIGS.items():
             tool = create_s3_jit_tool(config, action)
-            tools[tool.name] = tool
+            s3_tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
 except Exception as e:
     print(f"Error loading configurations: {e}")
     raise
 
-print(f"tools: {tools}")
 # Export all tools
 __all__ = ['tools', 's3_tools']
