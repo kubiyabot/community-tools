@@ -180,7 +180,6 @@ pip install -q boto3 requests jinja2 jsonschema argparse
 export S3_CONFIG="{config}"
 export BUCKETS="{','.join(config['buckets'])}"
 export MAX_DURATION="{config['session_duration']}"
-export S3_MANAGED_POLICIES="{config['managed_policies']}"
 
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
