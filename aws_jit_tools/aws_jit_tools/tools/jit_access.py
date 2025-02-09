@@ -10,8 +10,7 @@ with open(HANDLER_PATH) as f:
     HANDLER_CODE = f.read()
 
 # Initialize tools dictionary at module level
-s3_tools = {}
-access_tools = {}
+tools = {}
 
 
 def create_jit_tool(config, action):
@@ -208,12 +207,12 @@ try:
     for action in ["grant", "revoke"]:
         for access_type, config in ACCESS_CONFIGS.items():
             tool = create_jit_tool(config, action)
-            access_tools[tool.name] = tool
+            tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
         for access_type, config in S3_ACCESS_CONFIGS.items():
             tool = create_s3_jit_tool(config, action)
-            s3_tools[tool.name] = tool
+            tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
 except Exception as e:
@@ -221,4 +220,4 @@ except Exception as e:
     raise
 
 # Export all tools
-__all__ = ['access_tools', 's3_tools']
+__all__ = ['tools']

@@ -10,10 +10,10 @@ def initialize_tools():
     """Initialize and register all JIT access tools."""
     try:
         logger.info("Initializing AWS JIT access tools...")
-        logger.debug(f"jit_access s3_tools: {jit_access.s3_tools}")
-        logger.debug(f"jit_access access_tools: {jit_access.access_tools}")
+        logger.debug(f"jit_access tools: {jit_access.tools}")
+        logger.debug(f"jit_access tools values: {jit_access.tools.values()}")
         # Get all tools from jit_access module
-        return list(jit_access.access_tools.values())
+        return list(jit_access.tools.values())
     except Exception as e:
         logger.error(f"Failed to initialize tools: {str(e)}")
         raise
