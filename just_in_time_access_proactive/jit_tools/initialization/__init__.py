@@ -137,16 +137,22 @@ class EnforcerConfigBuilder:
                 print("⚠️ Invalid JSON configuration format")
                 raise ConfigurationError("Invalid configuration format")
 
-        print(f"📝 Processing configuration: {config}")
+        print(f"📝 Processing configuration in EnforcerConfigBuilder: {json.dumps(config, indent=2)}")
 
-        opa_policy = config.get('opa_policy')
         settings.org = os.getenv("KUBIYA_USER_ORG")
         settings.runner = config.get('opa_runner_name')
-        opa_policy_enabled = config.get('opa_policy_enabled')
-        if not opa_policy_enabled or opa_policy_enabled.lower() == 'false':
-            settings.policy = opa_policy
-        else:
+        
+        # Policy generation logic - either from AWS JIT config or use provided OPA policy
+        if config.get('aws_jit_config'):
+            print("📝 Found AWS JIT config, generating policy from template")
             settings.policy = get_opa_policy_template(config)
+        elif config.get('opa_policy'):
+            print("📝 Using provided OPA policy")
+            settings.policy = config.get('opa_policy')
+        else:
+            raise ConfigurationError("Either aws_jit_config or opa_policy must be provided")
+
+        print(f"📝 Final policy set in settings: {settings.policy}")
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint',
@@ -210,21 +216,25 @@ def initialize():
         settings = EnforcerConfigBuilder.parse_config(config)
         print(f"✅ Using configuration settings: {settings.__dict__}")
 
-        os.environ['BS64_ORG_NAME'] = base64.b64encode(settings.org.encode()).decode()
-        os.environ['BS64_RUNNER_NAME'] = base64.b64encode(settings.runner.encode()).decode()
-        os.environ['BS64_OPA_DEFAULT_POLICY'] = base64.b64encode(settings.policy.encode()).decode()
+        # Get organization name from environment or config
+        org_name = os.getenv("KUBIYA_USER_ORG") or config.get('org_name') or "default_org"
+        runner_name = config.get('opa_runner_name') or "default_runner"
+        policy = settings.policy or ""
 
-        # DataBricks API Key (optional)
+        # Set environment variables with defaults
+        os.environ['BS64_ORG_NAME'] = base64.b64encode(org_name.encode()).decode()
+        os.environ['BS64_RUNNER_NAME'] = base64.b64encode(runner_name.encode()).decode()
+        os.environ['BS64_OPA_DEFAULT_POLICY'] = base64.b64encode(policy.encode()).decode()
+
+        # DataDog settings (optional)
         if settings.dd_api_key:
             os.environ['BS64_DATA_DOG_API_KEY'] = base64.b64encode(settings.dd_api_key.encode()).decode()
-
-        # DataBricks API Key (optional)
         if settings.dd_site:
             os.environ['BS64_DATA_DOG_SITE'] = base64.b64encode(settings.dd_site.encode()).decode()
 
-            # Okta settings (optional)
+        # Okta settings (optional)
         os.environ['IDP_PROVIDER'] = settings.idp_provider
-        if settings.idp_provider == 'okta':
+        if settings.idp_provider == 'okta' and settings.okta_settings:
             os.environ['BS64_OKTA_BASE_URL'] = base64.b64encode(
                 settings.okta_settings['okta_base_url'].encode()).decode()
             os.environ['BS64_OKTA_TOKEN_ENDPOINT'] = base64.b64encode(
