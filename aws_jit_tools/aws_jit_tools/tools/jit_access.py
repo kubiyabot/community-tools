@@ -26,12 +26,12 @@ def create_jit_tool(config, action):
         args.append(
             Arg(name="duration",
                 description=f"How long you need the access for.\n"
-                "Examples:\n"
-                "- '1h' for one hour access\n" 
-                "- '30m' for 30 minutes access\n"
-                "- '2h' for two hours access\n"
-                "- 'PT1H' for one hour access\n"
-                "ISO8601 format also accepted (maximum {config['session_duration']}",
+                            "Examples:\n"
+                            "- '1h' for one hour access\n"
+                            "- '30m' for 30 minutes access\n"
+                            "- '2h' for two hours access\n"
+                            "- 'PT1H' for one hour access\n"
+                            "ISO8601 format also accepted (maximum {config['session_duration']}",
                 type="str",
                 # This is the recommended duration for the access token (controlled on scripts/config) - does not guarantee the duration
                 default=config['session_duration'])
@@ -116,12 +116,12 @@ def create_s3_jit_tool(config, action):
         args.append(
             Arg(name="duration",
                 description=f"How long you need the access for.\n"
-                "Examples:\n"
-                "- '1h' for one hour access\n" 
-                "- '30m' for 30 minutes access\n"
-                "- '2h' for two hours access\n"
-                "- 'PT1H' for one hour access\n"
-                "ISO8601 format also accepted (maximum {config['session_duration']}",
+                            "Examples:\n"
+                            "- '1h' for one hour access\n"
+                            "- '30m' for 30 minutes access\n"
+                            "- '2h' for two hours access\n"
+                            "- 'PT1H' for one hour access\n"
+                            "ISO8601 format also accepted (maximum {config['session_duration']}",
                 type="str",
                 default=config['session_duration'])
         )
@@ -211,10 +211,10 @@ try:
             tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
-        for access_type, config in S3_ACCESS_CONFIGS.items():
-            tool = create_s3_jit_tool(config, action)
-            s3_tools[tool.name] = tool
-            tool_registry.register("aws_jit", tool)
+        # for access_type, config in S3_ACCESS_CONFIGS.items():
+        #     tool = create_s3_jit_tool(config, action)
+        #     s3_tools[tool.name] = tool
+        #     tool_registry.register("aws_jit", tool)
 
 except Exception as e:
     print(f"Error loading configurations: {e}")
