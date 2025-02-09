@@ -202,7 +202,7 @@ done
 # Load configurations and create tools
 try:
     ACCESS_CONFIGS = get_access_configs()
-    S3_ACCESS_CONFIGS = get_s3_configs()
+    # S3_ACCESS_CONFIGS = get_s3_configs()
 
     # Create and register tools
     for action in ["grant", "revoke"]:
