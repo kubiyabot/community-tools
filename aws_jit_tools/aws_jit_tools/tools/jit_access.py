@@ -11,7 +11,6 @@ with open(HANDLER_PATH) as f:
 
 # Initialize tools dictionary at module level
 tools = {}
-s3_tools = {}
 
 
 def create_jit_tool(config, action):
@@ -26,12 +25,12 @@ def create_jit_tool(config, action):
         args.append(
             Arg(name="duration",
                 description=f"How long you need the access for.\n"
-                "Examples:\n"
-                "- '1h' for one hour access\n" 
-                "- '30m' for 30 minutes access\n"
-                "- '2h' for two hours access\n"
-                "- 'PT1H' for one hour access\n"
-                "ISO8601 format also accepted (maximum {config['session_duration']}",
+                            "Examples:\n"
+                            "- '1h' for one hour access\n"
+                            "- '30m' for 30 minutes access\n"
+                            "- '2h' for two hours access\n"
+                            "- 'PT1H' for one hour access\n"
+                            "ISO8601 format also accepted (maximum {config['session_duration']}",
                 type="str",
                 # This is the recommended duration for the access token (controlled on scripts/config) - does not guarantee the duration
                 default=config['session_duration'])
@@ -116,12 +115,12 @@ def create_s3_jit_tool(config, action):
         args.append(
             Arg(name="duration",
                 description=f"How long you need the access for.\n"
-                "Examples:\n"
-                "- '1h' for one hour access\n" 
-                "- '30m' for 30 minutes access\n"
-                "- '2h' for two hours access\n"
-                "- 'PT1H' for one hour access\n"
-                "ISO8601 format also accepted (maximum {config['session_duration']}",
+                            "Examples:\n"
+                            "- '1h' for one hour access\n"
+                            "- '30m' for 30 minutes access\n"
+                            "- '2h' for two hours access\n"
+                            "- 'PT1H' for one hour access\n"
+                            "ISO8601 format also accepted (maximum {config['session_duration']}",
                 type="str",
                 default=config['session_duration'])
         )
@@ -178,11 +177,9 @@ echo ">> Processing request... ⏳"
 pip install -q boto3 requests jinja2 jsonschema argparse
 
 # Export bucket names and policy template from config
-export S3_POLICY="{config['policy']}"
+export S3_CONFIG="{config}"
 export BUCKETS="{','.join(config['buckets'])}"
-export S3_PERMISSIONS="{config['permissions']}"
 export MAX_DURATION="{config['session_duration']}"
-export S3_MANAGED_POLICIES="{config['managed_policies']}"
 
 touch /opt/scripts/__init__.py
 touch /opt/scripts/utils/__init__.py
@@ -213,7 +210,7 @@ try:
 
         for access_type, config in S3_ACCESS_CONFIGS.items():
             tool = create_s3_jit_tool(config, action)
-            s3_tools[tool.name] = tool
+            tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
 except Exception as e:
@@ -221,4 +218,4 @@ except Exception as e:
     raise
 
 # Export all tools
-__all__ = ['tools', 's3_tools']
+__all__ = ['tools']
