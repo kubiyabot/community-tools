@@ -1,201 +1,207 @@
-# <img src="https://raw.githubusercontent.com/crossplane/crossplane/master/docs/media/logo.png" width="40" /> Crossplane Tools for Kubiya
+# <img src="https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png" width="70" align="center" /> Crossplane Tools for Kubiya
 
-> Empower your infrastructure automation with containerized Crossplane operations through the Kubiya platform.
+<div align="center">
+
+> 🚀 Empower your infrastructure automation with containerized Crossplane operations through the Kubiya platform.
+
+[![Kubiya Platform](https://img.shields.io/badge/Kubiya-Platform-blue?style=for-the-badge&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAADASURBVHgBjZLBDcIwEARPCX/cAakg6YB0QEqgA6ACQgWEDkgHpAPoAFcAJUAFrGYtWbKwlGQ/Zn1n786SyZxzEfYKd4uphSunA1rX7dKAzlWQBqbB+bacc1m4wCtFg1GM4RQKLRQXeKNh4Vz/lWjBHw3X+2KmE0+oB+71M0UR1WOwHvzJ0sDgC9xh0lbOLNbk4kUBJXw8ITPU4N+rR7zQwOKXvNDgvP6GpgbOXIQRX+4ZlX4QBPbBxbpV/FV8ARfDSCg/4aaZAAAAAElFTkSuQmCC)](https://chat.kubiya.ai)
+[![Crossplane](https://img.shields.io/badge/Crossplane-Managed-purple?style=for-the-badge&logo=crossplane)](https://crossplane.io)
+[![Docker](https://img.shields.io/badge/Docker-Powered-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
+
+</div>
+
+## 🎯 Overview
 
 This module provides a comprehensive suite of containerized tools for managing Crossplane operations through Kubiya. Built on Docker containers and leveraging the power of the Kubiya platform, these tools enable seamless orchestration of Crossplane resources across your infrastructure.
 
-[![Kubiya Platform](https://img.shields.io/badge/Kubiya-Platform-blue)](https://chat.kubiya.ai)
-[![Crossplane](https://img.shields.io/badge/Crossplane-Managed-purple)](https://crossplane.io)
-[![Docker](https://img.shields.io/badge/Docker-Powered-blue)](https://www.docker.com)
-
-## 🏗️ Architecture and Flow
+## 🏗️ How It Works
 
 ```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6f42c1', 'fontFamily': 'arial' }}}%%
-graph TD
-    A[Kubiya Teammate] -->|1. Install Tool Source| B[Local Runner]
-    B -->|2. Connect| C[Kubernetes Cluster]
-    C -->|3. Has Installed| D[Crossplane]
-    D -->|Manages| E[Cloud Resources]
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#6f42c1', 'fontFamily': 'arial', 'fontSize': '16px' }}}%%
+graph LR
+    A([Kubiya<br/>Teammate]) -->|Install| B[Local Runner]
+    B -->|Deploy| C[Crossplane]
+    C -->|Manage| D{Cloud<br/>Resources}
     
-    subgraph Containerized Operations
-        F[Core Operations] -->|Install/Uninstall| D
-        G[Provider Management] -->|Configure| D
-        H[Composition Management] -->|Define| D
-        I[Claim Management] -->|Request| D
-        J[Package Management] -->|Install| D
-    end
-    
-    B -->|Executes Container| F
-    B -->|Executes Container| G
-    B -->|Executes Container| H
-    B -->|Executes Container| I
-    B -->|Executes Container| J
-
-    style A fill:#6f42c1,color:#fff
-    style D fill:#1a73e8,color:#fff
-    style E fill:#34a853,color:#fff
+    style A fill:#6f42c1,color:#fff,stroke-width:2px
+    style B fill:#1a73e8,color:#fff,stroke-width:2px
+    style C fill:#6f42c1,color:#fff,stroke-width:2px
+    style D fill:#34a853,color:#fff,stroke-width:2px
 ```
 
-## 🚀 Key Features
+## ✨ Key Features
 
-- **Container-Based Architecture**: Each tool runs in its own optimized Docker container, ensuring consistency and isolation
-- **Platform Integration**: Seamlessly integrates with the Kubiya platform for enhanced orchestration capabilities
-- **Cloud Provider Agnostic**: Support for AWS, GCP, Azure, and other cloud providers through Crossplane providers
-- **Automated Operations**: Streamlined workflows for common Crossplane operations
-- **Enterprise Ready**: Built with security and scalability in mind
+<table>
+<tr>
+<td width="50%">
+
+### 🐳 Container-Based
+- Isolated environments
+- Consistent execution
+- Zero local dependencies
+- Automatic updates
+
+</td>
+<td width="50%">
+
+### 🔌 Platform Integration
+- Seamless Kubiya integration
+- Automated workflows
+- Team collaboration
+- Access control
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### ☁️ Multi-Cloud Ready
+- AWS support
+- GCP support
+- Azure support
+- Custom providers
+
+</td>
+<td width="50%">
+
+### 🛡️ Enterprise Grade
+- Security focused
+- Scalable architecture
+- Audit logging
+- Role-based access
+
+</td>
+</tr>
+</table>
 
 ## 📋 Prerequisites
 
-1. A local runner connected to a Kubernetes cluster
-   - Can be any Kubernetes cluster (local, cloud-based, etc.)
-   - Must have cluster admin permissions
-2. A Kubiya teammate configured in [chat.kubiya.ai](https://chat.kubiya.ai)
-3. Docker installed on the runner (automatically managed by Kubiya)
+<table>
+<tr>
+<td width="120" align="center">
+<img src="https://kubernetes.io/images/favicon.png" width="50"/>
+<br/>Kubernetes
+</td>
+<td>
 
-## 🛠️ Installation
+- Any Kubernetes cluster (local or cloud)
+- Cluster admin permissions
+- `kubectl` configured
 
-### Installing the Tool Source
+</td>
+</tr>
+<tr>
+<td width="120" align="center">
+<img src="https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png" width="50"/>
+<br/>Kubiya
+</td>
+<td>
 
-1. Navigate to [chat.kubiya.ai](https://chat.kubiya.ai)
-2. Edit your teammate settings
-3. Click on the information banner or tools wrench icon
-4. Navigate to the "Tools" tab
-5. Click "Install Source"
-6. Choose "Custom Source"
-7. Provide this repository's URL
-8. Click "Discover Tools"
-9. (Optional) Provide custom configuration
+- Kubiya teammate configured
+- Access to [chat.kubiya.ai](https://chat.kubiya.ai)
+- Tool source permissions
 
-### Attaching to Teammates
+</td>
+</tr>
+</table>
 
-1. After installing the tool source, attach it to your teammates
-2. Required configurations:
-   - Kubernetes credentials
-   - Cloud provider credentials (if using cloud providers)
-   - Environment-specific variables
+## 🚀 Quick Start
 
-### Environment Setup
+### 1️⃣ Install Tool Source
 
-Configure the following in your teammate's environment:
-- `KUBECONFIG` or Kubernetes credentials
-- Cloud provider credentials for your Crossplane providers
-- Any additional environment-specific configurations
+1. Visit [chat.kubiya.ai](https://chat.kubiya.ai)
+2. Navigate to teammate settings ⚙️
+3. Open tools configuration 🔧
+4. Click "Install Source" ➕
+5. Choose "Custom Source" 📦
+6. Enter repository URL 🔗
+7. Click "Discover Tools" 🔍
 
-## 🔧 Components
+### 2️⃣ Configure Environment
 
-Each component runs in its own optimized Docker container, leveraging official images and best practices:
+```bash
+# Required Environment Variables
+export KUBECONFIG=/path/to/kubeconfig        # Kubernetes credentials
+export AWS_ACCESS_KEY_ID=your-key-id         # If using AWS provider
+export AWS_SECRET_ACCESS_KEY=your-secret-key # If using AWS provider
+export GOOGLE_APPLICATION_CREDENTIALS=...     # If using GCP provider
+```
 
-### Core Operations Container
-- Install and uninstall Crossplane
-- Manage Crossplane system status
-- Version management
-
-### Provider Management Container
-- Install and configure providers
-- Manage provider lifecycle
-- Monitor provider status
-
-### Composition Management Container
-- Create and manage compositions
-- Handle Composite Resource Definitions (XRDs)
-- Composition versioning and updates
-
-### Claim Management Container
-- Create and manage composite resource claims
-- Monitor claim status
-- Handle claim lifecycle
-
-### Package Management Container
-- Install and manage Crossplane packages
-- Package repository management
-- Package updates and versioning
-
-## Usage
-
-### Basic Usage
+### 3️⃣ Start Using
 
 ```python
 from crossplane_tools.tools import CoreOperations
 
-# Initialize the core operations
+# Initialize and install Crossplane
 core = CoreOperations()
-
-# Install Crossplane
 core.install_crossplane()
 
-# Check Crossplane status
-core.get_status()
+# Verify installation
+status = core.get_status()
+print(f"Crossplane is {status['state']}")
 ```
 
-### Provider Management
+## 🛠️ Components
 
-```python
-from crossplane_tools.tools import ProviderManager
+Each component runs in its own optimized Docker container:
 
-# Initialize the provider manager
-provider_mgr = ProviderManager()
+<table>
+<tr>
+<td width="33%">
 
-# Install a provider
-provider_mgr.install_provider(provider_package="crossplane/provider-aws:v0.24.1")
+### 🎮 Core Operations
+- Crossplane installation
+- System management
+- Health monitoring
 
-# Configure the provider
-provider_mgr.configure_provider(provider_config="path/to/config.yaml")
-```
+</td>
+<td width="33%">
 
-### Composition Management
+### 🔌 Providers
+- Cloud providers
+- Database providers
+- Custom providers
 
-```python
-from crossplane_tools.tools import CompositionManager
+</td>
+<td width="33%">
 
-# Initialize the composition manager
-comp_mgr = CompositionManager()
+### 📦 Packages
+- Package management
+- Version control
+- Dependencies
 
-# Apply a composition
-comp_mgr.apply_composition(composition_file="path/to/composition.yaml")
+</td>
+</tr>
+</table>
 
-# List all compositions
-comp_mgr.list_compositions()
-```
+## 📚 Learn More
 
-### Claim Management
+<table>
+<tr>
+<td width="33%" align="center">
 
-```python
-from crossplane_tools.tools import ClaimManager
+[![Kubiya Docs](https://img.shields.io/badge/Kubiya-Docs-blue?style=for-the-badge&logo=readthedocs)](https://docs.kubiya.ai)
 
-# Initialize the claim manager
-claim_mgr = ClaimManager()
+</td>
+<td width="33%" align="center">
 
-# Create a claim
-claim_mgr.apply_claim(claim_file="path/to/claim.yaml")
+[![Crossplane Docs](https://img.shields.io/badge/Crossplane-Docs-purple?style=for-the-badge&logo=crossplane)](https://crossplane.io/docs)
 
-# Monitor claim status
-claim_mgr.watch_claim_status(
-    claim_name="my-claim",
-    claim_type="database.example.org",
-    namespace="default"
-)
-```
+</td>
+<td width="33%" align="center">
 
-## 📚 Additional Resources
+[![Community](https://img.shields.io/badge/Join-Community-orange?style=for-the-badge&logo=slack)](https://slack.crossplane.io)
 
-- [Kubiya Documentation](https://docs.kubiya.ai) - Learn more about Kubiya tools and platform
-- [Crossplane Documentation](https://crossplane.io/docs) - Official Crossplane documentation
-- [Community Support](https://slack.crossplane.io) - Join the Crossplane community
-
-## 🤝 Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License. 
+</td>
+</tr>
+</table>
 
 ---
-Built with ❤️ by the Kubiya Community 
+
+<div align="center">
+
+Built with ❤️ by the [Kubiya Community](https://chat.kubiya.ai)
+
+<img src="https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png" width="40" />
+
+</div> 
