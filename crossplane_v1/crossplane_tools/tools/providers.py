@@ -1,6 +1,26 @@
 from typing import List
 from .base import CrossplaneTool, Arg
 
+"""
+Provider Management Module Structure:
+
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class ProviderManager {
+        +install_provider()
+        +configure_provider()
+        +list_providers()
+        +get_provider_status()
+        +uninstall_provider()
+    }
+    CrossplaneTool <|-- ProviderManager
+    note for ProviderManager "Manages Crossplane providers\nand their configurations"
+```
+"""
+
 class ProviderManager(CrossplaneTool):
     """Manage Crossplane providers."""
     
@@ -10,7 +30,24 @@ class ProviderManager(CrossplaneTool):
             description="Manage Crossplane providers and their configurations",
             content="",
             args=[],
-            image="bitnami/kubectl:latest"
+            image="bitnami/kubectl:latest",
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class ProviderManager {
+        +install_provider()
+        +configure_provider()
+        +list_providers()
+        +get_provider_status()
+        +uninstall_provider()
+    }
+    CrossplaneTool <|-- ProviderManager
+    note for ProviderManager "Manages Crossplane providers\nand their configurations"
+```
+"""
         )
 
     def install_provider(self) -> CrossplaneTool:

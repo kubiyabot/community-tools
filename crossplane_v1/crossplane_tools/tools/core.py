@@ -1,6 +1,26 @@
 from typing import List
 from .base import CrossplaneTool, Arg
 
+"""
+Core Operations Module Structure:
+
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class CoreOperations {
+        +install_crossplane()
+        +uninstall_crossplane()
+        +get_status()
+        +version()
+        +debug_mode()
+    }
+    CrossplaneTool <|-- CoreOperations
+    note for CoreOperations "Manages core Crossplane\ninstallation and operations"
+```
+"""
+
 class CoreOperations(CrossplaneTool):
     """Core Crossplane operations."""
     
@@ -10,7 +30,24 @@ class CoreOperations(CrossplaneTool):
             description="Core Crossplane operations",
             content="",
             args=[],
-            image="bitnami/kubectl:latest"  # Using bitnami's kubectl image for core operations
+            image="bitnami/kubectl:latest",  # Using bitnami's kubectl image for core operations
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class CoreOperations {
+        +install_crossplane()
+        +uninstall_crossplane()
+        +get_status()
+        +version()
+        +debug_mode()
+    }
+    CrossplaneTool <|-- CoreOperations
+    note for CoreOperations "Manages core Crossplane\ninstallation and operations"
+```
+"""
         )
 
     def install_crossplane(self) -> CrossplaneTool:

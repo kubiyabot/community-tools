@@ -1,6 +1,26 @@
 from typing import List
 from .base import CrossplaneTool, Arg
 
+"""
+Composition Management Module Structure:
+
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class CompositionManager {
+        +apply_composition()
+        +apply_xrd()
+        +list_compositions()
+        +get_composition_details()
+        +validate_composition()
+    }
+    CrossplaneTool <|-- CompositionManager
+    note for CompositionManager "Manages Crossplane compositions\nand XRDs (Composite Resource Definitions)"
+```
+"""
+
 class CompositionManager(CrossplaneTool):
     """Manage Crossplane compositions."""
     
@@ -10,7 +30,24 @@ class CompositionManager(CrossplaneTool):
             description="Manage Crossplane compositions and XRDs",
             content="",
             args=[],
-            image="bitnami/kubectl:latest"
+            image="bitnami/kubectl:latest",
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class CompositionManager {
+        +apply_composition()
+        +apply_xrd()
+        +list_compositions()
+        +get_composition_details()
+        +validate_composition()
+    }
+    CrossplaneTool <|-- CompositionManager
+    note for CompositionManager "Manages Crossplane compositions\nand XRDs (Composite Resource Definitions)"
+```
+"""
         )
 
     def apply_composition(self) -> CrossplaneTool:

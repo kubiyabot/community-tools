@@ -1,6 +1,25 @@
 from typing import List
 from .base import CrossplaneTool, Arg
 
+"""
+Claims Management Module Structure:
+
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class ClaimManager {
+        +apply_claim()
+        +list_claims()
+        +get_claim_status()
+        +delete_claim()
+    }
+    CrossplaneTool <|-- ClaimManager
+    note for ClaimManager "Manages Crossplane composite\nresource claims across namespaces"
+```
+"""
+
 class ClaimManager(CrossplaneTool):
     """Manage Crossplane composite resource claims."""
     
@@ -10,7 +29,23 @@ class ClaimManager(CrossplaneTool):
             description="Manage Crossplane composite resource claims",
             content="",
             args=[],
-            image="bitnami/kubectl:latest"
+            image="bitnami/kubectl:latest",
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class ClaimManager {
+        +apply_claim()
+        +list_claims()
+        +get_claim_status()
+        +delete_claim()
+    }
+    CrossplaneTool <|-- ClaimManager
+    note for ClaimManager "Manages Crossplane composite\nresource claims across namespaces"
+```
+"""
         )
 
     def apply_claim(self) -> CrossplaneTool:

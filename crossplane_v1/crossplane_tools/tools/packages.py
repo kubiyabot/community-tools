@@ -1,6 +1,26 @@
 from typing import List
 from .base import CrossplaneTool, Arg
 
+"""
+Package Management Module Structure:
+
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class PackageManager {
+        +install_package()
+        +list_packages()
+        +get_package_status()
+        +uninstall_package()
+        +upgrade_package()
+    }
+    CrossplaneTool <|-- PackageManager
+    note for PackageManager "Manages Crossplane packages\nand their lifecycle"
+```
+"""
+
 class PackageManager(CrossplaneTool):
     """Manage Crossplane packages."""
     
@@ -10,7 +30,24 @@ class PackageManager(CrossplaneTool):
             description="Manage Crossplane packages and configurations",
             content="",
             args=[],
-            image="bitnami/kubectl:latest"
+            image="bitnami/kubectl:latest",
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class PackageManager {
+        +install_package()
+        +list_packages()
+        +get_package_status()
+        +uninstall_package()
+        +upgrade_package()
+    }
+    CrossplaneTool <|-- PackageManager
+    note for PackageManager "Manages Crossplane packages\nand their lifecycle"
+```
+"""
         )
 
     def install_package(self) -> CrossplaneTool:

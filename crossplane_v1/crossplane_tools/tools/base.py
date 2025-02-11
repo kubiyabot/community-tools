@@ -1,16 +1,42 @@
 from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 
-CROSSPLANE_ICON_URL = "https://crossplane.io/img/favicon.png"
+CROSSPLANE_ICON_URL = "https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png"
 
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
 
-    def __init__(self, name: str, description: str, content: str, args: List[Arg], image: str = "crossplane/crossplane:v1.14.0"):
+    def __init__(self, name: str, description: str, content: str, args: List[Arg], image: str = "crossplane/crossplane:v1.14.0", mermaid: str = None):
         super().__init__(
             name=name,
             description=description,
-            icon_url=CROSSPLANE_ICON_URL
+            icon_url=CROSSPLANE_ICON_URL,
+            mermaid=mermaid or """
+```mermaid
+classDiagram
+    class Tool {
+        <<interface>>
+        +get_args()
+        +get_content()
+        +get_image()
+    }
+    class CrossplaneTool {
+        -content: str
+        -args: List[Arg]
+        -image: str
+        +__init__(name, description, content, args, image)
+        +_add_cluster_context(content)
+        +get_args()
+        +get_content()
+        +get_image()
+        +get_file_specs()
+        +validate_args(args)
+        +get_error_message(args)
+        +get_environment()
+    }
+    Tool <|-- CrossplaneTool
+```
+"""
         )
         self.content = self._add_cluster_context(content)
         self.args = args
