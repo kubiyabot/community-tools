@@ -7,11 +7,12 @@ class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
 
     def __init__(self, name: str, description: str, content: str, args: List[Arg], image: str = "crossplane/crossplane:v1.14.0", mermaid: str = None):
-        super().__init__(
-            name=name,
-            description=description,
-            icon_url=CROSSPLANE_ICON_URL,
-            mermaid=mermaid or """
+        self.content = self._add_cluster_context(content)
+        self.args = args
+        self.image = image
+        self.name = name
+        self.description = description
+        self.mermaid = mermaid or """
 ```mermaid
 classDiagram
     class Tool {
@@ -37,10 +38,7 @@ classDiagram
     Tool <|-- CrossplaneTool
 ```
 """
-        )
-        self.content = self._add_cluster_context(content)
-        self.args = args
-        self.image = image
+        super().__init__()
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""
