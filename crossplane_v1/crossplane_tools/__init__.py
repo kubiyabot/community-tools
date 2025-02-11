@@ -3,9 +3,7 @@
 This package provides tools for managing Crossplane installations and resources.
 """
 import os
-import sys
 import logging
-from kubiya_sdk.tools.registry import tool_registry
 
 # Configure logging
 logging.basicConfig(
@@ -19,61 +17,42 @@ def initialize():
     try:
         logger.info("Starting Crossplane tools initialization...")
         
-        # Import core tools
+        # Import and initialize core tools
         logger.info("Loading core tools...")
-        from .tools.core import (
-            install_crossplane_tool,
-            uninstall_crossplane_tool,
-            get_status_tool,
-            version_tool,
-            debug_mode_tool
-        )
+        from .tools.core import create_core_tools
+        core_tools = create_core_tools()
+        logger.info(f"✅ Loaded {len(core_tools)} core tools")
         
-        # Import provider management tools
+        # Import and initialize provider management tools
         logger.info("Loading provider management tools...")
-        from .tools.providers import (
-            install_provider_tool,
-            configure_provider_tool,
-            list_providers_tool,
-            get_provider_status_tool,
-            uninstall_provider_tool,
-            apply_provider_resource_tool
-        )
+        from .tools.providers import create_provider_tools
+        provider_tools = create_provider_tools()
+        logger.info(f"✅ Loaded {len(provider_tools)} provider management tools")
         
-        # Import provider-specific tools
-        logger.info("Loading provider-specific tools...")
+        # Import and initialize AWS provider tools
+        logger.info("Loading AWS provider tools...")
         try:
-            # AWS Provider tools
-            from .tools.providers.aws import (
-                aws_s3_bucket_tool,
-                aws_eks_cluster_tool,
-                aws_rds_instance_tool,
-                aws_vpc_tool
-            )
-            logger.info("✅ AWS provider tools loaded")
+            from .tools.providers.aws import create_aws_tools
+            aws_tools = create_aws_tools()
+            logger.info(f"✅ Loaded {len(aws_tools)} AWS provider tools")
         except Exception as e:
             logger.warning(f"Failed to load AWS provider tools: {str(e)}")
 
+        # Import and initialize GCP provider tools
+        logger.info("Loading GCP provider tools...")
         try:
-            # GCP Provider tools
-            from .tools.providers.gcp import (
-                gcp_gke_cluster_tool,
-                gcp_storage_bucket_tool,
-                gcp_sql_instance_tool,
-                gcp_vpc_network_tool
-            )
-            logger.info("✅ GCP provider tools loaded")
+            from .tools.providers.gcp import create_gcp_tools
+            gcp_tools = create_gcp_tools()
+            logger.info(f"✅ Loaded {len(gcp_tools)} GCP provider tools")
         except Exception as e:
             logger.warning(f"Failed to load GCP provider tools: {str(e)}")
 
+        # Import and initialize documentation tools
+        logger.info("Loading documentation tools...")
         try:
-            # Documentation tools
-            from .tools.providers.docs import (
-                generate_provider_docs_tool,
-                view_provider_docs_tool,
-                export_provider_docs_tool
-            )
-            logger.info("✅ Documentation tools loaded")
+            from .tools.providers.docs import create_doc_tools
+            doc_tools = create_doc_tools()
+            logger.info(f"✅ Loaded {len(doc_tools)} documentation tools")
         except Exception as e:
             logger.warning(f"Failed to load documentation tools: {str(e)}")
         
