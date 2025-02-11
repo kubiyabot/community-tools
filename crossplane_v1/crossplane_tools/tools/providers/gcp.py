@@ -1,165 +1,120 @@
-"""GCP Provider Tools
+from typing import List
+from ..base import CrossplaneTool, Arg
 
-This module provides tools for managing GCP resources through Crossplane.
+class GCPProviderManager(CrossplaneTool):
+    """Manage GCP-specific Crossplane provider operations."""
+    
+    def __init__(self):
+        super().__init__(
+            name="gcp_provider",
+            description="Manage GCP provider and resources",
+            content="",
+            args=[],
+            image="bitnami/kubectl:latest",
+            mermaid="""
+```mermaid
+classDiagram
+    class CrossplaneTool {
+        <<base>>
+    }
+    class GCPProviderManager {
+        +install_provider()
+        +configure_credentials()
+        +create_gke_cluster()
+        +create_cloud_sql()
+        +create_storage_bucket()
+        +create_vpc()
+        +list_resources()
+    }
+    CrossplaneTool <|-- GCPProviderManager
+    note for GCPProviderManager "Manages GCP-specific\nresources and configurations"
+```
 """
-from typing import List, Dict, Any
-from ..base import CrossplaneTool, Arg, Secret, get_provider_config
-from kubiya_sdk.tools.registry import tool_registry
-import sys
-import logging
+        )
 
-logger = logging.getLogger(__name__)
-
-def create_gcp_resource_tool(resource_info: Dict[str, str], config: Dict[str, Any]) -> CrossplaneTool:
-    """Create a tool for managing a specific GCP resource type."""
-    name = resource_info['NAME'].replace('.gcp.crossplane.io', '')
-    kind = resource_info['KIND']
-    group = resource_info['GROUP']
-    version = resource_info['VERSION']
-
-    # Skip if resource is in exclude list
-    if not config['sync_all'] and name not in config['include']:
-        logger.info(f"Skipping {name} - not in include list")
-        return None
-    if name in config['exclude']:
-        logger.info(f"Skipping {name} - in exclude list")
-        return None
-
-    return CrossplaneTool(
-        name=f"gcp_{name.lower()}",
-        description=f"Create and manage GCP {kind} using Crossplane",
-        content=f"""
-        if [ -z "$RESOURCE_NAME" ]; then
-            echo "Error: Resource name not specified"
-            exit 1
-        fi
-
-        # Get resource template
-        TEMPLATE=$(generate_resource_template {resource_info['NAME']} $RESOURCE_NAME)
-
-        # Create resource
-        cat <<EOF | kubectl apply -f -
-apiVersion: {group}/{version}
-kind: {kind}
+    def install_provider(self) -> CrossplaneTool:
+        """Install GCP provider."""
+        return CrossplaneTool(
+            name="install_gcp_provider",
+            description="Install GCP provider and its CRDs",
+            content="""
+            # Install GCP provider
+            cat <<EOF | kubectl apply -f -
+apiVersion: pkg.crossplane.io/v1
+kind: Provider
 metadata:
-  name: $RESOURCE_NAME
-  ${{ANNOTATIONS:+annotations: $ANNOTATIONS}}
-  ${{LABELS:+labels: $LABELS}}
+  name: provider-gcp
 spec:
-  forProvider:
-    project: $GOOGLE_PROJECT_ID
-    ${{RESOURCE_CONFIG}}
-  providerConfigRef:
-    name: ${{PROVIDER_CONFIG:-default}}
+  package: xpkg.upbound.io/upbound/provider-gcp:v0.37.0
 EOF
 
-        if [ "$WAIT" = "true" ]; then
-            echo "Waiting for resource to be ready..."
-            kubectl wait --for=condition=ready {name.lower()}.{group}/{version}/$RESOURCE_NAME --timeout=${{TIMEOUT:-300s}}
-        fi
+            # Wait for provider to be healthy
+            kubectl wait --for=condition=healthy provider.pkg.crossplane.io/provider-gcp --timeout=300s
+            """,
+            args=[],
+            image="bitnami/kubectl:latest"
+        )
 
-        if [ "$VERIFY" = "true" ]; then
-            echo "\\nVerifying resource creation..."
-            kubectl get {name.lower()}.{group}/{version} $RESOURCE_NAME -o yaml
-        fi
-        """,
-        args=[
-            Arg(name="resource_name", description=f"Name of the {kind} resource", required=True),
-            Arg(name="resource_config", description="Resource-specific configuration in YAML format", required=True),
-            Arg(name="provider_config", description="Name of the GCP provider configuration to use", required=False),
-            Arg(name="wait", description="Wait for resource to be ready", required=False),
-            Arg(name="verify", description="Verify resource creation", required=False),
-            Arg(name="timeout", description="Timeout for waiting (default: 300s)", required=False)
-        ],
-        secrets=[Secret(**s) for s in config['secrets']],
-        image="bitnami/kubectl:latest"
-    )
+    def configure_credentials(self) -> CrossplaneTool:
+        """Configure GCP credentials."""
+        return CrossplaneTool(
+            name="configure_gcp_credentials",
+            description="Configure GCP provider credentials",
+            content="""
+            if [ -z "$GCP_CREDS" ]; then
+                echo "Error: GCP credentials file not specified"
+                exit 1
+            fi
 
-def discover_gcp_resources() -> List[CrossplaneTool]:
-    """Discover available GCP resource types and create corresponding tools."""
-    tools = []
-    
-    # Get GCP provider configuration
-    try:
-        config = get_provider_config('gcp')
-        if not config.get('enabled', True):
-            logger.info("GCP provider is disabled in configuration")
-            return tools
-    except Exception as e:
-        logger.error(f"Failed to get GCP provider configuration: {str(e)}")
-        return tools
+            # Create secret from credentials file
+            kubectl create secret generic gcp-creds -n crossplane-system --from-file=creds="$GCP_CREDS"
 
-    # Add core GCP tools if they match configuration
-    core_tools = {
-        'gke': gcp_gke_cluster_tool,
-        'storage': gcp_storage_bucket_tool,
-        'sql': gcp_sql_instance_tool,
-        'vpc': gcp_vpc_network_tool
-    }
+            # Create ProviderConfig
+            cat <<EOF | kubectl apply -f -
+apiVersion: gcp.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: default
+spec:
+  projectID: ${PROJECT_ID}
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: gcp-creds
+      key: creds
+EOF
+            """,
+            args=[
+                Arg("gcp_creds",
+                    description="Path to GCP credentials JSON file",
+                    required=True),
+                Arg("project_id",
+                    description="GCP project ID",
+                    required=True)
+            ],
+            image="bitnami/kubectl:latest"
+        )
 
-    for name, tool in core_tools.items():
-        if config['sync_all'] or name in config['include']:
-            if name not in config['exclude']:
-                tool.secrets = [Secret(**s) for s in config['secrets']]
-                tools.append(tool)
-                logger.info(f"Added core tool: {name}")
+    def create_gke_cluster(self) -> CrossplaneTool:
+        """Create a GKE cluster."""
+        return CrossplaneTool(
+            name="create_gke_cluster",
+            description="Create a GCP GKE cluster",
+            content="""
+            if [ -z "$CLUSTER_NAME" ]; then
+                echo "Error: Cluster name not specified"
+                exit 1
+            fi
 
-    try:
-        # Discover additional GCP resources
-        logger.info("Discovering GCP provider resources...")
-        resource_list = """
-        discover_provider_resources gcp | while read -r resource; do
-            echo "$resource"
-        done
-        """
-        
-        # Create tools for discovered resources
-        for resource_info in resource_list.split('\n'):
-            if resource_info.strip():
-                try:
-                    parts = resource_info.split()
-                    if len(parts) == 4:
-                        resource_data = {
-                            'NAME': parts[0],
-                            'GROUP': parts[1],
-                            'VERSION': parts[2],
-                            'KIND': parts[3]
-                        }
-                        # Skip resources that already have dedicated tools
-                        if not any(t.name == f"gcp_{resource_data['NAME'].lower()}" for t in tools):
-                            tool = create_gcp_resource_tool(resource_data, config)
-                            if tool:
-                                tools.append(tool)
-                                logger.info(f"✅ Created tool for: {resource_data['KIND']}")
-                except Exception as e:
-                    logger.error(f"❌ Failed to create tool for resource: {resource_info} - {str(e)}")
-    except Exception as e:
-        logger.error(f"❌ Failed to discover GCP resources: {str(e)}")
-
-    return tools
-
-# Core GCP tools with secrets
-gcp_gke_cluster_tool = CrossplaneTool(
-    name="gcp_gke_cluster",
-    description="Create and manage GCP GKE clusters using Crossplane",
-    content="""
-    if [ -z "$CLUSTER_NAME" ]; then
-        echo "Error: Cluster name not specified"
-        exit 1
-    fi
-
-    # Create GKE cluster resource
-    cat <<EOF | kubectl apply -f -
+            cat <<EOF | kubectl apply -f -
 apiVersion: container.gcp.crossplane.io/v1beta1
 kind: Cluster
 metadata:
-  name: ${CLUSTER_NAME}
-  ${ANNOTATIONS:+annotations: $ANNOTATIONS}
-  ${LABELS:+labels: $LABELS}
+  name: $CLUSTER_NAME
 spec:
   forProvider:
-    project: $GOOGLE_PROJECT_ID
-    location: ${LOCATION:-us-central1-a}
+    location: ${LOCATION:-us-central1}
     initialClusterVersion: ${VERSION:-1.27}
     network: ${NETWORK:-default}
     subnetwork: ${SUBNETWORK:-default}
@@ -168,254 +123,97 @@ spec:
     masterAuth:
       clientCertificateConfig:
         issueClientCertificate: false
-    ${PRIVATE_CLUSTER:+privateClusterConfig: $PRIVATE_CLUSTER}
-    ${NODE_POOLS:+nodePools: $NODE_POOLS}
-    ${LOGGING_SERVICE:+loggingService: $LOGGING_SERVICE}
-    ${MONITORING_SERVICE:+monitoringService: $MONITORING_SERVICE}
-    ${ADDONS_CONFIG:+addonsConfig: $ADDONS_CONFIG}
-    ${NETWORK_POLICY:+networkPolicy: $NETWORK_POLICY}
-    ${MAINTENANCE_POLICY:+maintenancePolicy: $MAINTENANCE_POLICY}
-    ${RESOURCE_LABELS:+resourceLabels: $RESOURCE_LABELS}
   providerConfigRef:
-    name: ${PROVIDER_CONFIG:-default}
+    name: default
 EOF
 
-    if [ "$WAIT" = "true" ]; then
-        echo "Waiting for cluster to be ready..."
-        kubectl wait --for=condition=ready cluster.container.gcp.crossplane.io/${CLUSTER_NAME} --timeout=${TIMEOUT:-900s}
-    fi
+            # Wait for cluster to be ready
+            kubectl wait --for=condition=ready cluster.container.gcp.crossplane.io/$CLUSTER_NAME --timeout=900s
+            """,
+            args=[
+                Arg("cluster_name",
+                    description="Name of the GKE cluster",
+                    required=True),
+                Arg("location",
+                    description="GCP location (defaults to us-central1)",
+                    required=False),
+                Arg("version",
+                    description="Kubernetes version (defaults to 1.27)",
+                    required=False),
+                Arg("network",
+                    description="VPC network name",
+                    required=False),
+                Arg("subnetwork",
+                    description="VPC subnetwork name",
+                    required=False)
+            ],
+            image="bitnami/kubectl:latest"
+        )
 
-    if [ "$VERIFY" = "true" ]; then
-        echo "\\nVerifying cluster creation..."
-        kubectl get cluster.container.gcp.crossplane.io ${CLUSTER_NAME} -o yaml
-    fi
-    """,
-    args=[
-        Arg(name="cluster_name", description="Name of the GKE cluster", required=True),
-        Arg(name="location", description="GCP zone or region for the cluster", required=False),
-        Arg(name="version", description="Kubernetes version for the cluster", required=False),
-        Arg(name="network", description="VPC network name", required=False),
-        Arg(name="subnetwork", description="VPC subnetwork name", required=False),
-        Arg(name="private_cluster", description="Private cluster configuration", required=False),
-        Arg(name="node_pools", description="Node pool configurations", required=False),
-        Arg(name="logging_service", description="Logging service configuration", required=False),
-        Arg(name="monitoring_service", description="Monitoring service configuration", required=False),
-        Arg(name="addons_config", description="Cluster addons configuration", required=False),
-        Arg(name="network_policy", description="Network policy configuration", required=False),
-        Arg(name="maintenance_policy", description="Maintenance window configuration", required=False),
-        Arg(name="resource_labels", description="Labels to apply to the cluster", required=False),
-        Arg(name="provider_config", description="Name of the GCP provider configuration to use", required=False),
-        Arg(name="wait", description="Wait for cluster to be ready", required=False),
-        Arg(name="verify", description="Verify cluster creation", required=False),
-        Arg(name="timeout", description="Timeout for waiting (default: 900s)", required=False)
-    ],
-    image="bitnami/kubectl:latest"
-)
+    def create_storage_bucket(self) -> CrossplaneTool:
+        """Create a GCS bucket."""
+        return CrossplaneTool(
+            name="create_storage_bucket",
+            description="Create a GCP Storage bucket",
+            content="""
+            if [ -z "$BUCKET_NAME" ]; then
+                echo "Error: Bucket name not specified"
+                exit 1
+            fi
 
-# GCP Storage Bucket Tool
-gcp_storage_bucket_tool = CrossplaneTool(
-    name="gcp_storage_bucket",
-    description="Create and manage GCP Storage buckets using Crossplane",
-    content="""
-    if [ -z "$BUCKET_NAME" ]; then
-        echo "Error: Bucket name not specified"
-        exit 1
-    fi
-
-    # Create Storage bucket resource
-    cat <<EOF | kubectl apply -f -
-apiVersion: storage.gcp.crossplane.io/v1alpha3
+            cat <<EOF | kubectl apply -f -
+apiVersion: storage.gcp.crossplane.io/v1beta1
 kind: Bucket
 metadata:
-  name: ${BUCKET_NAME}
-  ${ANNOTATIONS:+annotations: $ANNOTATIONS}
-  ${LABELS:+labels: $LABELS}
+  name: $BUCKET_NAME
 spec:
   forProvider:
     location: ${LOCATION:-US}
     storageClass: ${STORAGE_CLASS:-STANDARD}
-    uniformBucketLevelAccess: ${UNIFORM_ACCESS:-true}
     versioning:
-      enabled: ${VERSIONING:-false}
-    ${LIFECYCLE_RULES:+lifecycleRules: $LIFECYCLE_RULES}
-    ${CORS:+cors: $CORS}
-    ${ENCRYPTION:+encryption: $ENCRYPTION}
-    ${LABELS:+labels: $LABELS}
+      enabled: true
   providerConfigRef:
-    name: ${PROVIDER_CONFIG:-default}
+    name: default
 EOF
 
-    if [ "$WAIT" = "true" ]; then
-        echo "Waiting for bucket to be ready..."
-        kubectl wait --for=condition=ready bucket.storage.gcp.crossplane.io/${BUCKET_NAME} --timeout=${TIMEOUT:-300s}
-    fi
+            # Wait for bucket to be ready
+            kubectl wait --for=condition=ready bucket.storage.gcp.crossplane.io/$BUCKET_NAME --timeout=300s
+            """,
+            args=[
+                Arg("bucket_name",
+                    description="Name of the GCS bucket",
+                    required=True),
+                Arg("location",
+                    description="Bucket location (defaults to US)",
+                    required=False),
+                Arg("storage_class",
+                    description="Storage class (defaults to STANDARD)",
+                    required=False)
+            ],
+            image="bitnami/kubectl:latest"
+        )
 
-    if [ "$VERIFY" = "true" ]; then
-        echo "\\nVerifying bucket creation..."
-        kubectl get bucket.storage.gcp.crossplane.io ${BUCKET_NAME} -o yaml
-    fi
-    """,
-    args=[
-        Arg(name="bucket_name", description="Name of the Storage bucket", required=True),
-        Arg(name="location", description="Location for the bucket", required=False),
-        Arg(name="storage_class", description="Storage class for the bucket", required=False),
-        Arg(name="uniform_access", description="Enable uniform bucket-level access", required=False),
-        Arg(name="versioning", description="Enable object versioning", required=False),
-        Arg(name="lifecycle_rules", description="Lifecycle management rules", required=False),
-        Arg(name="cors", description="CORS configuration", required=False),
-        Arg(name="encryption", description="Encryption configuration", required=False),
-        Arg(name="labels", description="Labels to apply to the bucket", required=False),
-        Arg(name="provider_config", description="Name of the GCP provider configuration to use", required=False),
-        Arg(name="wait", description="Wait for bucket to be ready", required=False),
-        Arg(name="verify", description="Verify bucket creation", required=False),
-        Arg(name="timeout", description="Timeout for waiting (default: 300s)", required=False)
-    ],
-    image="bitnami/kubectl:latest"
-)
+    def list_resources(self) -> CrossplaneTool:
+        """List all GCP resources managed by Crossplane."""
+        return CrossplaneTool(
+            name="list_gcp_resources",
+            description="List all GCP resources managed by Crossplane",
+            content="""
+            echo "=== GCP GKE Clusters ==="
+            kubectl get clusters.container.gcp.crossplane.io
 
-# GCP SQL Instance Tool
-gcp_sql_instance_tool = CrossplaneTool(
-    name="gcp_sql_instance",
-    description="Create and manage GCP Cloud SQL instances using Crossplane",
-    content="""
-    if [ -z "$INSTANCE_NAME" ]; then
-        echo "Error: Instance name not specified"
-        exit 1
-    fi
+            echo "\n=== GCP Storage Buckets ==="
+            kubectl get buckets.storage.gcp.crossplane.io
 
-    # Create Cloud SQL instance resource
-    cat <<EOF | kubectl apply -f -
-apiVersion: database.gcp.crossplane.io/v1beta1
-kind: CloudSQLInstance
-metadata:
-  name: ${INSTANCE_NAME}
-  ${ANNOTATIONS:+annotations: $ANNOTATIONS}
-  ${LABELS:+labels: $LABELS}
-spec:
-  forProvider:
-    databaseVersion: ${DATABASE_VERSION:-POSTGRES_13}
-    region: ${REGION:-us-central1}
-    settings:
-      tier: ${TIER:-db-f1-micro}
-      dataDiskSizeGb: ${DISK_SIZE:-10}
-      dataDiskType: ${DISK_TYPE:-PD_SSD}
-      ipConfiguration:
-        ipv4Enabled: ${IPV4_ENABLED:-true}
-        requireSsl: ${REQUIRE_SSL:-true}
-        ${AUTHORIZED_NETWORKS:+authorizedNetworks: $AUTHORIZED_NETWORKS}
-      ${BACKUP_CONFIG:+backupConfiguration: $BACKUP_CONFIG}
-      ${DATABASE_FLAGS:+databaseFlags: $DATABASE_FLAGS}
-      ${MAINTENANCE_WINDOW:+maintenanceWindow: $MAINTENANCE_WINDOW}
-      ${USER_LABELS:+userLabels: $USER_LABELS}
-  providerConfigRef:
-    name: ${PROVIDER_CONFIG:-default}
-EOF
+            echo "\n=== GCP Cloud SQL Instances ==="
+            kubectl get instances.sql.gcp.crossplane.io
 
-    if [ "$WAIT" = "true" ]; then
-        echo "Waiting for SQL instance to be ready..."
-        kubectl wait --for=condition=ready cloudsqlinstance.database.gcp.crossplane.io/${INSTANCE_NAME} --timeout=${TIMEOUT:-900s}
-    fi
+            echo "\n=== GCP VPC Networks ==="
+            kubectl get networks.compute.gcp.crossplane.io
 
-    if [ "$VERIFY" = "true" ]; then
-        echo "\\nVerifying SQL instance creation..."
-        kubectl get cloudsqlinstance.database.gcp.crossplane.io ${INSTANCE_NAME} -o yaml
-    fi
-    """,
-    args=[
-        Arg(name="instance_name", description="Name of the Cloud SQL instance", required=True),
-        Arg(name="database_version", description="Database version (e.g., POSTGRES_13)", required=False),
-        Arg(name="region", description="Region for the instance", required=False),
-        Arg(name="tier", description="Machine type for the instance", required=False),
-        Arg(name="disk_size", description="Data disk size in GB", required=False),
-        Arg(name="disk_type", description="Data disk type", required=False),
-        Arg(name="ipv4_enabled", description="Enable IPv4 access", required=False),
-        Arg(name="require_ssl", description="Require SSL connections", required=False),
-        Arg(name="authorized_networks", description="Authorized networks configuration", required=False),
-        Arg(name="backup_config", description="Backup configuration", required=False),
-        Arg(name="database_flags", description="Database flags configuration", required=False),
-        Arg(name="maintenance_window", description="Maintenance window configuration", required=False),
-        Arg(name="user_labels", description="Labels to apply to the instance", required=False),
-        Arg(name="provider_config", description="Name of the GCP provider configuration to use", required=False),
-        Arg(name="wait", description="Wait for instance to be ready", required=False),
-        Arg(name="verify", description="Verify instance creation", required=False),
-        Arg(name="timeout", description="Timeout for waiting (default: 900s)", required=False)
-    ],
-    image="bitnami/kubectl:latest"
-)
-
-# GCP VPC Network Tool
-gcp_vpc_network_tool = CrossplaneTool(
-    name="gcp_vpc_network",
-    description="Create and manage GCP VPC networks using Crossplane",
-    content="""
-    if [ -z "$NETWORK_NAME" ]; then
-        echo "Error: Network name not specified"
-        exit 1
-    fi
-
-    # Create VPC network resource
-    cat <<EOF | kubectl apply -f -
-apiVersion: compute.gcp.crossplane.io/v1beta1
-kind: Network
-metadata:
-  name: ${NETWORK_NAME}
-  ${ANNOTATIONS:+annotations: $ANNOTATIONS}
-  ${LABELS:+labels: $LABELS}
-spec:
-  forProvider:
-    autoCreateSubnetworks: ${AUTO_SUBNETS:-false}
-    routingMode: ${ROUTING_MODE:-REGIONAL}
-    ${DESCRIPTION:+description: $DESCRIPTION}
-    ${MTU:+mtu: $MTU}
-    ${NETWORK_FIREWALL_POLICY:+networkFirewallPolicyEnforcementOrder: $NETWORK_FIREWALL_POLICY}
-  providerConfigRef:
-    name: ${PROVIDER_CONFIG:-default}
-EOF
-
-    if [ "$WAIT" = "true" ]; then
-        echo "Waiting for network to be ready..."
-        kubectl wait --for=condition=ready network.compute.gcp.crossplane.io/${NETWORK_NAME} --timeout=${TIMEOUT:-300s}
-    fi
-
-    if [ "$VERIFY" = "true" ]; then
-        echo "\\nVerifying network creation..."
-        kubectl get network.compute.gcp.crossplane.io ${NETWORK_NAME} -o yaml
-    fi
-    """,
-    args=[
-        Arg(name="network_name", description="Name of the VPC network", required=True),
-        Arg(name="auto_subnets", description="Auto-create subnetworks", required=False),
-        Arg(name="routing_mode", description="Network-wide routing mode", required=False),
-        Arg(name="description", description="Network description", required=False),
-        Arg(name="mtu", description="Maximum Transmission Unit in bytes", required=False),
-        Arg(name="network_firewall_policy", description="Network firewall policy enforcement order", required=False),
-        Arg(name="provider_config", description="Name of the GCP provider configuration to use", required=False),
-        Arg(name="wait", description="Wait for network to be ready", required=False),
-        Arg(name="verify", description="Verify network creation", required=False),
-        Arg(name="timeout", description="Timeout for waiting (default: 300s)", required=False)
-    ],
-    image="bitnami/kubectl:latest"
-)
-
-# Register GCP tools
-try:
-    logger.info("=== Registering GCP Provider Tools ===")
-    gcp_tools = discover_gcp_resources()
-    
-    for tool in gcp_tools:
-        try:
-            tool_registry.register("crossplane", tool)
-            logger.info(f"✅ Registered: {tool.name}")
-        except Exception as e:
-            logger.error(f"❌ Failed to register {tool.name}: {str(e)}")
-except Exception as e:
-    logger.error(f"❌ Failed to register GCP tools: {str(e)}")
-
-# Export tools
-__all__ = [
-    'gcp_gke_cluster_tool',
-    'gcp_storage_bucket_tool',
-    'gcp_sql_instance_tool',
-    'gcp_vpc_network_tool',
-    'discover_gcp_resources'
-] 
+            echo "\n=== GCP Service Accounts ==="
+            kubectl get serviceaccounts.iam.gcp.crossplane.io
+            """,
+            args=[],
+            image="bitnami/kubectl:latest"
+        ) 

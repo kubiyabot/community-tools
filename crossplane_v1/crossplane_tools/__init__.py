@@ -19,8 +19,7 @@ def initialize():
     try:
         logger.info("Starting Crossplane tools initialization...")
         
-        # Import core tools
-        logger.info("Loading core tools...")
+        # Import tools after logging is configured
         from .tools.core import (
             install_crossplane_tool,
             uninstall_crossplane_tool,
@@ -29,8 +28,6 @@ def initialize():
             debug_mode_tool
         )
         
-        # Import provider management tools
-        logger.info("Loading provider management tools...")
         from .tools.providers import (
             install_provider_tool,
             configure_provider_tool,
@@ -40,48 +37,11 @@ def initialize():
             apply_provider_resource_tool
         )
         
-        # Import provider-specific tools
-        logger.info("Loading provider-specific tools...")
-        try:
-            # AWS Provider tools
-            from .tools.providers.aws import (
-                aws_s3_bucket_tool,
-                aws_eks_cluster_tool,
-                aws_rds_instance_tool,
-                aws_vpc_tool
-            )
-            logger.info("✅ AWS provider tools loaded")
-        except Exception as e:
-            logger.warning(f"Failed to load AWS provider tools: {str(e)}")
-
-        try:
-            # GCP Provider tools
-            from .tools.providers.gcp import (
-                gcp_gke_cluster_tool,
-                gcp_storage_bucket_tool,
-                gcp_sql_instance_tool,
-                gcp_vpc_network_tool
-            )
-            logger.info("✅ GCP provider tools loaded")
-        except Exception as e:
-            logger.warning(f"Failed to load GCP provider tools: {str(e)}")
-
-        try:
-            # Documentation tools
-            from .tools.providers.docs import (
-                generate_provider_docs_tool,
-                view_provider_docs_tool,
-                export_provider_docs_tool
-            )
-            logger.info("✅ Documentation tools loaded")
-        except Exception as e:
-            logger.warning(f"Failed to load documentation tools: {str(e)}")
-        
         # Set version if available
         version = os.getenv('KUBIYA_VERSION', 'development')
         logger.info(f"Running version: {version}")
         
-        logger.info("Crossplane tools initialization completed successfully")
+        logger.info("Crossplane tools initialization completed")
         
     except Exception as e:
         logger.error(f"Failed to initialize Crossplane tools: {str(e)}")
