@@ -2,56 +2,53 @@
 
 This package provides tools for managing Crossplane installations and resources.
 """
-
-from .tools.core import (
-    install_crossplane,
-    uninstall_crossplane,
-    get_status,
-    version,
-    debug_mode
-)
-
-from .tools.providers import (
-    install_provider,
-    configure_provider,
-    list_providers,
-    get_provider_status,
-    uninstall_provider,
-    apply_provider_resource
-)
-
+import os
+import sys
+import logging
 from kubiya_sdk.tools.registry import tool_registry
 
-def register_all_tools():
-    """Register all Crossplane tools."""
-    tools = {
-        # Core tools
-        'install_crossplane': install_crossplane(),
-        'uninstall_crossplane': uninstall_crossplane(),
-        'get_status': get_status(),
-        'version': version(),
-        'debug_mode': debug_mode(),
-        
-        # Provider tools
-        'provider_install': install_provider(),
-        'provider_configure': configure_provider(),
-        'provider_list': list_providers(),
-        'provider_status': get_provider_status(),
-        'provider_uninstall': uninstall_provider(),
-        'provider_apply_resource': apply_provider_resource()
-    }
-    
-    print("\n=== Registering Crossplane Tools ===")
-    for name, tool in tools.items():
-        try:
-            tool_registry.register("crossplane", tool)
-            print(f"✅ Registered: {name}")
-        except Exception as e:
-            print(f"❌ Failed to register {name}: {str(e)}")
-    
-    print(f"\nTotal tools registered: {len(tools)}")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Register all tools when the package is imported
-register_all_tools()
+def initialize():
+    """Initialize Crossplane tools."""
+    try:
+        logger.info("Starting Crossplane tools initialization...")
+        
+        # Import tools after logging is configured
+        from .tools.core import (
+            install_crossplane_tool,
+            uninstall_crossplane_tool,
+            get_status_tool,
+            version_tool,
+            debug_mode_tool
+        )
+        
+        from .tools.providers import (
+            install_provider_tool,
+            configure_provider_tool,
+            list_providers_tool,
+            get_provider_status_tool,
+            uninstall_provider_tool,
+            apply_provider_resource_tool
+        )
+        
+        # Set version if available
+        version = os.getenv('KUBIYA_VERSION', 'development')
+        logger.info(f"Running version: {version}")
+        
+        logger.info("Crossplane tools initialization completed")
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Crossplane tools: {str(e)}")
+        raise
+
+# Run initialization when module is imported
+logger.info("Loading Crossplane tools module...")
+initialize()
 
 __version__ = "0.1.0" 
