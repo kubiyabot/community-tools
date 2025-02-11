@@ -1,22 +1,10 @@
 from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg, FileSpec
+from pydantic import BaseModel
 
 CROSSPLANE_ICON_URL = "https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png"
 
-class CrossplaneTool(Tool):
-    """Base class for all Crossplane tools."""
-
-    def __init__(self, **data):
-        """Initialize the Crossplane tool."""
-        # Process content if provided
-        if "content" in data:
-            data["content"] = self._add_cluster_context(data["content"])
-        
-        # Set default values
-        data.setdefault("icon_url", CROSSPLANE_ICON_URL)
-        data.setdefault("type", "docker")
-        data.setdefault("image", "crossplane/crossplane:v1.14.0")
-        data.setdefault("mermaid", """
+DEFAULT_MERMAID = """
 ```mermaid
 classDiagram
     class Tool {
@@ -41,29 +29,53 @@ classDiagram
     }
     Tool <|-- CrossplaneTool
 ```
-""")
-        data.setdefault("with_files", [
-            FileSpec(
-                mount_path="/root/.kube",
-                description="Kubernetes configuration directory"
-            ),
-            FileSpec(
-                mount_path="/var/run/secrets/kubernetes.io/serviceaccount",
-                description="Kubernetes service account tokens"
-            ),
-            FileSpec(
-                mount_path="/workspace",
-                description="Workspace directory for temporary files"
-            )
-        ])
-        data.setdefault("env", {
-            "KUBECONFIG": "/root/.kube/config",
-            "KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
-            "KUBERNETES_SERVICE_PORT": "443"
-        })
+"""
+
+class CrossplaneTool(Tool):
+    """Base class for all Crossplane tools."""
+
+    def __init__(self, **data):
+        """Initialize the Crossplane tool."""
+        # Process content if provided
+        if "content" in data:
+            data["content"] = self._add_cluster_context(data["content"])
         
-        # Initialize the base Tool class with keyword arguments
-        super().__init__(**data)
+        # Create the model data
+        model_data = {
+            "icon_url": CROSSPLANE_ICON_URL,
+            "type": "docker",
+            "image": "crossplane/crossplane:v1.14.0",
+            "mermaid": DEFAULT_MERMAID,
+            "with_files": [
+                {
+                    "destination": "/root/.kube/config",
+                    "description": "Kubernetes configuration directory",
+                    "source": "$HOME/.kube/config"
+                },
+                {
+                    "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                    "description": "Kubernetes service account tokens",
+                    "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                },
+                {
+                    "destination": "/workspace",
+                    "description": "Workspace directory for temporary files",
+                    "source": "$HOME/workspace"
+                }
+            ],
+            "env": [
+                "KUBECONFIG",
+                "KUBERNETES_SERVICE_HOST",
+                "KUBERNETES_SERVICE_PORT"
+            ]
+        }
+        
+        # Update with provided data
+        model_data.update(data)
+        
+        # Initialize using Pydantic's model_validate
+        validated_data = Tool.model_validate(model_data)
+        super().__init__(**validated_data.model_dump())
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""
@@ -193,16 +205,19 @@ verify_crd_exists() {
         """Return the required file specifications."""
         return [
             FileSpec(
-                mount_path="/root/.kube",
-                description="Kubernetes configuration directory"
+                destination="/root/.kube/config",
+                description="Kubernetes configuration directory",
+                source="$HOME/.kube/config"
             ),
             FileSpec(
-                mount_path="/var/run/secrets/kubernetes.io/serviceaccount",
-                description="Kubernetes service account tokens"
+                destination="/var/run/secrets/kubernetes.io/serviceaccount/token",
+                description="Kubernetes service account tokens",
+                source="/var/run/secrets/kubernetes.io/serviceaccount/token"
             ),
             FileSpec(
-                mount_path="/workspace",
-                description="Workspace directory for temporary files"
+                destination="/workspace",
+                description="Workspace directory for temporary files",
+                source="$HOME/workspace"
             )
         ]
 
