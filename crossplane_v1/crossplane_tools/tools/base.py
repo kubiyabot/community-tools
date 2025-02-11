@@ -1,8 +1,14 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec, Secret
+from kubiya_sdk.tools import Tool, Arg
 from pydantic import BaseModel
 
 CROSSPLANE_ICON_URL = "https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png"
+
+# Define Secret class since it's not available in kubiya_sdk.tools
+class Secret(BaseModel):
+    name: str
+    required: bool = True
+    description: Optional[str] = None
 
 # Default configuration values
 DEFAULT_CONFIG = {
@@ -129,140 +135,38 @@ classDiagram
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
     
-    # Define model fields
-    name: str
-    description: str
-    content: str = ""
-    args: List[Arg] = []
-    image: str = "crossplane/crossplane:v1.14.0"
-    icon_url: str = CROSSPLANE_ICON_URL
-    type: str = "docker"
-    mermaid: str = DEFAULT_MERMAID
-    secrets: List[Secret] = []
-    with_files: List[Dict[str, str]] = [
-        {
-            "destination": "/root/.kube/config",
-            "description": "Kubernetes configuration directory",
-            "source": "$HOME/.kube/config"
-        },
-        {
-            "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
-            "description": "Kubernetes service account tokens",
-            "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
-        },
-        {
-            "destination": "/workspace",
-            "description": "Workspace directory for temporary files",
-            "source": "$HOME/workspace"
-        }
-    ]
-    env: List[str] = ["KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]
-
-    def __init__(self, name, description, content, args=None, image="crossplane/crossplane:v1.14.0", secrets=None):
-        # Initialize the tool with the combined content
+    def __init__(self, name: str, description: str, args: Optional[List[Arg]] = None):
         super().__init__(
             name=name,
             description=description,
-            content=self._add_cluster_context(content),
             args=args or [],
-            image=image,
-            icon_url=CROSSPLANE_ICON_URL,
-            type="docker",
-            secrets=secrets or [],
-            with_files=[
-                {
-                    "destination": "/root/.kube/config",
-                    "description": "Kubernetes configuration directory",
-                    "source": "$HOME/.kube/config"
-                },
-                {
-                    "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
-                    "description": "Kubernetes service account tokens",
-                    "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
-                },
-                {
-                    "destination": "/workspace",
-                    "description": "Workspace directory for temporary files",
-                    "source": "$HOME/workspace"
-                }
-            ],
-            env=[
-                "KUBECONFIG",
-                "KUBERNETES_SERVICE_HOST",
-                "KUBERNETES_SERVICE_PORT"
-            ]
+            icon_url=CROSSPLANE_ICON_URL
         )
+    
+    def get_provider_config(self, provider_name: str) -> Dict[str, Any]:
+        """Get provider configuration from dynamic config."""
+        try:
+            from kubiya_sdk.tools.registry import tool_registry
+            config = tool_registry.dynamic_config.get("crossplane", {}).get("providers", {}).get(provider_name, {})
+            return {**DEFAULT_CONFIG.get(provider_name, {}), **config}
+        except Exception as e:
+            return DEFAULT_CONFIG.get(provider_name, {})
 
     def _add_cluster_context(self, content: str) -> str:
-        """Add cluster context setup and dependency installation to the shell script content."""
-        setup = """
-# Begin helper functions
-{
-    # Function to validate cluster access
-    validate_cluster_access() {
-        if ! kubectl cluster-info &> /dev/null; then
-            echo "Error: Unable to access Kubernetes cluster"
-            exit 1
-        fi
-    }
+        """Add cluster context to the tool content."""
+        return content
 
-    # Function to handle errors
-    handle_error() {
-        local exit_code=$?
-        local command=$BASH_COMMAND
-        echo "Error: Command '$command' failed with exit code $exit_code"
-        exit $exit_code
-    }
-
-    # Set error handling
-    set -e
-    trap 'handle_error' ERR
-
-    # Common utility functions
-    get_resource_name() {
-        local yaml_content="$1"
-        echo "$yaml_content" | yq e '.metadata.name' -
-    }
-
-    get_resource_namespace() {
-        local yaml_content="$1"
-        local namespace=$(echo "$yaml_content" | yq e '.metadata.namespace // "default"' -)
-        echo "$namespace"
-    }
-
-    wait_for_resource() {
-        local kind="$1"
-        local name="$2"
-        local namespace="$3"
-        local timeout="${4:-300s}"
-        
-        echo "Waiting for $kind/$name in namespace $namespace to be ready..."
-        kubectl wait --for=condition=ready "$kind/$name" -n "$namespace" --timeout="$timeout"
-    }
-
-    verify_crd_exists() {
-        local crd="$1"
-        if ! kubectl get crd "$crd" &> /dev/null; then
-            echo "Error: CRD $crd not found"
-            exit 1
-        fi
-    }
-
-    # Function to discover provider resources
-    discover_provider_resources() {
-        local provider="$1"
-        kubectl get crds -l crossplane.io/provider=$provider -o custom-columns=NAME:.metadata.name,GROUP:.spec.group,VERSION:.spec.versions[0].name,KIND:.spec.names.kind --no-headers
-    }
-
-    # Function to generate resource template
-    generate_resource_template() {
-        local crd="$1"
-        local name="$2"
-        kubectl get crd $crd -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema}' | yq e -P -
-    }
-}
-"""
-        return setup + "\n" + content
+    async def execute(self, args: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Execute the tool with the given arguments."""
+        try:
+            # Implement the base execution logic here
+            # This should be overridden by child classes
+            raise NotImplementedError("Tool execution not implemented")
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": str(e)
+            }
 
     def get_args(self) -> List[Arg]:
         """Return the tool's arguments."""
