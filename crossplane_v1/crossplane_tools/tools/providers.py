@@ -461,11 +461,19 @@ EOF
         )
 
 # Register all provider tools
-for tool in [
-    ProviderManager().install_provider(),
-    ProviderManager().configure_provider(),
-    ProviderManager().list_providers(),
-    ProviderManager().get_provider_status(),
-    ProviderManager().uninstall_provider(),
-]:
-    tool_registry.register("crossplane", tool) 
+provider_manager = ProviderManager()
+provider_tools = [
+    provider_manager.install_provider(),
+    provider_manager.configure_provider(),
+    provider_manager.list_providers(),
+    provider_manager.get_provider_status(),
+    provider_manager.uninstall_provider(),
+    provider_manager.apply_provider_resource()
+]
+
+# Register each tool with proper error handling
+for tool in provider_tools:
+    try:
+        tool_registry.register("crossplane", tool)
+    except Exception as e:
+        print(f"Failed to register tool {tool.name}: {str(e)}") 
