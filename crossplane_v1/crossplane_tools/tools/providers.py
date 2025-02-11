@@ -26,13 +26,13 @@ class ProviderManager(CrossplaneTool):
     """Manage Crossplane providers."""
     
     def __init__(self):
-        super().__init__(
-            name="crossplane_provider",
-            description="Manage Crossplane providers and their configurations",
-            content="",
-            args=[],
-            image="bitnami/kubectl:latest",
-            mermaid="""
+        super().__init__(**{
+            "name": "crossplane_provider",
+            "description": "Manage Crossplane providers and their configurations",
+            "content": "",
+            "args": [],
+            "image": "bitnami/kubectl:latest",
+            "mermaid": """
 ```mermaid
 classDiagram
     class CrossplaneTool {
@@ -49,14 +49,14 @@ classDiagram
     note for ProviderManager "Manages Crossplane providers\nand their configurations"
 ```
 """
-        )
+        })
 
     def install_provider(self) -> CrossplaneTool:
         """Install a Crossplane provider."""
-        return CrossplaneTool(
-            name="install_provider",
-            description="Install a Crossplane provider with specific version and configuration",
-            content="""
+        return CrossplaneTool(**{
+            "name": "install_provider",
+            "description": "Install a Crossplane provider with specific version and configuration",
+            "content": """
             if [ -z "$PROVIDER_PACKAGE" ]; then
                 echo "Error: Provider package not specified"
                 exit 1
@@ -93,7 +93,7 @@ EOF
                 kubectl get pods -n crossplane-system -l pkg.crossplane.io/provider=$CLEAN_NAME
             fi
             """,
-            args=[
+            "args": [
                 Arg("provider_package", 
                     description="The provider package to install (e.g., crossplane/provider-aws:v0.24.1)",
                     required=True),
@@ -122,8 +122,8 @@ EOF
                     description="Whether to verify the installation by checking provider status and pods",
                     required=False)
             ],
-            image="bitnami/kubectl:latest"
-        )
+            "image": "bitnami/kubectl:latest"
+        })
 
     def configure_provider(self) -> CrossplaneTool:
         """Configure a Crossplane provider with credentials and settings."""
