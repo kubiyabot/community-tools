@@ -6,13 +6,17 @@ CROSSPLANE_ICON_URL = "https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/c
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
 
-    def __init__(self, name: str, description: str, content: str, args: List[Arg], image: str = "crossplane/crossplane:v1.14.0", mermaid: str = None):
-        self.content = self._add_cluster_context(content)
-        self.args = args
-        self.image = image
-        self.name = name
-        self.description = description
-        self.mermaid = mermaid or """
+    def __init__(self, **data):
+        """Initialize the Crossplane tool."""
+        # Process content if provided
+        if "content" in data:
+            data["content"] = self._add_cluster_context(data["content"])
+        
+        # Set default values
+        data.setdefault("icon_url", CROSSPLANE_ICON_URL)
+        data.setdefault("type", "docker")
+        data.setdefault("image", "crossplane/crossplane:v1.14.0")
+        data.setdefault("mermaid", """
 ```mermaid
 classDiagram
     class Tool {
@@ -37,8 +41,29 @@ classDiagram
     }
     Tool <|-- CrossplaneTool
 ```
-"""
-        super().__init__()
+""")
+        data.setdefault("with_files", [
+            FileSpec(
+                mount_path="/root/.kube",
+                description="Kubernetes configuration directory"
+            ),
+            FileSpec(
+                mount_path="/var/run/secrets/kubernetes.io/serviceaccount",
+                description="Kubernetes service account tokens"
+            ),
+            FileSpec(
+                mount_path="/workspace",
+                description="Workspace directory for temporary files"
+            )
+        ])
+        data.setdefault("env", {
+            "KUBECONFIG": "/root/.kube/config",
+            "KUBERNETES_SERVICE_HOST": "kubernetes.default.svc",
+            "KUBERNETES_SERVICE_PORT": "443"
+        })
+        
+        # Initialize the base Tool class with keyword arguments
+        super().__init__(**data)
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""
