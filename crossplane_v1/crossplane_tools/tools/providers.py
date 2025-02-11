@@ -446,26 +446,29 @@ EOF
 # Register all provider tools
 def register_provider_tools():
     """Register all provider tools with proper error handling."""
+    print("Starting provider tools registration...")
     try:
         provider_manager = ProviderManager()
         provider_tools = [
-            provider_manager.install_provider(),
-            provider_manager.configure_provider(),
-            provider_manager.list_providers(),
-            provider_manager.get_provider_status(),
-            provider_manager.uninstall_provider(),
-            provider_manager.apply_provider_resource()
+            ("install_provider", provider_manager.install_provider()),
+            ("configure_provider", provider_manager.configure_provider()),
+            ("list_providers", provider_manager.list_providers()),
+            ("get_provider_status", provider_manager.get_provider_status()),
+            ("uninstall_provider", provider_manager.uninstall_provider()),
+            ("apply_provider_resource", provider_manager.apply_provider_resource())
         ]
 
         # Register each tool with proper error handling
-        for tool in provider_tools:
+        for tool_name, tool in provider_tools:
             try:
+                print(f"Attempting to register provider tool: {tool_name}")
                 tool_registry.register("crossplane", tool)
-                print(f"Successfully registered provider tool: {tool.name}")
+                print(f"Successfully registered provider tool: {tool_name}")
             except Exception as e:
-                print(f"Failed to register tool {tool.name}: {str(e)}")
+                print(f"Failed to register tool {tool_name}: {str(e)}")
     except Exception as e:
         print(f"Error initializing provider tools: {str(e)}")
+    print("Completed provider tools registration.")
 
 if __name__ == "__main__":
     register_provider_tools() 
