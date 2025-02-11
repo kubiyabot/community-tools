@@ -27,8 +27,8 @@ class ProviderManager(CrossplaneTool):
     
     def __init__(self):
         super().__init__(
-            name="crossplane_provider",
-            description="Manage Crossplane providers and their configurations",
+            name="provider",
+            description="Manage Crossplane providers",
             content="",
             args=[],
             image="bitnami/kubectl:latest"
@@ -37,7 +37,7 @@ class ProviderManager(CrossplaneTool):
     def install_provider(self) -> CrossplaneTool:
         """Install a Crossplane provider."""
         return CrossplaneTool(
-            name="install_provider",
+            name="provider_install",
             description="Install a Crossplane provider with specific version and configuration",
             content="""
             if [ -z "$PROVIDER_PACKAGE" ]; then
@@ -77,31 +77,31 @@ EOF
             fi
             """,
             args=[
-                Arg("provider_package", 
+                Arg(name="provider_package", 
                     description="The provider package to install (e.g., crossplane/provider-aws:v0.24.1)",
                     required=True),
-                Arg("revision_activation_policy",
+                Arg(name="revision_activation_policy",
                     description="RevisionActivationPolicy specifies how the provider controller should handle different revisions (Automatic or Manual)",
                     required=False),
-                Arg("revision_history_limit",
+                Arg(name="revision_history_limit",
                     description="Number of old revisions to retain",
                     required=False),
-                Arg("package_pull_secrets",
+                Arg(name="package_pull_secrets",
                     description="List of secrets required to pull the provider package",
                     required=False),
-                Arg("skip_dependency_resolution",
+                Arg(name="skip_dependency_resolution",
                     description="Whether to skip resolving dependencies",
                     required=False),
-                Arg("annotations",
+                Arg(name="annotations",
                     description="Additional annotations to add to the provider",
                     required=False),
-                Arg("labels",
+                Arg(name="labels",
                     description="Additional labels to add to the provider",
                     required=False),
-                Arg("timeout",
+                Arg(name="timeout",
                     description="Timeout for waiting for provider to be healthy (default: 300s)",
                     required=False),
-                Arg("verify",
+                Arg(name="verify",
                     description="Whether to verify the installation by checking provider status and pods",
                     required=False)
             ],
@@ -111,7 +111,7 @@ EOF
     def configure_provider(self) -> CrossplaneTool:
         """Configure a Crossplane provider with credentials and settings."""
         return CrossplaneTool(
-            name="configure_provider",
+            name="provider_configure",
             description="Configure a Crossplane provider with credentials and settings",
             content="""
             if [ -z "$PROVIDER_NAME" ]; then
@@ -167,37 +167,37 @@ EOF
             fi
             """,
             args=[
-                Arg("provider_name",
+                Arg(name="provider_name",
                     description="Name of the provider (e.g., aws, gcp, azure)",
                     required=True),
-                Arg("credentials",
+                Arg(name="credentials",
                     description="Provider credentials content",
                     required=False),
-                Arg("credentials_file",
+                Arg(name="credentials_file",
                     description="Path to the provider credentials file",
                     required=False),
-                Arg("config_name",
+                Arg(name="config_name",
                     description="Name of the provider configuration (default: default)",
                     required=False),
-                Arg("credentials_source",
+                Arg(name="credentials_source",
                     description="Source of the credentials (Secret, InjectedIdentity, etc.)",
                     required=False),
-                Arg("secret_namespace",
+                Arg(name="secret_namespace",
                     description="Namespace for the credentials secret (default: crossplane-system)",
                     required=False),
-                Arg("secret_name",
+                Arg(name="secret_name",
                     description="Name of the credentials secret (default: provider-secret)",
                     required=False),
-                Arg("secret_key",
+                Arg(name="secret_key",
                     description="Key in the secret for credentials (default: credentials)",
                     required=False),
-                Arg("annotations",
+                Arg(name="annotations",
                     description="Additional annotations for the provider config",
                     required=False),
-                Arg("labels",
+                Arg(name="labels",
                     description="Additional labels for the provider config",
                     required=False),
-                Arg("verify",
+                Arg(name="verify",
                     description="Whether to verify the configuration",
                     required=False)
             ],
@@ -207,7 +207,7 @@ EOF
     def list_providers(self) -> CrossplaneTool:
         """List installed Crossplane providers with detailed information."""
         return CrossplaneTool(
-            name="list_providers",
+            name="provider_list",
             description="List installed Crossplane providers with detailed information",
             content="""
             # Function to format output with emojis
@@ -236,10 +236,10 @@ EOF
             fi
             """,
             args=[
-                Arg("wide_output",
+                Arg(name="wide_output",
                     description="Show additional columns in the output",
                     required=False),
-                Arg("show_details",
+                Arg(name="show_details",
                     description="Show detailed information about each provider",
                     required=False)
             ],
@@ -249,7 +249,7 @@ EOF
     def get_provider_status(self) -> CrossplaneTool:
         """Get detailed status and health information for a specific provider."""
         return CrossplaneTool(
-            name="get_provider_status",
+            name="provider_status",
             description="Get detailed status and health information for a specific provider",
             content="""
             if [ -z "$PROVIDER_NAME" ]; then
@@ -284,19 +284,19 @@ EOF
             fi
             """,
             args=[
-                Arg("provider_name",
+                Arg(name="provider_name",
                     description="Name of the provider to check",
                     required=True),
-                Arg("output_format",
+                Arg(name="output_format",
                     description="Output format (json|yaml|wide)",
                     required=False),
-                Arg("show_events",
+                Arg(name="show_events",
                     description="Show provider events",
                     required=False),
-                Arg("show_resources",
+                Arg(name="show_resources",
                     description="Show managed resources",
                     required=False),
-                Arg("show_health",
+                Arg(name="show_health",
                     description="Show detailed health information",
                     required=False)
             ],
@@ -306,7 +306,7 @@ EOF
     def uninstall_provider(self) -> CrossplaneTool:
         """Uninstall a Crossplane provider and clean up its resources."""
         return CrossplaneTool(
-            name="uninstall_provider",
+            name="provider_uninstall",
             description="Uninstall a Crossplane provider and clean up its resources",
             content="""
             if [ -z "$PROVIDER_NAME" ]; then
@@ -352,19 +352,19 @@ EOF
             fi
             """,
             args=[
-                Arg("provider_name",
+                Arg(name="provider_name",
                     description="Name of the provider to uninstall",
                     required=True),
-                Arg("backup",
+                Arg(name="backup",
                     description="Create backup of provider resources before deletion",
                     required=False),
-                Arg("delete_resources",
+                Arg(name="delete_resources",
                     description="Delete all managed resources before provider removal",
                     required=False),
-                Arg("delete_crds",
+                Arg(name="delete_crds",
                     description="Delete provider CRDs after removal",
                     required=False),
-                Arg("verify",
+                Arg(name="verify",
                     description="Verify provider removal",
                     required=False)
             ],
@@ -374,7 +374,7 @@ EOF
     def apply_provider_resource(self) -> CrossplaneTool:
         """Apply a provider-specific resource or CRD."""
         return CrossplaneTool(
-            name="apply_provider_resource",
+            name="provider_apply_resource",
             description="Apply a provider-specific resource or CRD",
             content="""
             if [ -z "$RESOURCE_CONTENT" ] && [ -z "$RESOURCE_FILE" ]; then
@@ -421,22 +421,22 @@ EOF
             fi
             """,
             args=[
-                Arg("resource_content",
+                Arg(name="resource_content",
                     description="The YAML content of the resource to apply",
                     required=False),
-                Arg("resource_file",
+                Arg(name="resource_file",
                     description="Path to the resource YAML file",
                     required=False),
-                Arg("validate",
+                Arg(name="validate",
                     description="Validate the resource before applying",
                     required=False),
-                Arg("dry_run",
+                Arg(name="dry_run",
                     description="Perform a dry run without actually applying the resource",
                     required=False),
-                Arg("wait",
+                Arg(name="wait",
                     description="Wait for the resource to be ready",
                     required=False),
-                Arg("timeout",
+                Arg(name="timeout",
                     description="Timeout for waiting for resource readiness (default: 300s)",
                     required=False)
             ],
@@ -450,12 +450,12 @@ def register_provider_tools():
     try:
         provider_manager = ProviderManager()
         provider_tools = [
-            ("install_provider", provider_manager.install_provider()),
-            ("configure_provider", provider_manager.configure_provider()),
-            ("list_providers", provider_manager.list_providers()),
-            ("get_provider_status", provider_manager.get_provider_status()),
-            ("uninstall_provider", provider_manager.uninstall_provider()),
-            ("apply_provider_resource", provider_manager.apply_provider_resource())
+            ("provider_install", provider_manager.install_provider()),
+            ("provider_configure", provider_manager.configure_provider()),
+            ("provider_list", provider_manager.list_providers()),
+            ("provider_status", provider_manager.get_provider_status()),
+            ("provider_uninstall", provider_manager.uninstall_provider()),
+            ("provider_apply_resource", provider_manager.apply_provider_resource())
         ]
 
         # Register each tool with proper error handling
