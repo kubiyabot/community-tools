@@ -889,17 +889,9 @@ try:
         uninstall_provider_tool,
         apply_provider_resource_tool
     ]
-    
-    for tool in provider_tools:
-        try:
-    tool_registry.register("crossplane", tool) 
-            print(f"✅ Registered: {tool.name}")
-        except Exception as e:
-            print(f"❌ Failed to register {tool.name}: {str(e)}", file=sys.stderr)
-            raise
 except Exception as e:
-    print(f"❌ Failed to register provider tools: {str(e)}", file=sys.stderr)
-    raise
+    print(f"Error registering provider tools: {str(e)}")
+    
 
 # Export tools
 __all__ = [
