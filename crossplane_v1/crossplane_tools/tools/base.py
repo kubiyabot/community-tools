@@ -74,12 +74,32 @@ class CrossplaneTool(Tool):
             "description": description,
             "content": content,
             "args": args or [],
-            "image": image or self.image,
-            "icon_url": self.icon_url,
-            "type": self.type,
-            "mermaid": self.mermaid,
-            "with_files": self.with_files,
-            "env": self.env
+            "icon_url": CROSSPLANE_ICON_URL,
+            "type": "docker",
+            "image": image or "crossplane/crossplane:v1.14.0",
+            "mermaid": DEFAULT_MERMAID,
+            "with_files": [
+                {
+                    "destination": "/root/.kube/config",
+                    "description": "Kubernetes configuration directory",
+                    "source": "$HOME/.kube/config"
+                },
+                {
+                    "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+                    "description": "Kubernetes service account tokens",
+                    "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+                },
+                {
+                    "destination": "/workspace",
+                    "description": "Workspace directory for temporary files",
+                    "source": "$HOME/workspace"
+                }
+            ],
+            "env": [
+                "KUBECONFIG",
+                "KUBERNETES_SERVICE_HOST",
+                "KUBERNETES_SERVICE_PORT"
+            ]
         }
         
         # Update with any additional kwargs

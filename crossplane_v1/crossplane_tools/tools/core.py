@@ -136,10 +136,10 @@ classDiagram
 
     def debug_mode(self) -> CrossplaneTool:
         """Enable debug mode for Crossplane."""
-        return CrossplaneTool(**{
-            "name": "debug_mode",
-            "description": "Enable debug mode for Crossplane",
-            "content": """
+        return CrossplaneTool(
+            name="debug_mode",
+            description="Enable debug mode for Crossplane",
+            content="""
             echo "=== Enabling Debug Mode ==="
             
             # Update Crossplane deployment to use debug logging
@@ -153,9 +153,9 @@ classDiagram
             
             echo "\\n=== Debug Mode Enabled ==="
             """,
-            "args": [],
-            "image": "bitnami/kubectl:latest"
-        })
+            args=[],
+            image="bitnami/kubectl:latest"
+        )
 
 # Register all core tools
 def register_core_tools():
