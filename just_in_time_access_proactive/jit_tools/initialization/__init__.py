@@ -139,14 +139,19 @@ class EnforcerConfigBuilder:
 
         print(f"📝 Processing configuration: {config}")
 
-        opa_policy = config.get('opa_policy')
         settings.org = os.getenv("KUBIYA_USER_ORG")
         settings.runner = config.get('opa_runner_name')
-        opa_policy_enabled = config.get('opa_policy_enabled')
-        if not opa_policy_enabled or opa_policy_enabled.lower() == 'false':
-            settings.policy = opa_policy
-        else:
+        # Policy generation logic - either from AWS JIT config or use provided OPA policy
+        if config.get('aws_jit_config'):
+            print("📝 Found AWS JIT config, generating policy from template")
             settings.policy = get_opa_policy_template(config)
+        elif config.get('opa_policy'):
+            print("📝 Using provided OPA policy")
+            settings.policy = config.get('opa_policy')
+        else:
+            raise ConfigurationError("Either aws_jit_config or opa_policy must be provided")
+
+        print(f"📝 Final policy set in settings: {settings.policy}")
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint',

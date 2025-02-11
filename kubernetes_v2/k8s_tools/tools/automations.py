@@ -125,59 +125,6 @@ node_status_tool = KubernetesTool(
     args=[],
 )
 
-find_suspicious_errors_tool = KubernetesTool(
-    name="find_suspicious_errors",
-    description="Finds suspicious errors in a specific Kubernetes namespace or across all namespaces if 'all' is provided.",
-    content="""
-    #!/bin/sh
-    set -e
-
-    # Namespace is required and either a specific namespace or 'all' for all namespaces
-    if [ "$namespace" = "all" ]; then
-        echo "🔍 Searching for suspicious errors in all namespaces"
-        namespace_flag="--all-namespaces"
-    else
-        echo "🔍 Searching for suspicious errors in namespace: $namespace"
-        namespace_flag="-n $namespace"
-    fi
-
-    echo "========================================================="
-    kubectl get events $namespace_flag --sort-by=.metadata.creationTimestamp | 
-    grep -E "Error|Failed|CrashLoopBackOff|Evicted|OOMKilled" |
-    tail -n 20 | 
-    awk '{
-        if ($7 ~ /Error/) emoji = "❌";
-        else if ($7 ~ /Failed/) emoji = "💔";
-        else if ($7 ~ /CrashLoopBackOff/) emoji = "🔁";
-        else if ($7 ~ /Evicted/) emoji = "👉";
-        else if ($7 ~ /OOMKilled/) emoji = "💥";
-        else emoji = "⚠️";
-        print "  " emoji " " $0;
-    }'
-
-    echo "\n⚠️  Pods with non-Running status:"
-    kubectl get pods $namespace_flag --field-selector status.phase!=Running | 
-    awk 'NR>1 {
-        status = $3;
-        emoji = "❓";
-        if (status == "Pending") emoji = "⏳";
-        else if (status == "Succeeded") emoji = "🎉";
-        else if (status == "Failed") emoji = "❌";
-        else if (status == "Unknown") emoji = "❔";
-        print "  " emoji " " $0;
-    }'
-    """,
-    args=[
-        Arg(
-            name="namespace",
-            type="str",
-            description="Kubernetes namespace to search for errors. Use 'all' to search in all namespaces.",
-            required=True,
-        ),
-    ],
-)
-
-
 network_policy_analyzer_tool = KubernetesTool(
     name="network_policy_analyzer",
     description="Advanced network policy analyzer with pagination, output limiting and deep inspection capabilities",
@@ -568,7 +515,6 @@ for tool in [
     change_replicas_tool,
     get_resource_events_tool,
     node_status_tool,
-    find_suspicious_errors_tool,
     network_policy_analyzer_tool,
     persistent_volume_usage_tool,
     ingress_analyzer_tool,

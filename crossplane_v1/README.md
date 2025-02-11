@@ -2,7 +2,7 @@
 
 <div align="center">
 
-> 🚀 Empower your infrastructure automation with containerized Crossplane operations through the Kubiya platform.
+> 🚀 Streamline your infrastructure automation with Kubiya-powered Crossplane operations
 
 [![Kubiya Platform](https://img.shields.io/badge/Kubiya-Platform-blue?style=for-the-badge&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAOCAYAAAAfSC3RAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAADASURBVHgBjZLBDcIwEARPCX/cAakg6YB0QEqgA6ACQgWEDkgHpAPoAFcAJUAFrGYtWbKwlGQ/Zn1n786SyZxzEfYKd4uphSunA1rX7dKAzlWQBqbB+bacc1m4wCtFg1GM4RQKLRQXeKNh4Vz/lWjBHw3X+2KmE0+oB+71M0UR1WOwHvzJ0sDgC9xh0lbOLNbk4kUBJXw8ITPU4N+rR7zQwOKXvNDgvP6GpgbOXIQRX+4ZlX4QBPbBxbpV/FV8ARfDSCg/4aaZAAAAAElFTkSuQmCC)](https://chat.kubiya.ai)
 [![Crossplane](https://img.shields.io/badge/Crossplane-Managed-purple?style=for-the-badge&logo=crossplane)](https://crossplane.io)
@@ -173,6 +173,7 @@ from crossplane_tools.tools import CoreOperations
 core = CoreOperations()
 core.install_crossplane()
 
+# Verify installation
 status = core.get_status()
 print(f"Crossplane is {status['state']}")
 ```
@@ -240,4 +241,4 @@ Built with ❤️ by the [Kubiya Community](https://chat.kubiya.ai)
 
 <img src="https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png" width="40" />
 
-</div> 
+</div>
