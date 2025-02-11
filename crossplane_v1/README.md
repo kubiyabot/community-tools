@@ -119,8 +119,22 @@ graph LR
 
 ### 2️⃣ Configure Environment
 
+You can manage your environment variables and secrets in two ways:
+
+1. **Through Kubiya Platform (Recommended)**
+   - Visit [app.kubiya.ai](https://app.kubiya.ai)
+   - Navigate to Secrets Management
+   - Create secrets for your provider credentials:
+     ```
+     AWS_ACCESS_KEY_ID
+     AWS_SECRET_ACCESS_KEY
+     GOOGLE_APPLICATION_CREDENTIALS
+     ```
+   - Assign secret access to your teammate
+
+2. **Local Environment (Alternative)**
 ```bash
-# Required Environment Variables
+# Only if not using Kubiya Secrets Management
 export KUBECONFIG=/path/to/kubeconfig        # Kubernetes credentials
 export AWS_ACCESS_KEY_ID=your-key-id         # If using AWS provider
 export AWS_SECRET_ACCESS_KEY=your-secret-key # If using AWS provider
@@ -129,14 +143,36 @@ export GOOGLE_APPLICATION_CREDENTIALS=...     # If using GCP provider
 
 ### 3️⃣ Start Using
 
+1. **Configure Teammate Runtime**
+   - Visit [app.kubiya.ai](https://app.kubiya.ai)
+   - Navigate to Teammate Settings ⚙️
+   - Configure Runtime Environment:
+     - Set environment variables
+     - Grant access to required secrets
+     - Configure provider-specific settings
+
+2. **Start Interacting**
+   - Visit [chat.kubiya.ai](https://chat.kubiya.ai)
+   - Start a conversation with your configured teammate
+   - Execute Crossplane operations through natural language commands
+
+Example commands:
+```
+"Install Crossplane on my cluster"
+"Set up AWS provider using my configured credentials"
+"Create a new managed resource"
+"Check Crossplane installation status"
+```
+
+Your teammate will handle the underlying operations, automatically using the configured environment and secrets:
 ```python
+# Behind the scenes, your teammate executes operations like:
 from crossplane_tools.tools import CoreOperations
 
-# Initialize and install Crossplane
+# Environment variables and secrets are automatically injected
 core = CoreOperations()
 core.install_crossplane()
 
-# Verify installation
 status = core.get_status()
 print(f"Crossplane is {status['state']}")
 ```
