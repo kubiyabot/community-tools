@@ -26,13 +26,13 @@ class ProviderManager(CrossplaneTool):
     """Manage Crossplane providers."""
     
     def __init__(self):
-        super().__init__(**{
-            "name": "crossplane_provider",
-            "description": "Manage Crossplane providers and their configurations",
-            "content": "",
-            "args": [],
-            "image": "bitnami/kubectl:latest",
-            "mermaid": """
+        super().__init__(
+            name="crossplane_provider",
+            description="Manage Crossplane providers and their configurations",
+            content="",
+            args=[],
+            image="bitnami/kubectl:latest",
+            mermaid="""
 ```mermaid
 classDiagram
     class CrossplaneTool {
@@ -49,14 +49,14 @@ classDiagram
     note for ProviderManager "Manages Crossplane providers\nand their configurations"
 ```
 """
-        })
+        )
 
     def install_provider(self) -> CrossplaneTool:
         """Install a Crossplane provider."""
-        return CrossplaneTool(**{
-            "name": "install_provider",
-            "description": "Install a Crossplane provider with specific version and configuration",
-            "content": """
+        return CrossplaneTool(
+            name="install_provider",
+            description="Install a Crossplane provider with specific version and configuration",
+            content="""
             if [ -z "$PROVIDER_PACKAGE" ]; then
                 echo "Error: Provider package not specified"
                 exit 1
@@ -93,7 +93,7 @@ EOF
                 kubectl get pods -n crossplane-system -l pkg.crossplane.io/provider=$CLEAN_NAME
             fi
             """,
-            "args": [
+            args=[
                 Arg("provider_package", 
                     description="The provider package to install (e.g., crossplane/provider-aws:v0.24.1)",
                     required=True),
@@ -122,15 +122,15 @@ EOF
                     description="Whether to verify the installation by checking provider status and pods",
                     required=False)
             ],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def configure_provider(self) -> CrossplaneTool:
         """Configure a Crossplane provider with credentials and settings."""
-        return CrossplaneTool(**{
-            "name": "configure_provider",
-            "description": "Configure a Crossplane provider with credentials and settings",
-            "content": """
+        return CrossplaneTool(
+            name="configure_provider",
+            description="Configure a Crossplane provider with credentials and settings",
+            content="""
             if [ -z "$PROVIDER_NAME" ]; then
                 echo "Error: Provider name not specified"
                 exit 1
@@ -183,7 +183,7 @@ EOF
                 rm -f $CREDENTIALS_FILE
             fi
             """,
-            "args": [
+            args=[
                 Arg("provider_name",
                     description="Name of the provider (e.g., aws, gcp, azure)",
                     required=True),
@@ -218,15 +218,15 @@ EOF
                     description="Whether to verify the configuration",
                     required=False)
             ],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def list_providers(self) -> CrossplaneTool:
         """List installed Crossplane providers with detailed information."""
-        return CrossplaneTool(**{
-            "name": "list_providers",
-            "description": "List installed Crossplane providers with detailed information",
-            "content": """
+        return CrossplaneTool(
+            name="list_providers",
+            description="List installed Crossplane providers with detailed information",
+            content="""
             # Function to format output with emojis
             format_status() {
                 if [ "$1" = "Healthy" ]; then
@@ -248,43 +248,20 @@ EOF
             if [ "$SHOW_DETAILS" = "true" ]; then
                 echo "\\n=== Provider Details ==="
                 kubectl get providers.pkg.crossplane.io -o json | jq -r '.items[] | "Provider: " + .metadata.name + "\\nStatus: " + (.status.conditions[] | select(.type=="Healthy") | .status) + "\\nPackage: " + .spec.package + "\\n"' | while read -r line; do
-                    if [[ $line =~ ^Status:\ (.*)$ ]]; then
-                        format_status "${BASH_REMATCH[1]}"
-                    else
-                        echo "$line"
-                    fi
+                    echo "$line" | format_status
                 done
             fi
-
-            echo "\\n=== Provider Revisions ==="
-            kubectl get providerrevisions.pkg.crossplane.io
-
-            if [ "$SHOW_CONFIGS" = "true" ]; then
-                echo "\\n=== Provider Configs ==="
-                kubectl get providerconfigs --all-namespaces
-            fi
-
-            if [ "$SHOW_CRDS" = "true" ]; then
-                echo "\\n=== Provider CRDs ==="
-                kubectl get crds -l crossplane.io/provider=provider-* -o custom-columns=NAME:.metadata.name,PROVIDER:.metadata.labels.crossplane\\.io/provider
-            fi
             """,
-            "args": [
+            args=[
                 Arg("wide_output",
-                    description="Show additional details in wide output format",
+                    description="Show additional columns in the output",
                     required=False),
                 Arg("show_details",
                     description="Show detailed information about each provider",
-                    required=False),
-                Arg("show_configs",
-                    description="Show provider configurations",
-                    required=False),
-                Arg("show_crds",
-                    description="Show CRDs installed by providers",
                     required=False)
             ],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def get_provider_status(self) -> CrossplaneTool:
         """Get detailed status and health information for a specific provider."""
