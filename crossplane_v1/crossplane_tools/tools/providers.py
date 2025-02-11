@@ -461,19 +461,25 @@ EOF
         )
 
 # Register all provider tools
-provider_manager = ProviderManager()
-provider_tools = [
-    provider_manager.install_provider(),
-    provider_manager.configure_provider(),
-    provider_manager.list_providers(),
-    provider_manager.get_provider_status(),
-    provider_manager.uninstall_provider(),
-    provider_manager.apply_provider_resource()
-]
+def register_provider_tools():
+    """Register all provider tools with proper error handling."""
+    provider_manager = ProviderManager()
+    provider_tools = [
+        provider_manager.install_provider(),
+        provider_manager.configure_provider(),
+        provider_manager.list_providers(),
+        provider_manager.get_provider_status(),
+        provider_manager.uninstall_provider(),
+        provider_manager.apply_provider_resource()
+    ]
 
-# Register each tool with proper error handling
-for tool in provider_tools:
-    try:
-        tool_registry.register("crossplane", tool)
-    except Exception as e:
-        print(f"Failed to register tool {tool.name}: {str(e)}") 
+    # Register each tool with proper error handling
+    for tool in provider_tools:
+        try:
+            tool_registry.register("crossplane", tool)
+            print(f"Successfully registered provider tool: {tool.name}")
+        except Exception as e:
+            print(f"Failed to register tool {tool.name}: {str(e)}")
+
+# Register the tools when the module is imported
+register_provider_tools() 

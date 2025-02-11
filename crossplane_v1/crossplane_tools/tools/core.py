@@ -158,11 +158,24 @@ classDiagram
         })
 
 # Register all core tools
-for tool in [
-    CoreOperations().install_crossplane(),
-    CoreOperations().uninstall_crossplane(),
-    CoreOperations().get_status(),
-    CoreOperations().version(),
-    CoreOperations().debug_mode(),
-]:
-    tool_registry.register("crossplane", tool) 
+def register_core_tools():
+    """Register all core Crossplane tools with proper error handling."""
+    core_ops = CoreOperations()
+    core_tools = [
+        core_ops.install_crossplane(),
+        core_ops.uninstall_crossplane(),
+        core_ops.get_status(),
+        core_ops.version(),
+        core_ops.debug_mode()
+    ]
+
+    # Register each tool with proper error handling
+    for tool in core_tools:
+        try:
+            tool_registry.register("crossplane", tool)
+            print(f"Successfully registered core tool: {tool.name}")
+        except Exception as e:
+            print(f"Failed to register tool {tool.name}: {str(e)}")
+
+# Register the tools when the module is imported
+register_core_tools() 

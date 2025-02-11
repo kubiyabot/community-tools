@@ -33,6 +33,34 @@ classDiagram
 
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
+    
+    # Define model fields
+    name: str
+    description: str
+    content: str = ""
+    args: List[Arg] = []
+    image: str = "crossplane/crossplane:v1.14.0"
+    icon_url: str = CROSSPLANE_ICON_URL
+    type: str = "docker"
+    mermaid: str = DEFAULT_MERMAID
+    with_files: List[Dict[str, str]] = [
+        {
+            "destination": "/root/.kube/config",
+            "description": "Kubernetes configuration directory",
+            "source": "$HOME/.kube/config"
+        },
+        {
+            "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+            "description": "Kubernetes service account tokens",
+            "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        },
+        {
+            "destination": "/workspace",
+            "description": "Workspace directory for temporary files",
+            "source": "$HOME/workspace"
+        }
+    ]
+    env: List[str] = ["KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]
 
     def __init__(self, name: str, description: str, content: str = "", args: List[Arg] = None, image: str = None, **kwargs):
         """Initialize the Crossplane tool."""
@@ -40,38 +68,18 @@ class CrossplaneTool(Tool):
         if content:
             content = self._add_cluster_context(content)
         
-        # Create the model data
+        # Create the model data with defaults
         model_data = {
             "name": name,
             "description": description,
             "content": content,
             "args": args or [],
-            "icon_url": CROSSPLANE_ICON_URL,
-            "type": "docker",
-            "image": image or "crossplane/crossplane:v1.14.0",
-            "mermaid": DEFAULT_MERMAID,
-            "with_files": [
-                {
-                    "destination": "/root/.kube/config",
-                    "description": "Kubernetes configuration directory",
-                    "source": "$HOME/.kube/config"
-                },
-                {
-                    "destination": "/var/run/secrets/kubernetes.io/serviceaccount/token",
-                    "description": "Kubernetes service account tokens",
-                    "source": "/var/run/secrets/kubernetes.io/serviceaccount/token"
-                },
-                {
-                    "destination": "/workspace",
-                    "description": "Workspace directory for temporary files",
-                    "source": "$HOME/workspace"
-                }
-            ],
-            "env": [
-                "KUBECONFIG",
-                "KUBERNETES_SERVICE_HOST",
-                "KUBERNETES_SERVICE_PORT"
-            ]
+            "image": image or self.image,
+            "icon_url": self.icon_url,
+            "type": self.type,
+            "mermaid": self.mermaid,
+            "with_files": self.with_files,
+            "env": self.env
         }
         
         # Update with any additional kwargs
