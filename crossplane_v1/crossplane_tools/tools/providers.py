@@ -32,6 +32,30 @@ class ProviderManager(CrossplaneTool):
             content="",
             image="bitnami/kubectl:latest"
         )
+        # Register this tool and all provider-specific tools
+        self.register_tools()
+
+    def register_tools(self):
+        """Register all provider tools."""
+        try:
+            # Register the provider manager itself
+            tool_registry.register("crossplane", self)
+            
+            # Register all provider-specific tools
+            tools = [
+                self.install_provider(),
+                self.configure_provider(),
+                self.list_providers(),
+                self.get_provider_status(),
+                self.uninstall_provider(),
+                self.apply_provider_resource()
+            ]
+            
+            for tool in tools:
+                tool_registry.register("crossplane", tool)
+                
+        except Exception as e:
+            print(f"Error registering provider tools: {str(e)}")
 
     def install_provider(self) -> CrossplaneTool:
         """Install a Crossplane provider."""
@@ -442,32 +466,5 @@ EOF
             image="bitnami/kubectl:latest"
         )
 
-# Register all provider tools
-def register_provider_tools():
-    """Register all provider tools with proper error handling."""
-    print("Starting provider tools registration...")
-    try:
-        provider_manager = ProviderManager()
-        provider_tools = [
-            ("provider_install", provider_manager.install_provider()),
-            ("provider_configure", provider_manager.configure_provider()),
-            ("provider_list", provider_manager.list_providers()),
-            ("provider_status", provider_manager.get_provider_status()),
-            ("provider_uninstall", provider_manager.uninstall_provider()),
-            ("provider_apply_resource", provider_manager.apply_provider_resource())
-        ]
-
-        # Register each tool with proper error handling
-        for tool_name, tool in provider_tools:
-            try:
-                print(f"Attempting to register provider tool: {tool_name}")
-                tool_registry.register("crossplane", tool)
-                print(f"Successfully registered provider tool: {tool_name}")
-            except Exception as e:
-                print(f"Failed to register tool {tool_name}: {str(e)}")
-    except Exception as e:
-        print(f"Error initializing provider tools: {str(e)}")
-    print("Completed provider tools registration.")
-
 if __name__ == "__main__":
-    register_provider_tools() 
+    ProviderManager() 

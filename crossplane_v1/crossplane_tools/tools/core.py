@@ -26,13 +26,12 @@ class CoreOperations(CrossplaneTool):
     """Core Crossplane operations."""
     
     def __init__(self):
-        super().__init__(**{
-            "name": "crossplane_core",
-            "description": "Core Crossplane operations",
-            "content": "",
-            "args": [],
-            "image": "bitnami/kubectl:latest",  # Using bitnami's kubectl image for core operations
-            "mermaid": """
+        super().__init__(
+            name="crossplane_core",
+            description="Core Crossplane operations",
+            content="",
+            image="bitnami/kubectl:latest",
+            mermaid="""
 ```mermaid
 classDiagram
     class CrossplaneTool {
@@ -49,7 +48,30 @@ classDiagram
     note for CoreOperations "Manages core Crossplane\ninstallation and operations"
 ```
 """
-        })
+        )
+        # Register this tool and all core tools
+        self.register_tools()
+
+    def register_tools(self):
+        """Register all core tools."""
+        try:
+            # Register the core operations manager itself
+            tool_registry.register("crossplane", self)
+            
+            # Register all core tools
+            tools = [
+                self.install_crossplane(),
+                self.uninstall_crossplane(),
+                self.get_status(),
+                self.version(),
+                self.debug_mode()
+            ]
+            
+            for tool in tools:
+                tool_registry.register("crossplane", tool)
+                
+        except Exception as e:
+            print(f"Error registering core tools: {str(e)}")
 
     def install_crossplane(self) -> CrossplaneTool:
         """Install Crossplane in the cluster."""
@@ -157,25 +179,6 @@ classDiagram
             image="bitnami/kubectl:latest"
         )
 
-# Register all core tools
-def register_core_tools():
-    """Register all core Crossplane tools with proper error handling."""
-    core_ops = CoreOperations()
-    core_tools = [
-        core_ops.install_crossplane(),
-        core_ops.uninstall_crossplane(),
-        core_ops.get_status(),
-        core_ops.version(),
-        core_ops.debug_mode()
-    ]
-
-    # Register each tool with proper error handling
-    for tool in core_tools:
-        try:
-            tool_registry.register("crossplane", tool)
-            print(f"Successfully registered core tool: {tool.name}")
-        except Exception as e:
-            print(f"Failed to register tool {tool.name}: {str(e)}")
-
-# Register the tools when the module is imported
-register_core_tools() 
+# Remove the separate registration function since tools are registered in the class
+if __name__ == "__main__":
+    CoreOperations() 
