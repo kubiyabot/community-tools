@@ -62,19 +62,73 @@ class CrossplaneTool(Tool):
     ]
     env: List[str] = ["KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]
 
-    def __init__(self, **kwargs):
-        """Initialize the Crossplane tool."""
-        # Process content if provided
-        if "content" in kwargs:
-            kwargs["content"] = self._add_cluster_context(kwargs["content"])
+    def __init__(self, name, description, content, args=None, image="crossplane/crossplane:v1.14.0"):
+        # Add helper functions for Crossplane operations
+        setup_content = """
+# Begin helper functions
+{
+    # Function to validate cluster access
+    validate_cluster_access() {
+        if ! kubectl cluster-info &> /dev/null; then
+            echo "Error: Unable to access Kubernetes cluster"
+            exit 1
+        fi
+    }
+
+    # Function to handle errors
+    handle_error() {
+        local exit_code=$?
+        local command=$BASH_COMMAND
+        echo "Error: Command '$command' failed with exit code $exit_code"
+        exit $exit_code
+    }
+
+    # Set error handling
+    set -e
+    trap 'handle_error' ERR
+
+    # Common utility functions
+    get_resource_name() {
+        local yaml_content="$1"
+        echo "$yaml_content" | yq e '.metadata.name' -
+    }
+
+    get_resource_namespace() {
+        local yaml_content="$1"
+        local namespace=$(echo "$yaml_content" | yq e '.metadata.namespace // "default"' -)
+        echo "$namespace"
+    }
+
+    wait_for_resource() {
+        local kind="$1"
+        local name="$2"
+        local namespace="$3"
+        local timeout="${4:-300s}"
         
-        # Set default values
-        defaults = {
-            "icon_url": CROSSPLANE_ICON_URL,
-            "type": "docker",
-            "image": "crossplane/crossplane:v1.14.0",
-            "mermaid": DEFAULT_MERMAID,
-            "with_files": [
+        echo "Waiting for $kind/$name in namespace $namespace to be ready..."
+        kubectl wait --for=condition=ready "$kind/$name" -n "$namespace" --timeout="$timeout"
+    }
+
+    verify_crd_exists() {
+        local crd="$1"
+        if ! kubectl get crd "$crd" &> /dev/null; then
+            echo "Error: CRD $crd not found"
+            exit 1
+        fi
+    }
+}
+"""
+
+        # Initialize the tool with the combined content
+        super().__init__(
+            name=name,
+            description=description,
+            content=setup_content + "\n" + content,
+            args=args or [],
+            image=image,
+            icon_url=CROSSPLANE_ICON_URL,
+            type="docker",
+            with_files=[
                 {
                     "destination": "/root/.kube/config",
                     "description": "Kubernetes configuration directory",
@@ -91,21 +145,12 @@ class CrossplaneTool(Tool):
                     "source": "$HOME/workspace"
                 }
             ],
-            "env": [
+            env=[
                 "KUBECONFIG",
                 "KUBERNETES_SERVICE_HOST",
                 "KUBERNETES_SERVICE_PORT"
-            ],
-            "args": []
-        }
-        
-        # Update defaults with provided values
-        for key, value in defaults.items():
-            if key not in kwargs:
-                kwargs[key] = value
-        
-        # Initialize the parent class
-        super().__init__(**kwargs)
+            ]
+        )
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""

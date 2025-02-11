@@ -4,22 +4,6 @@ from kubiya_sdk.tools.registry import tool_registry
 
 """
 Core Operations Module Structure:
-
-```mermaid
-classDiagram
-    class CrossplaneTool {
-        <<base>>
-    }
-    class CoreOperations {
-        +install_crossplane()
-        +uninstall_crossplane()
-        +get_status()
-        +version()
-        +debug_mode()
-    }
-    CrossplaneTool <|-- CoreOperations
-    note for CoreOperations "Manages core Crossplane\ninstallation and operations"
-```
 """
 
 class CoreOperations(CrossplaneTool):
@@ -75,10 +59,10 @@ classDiagram
 
     def install_crossplane(self) -> CrossplaneTool:
         """Install Crossplane in the cluster."""
-        return CrossplaneTool(**{
-            "name": "install_crossplane",
-            "description": "Install Crossplane in the cluster",
-            "content": """
+        return CrossplaneTool(
+            name="install_crossplane",
+            description="Install Crossplane in the cluster",
+            content="""
             # Add Helm repo and update
             helm repo add crossplane-stable https://charts.crossplane.io/stable
             helm repo update
@@ -96,16 +80,15 @@ classDiagram
             # Wait for Crossplane to be ready
             kubectl wait --for=condition=ready pod -l app=crossplane --namespace crossplane-system --timeout=300s
             """,
-            "args": [],
-            "image": "alpine/helm:3.13.2"  # Using Alpine Helm image for installation
-        })
+            image="alpine/helm:3.13.2"  # Using Alpine Helm image for installation
+        )
 
     def uninstall_crossplane(self) -> CrossplaneTool:
         """Uninstall Crossplane from the cluster."""
-        return CrossplaneTool(**{
-            "name": "uninstall_crossplane",
-            "description": "Uninstall Crossplane from the cluster",
-            "content": """
+        return CrossplaneTool(
+            name="uninstall_crossplane",
+            description="Uninstall Crossplane from the cluster",
+            content="""
             # Uninstall Crossplane release
             helm uninstall crossplane --namespace crossplane-system
             
@@ -113,16 +96,15 @@ classDiagram
             kubectl delete crds --all --namespace crossplane-system
             kubectl delete namespace crossplane-system
             """,
-            "args": [],
-            "image": "alpine/helm:3.13.2"
-        })
+            image="alpine/helm:3.13.2"
+        )
 
     def get_status(self) -> CrossplaneTool:
         """Get Crossplane system status."""
-        return CrossplaneTool(**{
-            "name": "get_status",
-            "description": "Get Crossplane system status",
-            "content": """
+        return CrossplaneTool(
+            name="get_status",
+            description="Get Crossplane system status",
+            content="""
             echo "=== Crossplane Pods Status ==="
             kubectl get pods -n crossplane-system
 
@@ -135,16 +117,15 @@ classDiagram
             echo "\\n=== System Health ==="
             kubectl get events -n crossplane-system --sort-by='.lastTimestamp'
             """,
-            "args": [],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def version(self) -> CrossplaneTool:
         """Get Crossplane version information."""
-        return CrossplaneTool(**{
-            "name": "version",
-            "description": "Get Crossplane version information",
-            "content": """
+        return CrossplaneTool(
+            name="version",
+            description="Get Crossplane version information",
+            content="""
             echo "=== Crossplane Version ==="
             kubectl get deployment crossplane -n crossplane-system -o=jsonpath='{.spec.template.spec.containers[0].image}'
             echo "\\n"
@@ -152,9 +133,8 @@ classDiagram
             echo "=== Helm Chart Version ==="
             helm list -n crossplane-system
             """,
-            "args": [],
-            "image": "alpine/helm:3.13.2"
-        })
+            image="alpine/helm:3.13.2"
+        )
 
     def debug_mode(self) -> CrossplaneTool:
         """Enable debug mode for Crossplane."""
@@ -175,7 +155,6 @@ classDiagram
             
             echo "\\n=== Debug Mode Enabled ==="
             """,
-            args=[],
             image="bitnami/kubectl:latest"
         )
 
