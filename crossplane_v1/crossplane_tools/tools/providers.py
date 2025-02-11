@@ -265,10 +265,10 @@ EOF
 
     def get_provider_status(self) -> CrossplaneTool:
         """Get detailed status and health information for a specific provider."""
-        return CrossplaneTool(**{
-            "name": "get_provider_status",
-            "description": "Get detailed status and health information for a specific provider",
-            "content": """
+        return CrossplaneTool(
+            name="get_provider_status",
+            description="Get detailed status and health information for a specific provider",
+            content="""
             if [ -z "$PROVIDER_NAME" ]; then
                 echo "Error: Provider name not specified"
                 exit 1
@@ -300,7 +300,7 @@ EOF
                 jq -r '.status.conditions[] | "Type: " + .type + "\\nStatus: " + .status + "\\nMessage: " + .message + "\\nLast Transition: " + .lastTransitionTime + "\\n"'
             fi
             """,
-            "args": [
+            args=[
                 Arg("provider_name",
                     description="Name of the provider to check",
                     required=True),
@@ -317,15 +317,15 @@ EOF
                     description="Show detailed health information",
                     required=False)
             ],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def uninstall_provider(self) -> CrossplaneTool:
         """Uninstall a Crossplane provider and clean up its resources."""
-        return CrossplaneTool(**{
-            "name": "uninstall_provider",
-            "description": "Uninstall a Crossplane provider and clean up its resources",
-            "content": """
+        return CrossplaneTool(
+            name="uninstall_provider",
+            description="Uninstall a Crossplane provider and clean up its resources",
+            content="""
             if [ -z "$PROVIDER_NAME" ]; then
                 echo "Error: Provider name not specified"
                 exit 1
@@ -368,7 +368,7 @@ EOF
                 fi
             fi
             """,
-            "args": [
+            args=[
                 Arg("provider_name",
                     description="Name of the provider to uninstall",
                     required=True),
@@ -385,8 +385,8 @@ EOF
                     description="Verify provider removal",
                     required=False)
             ],
-            "image": "bitnami/kubectl:latest"
-        })
+            image="bitnami/kubectl:latest"
+        )
 
     def apply_provider_resource(self) -> CrossplaneTool:
         """Apply a provider-specific resource or CRD."""
