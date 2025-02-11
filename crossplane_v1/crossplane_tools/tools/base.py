@@ -1,6 +1,12 @@
 from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools.registry import tool_registry
 from pydantic import BaseModel
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 CROSSPLANE_ICON_URL = "https://59vlt2wq1mmini0e.public.blob.vercel-storage.com/crossplane-icon-color-05yZ9IQTXjBxS0XxV0pzG7lJhY6boJ.png"
 
@@ -96,7 +102,8 @@ class CrossplaneTool(Tool):
         image: str = "crossplane/crossplane:v1.14.0",
         secrets: Optional[List[Secret]] = None,
         file_specs: Optional[List[FileSpec]] = None,
-        env_vars: Optional[Dict[str, str]] = None
+        env_vars: Optional[Dict[str, str]] = None,
+        auto_register: bool = True
     ):
         super().__init__(
             name=name,
@@ -116,6 +123,33 @@ class CrossplaneTool(Tool):
             file_specs=file_specs or self._default_file_specs(),
             env_vars=env_vars or self._default_env_vars()
         )
+
+        # Auto-register the tool if requested
+        if auto_register:
+            self.register()
+
+    def register(self) -> bool:
+        """Register this tool with the tool registry."""
+        try:
+            tool_registry.register("crossplane", self)
+            logger.info(f"✅ Successfully registered tool: {self.name}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to register tool {self.name}: {str(e)}")
+            return False
+
+    @classmethod
+    def register_tools(cls, tools: List['CrossplaneTool']) -> None:
+        """Register multiple tools with the tool registry."""
+        logger.info(f"Registering {len(tools)} Crossplane tools...")
+        for tool in tools:
+            try:
+                if isinstance(tool, cls):
+                    tool.register()
+                else:
+                    logger.warning(f"Skipping invalid tool type: {type(tool)}")
+            except Exception as e:
+                logger.error(f"Failed to register tool: {str(e)}")
 
     @property
     def tool_config(self) -> CrossplaneToolConfig:
