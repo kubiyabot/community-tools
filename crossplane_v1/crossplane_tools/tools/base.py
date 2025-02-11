@@ -85,6 +85,8 @@ class CrossplaneToolConfig(BaseModel):
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
     
+    config: CrossplaneToolConfig = None
+
     def __init__(
         self,
         name: str,
@@ -96,6 +98,14 @@ class CrossplaneTool(Tool):
         file_specs: Optional[List[FileSpec]] = None,
         env_vars: Optional[Dict[str, str]] = None
     ):
+        super().__init__(
+            name=name,
+            description=description,
+            args=args or [],
+            icon_url=CROSSPLANE_ICON_URL
+        )
+        
+        # Initialize config after parent class
         self.config = CrossplaneToolConfig(
             name=name,
             description=description,
@@ -106,13 +116,55 @@ class CrossplaneTool(Tool):
             file_specs=file_specs or self._default_file_specs(),
             env_vars=env_vars or self._default_env_vars()
         )
-        
-        super().__init__(
-            name=name,
-            description=description,
-            args=args or [],
-            icon_url=CROSSPLANE_ICON_URL
-        )
+
+    @property
+    def tool_config(self) -> CrossplaneToolConfig:
+        """Get the tool configuration."""
+        if self.config is None:
+            self.config = CrossplaneToolConfig(
+                name=self.name,
+                description=self.description,
+                args=self.args,
+                icon_url=self.icon_url
+            )
+        return self.config
+
+    def get_args(self) -> List[Arg]:
+        """Return the tool's arguments."""
+        return self.tool_config.args
+
+    def get_content(self) -> str:
+        """Return the tool's content."""
+        return self.tool_config.content
+
+    def get_image(self) -> str:
+        """Return the tool's Docker image."""
+        return self.tool_config.image
+
+    def get_secrets(self) -> List[Secret]:
+        """Return the tool's secrets."""
+        return self.tool_config.secrets
+
+    def get_file_specs(self) -> List[FileSpec]:
+        """Return the tool's file specifications."""
+        return self.tool_config.file_specs
+
+    def get_env_vars(self) -> Dict[str, str]:
+        """Return the tool's environment variables."""
+        return self.tool_config.env_vars
+
+    def validate_args(self, args: Dict[str, Any]) -> bool:
+        """Validate the provided arguments."""
+        if not args:
+            return not any(arg.required for arg in self.tool_config.args)
+        return all(arg.name in args for arg in self.tool_config.args if arg.required)
+
+    def get_error_message(self, args: Dict[str, Any]) -> str:
+        """Return error message if arguments are invalid."""
+        missing = [arg.name for arg in self.tool_config.args if arg.required and arg.name not in args]
+        if missing:
+            return f"Missing required arguments: {', '.join(missing)}"
+        return "Invalid arguments provided"
 
     def _default_file_specs(self) -> List[FileSpec]:
         """Return default file specifications."""
@@ -154,47 +206,44 @@ class CrossplaneTool(Tool):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-    def validate_args(self, args: Dict[str, Any]) -> bool:
-        """Validate the provided arguments."""
-        if not args:
-            return not any(arg.required for arg in self.config.args)
-        return all(arg.name in args for arg in self.config.args if arg.required)
-
-    def get_error_message(self, args: Dict[str, Any]) -> str:
-        """Return error message if arguments are invalid."""
-        missing = [arg.name for arg in self.config.args if arg.required and arg.name not in args]
-        if missing:
-            return f"Missing required arguments: {', '.join(missing)}"
-        return "Invalid arguments provided"
-
-    def get_content(self) -> str:
-        """Return the tool's content."""
-        return self.config.content
-
-    def get_image(self) -> str:
-        """Return the tool's Docker image."""
-        return self.config.image
-
-    def get_secrets(self) -> List[Secret]:
-        """Return the tool's secrets."""
-        return self.config.secrets
-
-    def get_file_specs(self) -> List[FileSpec]:
-        """Return the tool's file specifications."""
-        return self.config.file_specs
-
-    def get_env_vars(self) -> Dict[str, str]:
-        """Return the tool's environment variables."""
-        return self.config.env_vars
-
     def get_provider_config(self, provider_name: str) -> Dict[str, Any]:
         """Get provider configuration from dynamic config."""
         try:
             from kubiya_sdk.tools.registry import tool_registry
-            config = tool_registry.dynamic_config.get("crossplane", {}).get("providers", {}).get(provider_name, {})
-            return {**DEFAULT_CONFIG.get(provider_name, {}), **config}
+            dynamic_config = tool_registry.dynamic_config or {}
+            
+            # Get provider configuration from dynamic config
+            provider_config = (
+                dynamic_config
+                .get("crossplane", {})
+                .get("providers", {})
+                .get(provider_name, {})
+            )
+            
+            # Get default configuration
+            default_config = DEFAULT_CONFIG["providers"].get(provider_name, {})
+            
+            # Merge configurations
+            return {
+                "enabled": provider_config.get("enabled", default_config.get("enabled", True)),
+                "sync_all": provider_config.get("sync_all", default_config.get("sync_all", True)),
+                "include": provider_config.get("include", default_config.get("include", [])),
+                "exclude": provider_config.get("exclude", default_config.get("exclude", [])),
+                "secrets": provider_config.get("secrets", default_config.get("secrets", []))
+            }
         except Exception as e:
-            return DEFAULT_CONFIG.get(provider_name, {})
+            # Log error and return default configuration
+            print(f"Error getting provider configuration: {str(e)}")
+            return DEFAULT_CONFIG["providers"].get(provider_name, {})
+
+    def get_dynamic_config(self) -> Dict[str, Any]:
+        """Get the complete dynamic configuration."""
+        try:
+            from kubiya_sdk.tools.registry import tool_registry
+            return tool_registry.dynamic_config or {}
+        except Exception as e:
+            print(f"Error getting dynamic configuration: {str(e)}")
+            return {}
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context to the tool content."""
