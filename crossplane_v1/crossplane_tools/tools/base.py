@@ -43,8 +43,66 @@ classDiagram
         self.image = image
 
     def _add_cluster_context(self, content: str) -> str:
-        """Add cluster context setup to the shell script content."""
-        context_setup = """
+        """Add cluster context setup and dependency installation to the shell script content."""
+        setup = """
+# Install required dependencies
+install_dependencies() {
+    echo "Installing required dependencies..."
+    
+    # Install kubectl if not present
+    if ! command -v kubectl &> /dev/null; then
+        echo "Installing kubectl..."
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        mv kubectl /usr/local/bin/
+    fi
+
+    # Install helm if not present
+    if ! command -v helm &> /dev/null; then
+        echo "Installing helm..."
+        curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        chmod 700 get_helm.sh
+        ./get_helm.sh
+        rm get_helm.sh
+    fi
+
+    # Install yq if not present
+    if ! command -v yq &> /dev/null; then
+        echo "Installing yq..."
+        wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+        chmod +x /usr/local/bin/yq
+    fi
+
+    # Install jq if not present
+    if ! command -v jq &> /dev/null; then
+        echo "Installing jq..."
+        apt-get update && apt-get install -y jq
+    fi
+}
+
+# Function to validate cluster access
+validate_cluster_access() {
+    if ! kubectl cluster-info &> /dev/null; then
+        echo "Error: Unable to access Kubernetes cluster"
+        exit 1
+    fi
+}
+
+# Function to handle errors
+handle_error() {
+    local exit_code=$?
+    local command=$BASH_COMMAND
+    echo "Error: Command '$command' failed with exit code $exit_code"
+    exit $exit_code
+}
+
+# Set error handling
+set -e
+trap 'handle_error' ERR
+
+# Install dependencies
+install_dependencies
+
 # Set up Kubernetes configuration for in-cluster access
 if [ -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
     echo "Running in-cluster, setting up Kubernetes configuration..."
@@ -60,18 +118,41 @@ if [ -f /var/run/secrets/kubernetes.io/serviceaccount/token ]; then
     kubectl config use-context in-cluster
 fi
 
-# Function to handle errors
-handle_error() {
-    echo "Error: $1"
-    exit 1
+# Validate cluster access
+validate_cluster_access
+
+# Common utility functions
+get_resource_name() {
+    local yaml_content="$1"
+    echo "$yaml_content" | yq e '.metadata.name' -
 }
 
-# Set error handling
-set -e
-trap 'handle_error "Command failed: $BASH_COMMAND"' ERR
+get_resource_namespace() {
+    local yaml_content="$1"
+    local namespace=$(echo "$yaml_content" | yq e '.metadata.namespace // "default"' -)
+    echo "$namespace"
+}
+
+wait_for_resource() {
+    local kind="$1"
+    local name="$2"
+    local namespace="$3"
+    local timeout="${4:-300s}"
+    
+    echo "Waiting for $kind/$name in namespace $namespace to be ready..."
+    kubectl wait --for=condition=ready "$kind/$name" -n "$namespace" --timeout="$timeout"
+}
+
+verify_crd_exists() {
+    local crd="$1"
+    if ! kubectl get crd "$crd" &> /dev/null; then
+        echo "Error: CRD $crd not found"
+        exit 1
+    fi
+}
 
 """
-        return context_setup + content
+        return setup + content
 
     def get_args(self) -> List[Arg]:
         """Return the tool's arguments."""
