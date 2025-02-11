@@ -73,9 +73,8 @@ class CrossplaneTool(Tool):
         # Update with provided data
         model_data.update(data)
         
-        # Initialize using Pydantic's model_validate
-        validated_data = Tool.model_validate(model_data)
-        super().__init__(**validated_data.model_dump())
+        # Initialize the parent class directly with the model data
+        super().__init__(**model_data)
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""
