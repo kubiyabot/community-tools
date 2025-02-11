@@ -30,7 +30,6 @@ class ProviderManager(CrossplaneTool):
             name="provider",
             description="Manage Crossplane providers",
             content="",
-            args=[],
             image="bitnami/kubectl:latest"
         )
 

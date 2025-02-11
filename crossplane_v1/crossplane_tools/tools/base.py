@@ -62,21 +62,17 @@ class CrossplaneTool(Tool):
     ]
     env: List[str] = ["KUBECONFIG", "KUBERNETES_SERVICE_HOST", "KUBERNETES_SERVICE_PORT"]
 
-    def __init__(self, name: str, description: str, content: str = "", args: List[Arg] = None, image: str = None, **kwargs):
+    def __init__(self, **kwargs):
         """Initialize the Crossplane tool."""
         # Process content if provided
-        if content:
-            content = self._add_cluster_context(content)
+        if "content" in kwargs:
+            kwargs["content"] = self._add_cluster_context(kwargs["content"])
         
-        # Create the model data with defaults
-        model_data = {
-            "name": name,
-            "description": description,
-            "content": content,
-            "args": args or [],
+        # Set default values
+        defaults = {
             "icon_url": CROSSPLANE_ICON_URL,
             "type": "docker",
-            "image": image or "crossplane/crossplane:v1.14.0",
+            "image": "crossplane/crossplane:v1.14.0",
             "mermaid": DEFAULT_MERMAID,
             "with_files": [
                 {
@@ -99,14 +95,17 @@ class CrossplaneTool(Tool):
                 "KUBECONFIG",
                 "KUBERNETES_SERVICE_HOST",
                 "KUBERNETES_SERVICE_PORT"
-            ]
+            ],
+            "args": []
         }
         
-        # Update with any additional kwargs
-        model_data.update(kwargs)
+        # Update defaults with provided values
+        for key, value in defaults.items():
+            if key not in kwargs:
+                kwargs[key] = value
         
-        # Initialize the parent class with the model data
-        super().__init__(**model_data)
+        # Initialize the parent class
+        super().__init__(**kwargs)
 
     def _add_cluster_context(self, content: str) -> str:
         """Add cluster context setup and dependency installation to the shell script content."""
