@@ -34,17 +34,21 @@ classDiagram
 class CrossplaneTool(Tool):
     """Base class for all Crossplane tools."""
 
-    def __init__(self, **data):
+    def __init__(self, name: str, description: str, content: str = "", args: List[Arg] = None, image: str = None, **kwargs):
         """Initialize the Crossplane tool."""
         # Process content if provided
-        if "content" in data:
-            data["content"] = self._add_cluster_context(data["content"])
+        if content:
+            content = self._add_cluster_context(content)
         
         # Create the model data
         model_data = {
+            "name": name,
+            "description": description,
+            "content": content,
+            "args": args or [],
             "icon_url": CROSSPLANE_ICON_URL,
             "type": "docker",
-            "image": "crossplane/crossplane:v1.14.0",
+            "image": image or "crossplane/crossplane:v1.14.0",
             "mermaid": DEFAULT_MERMAID,
             "with_files": [
                 {
@@ -70,10 +74,10 @@ class CrossplaneTool(Tool):
             ]
         }
         
-        # Update with provided data
-        model_data.update(data)
+        # Update with any additional kwargs
+        model_data.update(kwargs)
         
-        # Initialize the parent class directly with the model data
+        # Initialize the parent class with the model data
         super().__init__(**model_data)
 
     def _add_cluster_context(self, content: str) -> str:
