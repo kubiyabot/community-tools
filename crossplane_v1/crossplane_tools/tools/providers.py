@@ -466,5 +466,15 @@ EOF
             image="bitnami/kubectl:latest"
         )
 
+# Register tools when module is imported
+__all__ = [
+    'install_provider',
+    'configure_provider',
+    'list_providers',
+    'get_provider_status',
+    'uninstall_provider',
+    'apply_provider_resource'
+]
+
 if __name__ == "__main__":
     ProviderManager() 

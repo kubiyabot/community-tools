@@ -158,6 +158,15 @@ classDiagram
             image="bitnami/kubectl:latest"
         )
 
+# Register tools when module is imported
+__all__ = [
+    'install_crossplane',
+    'uninstall_crossplane',
+    'get_status',
+    'version',
+    'debug_mode'
+]
+
 # Remove the separate registration function since tools are registered in the class
 if __name__ == "__main__":
     CoreOperations() 
