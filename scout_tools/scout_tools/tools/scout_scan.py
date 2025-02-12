@@ -38,55 +38,6 @@ def create_aws_scan_tool():
                 type="str",
                 description="Comma-separated list of services to exclude from the scan",
                 required=False
-            ),
-            # New authentication arguments
-            Arg(
-                name="aws_profile",
-                type="str",
-                description="AWS profile name to use from credentials file",
-                required=False
-            ),
-            Arg(
-                name="aws_access_key_id",
-                type="str",
-                description="AWS access key ID for direct authentication",
-                required=False
-            ),
-            Arg(
-                name="aws_secret_access_key",
-                type="str",
-                description="AWS secret access key for direct authentication",
-                required=False
-            ),
-            Arg(
-                name="aws_session_token",
-                type="str",
-                description="AWS session token for temporary credentials",
-                required=False
-            ),
-            Arg(
-                name="assume_role_arn",
-                type="str",
-                description="ARN of IAM role to assume",
-                required=False
-            ),
-            Arg(
-                name="mfa_serial",
-                type="str",
-                description="MFA device serial number for authentication",
-                required=False
-            ),
-            Arg(
-                name="mfa_token",
-                type="str",
-                description="MFA token code",
-                required=False
-            ),
-            Arg(
-                name="credentials_file",
-                type="str",
-                description="Path to AWS credentials file (default: ~/.aws/credentials)",
-                required=False
             )
         ],
         content="""
@@ -110,42 +61,8 @@ from ScoutSuite.providers.aws.provider import AWSProvider
 
 def get_session():
     """Create AWS session with appropriate credentials"""
-    session_kwargs = {}
-    
-    # Direct credentials take precedence
-    if os.getenv('AWS_ACCESS_KEY_ID') and os.getenv('AWS_SECRET_ACCESS_KEY'):
-        session_kwargs.update({
-            'aws_access_key_id': os.getenv('AWS_ACCESS_KEY_ID'),
-            'aws_secret_access_key': os.getenv('AWS_SECRET_ACCESS_KEY'),
-            'aws_session_token': os.getenv('AWS_SESSION_TOKEN')
-        })
-    
-    # Create initial session
-    session = boto3.Session(**session_kwargs)
-    
-    # Handle role assumption if specified
-    if os.getenv('ASSUME_ROLE_ARN'):
-        sts = session.client('sts')
-        assume_role_kwargs = {
-            'RoleArn': os.getenv('ASSUME_ROLE_ARN'),
-            'RoleSessionName': 'ScoutSuite'
-        }
-        
-        # Add MFA if specified
-        if os.getenv('MFA_SERIAL') and os.getenv('MFA_TOKEN'):
-            assume_role_kwargs.update({
-                'SerialNumber': os.getenv('MFA_SERIAL'),
-                'TokenCode': os.getenv('MFA_TOKEN')
-            })
-            
-        credentials = sts.assume_role(**assume_role_kwargs)['Credentials']
-        session = boto3.Session(
-            aws_access_key_id=credentials['AccessKeyId'],
-            aws_secret_access_key=credentials['SecretAccessKey'],
-            aws_session_token=credentials['SessionToken']
-        )
-    
-    return session
+    # Use the default session which will use the AWS_PROFILE environment variable
+    return boto3.Session()
 
 def run_scout():
     parser = ScoutSuiteArgumentParser()
@@ -174,37 +91,8 @@ EOL
 
 chmod +x /opt/scout.py
 
-# Set up AWS credentials environment
-if [ ! -z "{{.aws_access_key_id}}" ] && [ ! -z "{{.aws_secret_access_key}}" ]; then
-    export AWS_ACCESS_KEY_ID="{{.aws_access_key_id}}"
-    export AWS_SECRET_ACCESS_KEY="{{.aws_secret_access_key}}"
-    if [ ! -z "{{.aws_session_token}}" ]; then
-        export AWS_SESSION_TOKEN="{{.aws_session_token}}"
-    fi
-fi
-
-if [ ! -z "{{.assume_role_arn}}" ]; then
-    export ASSUME_ROLE_ARN="{{.assume_role_arn}}"
-fi
-
-if [ ! -z "{{.mfa_serial}}" ] && [ ! -z "{{.mfa_token}}" ]; then
-    export MFA_SERIAL="{{.mfa_serial}}"
-    export MFA_TOKEN="{{.mfa_token}}"
-fi
-
-# Configure AWS credentials file if specified
-if [ ! -z "{{.credentials_file}}" ]; then
-    mkdir -p ~/.aws
-    cp "{{.credentials_file}}" ~/.aws/credentials
-fi
-
 # Build Scout command
 SCOUT_CMD="/opt/scout.py aws"
-
-# Add AWS profile if specified
-if [ ! -z "{{.aws_profile}}" ]; then
-    export AWS_PROFILE="{{.aws_profile}}"
-fi
 
 # Add services if specified
 if [ ! -z "{{.services}}" ]; then
