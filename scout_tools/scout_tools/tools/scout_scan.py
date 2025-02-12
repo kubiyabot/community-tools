@@ -87,7 +87,7 @@ def create_aws_scan_tool():
                 type="str",
                 description="Path to AWS credentials file (default: ~/.aws/credentials)",
                 required=False
-            ),
+            )
         ],
         content="""
 #!/bin/bash
