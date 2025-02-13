@@ -132,8 +132,8 @@ cluster_insights_tool = KubernetesTool(
 
 # Register all tools
 for tool in [
-    resource_usage_tool,
+    # resource_usage_tool,
     cluster_health_tool,
-    cluster_insights_tool,
+    # cluster_insights_tool,
 ]:
     tool_registry.register("kubernetes", tool)

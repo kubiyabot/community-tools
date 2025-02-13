@@ -236,6 +236,6 @@ cluster_housekeeping_tool = KubernetesTool(
 )
 
 
-# Register tools
-for tool in [manifest_apply_tool, cluster_housekeeping_tool]:
-    tool_registry.register("kubernetes", tool) 
+# # Register tools
+# for tool in [manifest_apply_tool, cluster_housekeeping_tool]:
+#     tool_registry.register("kubernetes", tool)
