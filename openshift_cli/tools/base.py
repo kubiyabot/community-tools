@@ -1,9 +1,10 @@
-from kubiya_sdk.tools.models import Tool, Arg
-from pydantic import HttpUrl
 from typing import Optional
 
-AUDI_LOGO_URL = HttpUrl(
-    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ3jLdiRIffyVvYjJSgZqFzc73YJSfqcRbR6Q&s"
+from kubiya_sdk.tools.models import Arg, Tool
+from pydantic import HttpUrl
+
+OPENSHIFT_LOGO = HttpUrl(
+    "https://dwglogo.com/wp-content/uploads/2017/11/2200px_OpenShift_logo.png"
 )
 
 COMMON_ENVS = [
@@ -61,7 +62,7 @@ fi
         super().__init__(
             name=name,
             description=description,
-            icon_url=AUDI_LOGO_URL,
+            icon_url=OPENSHIFT_LOGO,
             type="docker",
             image="openshift/origin-cli:latest",
             content=content,
