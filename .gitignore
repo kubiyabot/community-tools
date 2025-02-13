@@ -2,3 +2,6 @@
 github/prompts
 /scratch
 .idea
+uv.lock
+pyproject.toml
+.python-version

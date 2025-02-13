@@ -93,9 +93,9 @@ pv_list_tool = KubernetesTool(
     ],
 )
 
-for tool in [
-    pv_management_tool,
-    pv_describe_tool,
-    pv_list_tool,
-]:
-    tool_registry.register("kubernetes", tool)
+# for tool in [
+#     pv_management_tool,
+#     pv_describe_tool,
+#     pv_list_tool,
+# ]:
+#     tool_registry.register("kubernetes", tool)

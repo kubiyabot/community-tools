@@ -95,9 +95,9 @@ cluster_health_tool = KubernetesTool(
     args=[],
 )
 
-# Register all tools
-for tool in [
-    resource_usage_tool,
-    cluster_health_tool,
-]:
-    tool_registry.register("kubernetes", tool)
+# # Register all tools
+# for tool in [
+#     resource_usage_tool,
+#     cluster_health_tool,
+# ]:
+#     tool_registry.register("kubernetes", tool)

@@ -70,7 +70,7 @@ check_pod_restarts_tool = KubernetesTool(
 
 # Register all tools
 for tool in [
-    pod_management_tool,
+    # pod_management_tool,
     check_pod_restarts_tool,
 ]:
     tool_registry.register("kubernetes", tool)
