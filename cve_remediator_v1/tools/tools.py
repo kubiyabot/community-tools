@@ -1,7 +1,8 @@
 import inspect
 from kubiya_sdk.tools import Arg, FileSpec
-from tools import get_remediation, get_cve_info
 from tools.base import CVETool, register_cve_tool
+import tools.get_remediation as get_remediation_module
+import tools.get_cve_info as get_cve_info_module
 
 
 cve_info_tool = CVETool(
@@ -14,7 +15,7 @@ cve_info_tool = CVETool(
     with_files=[
         FileSpec(
             destination="/tmp/get_cve_info.py",
-            content=inspect.getsource(get_cve_info),
+            content=inspect.getsource(get_cve_info_module),
         ),
     ]
 )
@@ -29,7 +30,7 @@ cve_remediation_tool = CVETool(
     with_files=[
         FileSpec(
             destination="/tmp/get_remediation.py",
-            content=inspect.getsource(get_remediation),
+            content=inspect.getsource(get_remediation_module),
         ),
     ]
 )
