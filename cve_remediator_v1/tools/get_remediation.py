@@ -2,45 +2,35 @@ import requests
 from typing import List
 
 def get_remediation_info(cve_ids: List[str]) -> dict:
-    # Using OSV (Open Source Vulnerabilities) database
-    OSV_API_URL = "https://api.osv.dev/v1/query"
+    # Using OSV (Open Source Vulnerabilities) database direct vulnerability lookup
+    OSV_API_URL = "https://api.osv.dev/v1/vulns"
     
     results = {}
     for cve_id in cve_ids:
         try:
-            payload = {
-                "query": {
-                    "package": {},
-                    "ecosystem": "cve",
-                    "version": "",
-                    "id": cve_id
-                }
+            # Direct vulnerability lookup
+            response = requests.get(f"{OSV_API_URL}/{cve_id}")
+            response.raise_for_status()
+            vuln = response.json()
+            
+            results[cve_id] = {
+                'affected_versions': [affected.get('package', {}).get('name') for affected in vuln.get('affected', [])],
+                'fixed_versions': [],
+                'recommendations': []
             }
             
-            response = requests.post(OSV_API_URL, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            
-            if data.get('vulns'):
-                vuln = data['vulns'][0]
-                results[cve_id] = {
-                    'affected_versions': [affected.get('package', {}).get('name') for affected in vuln.get('affected', [])],
-                    'fixed_versions': [],
-                    'recommendations': []
-                }
+            # Extract fixed versions and recommendations
+            for affected in vuln.get('affected', []):
+                for ranges in affected.get('ranges', []):
+                    if ranges.get('type') == 'GIT':
+                        for event in ranges.get('events', []):
+                            if event.get('fixed'):
+                                results[cve_id]['fixed_versions'].append(event.get('fixed'))
                 
-                # Extract fixed versions and recommendations
-                for affected in vuln.get('affected', []):
-                    for ranges in affected.get('ranges', []):
-                        if ranges.get('type') == 'GIT':
-                            for event in ranges.get('events', []):
-                                if event.get('fixed'):
-                                    results[cve_id]['fixed_versions'].append(event.get('fixed'))
-                    
-                    if affected.get('database_specific', {}).get('solution'):
-                        results[cve_id]['recommendations'].append(
-                            affected['database_specific']['solution']
-                        )
+                if affected.get('database_specific', {}).get('solution'):
+                    results[cve_id]['recommendations'].append(
+                        affected['database_specific']['solution']
+                    )
             
         except Exception as e:
             results[cve_id] = {

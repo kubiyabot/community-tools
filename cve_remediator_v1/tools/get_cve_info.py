@@ -34,3 +34,38 @@ def get_cve_info(cve_id: str) -> dict:
     except Exception as e:
         print(f"Error: Failed to fetch CVE data: {str(e)}")
         raise RuntimeError(f"Failed to fetch CVE data: {str(e)}")
+
+def main():
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python get_cve_info.py CVE-ID")
+        sys.exit(1)
+    
+    cve_id = sys.argv[1]
+    
+    try:
+        cve_info = get_cve_info(cve_id)
+        
+        print(f"\nCVE Information for {cve_id}:")
+        print(f"Published: {cve_info['published']}")
+        print(f"Last Modified: {cve_info['lastModified']}")
+        print(f"\nDescription:")
+        print(cve_info['description'])
+        
+        if cve_info['metrics']:
+            print("\nCVSS Metrics:")
+            for key, value in cve_info['metrics'].items():
+                print(f"- {key}: {value}")
+        
+        if cve_info['references']:
+            print("\nReferences:")
+            for ref in cve_info['references']:
+                print(f"- {ref}")
+                
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
