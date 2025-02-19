@@ -1,11 +1,7 @@
 import inspect
 from kubiya_sdk.tools import Arg, FileSpec
-from base import CVETool, register_cve_tool
 from tools import get_remediation, get_cve_info
-
-import requests
-
-NVDB_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+from tools.base import CVETool, register_cve_tool
 
 
 cve_info_tool = CVETool(
@@ -13,7 +9,7 @@ cve_info_tool = CVETool(
     description="Get detailed information about a specific CVE",
     content="""python /tmp/get_cve_info.py "{{ .cve_id }}" """,
     args=[
-        Arg(name="cve_id", type="str", description="CVE ID (e.g., CVE-2021-44228)", required=True),
+        Arg(name="cve_id", description="CVE ID (e.g., CVE-2021-44228)", required=True),
     ],
     with_files=[
         FileSpec(
@@ -28,7 +24,7 @@ cve_remediation_tool = CVETool(
     description="Get remediation steps for a list of CVEs",
     content="""python /tmp/get_remediation.py "{{ .cve_ids }}" """,
     args=[
-        Arg(name="cve_ids", type="str", description="Comma-separated list of CVE IDs", required=True),
+        Arg(name="cve_ids", description="Comma-separated list of CVE IDs", required=True),
     ],
     with_files=[
         FileSpec(
