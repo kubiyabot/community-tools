@@ -2,7 +2,7 @@ import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, transition_issue
 
 
 class BaseCreationIssueTool(JiraPythonTool):
@@ -128,6 +128,25 @@ add_comment_issue_tool = JiraPythonTool(
         )
     ])
 
+transition_issue_tool = JiraPythonTool(
+    name="issue_transition",
+    description="Transition a Jira issue to a different status",
+    content="""python /tmp/transition_issue.py "{{ .issue_key }}" "{{ .transition }}" """,
+    args=[
+        Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
+        Arg(name="transition", type="str", description="Name of the transition (e.g., 'Done')", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/transition_issue.py",
+            content=inspect.getsource(transition_issue),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 [
     register_jira_tool(tool) for tool in [
         create_task_tool,
@@ -137,6 +156,7 @@ add_comment_issue_tool = JiraPythonTool(
         create_story_tool,
         view_issue_tool,
         list_issue_tool,
-        add_comment_issue_tool
+        add_comment_issue_tool,
+        transition_issue_tool
     ]
 ]
