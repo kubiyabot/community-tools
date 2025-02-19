@@ -23,14 +23,14 @@ def get_cve_info(cve_id: str) -> dict:
             
         vuln = data['vulnerabilities'][0]['cve']
         
-        return {
+        print ({
             'id': vuln.get('id'),
             'published': vuln.get('published'),
             'lastModified': vuln.get('lastModified'),
             'description': vuln.get('descriptions', [{}])[0].get('value', 'No description available'),
             'metrics': vuln.get('metrics', {}).get('cvssMetricV31', [{}])[0].get('cvssData', {}),
             'references': [ref.get('url') for ref in vuln.get('references', [])]
-        }
+        })
         
     except requests.exceptions.RequestException as e:
         print(f"Error: Failed to fetch CVE data: {str(e)}")
