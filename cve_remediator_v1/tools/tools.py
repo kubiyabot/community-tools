@@ -8,6 +8,7 @@ import requests
 NVDB_API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
 def get_cve_info(cve_id: str) -> dict:
+    print(f"Fetching CVE info for: {cve_id}")
     params = {
         "cveId": cve_id
     }
