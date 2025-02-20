@@ -4,7 +4,7 @@ from kubiya_sdk.tools import Tool, Arg, FileSpec
 KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 
 class KubernetesTool(Tool):
-    def __init__(self, name, description, content, args, image="bitnami/kubectl:latest"):
+    def __init__(self, name, description, content, args, image="d3fk/kubectl:latest"):
         inject_kubernetes_context = """
 set -eu
 TOKEN_LOCATION="/tmp/kubernetes_context_token"
