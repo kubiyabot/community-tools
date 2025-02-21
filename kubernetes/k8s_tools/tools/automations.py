@@ -15,8 +15,12 @@ find_resource_tool = KubernetesTool(
     field_selector=${field_selector:-}
     search_term=${search_term:-}
 
-    # Use --all-namespaces if no specific namespace is provided
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Use --all-namespaces only if no namespace is provided
+    if [ -z "$namespace" ]; then
+        namespace_flag="--all-namespaces"
+    else
+        namespace_flag="-n $namespace"
+    fi
 
     # Run kubectl command and filter by search_term if provided
     result=$(kubectl get $resource_type $namespace_flag \
