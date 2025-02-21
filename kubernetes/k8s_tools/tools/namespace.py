@@ -27,4 +27,4 @@ namespace_tool = KubernetesTool(
     args=[],  # No arguments needed since this tool has a single purpose
 )
 
-tool_registry.register("kubernetes", namespace_tool)
+# tool_registry.register("kubernetes", namespace_tool)

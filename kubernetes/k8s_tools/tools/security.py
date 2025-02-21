@@ -314,14 +314,14 @@ full_security_scan_tool = KubernetesTool(
         Arg(name="namespace", type="str", description="Kubernetes namespace to scan. If omitted, scans all namespaces.", required=False),
     ],
 )
-
-# Register all tools
-for tool in [
-    # check_privileged_pods_tool,
-    # check_resource_limits_tool,
-    # check_network_policies_tool,
-    check_exposed_services_tool,
-    # check_pod_security_tool,
-    # full_security_scan_tool,
-]:
-    tool_registry.register("kubernetes", tool) 
+#
+# # Register all tools
+# for tool in [
+#     # check_privileged_pods_tool,
+#     # check_resource_limits_tool,
+#     # check_network_policies_tool,
+#     check_exposed_services_tool,
+#     # check_pod_security_tool,
+#     # full_security_scan_tool,
+# ]:
+#     tool_registry.register("kubernetes", tool)

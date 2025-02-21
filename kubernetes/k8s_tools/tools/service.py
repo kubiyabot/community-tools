@@ -62,9 +62,9 @@ service_describe_tool = KubernetesTool(
     ],
 )
 
-# Register Tools
-for tool in [
-    service_management_tool,
-    # service_describe_tool,
-]:
-    tool_registry.register("kubernetes", tool)
+# # Register Tools
+# for tool in [
+#     service_management_tool,
+#     # service_describe_tool,
+# ]:
+#     tool_registry.register("kubernetes", tool)
