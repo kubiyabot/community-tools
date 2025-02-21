@@ -9,8 +9,8 @@ check_privileged_pods_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, with proper variable reference
+    namespace_flag=$( [ -n "${1:-}" ] && echo "-n $1" || echo "--all-namespaces" )
 
     echo "🔍 Scanning for security risks in pods..."
     echo "========================================="
@@ -54,8 +54,8 @@ check_resource_limits_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
-    # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    # Set namespace flag based on input, with proper variable reference
+    namespace_flag=$( [ -n "${1:-}" ] && echo "-n $1" || echo "--all-namespaces" )
 
     echo "📊 Scanning for missing resource limits..."
     echo "========================================"
@@ -161,7 +161,7 @@ check_exposed_services_tool = KubernetesTool(
     kubectl get services $namespace_flag -o json | jq -r '
         .items[] | 
         select(.spec.type == "LoadBalancer" or .spec.type == "NodePort") |
-        "  ⚠��  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
+        "  ⚠️  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
             [.spec.ports[] | 
             "\(if .nodePort then "NodePort: \(.nodePort)" else "" end) → \(.port)"] | 
             join(", ")
