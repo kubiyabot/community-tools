@@ -254,7 +254,17 @@ data:
 $SECRET_DATA
 EOF
     check_command "Failed to update enforcer secret" "Updated enforcer secret successfully"
-    log "✅ Configuration updated successfully!"
+
+    # Restart the enforcer deployment to pick up new configuration
+    log "Restarting enforcer deployment to apply new configuration..."
+    kubectl rollout restart deployment/enforcer -n kubiya
+    
+    # Wait for the rollout to complete
+    log "Waiting for enforcer deployment to be ready..."
+    kubectl rollout status deployment/enforcer -n kubiya
+    check_command "Failed to restart enforcer deployment" "Enforcer deployment restarted successfully"
+    
+    log "✅ Configuration updated and enforcer restarted successfully!"
     exit 0
 fi
 
