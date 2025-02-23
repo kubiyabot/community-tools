@@ -258,13 +258,9 @@ EOF
     # Restart the enforcer deployment to pick up new configuration
     log "Restarting enforcer deployment to apply new configuration..."
     kubectl rollout restart deployment/enforcer -n kubiya
+    check_command "Failed to restart enforcer deployment" "Enforcer restart initiated successfully"
     
-    # Wait for the rollout to complete
-    log "Waiting for enforcer deployment to be ready..."
-    kubectl rollout status deployment/enforcer -n kubiya
-    check_command "Failed to restart enforcer deployment" "Enforcer deployment restarted successfully"
-    
-    log "✅ Configuration updated and enforcer restarted successfully!"
+    log "✅ Configuration updated and enforcer restart triggered!"
     exit 0
 fi
 
