@@ -70,7 +70,7 @@ repo_clone = GitHubCliTool(
 )
 
 # Register both tools
-tool_registry.register(repo_create)
 tool_registry.register(repo_clone)
+tool_registry.register(repo_create)
 
 # Add other repository-specific tools...
