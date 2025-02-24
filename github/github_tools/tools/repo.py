@@ -30,11 +30,11 @@ repo_create = GitHubCliTool(
     args=[
         Arg(name="name", type="str", description="Repository name", required=True),
         Arg(name="org", type="str", description="Organization name", required=False),
-        Arg(name="private", type="bool", description="Create private repository", required=False),
+        Arg(name="private", type="bool", description="Create private repository", required=False, default=False),
         Arg(name="description", type="str", description="Repository description", required=False),
         Arg(name="homepage", type="str", description="Repository homepage URL", required=False),
-        Arg(name="has_issues", type="bool", description="Enable issues", required=False),
-        Arg(name="has_wiki", type="bool", description="Enable wiki", required=False),
+        Arg(name="has_issues", type="bool", description="Enable issues", required=False, default=True),
+        Arg(name="has_wiki", type="bool", description="Enable wiki", required=False, default=True),
     ],
 )
 
