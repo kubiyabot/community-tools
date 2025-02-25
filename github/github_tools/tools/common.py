@@ -7,5 +7,5 @@ COMMON_FILES = [
 ]
 
 COMMON_SECRETS = [
-    "GH_TOKEN", # Github Token (integration) - https://docs.kubiya.ai/integrations/github
+    "GH_ENTERPRISE_TOKEN", # Github Enterprise Token (integration) - https://docs.kubiya.ai/integrations/github
 ]
