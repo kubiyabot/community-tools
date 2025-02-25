@@ -1,6 +1,7 @@
 from kubiya_sdk.tools import FileSpec
 
 COMMON_ENV = [
+    "GH_ENTERPRISE_HOST",  # GitHub Enterprise host URL (e.g., github.mycompany.com)
 ]
 
 COMMON_FILES = [
