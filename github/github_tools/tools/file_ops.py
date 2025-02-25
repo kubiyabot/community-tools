@@ -463,7 +463,7 @@ edit_file = GitHubCliTool(
         Arg(name="base_branch", type="str", description="Base branch name", required=False, default="main"),
         Arg(name="commit_message", type="str", description="Commit message", required=False, default="Update file"),
     ],
-    with_volumes=[GIT_VOLUME]
+    volumes=[GIT_VOLUME]
 )
 
 # Register tool

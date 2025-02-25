@@ -66,7 +66,7 @@ rm -rf "$TEMP_DIR"
         Arg(name="branch_name", type="str", description="Name of the new branch", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
     ],
-    with_volumes=[GIT_VOLUME]
+    volumes=[GIT_VOLUME]
 )
 
 create_files = GitHubCliTool(
@@ -156,7 +156,7 @@ rm -rf "$TEMP_DIR"
 ]""", required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=False),
     ],
-    with_volumes=[GIT_VOLUME]
+    volumes=[GIT_VOLUME]
 )
 
 # Register tools
