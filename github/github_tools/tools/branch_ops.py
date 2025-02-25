@@ -19,7 +19,11 @@ fi
 GH_TOKEN=$(gh auth token)
 REPO_URL="https://${GH_TOKEN}@github.com/${repo}.git"
 
-echo "🌱 Creating new branch: $branch_name from ${base_branch:-main}"
+# Generate unique branch name with timestamp
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+UNIQUE_BRANCH="${branch_name}-${TIMESTAMP}"
+
+echo "🌱 Creating new branch: $UNIQUE_BRANCH from ${base_branch:-main}"
 echo "📂 Target Repository: $repo"
 
 # Create temporary directory
@@ -39,7 +43,7 @@ git config --global user.email "bot@kubiya.ai"
 
 # Create and checkout new branch
 echo "🌱 Creating branch..."
-git checkout -b "$branch_name" "origin/${base_branch:-main}"
+git checkout -b "$UNIQUE_BRANCH" "origin/${base_branch:-main}"
 
 # Process terraform configuration files
 if [ -n "${files:-}" ]; then
@@ -63,13 +67,13 @@ fi
 
 # Push the branch
 echo "🚀 Pushing to remote..."
-if ! git push -u "$REPO_URL" "$branch_name"; then
+if ! git push "$REPO_URL" "$UNIQUE_BRANCH"; then
     echo "❌ Failed to push branch"
     exit 1
 fi
 
-echo "✨ Branch '$branch_name' created successfully!"
-echo "🔗 Branch URL: https://github.com/$repo/tree/$branch_name"
+echo "✨ Branch '$UNIQUE_BRANCH' created successfully!"
+echo "🔗 Branch URL: https://github.com/$repo/tree/$UNIQUE_BRANCH"
 
 # Cleanup
 cd - >/dev/null
@@ -77,7 +81,7 @@ rm -rf "$TEMP_DIR"
 """,
     args=[
         Arg(name="repo", type="str", description="Application repository name (owner/repo)", required=True),
-        Arg(name="branch_name", type="str", description="Name of the new branch", required=True),
+        Arg(name="branch_name", type="str", description="Base name for the branch (timestamp will be added)", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
         Arg(name="files", type="str", description="""JSON array of terraform files to create/update. Format:
 [
