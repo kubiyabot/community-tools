@@ -43,6 +43,12 @@ create_files = GitHubCliTool(
 #!/bin/bash
 set -e
 
+# Ensure GitHub CLI is authenticated
+if ! gh auth status &>/dev/null; then
+    echo "❌ GitHub CLI is not authenticated"
+    exit 1
+fi
+
 echo "📝 Creating files in repository: $repo"
 echo "🌱 Branch: $branch_name"
 
@@ -50,23 +56,16 @@ echo "🌱 Branch: $branch_name"
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Clone repository
-echo "📥 Cloning repository..."
-if ! gh repo clone "$repo" .; then
-    echo "❌ Failed to clone repository"
+# Clone and checkout in one command, similar to create_branch
+if ! gh repo clone "$repo" . -- -q && \
+   ! git checkout "$branch_name"; then
+    echo "❌ Failed to clone repository or checkout branch"
     exit 1
 fi
 
 # Configure git
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
-
-# Checkout target branch
-echo "🔄 Checking out branch: $branch_name"
-if ! git fetch origin "$branch_name" && ! git checkout "$branch_name"; then
-    echo "❌ Branch not found or checkout failed"
-    exit 1
-fi
 
 # Process files
 echo "📝 Processing files..."
@@ -75,18 +74,12 @@ echo "$files" | jq -c '.[]' | while read -r file_info; do
     content=$(echo "$file_info" | jq -r '.content')
     
     echo "📄 Creating file: $path"
-    
-    # Create directory structure if needed
     mkdir -p "$(dirname "$path")"
-    
-    # Write file content
     echo "$content" > "$path"
-    
-    # Add file to git
     git add "$path"
 done
 
-# Commit changes
+# Commit and push changes
 if git status --porcelain | grep '^[AM]'; then
     echo "💾 Committing changes..."
     git commit -m "${commit_message:-Add new files via Kubiya}"
