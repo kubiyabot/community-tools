@@ -22,14 +22,17 @@ echo "📂 Repository: $repo"
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Clone, create branch, and checkout in one flow
+# Clone repository using GitHub CLI
 echo "📥 Cloning repository..."
 if ! gh repo clone "$repo" . -- -q; then
     echo "❌ Failed to clone repository"
     exit 1
 fi
 
-# Configure git
+# Configure git to use GitHub CLI credentials
+git config --global credential.helper gh
+
+# Configure git identity
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
@@ -57,9 +60,9 @@ if [ -n "${files:-}" ]; then
     fi
 fi
 
-# Push the branch with any changes
+# Push the branch with any changes using GitHub CLI
 echo "🚀 Pushing to remote..."
-if ! git push -u origin "$branch_name"; then
+if ! gh repo sync . --branch "$branch_name" --force; then
     echo "❌ Failed to push branch"
     exit 1
 fi
