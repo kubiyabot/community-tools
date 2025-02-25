@@ -9,51 +9,25 @@ create_branch = GitHubCliTool(
 #!/bin/bash
 set -e
 
-echo "🌱 Creating new branch: $branch_name"
+# Ensure GitHub CLI is authenticated
+if ! gh auth status &>/dev/null; then
+    echo "❌ GitHub CLI is not authenticated"
+    exit 1
+fi
+
+echo "🌱 Creating new branch: $branch_name from ${base_branch:-main}"
 echo "📂 Repository: $repo"
-echo "🔄 Base branch: ${base_branch:-main}"
 
-# Create temporary directory
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR"
-
-# Clone repository
-echo "📥 Cloning repository..."
-if ! gh repo clone "$repo" .; then
-    echo "❌ Failed to clone repository"
-    exit 1
-fi
-
-# Configure git
-git config --global user.name "Kubiya Bot"
-git config --global user.email "bot@kubiya.ai"
-
-# Fetch and checkout base branch
-echo "🔄 Fetching latest changes..."
-git fetch origin "${base_branch:-main}"
-git checkout "${base_branch:-main}"
-git pull origin "${base_branch:-main}"
-
-# Create and push new branch
-echo "🌱 Creating branch: $branch_name"
-if ! git checkout -b "$branch_name"; then
+# Create branch using GitHub CLI
+if ! gh repo clone "$repo" . -- -q && \
+   ! git checkout -b "$branch_name" "origin/${base_branch:-main}" && \
+   ! git push -u origin "$branch_name"; then
     echo "❌ Failed to create branch"
-    exit 1
-fi
-
-# Push the new branch
-echo "🚀 Pushing branch to remote..."
-if ! git push -u origin "$branch_name"; then
-    echo "❌ Failed to push branch"
     exit 1
 fi
 
 echo "✨ Branch '$branch_name' created successfully!"
 echo "🔗 Branch URL: https://github.com/$repo/tree/$branch_name"
-
-# Cleanup
-cd - >/dev/null
-rm -rf "$TEMP_DIR"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
