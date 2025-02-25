@@ -1,12 +1,6 @@
-from kubiya_sdk.tools import Arg, Volume
+from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
-
-# Define volume for git operations
-GIT_VOLUME = Volume(
-    name="gh_files",
-    path="/opt/gh_files"
-)
 
 create_branch = GitHubCliTool(
     name="github_create_branch",
@@ -65,8 +59,7 @@ rm -rf "$TEMP_DIR"
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="branch_name", type="str", description="Name of the new branch", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-    ],
-    volumes=[GIT_VOLUME]
+    ]
 )
 
 create_files = GitHubCliTool(
@@ -155,8 +148,7 @@ rm -rf "$TEMP_DIR"
     }
 ]""", required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=False),
-    ],
-    volumes=[GIT_VOLUME]
+    ]
 )
 
 # Register tools
