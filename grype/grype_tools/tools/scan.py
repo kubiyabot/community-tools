@@ -1,21 +1,12 @@
-from kubiya_sdk.tools import Arg
-from .base import GrypeTool
+from kubiya_sdk.tools.models import Arg
+from kubiya_sdk.tools.registry import tool_registry
+from tools.base import GrypeTool
 
-def create_scan_image_tool():
-    args = [
-        Arg("image", description="The container image to scan", type=str),
-        Arg("fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", type=str, required=False),
-        Arg("output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", type=str, required=False, default="table"),
-        Arg("scope", description="The scope to scan (squashed, all-layers)", type=str, required=False, default="squashed"),
-        Arg("only_fixed", description="Only show vulnerabilities that have a fix available", type=bool, required=False, default=False),
-        Arg("platform", description="Platform to use for the container image (e.g., linux/amd64)", type=str, required=False),
-        # Output control flags
-        Arg("quiet", description="Show only the final summary and recommendations", type=bool, required=False, default=False),
-        Arg("show_details", description="Show detailed vulnerability information", type=bool, required=False, default=True),
-        Arg("show_recommendations", description="Show recommendations for fixing issues", type=bool, required=False, default=True),
-    ]
-
-    content = """
+# Create scan image tool
+scan_image_tool = GrypeTool(
+    name="scan_image_tool",
+    description="Scan a container image for vulnerabilities using Grype",
+    content="""
 # Function to analyze vulnerabilities and provide recommendations
 analyze_vulnerabilities() {
     local scan_output="$1"
@@ -216,25 +207,26 @@ fi
 
 # Execute the scan
 execute_scan "$cmd"
-"""
+""",
+    args=[
+        Arg(name="image", description="The container image to scan"),
+        Arg(name="fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", required=False),
+        Arg(name="output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", required=False, default="table"),
+        Arg(name="scope", description="The scope to scan (squashed, all-layers)", required=False, default="squashed"),
+        Arg(name="only_fixed", description="Only show vulnerabilities that have a fix available", required=False, default="False"),
+        Arg(name="platform", description="Platform to use for the container image (e.g., linux/amd64)", required=False),
+        Arg(name="quiet", description="Show only the final summary and recommendations", required=False, default="False"),
+        Arg(name="show_details", description="Show detailed vulnerability information", required=False, default="true"),
+        Arg(name="show_recommendations", description="Show recommendations for fixing issues", required=False, default="true"),
+    ],
+    long_running=True
+)
 
-    return GrypeTool(
-        name="scan_image_tool",
-        description="Scan a container image for vulnerabilities using Grype",
-        content=content,
-        args=args,
-        long_running=True
-    )
-
-def create_scan_directory_tool():
-    args = [
-        Arg("directory", description="The directory to scan", type=str),
-        Arg("fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", type=str, required=False),
-        Arg("output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", type=str, required=False, default="table"),
-        Arg("only_fixed", description="Only show vulnerabilities that have a fix available", type=bool, required=False, default=False),
-    ]
-
-    content = """
+# Create scan directory tool
+scan_directory_tool = GrypeTool(
+    name="scan_directory",
+    description="Scan a directory for vulnerabilities using Grype",
+    content="""
 # Function to analyze vulnerabilities and provide recommendations
 analyze_vulnerabilities() {
     local scan_output="$1"
@@ -383,26 +375,21 @@ fi
 
 # Execute the scan
 execute_scan "$cmd"
-"""
+""",
+    args=[
+        Arg(name="directory", description="The directory to scan"),
+        Arg(name="fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", required=False),
+        Arg(name="output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", required=False, default="table"),
+        Arg(name="only_fixed", description="Only show vulnerabilities that have a fix available", required=False, default="False"),
+    ],
+    long_running=True
+)
 
-    return GrypeTool(
-        name="scan_directory",
-        description="Scan a directory for vulnerabilities using Grype",
-        content=content,
-        args=args,
-        long_running=True
-    )
-
-def create_scan_sbom_tool():
-    args = [
-        Arg("sbom_file", description="Path to the SBOM file (supports Syft JSON, SPDX, CycloneDX)", type=str),
-        Arg("fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", type=str, required=False),
-        Arg("output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", type=str, required=False, default="table"),
-        Arg("only_fixed", description="Only show vulnerabilities that have a fix available", type=bool, required=False, default=False),
-        Arg("add_cpes_if_none", description="Add CPEs if none are found in the SBOM", type=bool, required=False, default=False),
-    ]
-
-    content = """
+# Create scan SBOM tool
+scan_sbom_tool = GrypeTool(
+    name="scan_sbom",
+    description="Scan an SBOM file for vulnerabilities using Grype",
+    content="""
 # Function to analyze vulnerabilities and provide recommendations
 analyze_vulnerabilities() {
     local scan_output="$1"
@@ -555,12 +542,24 @@ fi
 
 # Execute the scan
 execute_scan "$cmd"
-"""
+""",
+    args=[
+        Arg(name="sbom_file", description="Path to the SBOM file (supports Syft JSON, SPDX, CycloneDX)"),
+        Arg(name="fail_on", description="Exit with error code if vulnerability found with severity >= specified level (negligible, low, medium, high, critical)", required=False),
+        Arg(name="output_format", description="Output format (table, json, cyclonedx, cyclonedx-json, sarif)", required=False, default="table"),
+        Arg(name="only_fixed", description="Only show vulnerabilities that have a fix available", required=False, default="False"),
+        Arg(name="add_cpes_if_none", description="Add CPEs if none are found in the SBOM", required=False, default="False"),
+    ],
+    long_running=True
+)
 
-    return GrypeTool(
-        name="scan_sbom",
-        description="Scan an SBOM file for vulnerabilities using Grype",
-        content=content,
-        args=args,
-        long_running=True
-    ) 
+# List of all Grype tools
+grype_tools = [
+    scan_image_tool,
+    scan_directory_tool,
+    scan_sbom_tool
+]
+
+# Register all Grype tools
+for tool in grype_tools:
+    tool_registry.register("grype_tools", tool)

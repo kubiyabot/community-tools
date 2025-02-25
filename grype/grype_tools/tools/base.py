@@ -1,8 +1,7 @@
-from kubiya_sdk.tools import Tool, Volume
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools.models import Arg, Tool, Volume
 
 GRYPE_ICON_URL = "https://raw.githubusercontent.com/anchore/grype/main/grype.png"
-GRYPE_DOCKER_IMAGE = "anchore/grype:latest"
+GRYPE_DOCKER_IMAGE = "alpine:latest"
 
 # Define volume for Grype database
 GRYPE_DB_VOLUME = Volume(
@@ -10,20 +9,34 @@ GRYPE_DB_VOLUME = Volume(
     path="/root/.cache/grype"
 )
 
-# Common environment variables and files
-COMMON_ENV = [
-    "GRYPE_DB_AUTO_UPDATE",
-    "GRYPE_CHECK_FOR_APP_UPDATE",
-    "GRYPE_DB_CACHE_DIR"
+# Common environment variables
+COMMON_ENVS = [
+    "GRYPE_DB_UPDATE",           # Controls whether Grype should update its vulnerability database
+    "GRYPE_REGISTRY_INSECURE",   # Allow connections to insecure registries
+    "GRYPE_SEARCH_UNINDEXED",    # Search all possible packages
+    "OPENSHIFT_URL",             # OpenShift cluster URL
+    "OPENSHIFT_USERNAME",        # OpenShift username
 ]
 
 COMMON_FILES = []
 
-# Define required secrets as simple names
-COMMON_SECRETS = ["vendor_credentials"]
+# Define required secrets
+COMMON_SECRETS = [
+    "vendor_credentials",
+    "OPENSHIFT_PASSWORD"         # OpenShift password
+]
 
 class GrypeTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        content: str,
+        args: list[Arg] = [],
+        env: list[str] = [],
+        secrets: list[str] = [],
+        long_running=False,
+    ):
         enhanced_content = f"""
 #!/bin/sh
 set -e
@@ -31,32 +44,65 @@ set -e
 # Install required tools
 install_tools() {{
     echo "Installing required tools..."
-    apk add --no-cache jq yq curl &>/dev/null || {{
+    apk add --no-cache curl jq yq tar gzip podman fuse-overlayfs &>/dev/null || {{
         echo "Failed to install required tools"
+        exit 1
+    }}
+    
+    # Install OpenShift CLI
+    echo "Installing OpenShift CLI..."
+    OC_VERSION="latest"
+    curl -sSfL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_VERSION/openshift-client-linux.tar.gz -o oc.tar.gz || {{
+        echo "Failed to download OpenShift CLI"
+        exit 1
+    }}
+    tar xzf oc.tar.gz oc
+    mv oc /usr/local/bin/
+    rm oc.tar.gz
+    chmod +x /usr/local/bin/oc
+    
+    # Install Grype
+    echo "Installing Grype..."
+    curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin || {{
+        echo "Failed to install Grype"
         exit 1
     }}
 }}
 
-# Function to safely create directories
-create_dir() {{
-    local dir="$1"
-    if [ ! -d "$dir" ]; then
-        mkdir -p "$dir" || {{
-            echo "Failed to create directory: $dir"
-            exit 1
-        }}
+# Setup Podman
+setup_podman() {{
+    echo "Setting up Podman..."
+    
+    # Configure storage
+    mkdir -p /etc/containers
+    cat > /etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+runroot = "/run/containers/storage"
+graphroot = "/var/lib/containers/storage"
+[storage.options]
+mount_program = "/usr/bin/fuse-overlayfs"
+EOF
+
+    # Setup registry auth if credentials provided
+    if [ -n "$VENDOR_CREDENTIALS" ]; then
+        echo "Setting up registry authentication..."
+        mkdir -p /root/.config/containers
+        echo "$VENDOR_CREDENTIALS" > /root/.config/containers/auth.json
     fi
 }}
 
-# Function to setup Grype database directory
+# Function to handle command output
+handle_output() {{
+    sed 's/\\x1b\\[[0-9;]*[a-zA-Z]//g' | tr -d '\\r'
+}}
+
+# Function to setup Grype database
 setup_grype_db() {{
     echo "Setting up Grype database directory..."
-    create_dir "{GRYPE_DB_VOLUME.path}"
-    
-    # Ensure proper permissions
+    mkdir -p "{GRYPE_DB_VOLUME.path}"
     chmod 755 "{GRYPE_DB_VOLUME.path}"
     
-    # Initialize/update the database
     echo "Initializing/updating Grype database..."
     if ! grype db status &>/dev/null; then
         echo "Performing initial database download..."
@@ -65,19 +111,6 @@ setup_grype_db() {{
             exit 1
         }}
     fi
-}}
-
-# Function to safely write files
-write_file() {{
-    local file="$1"
-    local content="$2"
-    local dir=$(dirname "$file")
-    
-    create_dir "$dir"
-    echo "$content" > "$file" || {{
-        echo "Failed to write to file: $file"
-        exit 1
-    }}
 }}
 
 # Function to validate vendor credentials
@@ -217,6 +250,19 @@ verify_grype() {{
 # Main execution
 echo "Initializing Grype environment..."
 install_tools
+setup_podman
+
+# Login to OpenShift
+echo "Logging into OpenShift..."
+if ! oc login "$OPENSHIFT_URL" \\
+    --username="$OPENSHIFT_USERNAME" \\
+    --password="$OPENSHIFT_PASSWORD" \\
+    --insecure-skip-tls-verify=true \\
+    2>/dev/null | handle_output; then
+    echo "Failed to login to OpenShift cluster - check your credentials and URL" | handle_output
+    exit 1
+fi
+
 setup_grype_db
 verify_grype
 setup_vendor_credentials
@@ -225,16 +271,18 @@ echo "Starting Grype operation..."
 {content}
 """
         
-        super().__init__(
-            name=name,
-            description=description,
-            docker_image=GRYPE_DOCKER_IMAGE,
-            icon_url=GRYPE_ICON_URL,
-            content=enhanced_content,
-            args=args,
-            env=COMMON_ENV,
-            files=COMMON_FILES,
-            secrets=COMMON_SECRETS,
-            volumes=[GRYPE_DB_VOLUME],  # Add the volume to the tool
-            long_running=long_running
-        ) 
+        kwargs = {
+            'name': name,
+            'description': description,
+            'docker_image': GRYPE_DOCKER_IMAGE,
+            'icon_url': GRYPE_ICON_URL,
+            'content': enhanced_content,
+            'args': args,
+            'env': COMMON_ENVS,
+            'files': COMMON_FILES,
+            'secrets': COMMON_SECRETS,
+            'volumes': [GRYPE_DB_VOLUME],
+            'long_running': long_running
+        }
+        
+        super().__init__(**kwargs) 
