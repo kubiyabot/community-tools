@@ -15,6 +15,10 @@ if ! gh auth status &>/dev/null; then
     exit 1
 fi
 
+# Get GitHub token for git operations
+GH_TOKEN=$(gh auth token)
+REPO_URL="https://${GH_TOKEN}@github.com/${repo}.git"
+
 echo "🌱 Creating new branch: $branch_name from ${base_branch:-main}"
 echo "📂 Repository: $repo"
 
@@ -28,9 +32,6 @@ if ! gh repo clone "$repo" . -- -q; then
     echo "❌ Failed to clone repository"
     exit 1
 fi
-
-# Configure git to use GitHub CLI credentials
-git config --global credential.helper gh
 
 # Configure git identity
 git config --global user.name "Kubiya Bot"
@@ -60,9 +61,9 @@ if [ -n "${files:-}" ]; then
     fi
 fi
 
-# Push the branch with any changes using GitHub CLI
+# Push the branch with any changes
 echo "🚀 Pushing to remote..."
-if ! gh repo sync . --branch "$branch_name" --force; then
+if ! git push -u "$REPO_URL" "$branch_name"; then
     echo "❌ Failed to push branch"
     exit 1
 fi
