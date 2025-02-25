@@ -2,9 +2,9 @@ from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
-create_branch = GitHubCliTool(
-    name="github_create_branch",
-    description="Create a new branch in a GitHub repository",
+create_branch_with_files = GitHubCliTool(
+    name="github_create_branch_with_files",
+    description="Create a new branch and add files to it in a GitHub repository",
     content="""
 #!/bin/bash
 set -e
@@ -18,48 +18,14 @@ fi
 echo "🌱 Creating new branch: $branch_name from ${base_branch:-main}"
 echo "📂 Repository: $repo"
 
-# Create branch using GitHub CLI
-if ! gh repo clone "$repo" . -- -q && \
-   ! git checkout -b "$branch_name" "origin/${base_branch:-main}" && \
-   ! git push -u origin "$branch_name"; then
-    echo "❌ Failed to create branch"
-    exit 1
-fi
-
-echo "✨ Branch '$branch_name' created successfully!"
-echo "🔗 Branch URL: https://github.com/$repo/tree/$branch_name"
-""",
-    args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="branch_name", type="str", description="Name of the new branch", required=True),
-        Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-    ]
-)
-
-create_files = GitHubCliTool(
-    name="github_create_files",
-    description="Create one or more files in a GitHub repository branch",
-    content="""
-#!/bin/bash
-set -e
-
-# Ensure GitHub CLI is authenticated
-if ! gh auth status &>/dev/null; then
-    echo "❌ GitHub CLI is not authenticated"
-    exit 1
-fi
-
-echo "📝 Creating files in repository: $repo"
-echo "🌱 Branch: $branch_name"
-
 # Create temporary directory
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Clone and checkout in one command, similar to create_branch
-if ! gh repo clone "$repo" . -- -q && \
-   ! git checkout "$branch_name"; then
-    echo "❌ Failed to clone repository or checkout branch"
+# Clone, create branch, and checkout in one flow
+echo "📥 Cloning repository..."
+if ! gh repo clone "$repo" . -- -q; then
+    echo "❌ Failed to clone repository"
     exit 1
 fi
 
@@ -67,34 +33,39 @@ fi
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
-# Process files
-echo "📝 Processing files..."
-echo "$files" | jq -c '.[]' | while read -r file_info; do
-    path=$(echo "$file_info" | jq -r '.path')
-    content=$(echo "$file_info" | jq -r '.content')
-    
-    echo "📄 Creating file: $path"
-    mkdir -p "$(dirname "$path")"
-    echo "$content" > "$path"
-    git add "$path"
-done
+# Create and checkout new branch
+echo "🌱 Creating branch..."
+git checkout -b "$branch_name" "origin/${base_branch:-main}"
 
-# Commit and push changes
-if git status --porcelain | grep '^[AM]'; then
-    echo "💾 Committing changes..."
-    git commit -m "${commit_message:-Add new files via Kubiya}"
-    
-    echo "🚀 Pushing changes..."
-    if ! git push origin "$branch_name"; then
-        echo "❌ Failed to push changes"
-        exit 1
+# Process files if provided
+if [ -n "${files:-}" ]; then
+    echo "📝 Processing files..."
+    echo "$files" | jq -c '.[]' | while read -r file_info; do
+        path=$(echo "$file_info" | jq -r '.path')
+        content=$(echo "$file_info" | jq -r '.content')
+        
+        echo "📄 Creating file: $path"
+        mkdir -p "$(dirname "$path")"
+        echo "$content" > "$path"
+        git add "$path"
+    done
+
+    # Commit changes if files were added
+    if git status --porcelain | grep '^[AM]'; then
+        echo "💾 Committing changes..."
+        git commit -m "${commit_message:-Add new files via Kubiya}"
     fi
-    
-    echo "✨ Files created successfully!"
-    echo "🔗 Branch URL: https://github.com/$repo/tree/$branch_name"
-else
-    echo "ℹ️ No changes to commit"
 fi
+
+# Push the branch with any changes
+echo "🚀 Pushing to remote..."
+if ! git push -u origin "$branch_name"; then
+    echo "❌ Failed to push branch"
+    exit 1
+fi
+
+echo "✨ Branch '$branch_name' created successfully!"
+echo "🔗 Branch URL: https://github.com/$repo/tree/$branch_name"
 
 # Cleanup
 cd - >/dev/null
@@ -102,7 +73,8 @@ rm -rf "$TEMP_DIR"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="branch_name", type="str", description="Branch name to create files in", required=True),
+        Arg(name="branch_name", type="str", description="Name of the new branch", required=True),
+        Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
         Arg(name="files", type="str", description="""JSON array of files to create. Format:
 [
     {
@@ -113,13 +85,12 @@ rm -rf "$TEMP_DIR"
         "path": "path/to/file2.md",
         "content": "# Title\\nContent here"
     }
-]""", required=True),
-        Arg(name="commit_message", type="str", description="Commit message", required=False),
+]""", required=False),
+        Arg(name="commit_message", type="str", description="Commit message for file changes", required=False),
     ]
 )
 
-# Register tools
-for tool in [create_branch, create_files]:
-    tool_registry.register("github", tool)
+# Register tool
+tool_registry.register("github", create_branch_with_files)
 
-__all__ = ['create_branch', 'create_files'] 
+__all__ = ['create_branch_with_files'] 
