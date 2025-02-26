@@ -20,7 +20,7 @@ pr_create = GitHubCliTool(
 pr_list = GitHubRepolessCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
-    content="gh search prs $([[ -n \"$repo\" ]] && echo \"$repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$org\" ]] && echo \"$org\")",
+    content="gh search prs $([[ -n \"$repo\" ]] && echo \"$repo\") $([[ -n \"$org\" ]] && echo \"$org\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
