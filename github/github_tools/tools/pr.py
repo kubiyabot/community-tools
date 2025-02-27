@@ -17,13 +17,13 @@ pr_create = GitHubCliTool(
     ],
 )
 
-pr_list = GitHubCliTool(
+pr_list = GitHubRepolessCliTool(
     name="github_pr_list",
-    description="List pull requests in a GitHub repository.",
+    description="List pull requests in a GitHub repository or organization.",
     content="""
 if [ -n "$repo" ]; then
     # When repo is specified, only search in that repo
-    gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
+    gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
 else
     # When no repo is specified but org is, list PRs across the org
     if [ -n "$org" ]; then
@@ -40,7 +40,6 @@ fi
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
         Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe. use `@me` to get prs assigned to the user", required=False),
-        Arg(name="org", type="str", description="The github organization to look for prs in (only used when repo is not specified). Example: octocat", required=False),
     ]
 )
 
