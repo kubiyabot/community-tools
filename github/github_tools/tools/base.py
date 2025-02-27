@@ -11,9 +11,12 @@ class GitHubCliTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required packages
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
     apk add --quiet jq >/dev/null 2>&1
+fi
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
@@ -98,9 +101,12 @@ class GitHubRepolessCliTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required packages
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
     apk add --quiet jq >/dev/null 2>&1
+fi
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
 fi
 
 check_and_set_org() {{
@@ -164,8 +170,12 @@ class BasicGitHubTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required packages
 if ! command -v jq >/dev/null 2>&1; then
     apk add --quiet jq >/dev/null 2>&1
+fi
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
 fi
 
 # Print the command that will be executed
