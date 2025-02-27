@@ -23,10 +23,15 @@ pr_list = GitHubCliTool(
     content="""
 if [ -n "$repo" ]; then
     # When repo is specified, only search in that repo
-    gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
+    gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
 else
-    # When no repo is specified, search across the org
-    gh search prs $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
+    # When no repo is specified but org is, list PRs across the org
+    if [ -n "$org" ]; then
+        gh search prs --owner $org $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
+    else
+        # When neither repo nor org is specified, list PRs for the authenticated user
+        gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
+    fi
 fi
 """,
     args=[
