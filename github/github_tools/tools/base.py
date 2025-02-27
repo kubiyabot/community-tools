@@ -63,6 +63,11 @@ get_repo_context() {{
 check_and_set_org
 get_repo_context
 
+# Print the command that will be executed
+echo "🔧 Executing command:"
+echo "$ {content}" | envsubst
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 {content}
 """
 
@@ -118,6 +123,11 @@ check_and_set_org() {{
 }}
 check_and_set_org
 
+# Print the command that will be executed
+echo "🔧 Executing command:"
+echo "$ {content}" | envsubst
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 {content}
 """
 
@@ -157,6 +167,11 @@ set -e
 if ! command -v jq >/dev/null 2>&1; then
     apk add --quiet jq >/dev/null 2>&1
 fi
+
+# Print the command that will be executed
+echo "🔧 Executing command:"
+echo "$ {content}" | envsubst
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 {content}
 """,
