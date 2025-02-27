@@ -17,7 +17,7 @@ pr_create = GitHubCliTool(
     ],
 )
 
-pr_list = GitHubRepolessCliTool(
+pr_list = GitHubCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
     #content="gh search prs $([[ -n \"$repo\" ]] && echo \"$repo\") $([[ -n \"$org\" ]] && echo \"$org\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\")",
