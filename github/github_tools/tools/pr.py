@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool, GitHubRepolessCliTool
+from .base import GitHubCliTool, GitHubRepolessCliTool, BasicGitHubTool
 from kubiya_sdk.tools.registry import tool_registry
 
 pr_create = GitHubCliTool(
@@ -17,7 +17,7 @@ pr_create = GitHubCliTool(
     ],
 )
 
-pr_list = GitHubRepolessCliTool(
+pr_list = BasicGitHubTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository.",
     content="gh search prs $([[ -n \"$repo\" ]] && echo \"--repo $repo\") $([[ -n \"$state\" ]] && echo \"--state $state\") $([[ -n \"$limit\" ]] && echo \"--limit $limit\") $([[ -n \"$author\" ]] && echo \"--author $author\") $([[ -n \"$assignee\" ]] && echo \"--assignee $assignee\") $([[ -n \"$org\" ]] && echo \"--owner $org\")",

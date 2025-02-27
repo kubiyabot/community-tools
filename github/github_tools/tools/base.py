@@ -221,3 +221,29 @@ done
 # Don't forget to register the new tool
 from kubiya_sdk.tools.registry import tool_registry
 tool_registry.register("github", stream_workflow_logs)
+
+
+class BasicGitHubTool(Tool):
+    def __init__(self, name, description, content, args, long_running=False):
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=GITHUB_ICON_URL,
+            type="docker",
+            image=GITHUB_CLI_DOCKER_IMAGE,
+            content=f"""
+#!/bin/sh
+set -e
+
+if ! command -v jq >/dev/null 2>&1; then
+    apk add --quiet jq >/dev/null 2>&1
+fi
+
+{content}
+""",
+            args=args,
+            env=COMMON_ENV,
+            files=COMMON_FILES,
+            secrets=COMMON_SECRETS,
+            long_running=long_running
+        )
