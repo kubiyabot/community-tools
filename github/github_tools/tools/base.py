@@ -128,6 +128,7 @@ check_and_set_org() {{
         fi
     fi
 }}
+
 check_and_set_org
 
 # Print the command that will be executed

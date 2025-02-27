@@ -20,15 +20,7 @@ pr_create = GitHubCliTool(
 pr_list = GitHubRepolessCliTool(
     name="github_pr_list",
     description="List pull requests in a GitHub repository or organization.",
-    content="""
-if [ -n "$repo" ]; then
-    # When repo is specified, only search in that repo
-    gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
-else
-    # When no repo is specified but org is, list PRs across the org
-    gh search prs --owner $org $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
-fi
-""",
+    content='if [ -n "$repo" ]; then gh search prs --repo "$repo" $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"); else gh search prs --owner "$org" $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"); fi',
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'. If specified, org parameter will be ignored.", required=False),
         Arg(name="org", type="str", description="The github organization to look for prs in (only used when repo is not specified). Example: octocat", required=False),
