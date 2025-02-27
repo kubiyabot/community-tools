@@ -26,16 +26,12 @@ if [ -n "$repo" ]; then
     gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
 else
     # When no repo is specified but org is, list PRs across the org
-    if [ -n "$org" ]; then
-        gh search prs --owner $org $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
-    else
-        # When neither repo nor org is specified, list PRs for the authenticated user
-        gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
-    fi
+    gh search prs --owner $org $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
 fi
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'. If specified, org parameter will be ignored.", required=False),
+        Arg(name="org", type="str", description="The github organization to look for prs in (only used when repo is not specified). Example: octocat", required=False),
         Arg(name="state", type="str", description="Filter by pull request state (open, closed, merged, all). Example: 'open'", required=False),
         Arg(name="limit", type="int", description="Maximum number of pull requests to list. Example: 10", required=False),
         Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
