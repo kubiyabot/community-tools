@@ -36,9 +36,7 @@ fi
         Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe. use `@me` to get prs assigned to the user", required=False),
         Arg(name="org", type="str", description="The github organization to look for prs in (only used when repo is not specified). Example: octocat", required=False),
-    ],
-    check_org=False,
-    check_repo=False
+    ]
 )
 
 pr_view = GitHubCliTool(

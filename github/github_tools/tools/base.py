@@ -86,47 +86,6 @@ get_repo_context
             long_running=long_running
         )
 
-# Add this new tool for streaming GitHub Actions workflow logs
-stream_workflow_logs = GitHubCliTool(
-    name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
-    content="""
-#!/bin/sh
-set -e
-
-if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
-    if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
-        exit 1
-    fi
-    echo "Using the latest run ID: $run_id"
-fi
-
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
-
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
-""",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
-    ],
-    long_running=True
-)
-
-# Don't forget to register the new tool
-from kubiya_sdk.tools.registry import tool_registry
-tool_registry.register("github", stream_workflow_logs)
-
 
 class GitHubRepolessCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
@@ -181,46 +140,6 @@ check_and_set_org
             long_running=long_running
         )
 
-# Add this new tool for streaming GitHub Actions workflow logs
-stream_workflow_logs = GitHubCliTool(
-    name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time.",
-    content="""
-#!/bin/sh
-set -e
-
-if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
-    if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
-        exit 1
-    fi
-    echo "Using the latest run ID: $run_id"
-fi
-
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
-
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
-""",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
-    ],
-    long_running=True
-)
-
-# Don't forget to register the new tool
-from kubiya_sdk.tools.registry import tool_registry
-tool_registry.register("github", stream_workflow_logs)
 
 
 class BasicGitHubTool(Tool):
