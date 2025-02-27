@@ -68,7 +68,8 @@ get_repo_context
 
 # Print the command that will be executed
 echo "🔧 Executing command:"
-echo "$ {content}" | envsubst
+COMMAND="{content}"
+echo "${{COMMAND}}" | envsubst
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 {content}
@@ -131,7 +132,8 @@ check_and_set_org
 
 # Print the command that will be executed
 echo "🔧 Executing command:"
-echo "$ {content}" | envsubst
+COMMAND="{content}"
+echo "${{COMMAND}}" | envsubst
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 {content}
@@ -180,7 +182,8 @@ fi
 
 # Print the command that will be executed
 echo "🔧 Executing command:"
-echo "$ {content}" | envsubst
+COMMAND="{content}"
+echo "${{COMMAND}}" | envsubst
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 {content}
