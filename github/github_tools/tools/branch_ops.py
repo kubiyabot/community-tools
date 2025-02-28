@@ -45,16 +45,35 @@ git config --global user.email "bot@kubiya.ai"
 echo "🌱 Creating branch..."
 git checkout -b "$UNIQUE_BRANCH" "origin/${base_branch:-main}"
 
+# Read existing file content before updating
+read_existing_content() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        echo "📖 Reading existing content from: $file"
+        cat "$file"
+    fi
+}
+
 # Process terraform configuration files
 if [ -n "${files:-}" ]; then
-    echo "📝 Adding terraform configurations..."
+    echo "📝 Processing terraform configurations..."
     echo "$files" | jq -c '.[]' | while read -r file_info; do
         path=$(echo "$file_info" | jq -r '.path')
         content=$(echo "$file_info" | jq -r '.content')
+        append_mode=$(echo "$file_info" | jq -r '.append // "false"')
         
-        echo "📄 Creating/updating file: $path"
+        echo "📄 Processing file: $path"
         mkdir -p "$(dirname "$path")"
-        echo "$content" > "$path"
+        
+        if [ "$append_mode" = "true" ] && [ -f "$path" ]; then
+            echo "📎 Appending to existing file..."
+            existing_content=$(read_existing_content "$path")
+            echo -e "${existing_content}\\n${content}" > "$path"
+        else
+            echo "✏️  Creating/replacing file..."
+            echo "$content" > "$path"
+        fi
+        
         git add "$path"
     done
 
@@ -87,15 +106,12 @@ rm -rf "$TEMP_DIR"
 [
     {
         "path": "terraform/services/new-service/main.tf",
-        "content": "module 'new_service' { ... }"
-    },
-    {
-        "path": "terraform/services/new-service/variables.tf",
-        "content": "variable 'service_name' { ... }"
+        "content": "module 'new_service' { ... }",
+        "append": true  # Optional: append to existing file instead of replacing
     }
 ]""", required=False),
         Arg(name="commit_message", type="str", description="Commit message for terraform changes", required=False),
-    ]
+    ],
 )
 
 # Register tool
