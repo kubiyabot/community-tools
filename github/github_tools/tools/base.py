@@ -20,7 +20,7 @@ fi
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
     echo "📦 Installing Kubiya CLI..."
-    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    curl -L https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64 -o /usr/local/bin/kubiya
     chmod +x /usr/local/bin/kubiya
 fi
 
@@ -109,7 +109,7 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
     echo "📦 Installing Kubiya CLI..."
-    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    curl -L https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64 -o /usr/local/bin/kubiya
     chmod +x /usr/local/bin/kubiya
 fi
 
@@ -175,7 +175,7 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
     echo "📦 Installing Kubiya CLI..."
-    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    curl -L https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64 -o /usr/local/bin/kubiya
     chmod +x /usr/local/bin/kubiya
 fi
 
