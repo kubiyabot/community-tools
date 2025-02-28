@@ -12,9 +12,9 @@ class GitHubCliTool(Tool):
 set -e
 
 # Install required tools
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --quiet jq >/dev/null 2>&1
+if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+    echo "📦 Installing required tools..."
+    apk add --quiet jq curl >/dev/null 2>&1
 fi
 
 # Install Kubiya CLI if not present
@@ -102,10 +102,9 @@ class GitHubRepolessCliTool(Tool):
 set -e
 
 # Install required tools
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --quiet jq >/dev/null 2>&1
-fi
+if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+    echo "📦 Installing required tools..."
+    apk add --quiet jq curl >/dev/null 2>&1
 
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
@@ -169,10 +168,9 @@ class BasicGitHubTool(Tool):
 #!/bin/sh
 set -e
 
-# Install required tools
-if ! command -v jq >/dev/null 2>&1; then
-    apk add --quiet jq >/dev/null 2>&1
-fi
+if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+    echo "📦 Installing required tools..."
+    apk add --quiet jq curl >/dev/null 2>&1
 
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
