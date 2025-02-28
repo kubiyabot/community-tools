@@ -4,7 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 
 create_branch_with_files = GitHubCliTool(
     name="github_create_branch_with_files",
-    description="Create a new branch and add/modify terraform configurations based on reference modules",
+    description="Create a new branch and add/modify files",
     content="""
 #!/bin/bash
 set -e
@@ -45,18 +45,9 @@ git config --global user.email "bot@kubiya.ai"
 echo "🌱 Creating branch..."
 git checkout -b "$UNIQUE_BRANCH" "origin/${base_branch:-main}"
 
-# Read existing file content before updating
-read_existing_content() {
-    local file="$1"
-    if [ -f "$file" ]; then
-        echo "📖 Reading existing content from: $file"
-        cat "$file"
-    fi
-}
-
-# Process terraform configuration files
+# Process files
 if [ -n "${files:-}" ]; then
-    echo "📝 Processing terraform configurations..."
+    echo "📝 Processing files..."
     echo "$files" | jq -c '.[]' | while read -r file_info; do
         path=$(echo "$file_info" | jq -r '.path')
         content=$(echo "$file_info" | jq -r '.content')
@@ -67,8 +58,7 @@ if [ -n "${files:-}" ]; then
         
         if [ "$append_mode" = "true" ] && [ -f "$path" ]; then
             echo "📎 Appending to existing file..."
-            existing_content=$(read_existing_content "$path")
-            echo -e "${existing_content}\\n${content}" > "$path"
+            echo -e "$(cat "$path")\\n${content}" > "$path"
         else
             echo "✏️  Creating/replacing file..."
             echo "$content" > "$path"
@@ -99,18 +89,11 @@ cd - >/dev/null
 rm -rf "$TEMP_DIR"
 """,
     args=[
-        Arg(name="repo", type="str", description="Application repository name (owner/repo)", required=True),
-        Arg(name="branch_name", type="str", description="Base name for the branch (timestamp will be added)", required=True),
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="branch_name", type="str", description="Base name for the branch", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-        Arg(name="files", type="str", description="""JSON array of terraform files to create/update. Format:
-[
-    {
-        "path": "terraform/services/new-service/main.tf",
-        "content": "module 'new_service' { ... }",
-        "append": true  # Optional: append to existing file instead of replacing
-    }
-]""", required=False),
-        Arg(name="commit_message", type="str", description="Commit message for terraform changes", required=False),
+        Arg(name="files", type="str", description="JSON array of files to create/update", required=False),
+        Arg(name="commit_message", type="str", description="Commit message", required=False),
     ],
 )
 

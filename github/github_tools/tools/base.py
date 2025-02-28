@@ -11,9 +11,17 @@ class GitHubCliTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required tools
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
+    # Silently install jq
     apk add --quiet jq >/dev/null 2>&1
+fi
+
+# Install Kubiya CLI if not present
+if ! command -v kubiya >/dev/null 2>&1; then
+    echo "📦 Installing Kubiya CLI..."
+    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    chmod +x /usr/local/bin/kubiya
 fi
 
 check_and_set_org() {{
@@ -93,9 +101,17 @@ class GitHubRepolessCliTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required tools
 if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
+    # Silently install jq
     apk add --quiet jq >/dev/null 2>&1
+fi
+
+# Install Kubiya CLI if not present
+if ! command -v kubiya >/dev/null 2>&1; then
+    echo "📦 Installing Kubiya CLI..."
+    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    chmod +x /usr/local/bin/kubiya
 fi
 
 check_and_set_org() {{
@@ -153,8 +169,16 @@ class BasicGitHubTool(Tool):
 #!/bin/sh
 set -e
 
+# Install required tools
 if ! command -v jq >/dev/null 2>&1; then
     apk add --quiet jq >/dev/null 2>&1
+fi
+
+# Install Kubiya CLI if not present
+if ! command -v kubiya >/dev/null 2>&1; then
+    echo "📦 Installing Kubiya CLI..."
+    curl -L https://download.kubiya.ai/cli/latest/kubiya-linux-amd64 -o /usr/local/bin/kubiya
+    chmod +x /usr/local/bin/kubiya
 fi
 
 {content}
