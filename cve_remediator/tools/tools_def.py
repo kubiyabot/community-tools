@@ -38,6 +38,5 @@ cve_remediation_tool = CVETool(
 [
     register_cve_tool(tool) for tool in [
         cve_info_tool,
-        cve_remediation_tool
     ]
 ] 
