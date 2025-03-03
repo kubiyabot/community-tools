@@ -49,7 +49,7 @@ while IFS= read -r file; do
     fi
 done <<< "$tf_files"
 
-module_selection=$(kubiya chat -n "gitboy" --stream \
+module_selection=$(kubiya chat -n "terraform-self-service" --stream \
     --suggest-tool "github_create_branch_with_files" \
     --message "Find appropriate terraform module for new service:
 - Service name: ${service_name}
