@@ -173,7 +173,3 @@ echo "✅ Analysis complete!"
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
     ]
 )
-
-tool_registry.register("github", analyze_terraform_structure)
-
-__all__ = ['analyze_terraform_structure'] 

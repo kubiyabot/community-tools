@@ -76,7 +76,3 @@ Requirements: ${requirements}"
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
     ]
 )
-
-tool_registry.register("github", github_terraform_updater)
-
-__all__ = ['github_terraform_updater']
