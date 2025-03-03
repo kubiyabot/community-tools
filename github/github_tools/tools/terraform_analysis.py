@@ -28,7 +28,29 @@ gh api "repos/${app_repo}/git/trees/HEAD?recursive=1" | \
 
 # Find appropriate module based on service requirements
 echo "🔍 Finding appropriate module..."
-module_selection=$(kubiya chat -n "terraform" \
+
+# Check which terraform files exist in the specified path
+echo "📁 Checking terraform files in ${app_path}..."
+tf_files=$(grep "^${app_path}.*\.tf$" app_files.txt || true)
+
+if [ -z "$tf_files" ]; then
+    echo "❌ No terraform files found in ${app_path}"
+    exit 1
+fi
+
+# Get content of existing terraform files
+echo "📄 Reading terraform files..."
+tf_content=""
+while IFS= read -r file; do
+    echo "Reading: $file"
+    content=$(gh api "repos/${app_repo}/contents/$file" --jq '.content' | base64 -d 2>/dev/null)
+    if [ -n "$content" ]; then
+        tf_content+="$file:\\n$content\\n\\n"
+    fi
+done <<< "$tf_files"
+
+module_selection=$(kubiya chat -n "gitboy" --stream \
+    --suggest-tool "github_create_branch_with_files" \
     --message "Find appropriate terraform module for new service:
 - Service name: ${service_name}
 - Service type: ${service_type}
@@ -38,17 +60,12 @@ Available modules:
 $(cat modules_content.txt)
 
 Current app structure:
-$(cat app_files.txt)" \
-    --stream)
+$(cat app_files.txt)
 
-# Once analysis is complete, call the update tool
-echo "🔄 Initiating terraform update..."
-kubiya run github_update_terraform_config \
-    --app-repo "${app_repo}" \
-    --module-source "${module_selection}" \
-    --service-name "${service_name}" \
-    --app-path "${app_path}" \
-    --base-branch "${base_branch:-main}"
+Current terraform files:
+$tf_content")
+
+echo "$module_selection"
 
 # Cleanup
 rm -f modules.txt modules_content.txt app_files.txt
