@@ -352,13 +352,6 @@ tools = [
 for tool in tools:
     tool_registry.register("github", tool)
 
-__all__ = [
-    'get_file',
-    'remote_search',
-    'stateful_create_pr',
-    'list_files'
-]
-
 # Script for direct file content editing
 FILE_EDIT_SCRIPT = '''
 #!/bin/bash

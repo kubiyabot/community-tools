@@ -4,10 +4,41 @@ from kubiya_sdk.tools.registry import tool_registry
 
 create_branch_with_files = GitHubCliTool(
     name="github_create_branch_with_files",
-    description="Create a new branch and add/modify files",
+    description="""Create a new branch and add/modify files. 
+    
+    IMPORTANT: You must provide the complete file contents when calling this tool.
+    Do not try to create files separately - include all file contents in the 'files' parameter.
+    
+    Example files parameter:
+    [
+        {
+            "path": "terraform/modules/services/alb/main.tf",
+            "content": "resource 'aws_lb' 'main' {...}",
+            "append": false
+        },
+        {
+            "path": "terraform/modules/services/alb/variables.tf",
+            "content": "variable 'name' {...}",
+            "append": false
+        }
+    ]
+    """,
     content="""
 #!/bin/bash
 set -e
+
+# Validate files parameter
+if [ -z "${files:-}" ]; then
+    echo "❌ No files specified. Please provide at least one file to create/modify"
+    echo "Files should be a JSON array with objects containing 'path' and 'content'"
+    exit 1
+fi
+
+# Validate files JSON structure
+echo "$files" | jq -e 'all(.[] | has("path") and has("content"))' >/dev/null || {
+    echo "❌ Invalid files format. Each file must have 'path' and 'content' fields"
+    exit 1
+}
 
 # Ensure GitHub CLI is authenticated
 if ! gh auth status &>/dev/null; then
@@ -92,7 +123,14 @@ rm -rf "$TEMP_DIR"
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="branch_name", type="str", description="Base name for the branch", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-        Arg(name="files", type="str", description="JSON array of files to create/update", required=False),
+        Arg(name="files", type="str", description="""JSON array of files to create/update. You must include the complete file contents here.
+            Each file must be an object with:
+            - path: File path in the repository (e.g., "terraform/modules/services/alb/main.tf")
+            - content: Complete file content (e.g., the entire Terraform configuration)
+            - append: (optional) Boolean to append instead of replace content
+            
+            Do not try to create files separately - include all file contents in this parameter.""", 
+            required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=False),
     ],
 )
