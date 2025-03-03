@@ -75,15 +75,40 @@ done < modules.txt
 # Analyze application repository
 echo "📂 Fetching repository tree for ${app_repo}"
 echo "Running: gh api \"repos/${app_repo}/git/trees/${base_branch}?recursive=1\""
-app_tree=$(gh api "repos/${app_repo}/git/trees/${base_branch}?recursive=1")
-echo "$app_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > app_files.txt
+app_tree=$(gh api "repos/${app_repo}/git/trees/${base_branch}?recursive=1") || {
+    echo "❌ Failed to fetch repository tree"
+    exit 1
+}
+
+# Find terraform files
+echo "🔍 Finding Terraform files"
+echo "$app_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > app_files.txt || {
+    echo "❌ Failed to process repository tree"
+    exit 1
+}
+
+# Check if any terraform files were found
+if [ ! -s app_files.txt ]; then
+    echo "❌ No Terraform files found in repository"
+    exit 1
+fi
 
 # Find terraform directories
 echo "🔍 Finding Terraform directories"
 echo "Processing terraform files to find directories..."
 while IFS= read -r file; do
-    dirname "$file"
+    dirname "$file" || {
+        echo "❌ Failed to process directory for file: $file"
+        exit 1
+    }
 done < app_files.txt | sort -u > tf_directories.txt
+
+# Check if directories file was created successfully
+if [ ! -s tf_directories.txt ]; then
+    echo "❌ Failed to identify Terraform directories"
+    exit 1
+fi
+
 tf_dirs=$(cat tf_directories.txt)
 
 # For each directory, gather its terraform content
