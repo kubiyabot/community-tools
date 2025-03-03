@@ -9,15 +9,56 @@ analyze_terraform_structure = GitHubCliTool(
 #!/bin/bash
 set -e
 
+# Debug: Print current user and their permissions
+echo "🔍 Checking GitHub authentication..."
+if ! gh auth status; then
+    echo "❌ Error: Not authenticated with GitHub"
+    exit 1
+fi
+
+# Debug: Print current user and organization context
+echo "👤 Current user context:"
+gh api user --jq '.login'
+
 # Analyze modules repository directly
-echo "📁 Analyzing terraform modules repository..."
-gh api "repos/${modules_repo}/git/trees/HEAD?recursive=1" | \
-    jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > modules.txt
+echo "📁 Analyzing terraform modules repository '${modules_repo}'..."
+
+# Debug: Try to view the repository first
+if ! gh repo view "${modules_repo}" 2>/dev/null; then
+    echo "❌ Error: Could not view repository '${modules_repo}'"
+    echo "Please check:"
+    echo "  1. The repository exists"
+    echo "  2. You have the correct permissions"
+    echo "  3. The repository name is spelled correctly"
+    echo "  4. If not using full path, prefix with organization name: org/repo"
+    exit 1
+fi
+
+# Try to get the default branch
+echo "🌿 Getting default branch..."
+default_branch=$(gh api "repos/${modules_repo}" --jq '.default_branch')
+echo "Default branch is: ${default_branch}"
+
+# Now try to get the tree using the default branch
+echo "🌳 Getting repository tree..."
+if ! modules_tree=$(gh api "repos/${modules_repo}/git/trees/${default_branch}?recursive=1" 2>/dev/null); then
+    echo "❌ Error: Could not access repository tree for '${modules_repo}'"
+    echo "API Response:"
+    gh api "repos/${modules_repo}/git/trees/${default_branch}?recursive=1" || true
+    exit 1
+fi
+
+# Continue only if we can access the repository
+echo "$modules_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > modules.txt
 
 # Get modules content for better analysis
 while read -r module_file; do
     echo "📄 Reading module: $module_file"
-    gh api "repos/${modules_repo}/contents/$module_file" --jq '.content' | base64 -d >> modules_content.txt
+    if ! module_content=$(gh api "repos/${modules_repo}/contents/$module_file" --jq '.content' 2>/dev/null); then
+        echo "⚠️ Warning: Could not read $module_file, skipping..."
+        continue
+    fi
+    echo "$module_content" | base64 -d >> modules_content.txt
     echo -e "\\n---\\n" >> modules_content.txt
 done < modules.txt
 
