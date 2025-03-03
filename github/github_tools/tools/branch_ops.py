@@ -1,24 +1,19 @@
 from kubiya_sdk.tools import Arg
 from .base import GitHubCliTool
 from kubiya_sdk.tools.registry import tool_registry
+import json
 
 create_branch_with_files = GitHubCliTool(
     name="github_create_branch_with_files",
     description="""Create a new branch and add/modify files. 
     
     IMPORTANT: You must provide the complete file contents when calling this tool.
-    Do not try to create files separately - include all file contents in the 'files' parameter.
+    The files parameter should be a list of dictionaries with the following structure:
     
-    Example files parameter:
-    [
+    files = [
         {
             "path": "terraform/modules/services/alb/main.tf",
             "content": "resource 'aws_lb' 'main' {...}",
-            "append": false
-        },
-        {
-            "path": "terraform/modules/services/alb/variables.tf",
-            "content": "variable 'name' {...}",
             "append": false
         }
     ]
@@ -27,15 +22,24 @@ create_branch_with_files = GitHubCliTool(
 #!/bin/bash
 set -e
 
+# Convert files parameter to proper JSON if needed
+if [[ "$files" == "["* ]]; then
+    # Already looks like JSON, use as-is
+    FILES_JSON="$files"
+else
+    # Try to evaluate as Python and convert to JSON
+    FILES_JSON=$(python3 -c "import json, ast; print(json.dumps(ast.literal_eval('$files')))")
+fi
+
 # Validate files parameter
-if [ -z "${files:-}" ]; then
+if [ -z "${FILES_JSON:-}" ]; then
     echo "❌ No files specified. Please provide at least one file to create/modify"
     echo "Files should be a JSON array with objects containing 'path' and 'content'"
     exit 1
 fi
 
 # Validate files JSON structure
-echo "$files" | jq -e 'all(.[] | has("path") and has("content"))' >/dev/null || {
+echo "$FILES_JSON" | jq -e 'all(.[] | has("path") and has("content"))' >/dev/null || {
     echo "❌ Invalid files format. Each file must have 'path' and 'content' fields"
     exit 1
 }
@@ -77,9 +81,9 @@ echo "🌱 Creating branch..."
 git checkout -b "$UNIQUE_BRANCH" "origin/${base_branch:-main}"
 
 # Process files
-if [ -n "${files:-}" ]; then
+if [ -n "${FILES_JSON:-}" ]; then
     echo "📝 Processing files..."
-    echo "$files" | jq -c '.[]' | while read -r file_info; do
+    echo "$FILES_JSON" | jq -c '.[]' | while read -r file_info; do
         path=$(echo "$file_info" | jq -r '.path')
         content=$(echo "$file_info" | jq -r '.content')
         append_mode=$(echo "$file_info" | jq -r '.append // "false"')
@@ -123,13 +127,10 @@ rm -rf "$TEMP_DIR"
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="branch_name", type="str", description="Base name for the branch", required=True),
         Arg(name="base_branch", type="str", description="Base branch to create from", required=False, default="main"),
-        Arg(name="files", type="str", description="""JSON array of files to create/update. You must include the complete file contents here.
-            Each file must be an object with:
+        Arg(name="files", type="list", description="""List of files to create/update. Each file must be a dictionary with:
             - path: File path in the repository (e.g., "terraform/modules/services/alb/main.tf")
             - content: Complete file content (e.g., the entire Terraform configuration)
-            - append: (optional) Boolean to append instead of replace content
-            
-            Do not try to create files separately - include all file contents in this parameter.""", 
+            - append: (optional) Boolean to append instead of replace content""", 
             required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=False),
     ],
