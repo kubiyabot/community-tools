@@ -232,8 +232,3 @@ echo "✨ Search Complete! ✨"
         Arg(name="limit", type="str", description="Maximum results to return", required=False, default="100"),
     ],
 )
-
-# Register tools
-tool_registry.register("github", github_search)
-tool_registry.register("github", code_search)
-tool_registry.register("github", advanced_code_search) 
