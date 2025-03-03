@@ -80,7 +80,11 @@ echo "$app_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > a
 
 # Find terraform directories
 echo "🔍 Finding Terraform directories"
-tf_dirs=$(cat app_files.txt | xargs -n1 dirname | sort -u)
+echo "Processing terraform files to find directories..."
+while IFS= read -r file; do
+    dirname "$file"
+done < app_files.txt | sort -u > tf_directories.txt
+tf_dirs=$(cat tf_directories.txt)
 
 # For each directory, gather its terraform content
 for dir in $tf_dirs; do
@@ -124,7 +128,7 @@ INSTRUCTIONS:
 
 echo "🧹 Cleaning up temporary files..."
 # Cleanup
-rm -f modules.txt modules_content.txt app_files.txt app_content.txt
+rm -f modules.txt modules_content.txt app_files.txt app_content.txt tf_directories.txt
 
 echo "✅ Analysis complete!"
 """,
