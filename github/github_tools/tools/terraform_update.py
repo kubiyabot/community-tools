@@ -47,7 +47,7 @@ ${variables_tf}
 terraform.tfvars:
 ${tfvars:-'# No existing tfvars'}")
 
-# Create branch with updates
+# Create branch with updates and call PR creation tool
 echo "🌱 Creating branch with updates..."
 kubiya run github_create_branch_with_files \
     --repo "${app_repo}" \
@@ -55,17 +55,6 @@ kubiya run github_create_branch_with_files \
     --base-branch "${base_branch:-main}" \
     --files "${updated_config}" \
     --commit-message "feat: add terraform configuration for ${service_name}"
-
-# Create PR
-echo "📝 Creating pull request..."
-kubiya run github_create_pr \
-    --repo "${app_repo}" \
-    --title "feat: add terraform configuration for ${service_name}" \
-    --body "Adds terraform configuration for new ${service_name} service" \
-    --base "${base_branch:-main}" \
-    --head "terraform/${service_name}"
-
-echo "✨ Terraform configuration updated and PR created!"
 """,
     args=[
         Arg(name="app_repo", type="str", description="Application repository to update", required=True),
