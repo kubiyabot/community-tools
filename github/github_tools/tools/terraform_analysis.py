@@ -80,7 +80,7 @@ echo "$app_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > a
 
 # Find terraform directories
 echo "🔍 Finding Terraform directories"
-tf_dirs=$(dirname $(cat app_files.txt) | sort -u)
+tf_dirs=$(cat app_files.txt | xargs -n1 dirname | sort -u)
 
 # For each directory, gather its terraform content
 for dir in $tf_dirs; do
