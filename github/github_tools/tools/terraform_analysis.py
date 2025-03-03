@@ -97,21 +97,18 @@ fi
 echo "🔍 Finding Terraform directories"
 echo "Processing terraform files to find directories..."
 
-# Create a temporary function to process directories
-process_directories() {
-    while IFS= read -r file; do
-        dirname "$file" || {
-            echo "❌ Failed to process directory for file: $file" >&2
-            return 1
-        }
-    done
-}
+# Process directories one at a time
+touch tf_directories.txt
+while IFS= read -r file; do
+    dir=$(dirname "$file") || {
+        echo "❌ Failed to process directory for file: $file"
+        exit 1
+    }
+    echo "$dir" >> tf_directories.txt
+done < app_files.txt
 
-# Process directories and handle errors
-if ! cat app_files.txt | process_directories | sort -u > tf_directories.txt; then
-    echo "❌ Directory processing failed"
-    exit 1
-fi
+# Sort and deduplicate the directories
+sort -u tf_directories.txt > tf_directories.tmp && mv tf_directories.tmp tf_directories.txt
 
 # Check if directories file was created successfully
 if [ ! -s tf_directories.txt ]; then
