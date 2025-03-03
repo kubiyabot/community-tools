@@ -65,6 +65,16 @@ get_repo_context() {{
             fi
         fi
         echo "Using repository: $repo"
+        
+        # Check if repository exists and is accessible
+        if ! gh repo view "$repo" >/dev/null 2>&1; then
+            echo "Error: Repository '$repo' not found or not accessible."
+            echo "Please check:"
+            echo "  1. The repository exists"
+            echo "  2. You have the correct permissions"
+            echo "  3. The repository name is spelled correctly"
+            exit 1
+        fi
     fi
 }}
 
@@ -105,6 +115,7 @@ set -e
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
     echo "📦 Installing required tools..."
     apk add --quiet jq curl >/dev/null 2>&1
+fi
 
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
@@ -171,6 +182,7 @@ set -e
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
     echo "📦 Installing required tools..."
     apk add --quiet jq curl >/dev/null 2>&1
+fi
 
 # Install Kubiya CLI if not present
 if ! command -v kubiya >/dev/null 2>&1; then
