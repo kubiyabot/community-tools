@@ -346,7 +346,6 @@ echo "✨ File listing complete!"
 # Update the tools list
 tools = [
     get_file,
-    remote_search,
     list_files
 ]
 
