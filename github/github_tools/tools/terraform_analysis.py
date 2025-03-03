@@ -1,41 +1,70 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool
+from .base import BasicGitHubTool
 from kubiya_sdk.tools.registry import tool_registry
 
-analyze_terraform_structure = GitHubCliTool(
+analyze_terraform_structure = BasicGitHubTool(
     name="github_analyze_terraform_structure",
     description="Gather terraform files information and determine required changes",
     content="""
 #!/bin/bash
 set -e
 
-# Debug: Print current user and their permissions
-echo "🔍 Checking GitHub authentication..."
-if ! gh auth status; then
-    echo "❌ Error: Not authenticated with GitHub"
-    exit 1
-fi
+echo "🚀 Starting terraform analysis with:"
+echo "- Service name: ${service_name}"
+echo "- Service type: ${service_type}"
+echo "- Modules repo: ${modules_repo}"
+echo "- App repo: ${app_repo}"
+echo "- Base branch: ${base_branch}"
+echo "----------------------------------------"
 
-# Debug: Print current user context
-echo "👤 Current user context:"
-gh api user --jq '.login'
+# Validate repository format
+validate_repo() {
+    local repo=$1
+    echo "🔍 Validating repository format for: $repo"
+    if [[ ! $repo =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+        echo "❌ Error: Invalid repository format for '$repo'"
+        echo "Repository should be in format 'owner/repo'"
+        exit 1
+    fi
+}
 
-# Analyze modules repository
-echo "📁 Analyzing terraform modules repository '${modules_repo}'..."
-if ! gh repo view "${modules_repo}" 2>/dev/null; then
-    echo "❌ Error: Could not view repository '${modules_repo}'"
-    echo "Please check repository access and name"
-    exit 1
-fi
+# Validate input repositories
+validate_repo "${modules_repo}"
+validate_repo "${app_repo}"
+
+# Check repository access
+check_repo_access() {
+    local repo=$1
+    echo "🔍 Verifying access to repository: $repo"
+    echo "Running: gh repo view \"$repo\" --json name"
+    if ! gh repo view "$repo" --json name >/dev/null 2>&1; then
+        echo "❌ Error: Cannot access repository '$repo'"
+        echo "Please check repository permissions and name"
+        exit 1
+    fi
+}
+
+check_repo_access "${modules_repo}"
+check_repo_access "${app_repo}"
 
 # Get default branch and tree
+echo "📥 Fetching default branch for ${modules_repo}"
+echo "Running: gh api \"repos/${modules_repo}\" --jq '.default_branch'"
 default_branch=$(gh api "repos/${modules_repo}" --jq '.default_branch')
+echo "Default branch: ${default_branch}"
+
+echo "📂 Fetching repository tree for ${modules_repo}"
+echo "Running: gh api \"repos/${modules_repo}/git/trees/${default_branch}?recursive=1\""
 modules_tree=$(gh api "repos/${modules_repo}/git/trees/${default_branch}?recursive=1")
 
 # Get all module files and their contents
+echo "🔍 Finding Terraform files in modules repository"
 echo "$modules_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > modules.txt
+
+echo "📄 Reading module contents:"
 while read -r module_file; do
-    echo "📄 Reading module: $module_file"
+    echo "  - Reading: $module_file"
+    echo "  Running: gh api \"repos/${modules_repo}/contents/$module_file\""
     module_content=$(gh api "repos/${modules_repo}/contents/$module_file" --jq '.content' 2>/dev/null || echo "")
     if [ -n "$module_content" ]; then
         echo "$module_content" | base64 -d >> modules_content.txt
@@ -44,11 +73,13 @@ while read -r module_file; do
 done < modules.txt
 
 # Analyze application repository
-echo "📁 Analyzing application repository..."
+echo "📂 Fetching repository tree for ${app_repo}"
+echo "Running: gh api \"repos/${app_repo}/git/trees/${base_branch}?recursive=1\""
 app_tree=$(gh api "repos/${app_repo}/git/trees/${base_branch}?recursive=1")
 echo "$app_tree" | jq -r '.tree[] | select(.path | endswith(".tf")) | .path' > app_files.txt
 
 # Find terraform directories
+echo "🔍 Finding Terraform directories"
 tf_dirs=$(dirname $(cat app_files.txt) | sort -u)
 
 # For each directory, gather its terraform content
@@ -58,6 +89,8 @@ for dir in $tf_dirs; do
     
     if [ -n "$tf_files" ]; then
         while IFS= read -r file; do
+            echo "  - Reading: $file"
+            echo "  Running: gh api \"repos/${app_repo}/contents/$file\""
             content=$(gh api "repos/${app_repo}/contents/$file" --jq '.content' | base64 -d 2>/dev/null)
             if [ -n "$content" ]; then
                 echo "FILE:$file" >> app_content.txt
@@ -68,6 +101,7 @@ for dir in $tf_dirs; do
     fi
 done
 
+echo "🤖 Analyzing terraform structure and suggesting changes..."
 # Analyze and determine changes
 kubiya chat -n "terraform-self-service" --stream \
     --suggest-tool "github_terraform_updater" \
@@ -86,27 +120,13 @@ INSTRUCTIONS:
 1. Find the most appropriate module from the available modules
 2. Determine which existing terraform files need updates
 3. Generate the required terraform code
-4. Specify if new files need to be created
+4. Specify if new files need to be created"
 
-RESPONSE FORMAT:
-Please format your response as a series of file changes, like this:
-
-\`\`\`hcl:path/to/existing/file.tf
-// ... existing code ...
-
-module \"new_service\" {
-    source = \"../modules/selected_module\"
-    // ... configuration ...
-}
-\`\`\`
-
-For new files:
-\`\`\`hcl:path/to/new/file.tf
-// Complete contents of new file
-\`\`\`"
-
+echo "🧹 Cleaning up temporary files..."
 # Cleanup
 rm -f modules.txt modules_content.txt app_files.txt app_content.txt
+
+echo "✅ Analysis complete!"
 """,
     args=[
         Arg(name="service_name", type="str", description="Name of the new service", required=True),
