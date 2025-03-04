@@ -119,6 +119,27 @@ fi
 echo "✨ Branch '$UNIQUE_BRANCH' created successfully!"
 echo "🔗 Branch URL: https://github.com/$repo/tree/$UNIQUE_BRANCH"
 
+# Create PR if requested
+if [ "${create_pr}" = "true" ]; then
+    echo "📝 Creating pull request..."
+    PR_URL=$(gh pr create \
+        --repo "$repo" \
+        --base "${base_branch:-main}" \
+        --head "$UNIQUE_BRANCH" \
+        --title "${pr_title:-Add new service configuration}" \
+        --body "${pr_body:-Add new service configuration}" \
+        $([[ -n "${pr_reviewers}" ]] && echo "--reviewer ${pr_reviewers}") \
+        $([[ -n "${pr_assignees}" ]] && echo "--assignee ${pr_assignees}"))
+    
+    if [ $? -eq 0 ]; then
+        echo "✨ Pull request created successfully!"
+        echo "🔗 PR URL: $PR_URL"
+    else
+        echo "❌ Failed to create pull request"
+        echo "You can create it manually using the branch: $UNIQUE_BRANCH"
+    fi
+fi
+
 # Cleanup
 cd - >/dev/null
 rm -rf "$TEMP_DIR"
@@ -133,6 +154,11 @@ rm -rf "$TEMP_DIR"
             - append: (optional) Boolean to append instead of replace content""", 
             required=True),
         Arg(name="commit_message", type="str", description="Commit message", required=False),
+        Arg(name="create_pr", type="bool", description="Whether to create a PR after pushing the branch", required=False, default=False),
+        Arg(name="pr_title", type="str", description="Title for the PR (if create_pr is true)", required=False),
+        Arg(name="pr_body", type="str", description="Description for the PR (if create_pr is true)", required=False),
+        Arg(name="pr_reviewers", type="str", description="Comma-separated list of PR reviewers (if create_pr is true)", required=False),
+        Arg(name="pr_assignees", type="str", description="Comma-separated list of PR assignees (if create_pr is true)", required=False),
     ],
 )
 
