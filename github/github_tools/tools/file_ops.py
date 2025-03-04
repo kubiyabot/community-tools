@@ -249,7 +249,7 @@ $(add_disclaimer text)"
 '''
 
 # Tool definitions using the shared script
-get_file = BasicGitHubTool(
+get_file = GitHubCliTool(
     name="github_get_file",
     description="""Get contents of a specific file from a repository.
     
