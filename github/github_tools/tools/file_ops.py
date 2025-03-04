@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg, Volume
-from .base import GitHubCliTool
+from .base import GitHubCliTool, BasicGitHubTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Define the volume for git operations
@@ -249,7 +249,7 @@ $(add_disclaimer text)"
 '''
 
 # Tool definitions using the shared script
-get_file = GitHubCliTool(
+get_file = BasicGitHubTool(
     name="github_get_file",
     description="""Get contents of a specific file from a repository.
     
