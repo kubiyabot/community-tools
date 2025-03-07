@@ -1,0 +1,2 @@
+kubiya-sdk
+okta-sdk-python>=2.5.0

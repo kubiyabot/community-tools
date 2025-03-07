@@ -1,0 +1,3 @@
+kubiya-sdk
+mysql-connector-python
+sshtunnel
