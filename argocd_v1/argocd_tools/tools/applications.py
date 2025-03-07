@@ -40,18 +40,18 @@ class ApplicationManager:
             name="create_application",
             description="Create a new ArgoCD application",
             content="""
-            if [ -z "$APP_NAME" ] || [ -z "$REPO_URL" ]; then
+            if [ -z "$app_name" ] || [ -z "$repo_url" ]; then
                 echo "Error: Application name and repository URL are required"
                 exit 1
             fi
 
             # Create application using ArgoCD CLI
-            argocd app create "$APP_NAME" \
-                --repo "$REPO_URL" \
-                --path "$PATH" \
-                --dest-server "$DEST_SERVER" \
-                --dest-namespace "$DEST_NAMESPACE" \
-                --sync-policy "$SYNC_POLICY" \
+            argocd app create "$app_name" \
+                --repo "$repo_url" \
+                --path "$path" \
+                --dest-server "$dest_server" \
+                --dest-namespace "$dest_namespace" \
+                --sync-policy "$sync_policy" \
                 --insecure
             """,
             args=[
@@ -97,13 +97,13 @@ class ApplicationManager:
             name="sync_application",
             description="Sync an ArgoCD application",
             content="""
-            if [ -z "$APP_NAME" ]; then
+            if [ -z "$app_name" ]; then
                 echo "Error: Application name not specified"
                 exit 1
             fi
 
             # Sync application using ArgoCD CLI
-            argocd app sync "$APP_NAME" ${PRUNE:+--prune} ${FORCE:+--force} --insecure
+            argocd app sync "$app_name" ${prune:+--prune} ${force:+--force} --insecure
             """,
             args=[
                 Arg(name="app_name",
@@ -124,11 +124,11 @@ class ApplicationManager:
             name="get_application_logs",
             description="Get logs from an application's pods",
             content="""
-            if [ -z "$APP_NAME" ]; then
+            if [ -z "$app_name" ]; then
                 echo "Error: Application name not specified"
                 exit 1
             fi
-            argocd app logs "$APP_NAME" ${CONTAINER:+--container $CONTAINER} ${FOLLOW:+--follow} --insecure
+            argocd app logs "$app_name" ${container:+--container $container} ${follow:+--follow} --insecure
             """,
             args=[
                 Arg(name="app_name",
@@ -149,13 +149,13 @@ class ApplicationManager:
             name="get_application_details",
             description="Get detailed information about an ArgoCD application",
             content="""
-            if [ -z "$APP_NAME" ]; then
+            if [ -z "$app_name" ]; then
                 echo "Error: Application name not specified"
                 exit 1
             fi
 
             # Get application details
-            argocd app get "$APP_NAME" --insecure
+            argocd app get "$app_name" --insecure
             """,
             args=[
                 Arg(name="app_name",
@@ -170,13 +170,13 @@ class ApplicationManager:
             name="refresh_application",
             description="Refresh ArgoCD cache for an application",
             content="""
-            if [ -z "$APP_NAME" ]; then
+            if [ -z "$app_name" ]; then
                 echo "Error: Application name not specified"
                 exit 1
             fi
 
             # Refresh application cache
-            argocd app get "$APP_NAME" --refresh --insecure
+            argocd app get "$app_name" --refresh --insecure
             """,
             args=[
                 Arg(name="app_name",
@@ -203,13 +203,13 @@ class ApplicationManager:
             name="get_application_history",
             description="List past revisions of an application",
             content="""
-            if [ -z "$APP_NAME" ]; then
+            if [ -z "$app_name" ]; then
                 echo "Error: Application name not specified"
                 exit 1
             fi
 
             # Get deployment history
-            argocd app history "$APP_NAME" --insecure
+            argocd app history "$app_name" --insecure
             """,
             args=[
                 Arg(name="app_name",
