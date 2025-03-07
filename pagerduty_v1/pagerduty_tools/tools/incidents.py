@@ -21,7 +21,6 @@ class IncidentManager:
                 self.list_services(),
                 self.list_users(),
                 self.list_teams(),
-                self.verify_config(),
                 self.get_oncall_engineers()
             ]
             
