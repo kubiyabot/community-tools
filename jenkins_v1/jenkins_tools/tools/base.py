@@ -41,7 +41,8 @@ class JenkinsTool(Tool):
     icon_url: str = JENKINS_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
-    env: List[str] = ["JENKINS_URL", "JENKINS_USER", "JENKINS_TOKEN"]
+    env: List[str] = []
+    secrets: List[str] = []
 
     def __init__(self, name, description, content, args=None, image="jenkins/jenkins:lts-jdk11"):
         # Add helper functions for Jenkins operations
@@ -128,7 +129,8 @@ class JenkinsTool(Tool):
             image=image,
             icon_url=JENKINS_ICON_URL,
             type="docker",
-            env=["JENKINS_URL", "JENKINS_USER", "JENKINS_TOKEN"]
+            env=["JENKINS_URL", "JENKINS_USER"],
+            secrets=["JENKINS_TOKEN"]
         )
 
     def get_args(self) -> List[Arg]:
@@ -158,11 +160,3 @@ class JenkinsTool(Tool):
         if missing_args:
             return f"Missing required arguments: {', '.join(missing_args)}"
         return None
-
-    def get_environment(self) -> Dict[str, str]:
-        """Return required environment variables."""
-        return {
-            "JENKINS_URL": "",
-            "JENKINS_USER": "",
-            "JENKINS_TOKEN": ""
-        } 
