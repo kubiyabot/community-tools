@@ -156,11 +156,3 @@ class JenkinsTool(Tool):
         if missing_args:
             return f"Missing required arguments: {', '.join(missing_args)}"
         return None
-
-    def get_environment(self) -> Dict[str, str]:
-        """Return required environment variables."""
-        return {
-            "JENKINS_URL": "",
-            "JENKINS_USER": "",
-            "JENKINS_TOKEN": ""
-        } 
