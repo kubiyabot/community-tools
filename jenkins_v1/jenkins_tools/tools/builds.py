@@ -35,7 +35,7 @@ class BuildAnalyzer:
             name="jenkins_build_logs_failed",
             description="Get logs from a failed build",
             content="""
-            if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
+            if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
             fi
@@ -44,14 +44,14 @@ class BuildAnalyzer:
             validate_jenkins_connection
 
             # Get build URL
-            BUILD_URL=$(get_build_url "$JOB_NAME" "$BUILD_NUMBER")
+            BUILD_URL=$(get_build_url "$job_name" "$build_number")
 
             # Get build status
-            STATUS=$(get_build_status "$JOB_NAME" "$BUILD_NUMBER")
+            STATUS=$(get_build_status "$job_name" "$build_number")
             
             echo "=== Build Information ==="
-            echo "Job: $JOB_NAME"
-            echo "Build: #$BUILD_NUMBER"
+            echo "Job: $job_name"
+            echo "Build: #$build_number"
             echo "Status: $STATUS"
             echo "URL: $BUILD_URL"
 
@@ -60,13 +60,13 @@ class BuildAnalyzer:
             curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL/consoleText"
 
             # Get error patterns if specified
-            if [ "$ANALYZE_ERRORS" = "true" ]; then
+            if [ "$analyze_errors" = "true" ]; then
                 echo "\n=== Error Analysis ==="
                 curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL/consoleText" | grep -i "error\\|exception\\|failed\\|failure" || true
             fi
 
             # Get test results if available
-            if [ "$INCLUDE_TESTS" = "true" ]; then
+            if [ "$include_tests" = "true" ]; then
                 echo "\n=== Test Results ==="
                 curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL/testReport/api/json" 2>/dev/null | \
                     jq -r '.failCount, .passCount, .skipCount' || echo "No test results available"
@@ -95,7 +95,7 @@ class BuildAnalyzer:
             name="analyze_build_failure",
             description="Analyze the cause of a build failure",
             content="""
-            if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
+            if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
             fi
@@ -103,7 +103,7 @@ class BuildAnalyzer:
             # Validate Jenkins connection
             validate_jenkins_connection
 
-            BUILD_URL=$(get_build_url "$JOB_NAME" "$BUILD_NUMBER")
+            BUILD_URL=$(get_build_url "$job_name" "$build_number")
 
             echo "=== Build Analysis ==="
             
@@ -164,7 +164,7 @@ class BuildAnalyzer:
             name="get_build_artifacts",
             description="Get artifacts from a build",
             content="""
-            if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
+            if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
             fi
@@ -172,7 +172,7 @@ class BuildAnalyzer:
             # Validate Jenkins connection
             validate_jenkins_connection
 
-            BUILD_URL=$(get_build_url "$JOB_NAME" "$BUILD_NUMBER")
+            BUILD_URL=$(get_build_url "$job_name" "$build_number")
 
             echo "=== Build Artifacts ==="
             
@@ -186,7 +186,7 @@ class BuildAnalyzer:
             fi
 
             # Create artifacts directory
-            ARTIFACTS_DIR="${OUTPUT_DIR:-artifacts}"
+            ARTIFACTS_DIR="${output_dir:-artifacts}"
             mkdir -p "$ARTIFACTS_DIR"
 
             # Download artifacts
@@ -219,7 +219,7 @@ class BuildAnalyzer:
             name="compare_builds",
             description="Compare two builds of the same job",
             content="""
-            if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER1" ] || [ -z "$BUILD_NUMBER2" ]; then
+            if [ -z "$job_name" ] || [ -z "$build_number1" ] || [ -z "$build_number2" ]; then
                 echo "Error: Job name and both build numbers are required"
                 exit 1
             fi
@@ -227,11 +227,11 @@ class BuildAnalyzer:
             # Validate Jenkins connection
             validate_jenkins_connection
 
-            BUILD_URL1=$(get_build_url "$JOB_NAME" "$BUILD_NUMBER1")
-            BUILD_URL2=$(get_build_url "$JOB_NAME" "$BUILD_NUMBER2")
+            BUILD_URL1=$(get_build_url "$job_name" "$build_number1")
+            BUILD_URL2=$(get_build_url "$job_name" "$build_number2")
 
             echo "=== Build Comparison ==="
-            echo "Comparing builds #$BUILD_NUMBER1 and #$BUILD_NUMBER2 of $JOB_NAME"
+            echo "Comparing builds #$build_number1 and #$build_number2 of $job_name"
 
             # Get build information
             BUILD1_INFO=$(curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL1/api/json")
@@ -239,12 +239,12 @@ class BuildAnalyzer:
 
             # Compare basic metrics
             echo "\n=== Basic Metrics ==="
-            echo "Build #$BUILD_NUMBER1:"
+            echo "Build #$build_number1:"
             echo "Result: $(echo "$BUILD1_INFO" | jq -r '.result')"
             echo "Duration: $(echo "$BUILD1_INFO" | jq -r '.duration')"
             echo "Timestamp: $(echo "$BUILD1_INFO" | jq -r '.timestamp')"
 
-            echo "\nBuild #$BUILD_NUMBER2:"
+            echo "\nBuild #$build_number2:"
             echo "Result: $(echo "$BUILD2_INFO" | jq -r '.result')"
             echo "Duration: $(echo "$BUILD2_INFO" | jq -r '.duration')"
             echo "Timestamp: $(echo "$BUILD2_INFO" | jq -r '.timestamp')"
@@ -261,12 +261,12 @@ class BuildAnalyzer:
             TEST1=$(curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL1/testReport/api/json" 2>/dev/null || echo '{"failCount":0,"passCount":0,"skipCount":0}')
             TEST2=$(curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL2/testReport/api/json" 2>/dev/null || echo '{"failCount":0,"passCount":0,"skipCount":0}')
 
-            echo "Build #$BUILD_NUMBER1:"
+            echo "Build #$build_number1:"
             echo "Failed: $(echo "$TEST1" | jq -r '.failCount')"
             echo "Passed: $(echo "$TEST1" | jq -r '.passCount')"
             echo "Skipped: $(echo "$TEST1" | jq -r '.skipCount')"
 
-            echo "\nBuild #$BUILD_NUMBER2:"
+            echo "\nBuild #$build_number2:"
             echo "Failed: $(echo "$TEST2" | jq -r '.failCount')"
             echo "Passed: $(echo "$TEST2" | jq -r '.passCount')"
             echo "Skipped: $(echo "$TEST2" | jq -r '.skipCount')"
