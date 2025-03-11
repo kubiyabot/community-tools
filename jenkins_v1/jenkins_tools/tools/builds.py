@@ -1,23 +1,13 @@
 from typing import List
+import sys
 from .base import JenkinsTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 
-class BuildAnalyzer(JenkinsTool):
+class BuildAnalyzer:
     """Analyze Jenkins builds and their logs."""
     
     def __init__(self):
-        super().__init__(
-            name="jenkins_builds",
-            description="Analyze Jenkins builds and their logs",
-            content="",
-            args=[],
-            image="jenkins/jenkins:lts-jdk11"
-        )
-        # Register all build analysis tools
-        self.register_tools()
-
-    def register_tools(self):
-        """Register all build analysis tools."""
+        """Initialize and register all tools."""
         try:
             # Create and register tools
             tools = [
@@ -28,10 +18,15 @@ class BuildAnalyzer(JenkinsTool):
             ]
             
             for tool in tools:
-                tool_registry.register("jenkins", tool)
-                
+                try:
+                    tool_registry.register("jenkins", tool)
+                    print(f"✅ Registered: {tool.name}")
+                except Exception as e:
+                    print(f"❌ Failed to register {tool.name}: {str(e)}", file=sys.stderr)
+                    raise
+
         except Exception as e:
-            print(f"Error registering build analysis tools: {str(e)}")
+            print(f"❌ Failed to register Jenkins build tools: {str(e)}", file=sys.stderr)
             raise
 
     def get_failed_build_logs(self) -> JenkinsTool:
@@ -289,3 +284,6 @@ class BuildAnalyzer(JenkinsTool):
             ],
             image="curlimages/curl:latest"
         ) 
+
+# Initialize when module is imported
+BuildAnalyzer() 
