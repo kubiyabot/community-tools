@@ -86,7 +86,7 @@ class BuildAnalyzer:
                     description="Include test results in the output",
                     required=False)
             ],
-            image="curlimages/curl:latest"
+            image="curlimages/curl:8.1.2"  # Using a specific version that includes jq
         )
 
     def analyze_build_failure(self) -> JenkinsTool:

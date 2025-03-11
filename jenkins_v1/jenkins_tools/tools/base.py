@@ -42,6 +42,43 @@ class JenkinsTool(Tool):
     mermaid: str = DEFAULT_MERMAID
     
     def __init__(self, name, description, content, args=None, image="jenkins/jenkins:lts-jdk11"):
+        # Add helper functions to the content
+        helper_functions = """
+            # Helper functions for Jenkins tools
+            validate_jenkins_connection() {
+                if [ -z "$JENKINS_URL" ]; then
+                    echo "Error: JENKINS_URL environment variable is not set"
+                    exit 1
+                fi
+
+                if [ -z "$JENKINS_USER" ] || [ -z "$JENKINS_TOKEN" ]; then
+                    echo "Error: JENKINS_USER and JENKINS_TOKEN environment variables are required"
+                    exit 1
+                fi
+
+                # Test connection
+                if ! curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/api/json" > /dev/null; then
+                    echo "Error: Could not connect to Jenkins server"
+                    exit 1
+                fi
+            }
+
+            get_build_url() {
+                local job_name="$1"
+                local build_number="$2"
+                echo "$JENKINS_URL/job/$job_name/$build_number"
+            }
+
+            get_build_status() {
+                local job_name="$1"
+                local build_number="$2"
+                local build_url=$(get_build_url "$job_name" "$build_number")
+                curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$build_url/api/json" | jq -r '.result'
+            }
+        """
+        
+        content = helper_functions + "\n" + content
+        
         super().__init__(
             name=name,
             description=description,
