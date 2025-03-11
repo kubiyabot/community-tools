@@ -32,16 +32,14 @@ classDiagram
 class JenkinsTool(Tool):
     """Base class for all Jenkins tools."""
     
-    name: str
-    description: str
-    content: str = ""
-    args: List[Arg] = []
-    image: str = "jenkins/jenkins:lts-jdk11"
-    icon_url: str = JENKINS_ICON_URL
-    type: str = "docker"
-    mermaid: str = DEFAULT_MERMAID
-    
-    def __init__(self, name, description, content, args=None, image="jenkins/jenkins:lts-jdk11"):
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        content: str = "",
+        args: Optional[List[Arg]] = None,
+        image: str = "jenkins/jenkins:lts-jdk11"
+    ):
         # Add helper functions for Jenkins operations
         setup_content = """
 # Begin helper functions
@@ -125,8 +123,10 @@ class JenkinsTool(Tool):
             icon_url=JENKINS_ICON_URL,
             type="docker",
             secrets=["JENKINS_TOKEN"],
-            env=["JENKINS_URL", "JENKINS_USER"]
+            env=["JENKINS_URL", "JENKINS_USER"],
+            mermaid=DEFAULT_MERMAID
         )
+        self.args = args or []
 
     def get_args(self) -> List[Arg]:
         """Return the tool's arguments."""
