@@ -38,7 +38,7 @@ class BuildAnalyzer:
             if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
-            }
+            fi
 
             # Validate Jenkins connection
             validate_jenkins_connection
@@ -98,7 +98,7 @@ class BuildAnalyzer:
             if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
-            }
+            fi
 
             # Validate Jenkins connection
             validate_jenkins_connection
@@ -167,7 +167,7 @@ class BuildAnalyzer:
             if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
-            }
+            fi
 
             # Validate Jenkins connection
             validate_jenkins_connection
@@ -222,7 +222,7 @@ class BuildAnalyzer:
             if [ -z "$JOB_NAME" ] || [ -z "$BUILD_NUMBER1" ] || [ -z "$BUILD_NUMBER2" ]; then
                 echo "Error: Job name and both build numbers are required"
                 exit 1
-            }
+            fi
 
             # Validate Jenkins connection
             validate_jenkins_connection
