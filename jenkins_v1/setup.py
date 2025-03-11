@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="jenkins_tools",
     version="0.1.0",
-    packages=find_packages(include=['jenkins_tools', 'jenkins_tools.*']),
+    packages=find_packages(),
     install_requires=[
         "kubiya-sdk>=0.1.0",
         "requests>=2.31.0",
