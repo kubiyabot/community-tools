@@ -41,9 +41,7 @@ class JenkinsTool(Tool):
     icon_url: str = JENKINS_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
-    env: List[str] = []
-    secrets: List[str] = []
-
+    
     def __init__(self, name, description, content, args=None, image="jenkins/jenkins:lts-jdk11"):
         # Add helper functions for Jenkins operations
         setup_content = """
@@ -119,8 +117,6 @@ class JenkinsTool(Tool):
     }
 }
 """
-
-        # Initialize the tool with the combined content
         super().__init__(
             name=name,
             description=description,
@@ -129,8 +125,8 @@ class JenkinsTool(Tool):
             image=image,
             icon_url=JENKINS_ICON_URL,
             type="docker",
-            env=["JENKINS_URL", "JENKINS_USER"],
-            secrets=["JENKINS_TOKEN"]
+            secrets=["JENKINS_TOKEN"],
+            env=["JENKINS_URL", "JENKINS_USER"]
         )
 
     def get_args(self) -> List[Arg]:
