@@ -73,16 +73,16 @@ class BuildAnalyzer:
             fi
             """,
             args=[
-                Arg("job_name",
+                Arg(name="job_name",
                     description="Name of the Jenkins job",
                     required=True),
-                Arg("build_number",
+                Arg(name="build_number",
                     description="Build number to analyze",
                     required=True),
-                Arg("analyze_errors",
+                Arg(name="analyze_errors",
                     description="Analyze and highlight errors in the log",
                     required=False),
-                Arg("include_tests",
+                Arg(name="include_tests",
                     description="Include test results in the output",
                     required=False)
             ],
@@ -148,10 +148,10 @@ class BuildAnalyzer:
                 echo "No test report available"
             """,
             args=[
-                Arg("job_name",
+                Arg(name="job_name",
                     description="Name of the Jenkins job",
                     required=True),
-                Arg("build_number",
+                Arg(name="build_number",
                     description="Build number to analyze",
                     required=True)
             ],
@@ -200,13 +200,13 @@ class BuildAnalyzer:
             ls -lh "$ARTIFACTS_DIR"
             """,
             args=[
-                Arg("job_name",
+                Arg(name="job_name",
                     description="Name of the Jenkins job",
                     required=True),
-                Arg("build_number",
+                Arg(name="build_number",
                     description="Build number to get artifacts from",
                     required=True),
-                Arg("output_dir",
+                Arg(name="output_dir",
                     description="Directory to save artifacts",
                     required=False)
             ],
@@ -272,13 +272,13 @@ class BuildAnalyzer:
             echo "Skipped: $(echo "$TEST2" | jq -r '.skipCount')"
             """,
             args=[
-                Arg("job_name",
+                Arg(name="job_name",
                     description="Name of the Jenkins job",
                     required=True),
-                Arg("build_number1",
+                Arg(name="build_number1",
                     description="First build number to compare",
                     required=True),
-                Arg("build_number2",
+                Arg(name="build_number2",
                     description="Second build number to compare",
                     required=True)
             ],
