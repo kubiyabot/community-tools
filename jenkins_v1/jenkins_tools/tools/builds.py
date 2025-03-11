@@ -155,7 +155,7 @@ class BuildAnalyzer:
                     description="Build number to analyze",
                     required=True)
             ],
-            image="curlimages/curl:latest"
+            image="curlimages/curl:8.1.2"
         )
 
     def get_build_artifacts(self) -> JenkinsTool:
