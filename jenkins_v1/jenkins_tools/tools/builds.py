@@ -1,5 +1,6 @@
 from typing import List
 from .base import JenkinsTool, Arg
+from kubiya_sdk.tools.registry import tool_registry
 
 class BuildAnalyzer(JenkinsTool):
     """Analyze Jenkins builds and their logs."""
@@ -12,6 +13,26 @@ class BuildAnalyzer(JenkinsTool):
             args=[],
             image="jenkins/jenkins:lts-jdk11"
         )
+        # Register all build analysis tools
+        self.register_tools()
+
+    def register_tools(self):
+        """Register all build analysis tools."""
+        try:
+            # Create and register tools
+            tools = [
+                self.get_failed_build_logs(),
+                self.analyze_build_failure(),
+                self.get_build_artifacts(),
+                self.compare_builds()
+            ]
+            
+            for tool in tools:
+                tool_registry.register("jenkins", tool)
+                
+        except Exception as e:
+            print(f"Error registering build analysis tools: {str(e)}")
+            raise
 
     def get_failed_build_logs(self) -> JenkinsTool:
         """Get logs from a failed build."""
