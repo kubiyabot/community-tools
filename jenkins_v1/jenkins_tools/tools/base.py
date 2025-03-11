@@ -42,93 +42,17 @@ class JenkinsTool(Tool):
     mermaid: str = DEFAULT_MERMAID
     
     def __init__(self, name, description, content, args=None, image="jenkins/jenkins:lts-jdk11"):
-        # Add helper functions for Jenkins operations
-        setup_content = """
-# Begin helper functions
-{
-    # Function to validate Jenkins connection
-    validate_jenkins_connection() {
-        if ! curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/api/json" > /dev/null; then
-            echo "Error: Unable to connect to Jenkins server"
-            exit 1
-        fi
-    }
-
-    # Function to handle errors
-    handle_error() {
-        local exit_code=$?
-        local command=$BASH_COMMAND
-        echo "Error: Command '$command' failed with exit code $exit_code"
-        exit $exit_code
-    }
-
-    # Set error handling
-    set -e
-    trap 'handle_error' ERR
-
-    # Common utility functions
-    get_build_url() {
-        local job_name="$1"
-        local build_number="$2"
-        echo "$JENKINS_URL/job/$job_name/$build_number"
-    }
-
-    get_build_status() {
-        local job_name="$1"
-        local build_number="$2"
-        curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$(get_build_url "$job_name" "$build_number")/api/json" | jq -r '.result'
-    }
-
-    get_build_timestamp() {
-        local job_name="$1"
-        local build_number="$2"
-        curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$(get_build_url "$job_name" "$build_number")/api/json" | jq -r '.timestamp'
-    }
-
-    get_build_duration() {
-        local job_name="$1"
-        local build_number="$2"
-        curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$(get_build_url "$job_name" "$build_number")/api/json" | jq -r '.duration'
-    }
-
-    wait_for_build() {
-        local job_name="$1"
-        local build_number="$2"
-        local timeout="${3:-300}"
-        
-        echo "Waiting for build #$build_number of $job_name to complete..."
-        local start_time=$(date +%s)
-        while true; do
-            local status=$(get_build_status "$job_name" "$build_number")
-            if [[ "$status" != "null" && "$status" != "INPROGRESS" ]]; then
-                echo "Build completed with status: $status"
-                break
-            fi
-            
-            local current_time=$(date +%s)
-            if (( current_time - start_time > timeout )); then
-                echo "Timeout waiting for build to complete"
-                exit 1
-            fi
-            
-            sleep 10
-        done
-    }
-}
-"""
         super().__init__(
             name=name,
             description=description,
-            content=setup_content + "\n" + content,
+            content=content,
             args=args or [],
             image=image,
             icon_url=JENKINS_ICON_URL,
             type="docker",
             secrets=["JENKINS_TOKEN"],
-            env=["JENKINS_URL", "JENKINS_USER"],
-            mermaid=DEFAULT_MERMAID
+            env=["JENKINS_URL", "JENKINS_USER"]
         )
-        self.args = args or []
 
     def get_args(self) -> List[Arg]:
         """Return the tool's arguments."""
