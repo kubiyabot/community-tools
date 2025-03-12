@@ -100,6 +100,11 @@ class BuildAnalyzer:
             name="analyze_build_failure",
             description="Analyze the cause of a build failure",
             content="""
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+                apk add --no-cache jq
+            fi
+
             if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
@@ -169,6 +174,11 @@ class BuildAnalyzer:
             name="get_build_artifacts",
             description="Get artifacts from a build",
             content="""
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+                apk add --no-cache jq
+            fi
+
             if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
@@ -224,6 +234,11 @@ class BuildAnalyzer:
             name="compare_builds",
             description="Compare two builds of the same job",
             content="""
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+                apk add --no-cache jq
+            fi
+
             if [ -z "$job_name" ] || [ -z "$build_number1" ] || [ -z "$build_number2" ]; then
                 echo "Error: Job name and both build numbers are required"
                 exit 1
