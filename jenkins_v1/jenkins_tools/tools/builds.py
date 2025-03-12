@@ -37,7 +37,7 @@ class BuildAnalyzer:
             content="""
             # Install jq if not present
             if ! command -v jq &> /dev/null; then
-                apt-get update && apt-get install -y jq
+                apk add --no-cache jq
             fi
 
             if [ -z "$job_name" ] || [ -z "$build_number" ]; then
