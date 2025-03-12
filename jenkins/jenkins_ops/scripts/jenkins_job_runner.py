@@ -11,12 +11,30 @@ import sys
 import logging
 from typing import Dict, Any, Optional, Tuple
 
-# Configure detailed logging
+# Configure logging to stdout with immediate flushing
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True
 )
+
+# Ensure all print statements are flushed immediately
+sys.stdout.reconfigure(line_buffering=True)
+
 logger = logging.getLogger(__name__)
+
+def log_and_print(message: str, level: str = "INFO") -> None:
+    """Log a message and print it to stdout."""
+    print(message, flush=True)
+    if level == "INFO":
+        logger.info(message)
+    elif level == "ERROR":
+        logger.error(message)
+    elif level == "DEBUG":
+        logger.debug(message)
+    elif level == "WARNING":
+        logger.warning(message)
 
 class JenkinsJobRunner:
     """Handles Jenkins job execution and monitoring."""
@@ -30,11 +48,9 @@ class JenkinsJobRunner:
         stream_logs: bool = True,
         poll_interval: int = 30
     ):
-        logger.info(f"Initializing JenkinsJobRunner for job: {job_name}")
-        logger.debug(f"Jenkins URL: {jenkins_url}")
-        logger.debug(f"Username: {username}")
-        logger.debug(f"Stream logs: {stream_logs}")
-        logger.debug(f"Poll interval: {poll_interval}")
+        log_and_print(f"🔧 Initializing Jenkins runner for job: {job_name}")
+        log_and_print(f"Jenkins URL: {jenkins_url}", "DEBUG")
+        log_and_print(f"Username: {username}", "DEBUG")
         
         self.jenkins_url = jenkins_url
         self.username = username
@@ -70,6 +86,7 @@ class JenkinsJobRunner:
     def connect(self) -> None:
         """Establish connection to Jenkins server."""
         try:
+            log_and_print("🔌 Attempting to connect to Jenkins...")
             self.server = jenkins.Jenkins(
                 self.jenkins_url,
                 username=self.username,
@@ -77,9 +94,9 @@ class JenkinsJobRunner:
             )
             user = self.server.get_whoami()
             version = self.server.get_version()
-            logger.info(f"Connected to Jenkins {version} as {user['fullName']}")
+            log_and_print(f"✅ Connected to Jenkins {version} as {user['fullName']}")
         except Exception as e:
-            logger.error(f"Failed to connect to Jenkins: {str(e)}")
+            log_and_print(f"❌ Failed to connect to Jenkins: {str(e)}", "ERROR")
             raise
 
     def _prepare_parameters_for_jenkins(self, parameters: Dict[str, Any], param_types: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
@@ -111,40 +128,38 @@ class JenkinsJobRunner:
     def trigger_build(self, parameters: Dict[str, Any]) -> int:
         """Trigger Jenkins build with parameters."""
         try:
-            logger.info(f"Triggering build for job: {self.job_name}")
-            logger.debug(f"Loading parameter configuration from /tmp/jenkins_config.json")
+            log_and_print(f"🚀 Triggering build for job: {self.job_name}")
             
             # Load parameter type information
+            log_and_print("📝 Loading parameter configuration...", "DEBUG")
             with open('/tmp/jenkins_config.json', 'r') as f:
                 config = json.load(f)
-                logger.debug(f"Loaded config: {json.dumps(config, indent=2)}")
             
             # Get parameter types from config
             param_types = config.get('parameters', {})
-            logger.debug(f"Parameter types: {json.dumps(param_types, indent=2)}")
+            log_and_print(f"Parameters configuration: {json.dumps(param_types, indent=2)}", "DEBUG")
             
             # Convert parameters to Jenkins format
             jenkins_params = self._prepare_parameters_for_jenkins(parameters, param_types)
-            logger.info(f"Prepared parameters for Jenkins: {json.dumps(jenkins_params, indent=2)}")
+            log_and_print(f"Prepared parameters: {json.dumps(jenkins_params, indent=2)}", "DEBUG")
             
             # Queue the build with prepared parameters
-            logger.info("Queuing build with Jenkins")
+            log_and_print("⏳ Queuing build with Jenkins...")
             queue_id = self.server.build_job(self.job_name, parameters=jenkins_params)
-            logger.info(f"Build queued with queue ID: {queue_id}")
+            log_and_print(f"✅ Build queued with ID: {queue_id}")
             
             # Get build number from queue
-            logger.info("Waiting for build number...")
+            log_and_print("⏳ Waiting for build number...")
             while True:
                 queue_item = self.server.get_queue_item(queue_id)
-                logger.debug(f"Queue item status: {json.dumps(queue_item, indent=2)}")
                 if queue_item.get('executable'):
                     build_number = queue_item['executable']['number']
-                    logger.info(f"Build number received: {build_number}")
+                    log_and_print(f"📋 Build number received: {build_number}")
                     return build_number
-                logger.debug("Build not yet started, waiting...")
+                log_and_print("Still waiting for build to start...", "DEBUG")
                 time.sleep(2)
         except Exception as e:
-            logger.error(f"Failed to trigger build: {str(e)}", exc_info=True)
+            log_and_print(f"❌ Failed to trigger build: {str(e)}", "ERROR")
             raise
 
     def get_build_logs(self, build_number: int, start_line: int = 0) -> Optional[str]:
@@ -218,21 +233,20 @@ def get_parameters_from_env() -> Dict[str, Any]:
 def main():
     """Main execution function."""
     try:
-        logger.info("Starting Jenkins job runner")
+        log_and_print("🚀 Starting Jenkins job runner")
         
         # Load configuration
-        logger.debug("Loading configuration from /tmp/jenkins_config.json")
+        log_and_print("📝 Loading configuration...")
         with open('/tmp/jenkins_config.json', 'r') as f:
             config = json.load(f)
-            logger.debug(f"Loaded config: {json.dumps(config, indent=2)}")
+            log_and_print(f"Configuration loaded: {json.dumps(config, indent=2)}", "DEBUG")
         
         # Get parameters from environment variables
-        logger.info("Getting parameters from environment variables")
+        log_and_print("🔍 Getting parameters from environment...")
         parameters = get_parameters_from_env()
-        logger.debug(f"Parameters from environment: {json.dumps(parameters, indent=2)}")
+        log_and_print(f"Parameters: {json.dumps(parameters, indent=2)}", "DEBUG")
         
         # Initialize runner
-        logger.info("Initializing Jenkins runner")
         runner = JenkinsJobRunner(
             jenkins_url=os.environ['JENKINS_URL'],
             username=config['username'],
@@ -243,37 +257,28 @@ def main():
         )
         
         # Connect to Jenkins
-        print("🔌 Connecting to Jenkins...")
-        logger.info("Connecting to Jenkins server")
         runner.connect()
         
         # Trigger build
-        print("🚀 Triggering build...")
-        logger.info("Triggering Jenkins build")
         build_number = runner.trigger_build(parameters)
-        print(f"📋 Build #{build_number} started")
         
         # Monitor build
-        print("👀 Monitoring build progress...")
-        logger.info(f"Monitoring build #{build_number}")
+        log_and_print(f"👀 Monitoring build #{build_number}...")
         status, url = runner.monitor_build(build_number)
-        logger.info(f"Build completed with status: {status}")
+        log_and_print(f"Build completed with status: {status}")
         
         # Process result
         if status == 'SUCCESS':
-            print(f"✅ Build completed successfully")
-            print(f"🔗 Build URL: {url}")
-            logger.info(f"Build successful. URL: {url}")
+            log_and_print(f"✅ Build completed successfully")
+            log_and_print(f"🔗 Build URL: {url}")
             sys.exit(0)
         else:
-            print(f"❌ Build failed with status: {status}")
-            print(f"🔗 Build URL: {url}")
-            logger.error(f"Build failed. Status: {status}, URL: {url}")
+            log_and_print(f"❌ Build failed with status: {status}")
+            log_and_print(f"🔗 Build URL: {url}")
             sys.exit(1)
             
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        logger.error("Job execution failed", exc_info=True)
+        log_and_print(f"❌ Error: {str(e)}", "ERROR")
         sys.exit(1)
 
 if __name__ == '__main__':
