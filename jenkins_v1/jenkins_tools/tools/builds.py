@@ -35,6 +35,11 @@ class BuildAnalyzer:
             name="jenkins_build_logs_failed",
             description="Get logs from a failed build",
             content="""
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+                apt-get update && apt-get install -y jq
+            fi
+
             if [ -z "$job_name" ] || [ -z "$build_number" ]; then
                 echo "Error: Job name and build number are required"
                 exit 1
@@ -86,7 +91,7 @@ class BuildAnalyzer:
                     description="Include test results in the output",
                     required=False)
             ],
-            image="curlimages/curl:8.1.2"  # Using a specific version that includes jq
+            image="curlimages/curl:8.1.2",
         )
 
     def analyze_build_failure(self) -> JenkinsTool:
