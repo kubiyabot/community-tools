@@ -42,6 +42,9 @@ class LaunchDarklyTool(Tool):
     def __init__(self, name, description, content, args=None, image="curlimages/curl:8.1.2"):
         # Add helper functions to the content
         helper_functions = """
+            # Install required packages
+            apk --no-cache add jq
+
             # Helper functions for LaunchDarkly tools
             validate_launchdarkly_connection() {
                 if [ -z "$LD_API_KEY" ]; then
