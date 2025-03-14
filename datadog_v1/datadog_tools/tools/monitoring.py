@@ -36,9 +36,7 @@ class MonitoringTools:
             description="Get detailed information about a specific alert",
             content="""
             # Install jq if not present
-            if ! command -v jq &> /dev/null; then
-                apk add --no-cache jq
-            fi
+            apk add --no-cache jq
 
             # Validate connection and inputs
             validate_datadog_connection
@@ -51,30 +49,49 @@ class MonitoringTools:
             echo "=== Alert Details ==="
             
             # Get alert information
-            curl -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id" \
+            ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" | \
-                jq '{ 
-                    name: .name,
-                    status: .overall_state,
-                    message: .message,
-                    created: .created,
-                    modified: .modified,
-                    query: .query,
-                    options: .options
-                }'
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+
+            # Check for errors and format output
+            echo "$ALERT_DATA" | jq -r '
+                if .errors then
+                    ["Error retrieving alert:"] + .errors | .[]
+                elif .id then
+                    "ID: \(.id)",
+                    "Name: \(.name // "N/A")",
+                    "Status: \(.overall_state // "N/A")",
+                    "Type: \(.type // "N/A")",
+                    "Query: \(.query // "N/A")",
+                    "Message: \(.message // "N/A")",
+                    "Created: \(.created | strftime("%Y-%m-%d %H:%M:%S") // "N/A")",
+                    "Modified: \(.modified | strftime("%Y-%m-%d %H:%M:%S") // "N/A")",
+                    "",
+                    "=== Options ===",
+                    (.options | to_entries[] | "\(.key): \(.value)")
+                else
+                    "No alert found with ID: '$alert_id'"
+                end'
 
             # Get recent alert history if requested
             if [ "$include_history" = "true" ]; then
-                echo "\n=== Alert History ==="
-                curl -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id/history" \
+                echo -e "\n=== Alert History ==="
+                HISTORY_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id/history" \
                     -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" | \
-                    jq '.[] | {
-                        timestamp: .date_happened,
-                        status: .status,
-                        message: .message
-                    }'
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+
+                echo "$HISTORY_DATA" | jq -r '
+                    if .errors then
+                        ["Error retrieving history:"] + .errors | .[]
+                    elif length > 0 then
+                        .[] | [
+                            (.date_happened | strftime("%Y-%m-%d %H:%M:%S")),
+                            "Status: \(.status // "N/A")",
+                            "Message: \(.message // "N/A")"
+                        ] | .[]
+                    else
+                        "No history found"
+                    end'
             fi
             """,
             args=[
@@ -105,45 +122,60 @@ class MonitoringTools:
             WEEK_AGO=$((NOW - 604800))
             TWO_WEEKS_AGO=$((WEEK_AGO - 604800))
 
-            if [ -z "$metric_query" ]; then
-                # Default to a general error rate query if none provided
-                metric_query="sum:errors{*}.as_count()"
-            fi
+            # URL encode the metric query
+            ENCODED_QUERY=$(echo "$metric_query" | jq -sRr @uri)
 
             echo "=== Error Rate Comparison ==="
             echo "Query: $metric_query"
 
+            # Function to fetch and process metrics
+            fetch_metrics() {
+                local start=$1
+                local end=$2
+                local period="$3"
+                
+                echo "\n$period:"
+                curl -s -X GET "https://api.$DD_SITE/api/v1/query/metrics?from=$start&to=$end&query=$ENCODED_QUERY" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" | \
+                    jq -r '
+                        if .errors then
+                            .errors[] | "Error: \(.)" 
+                        elif .series == null or (.series | length == 0) then
+                            "No data found for this period"
+                        else
+                            .series[0].pointlist | 
+                            map(.[1]) | 
+                            (add / length | "Average: \(. | tostring)"), 
+                            ("Total: \(add | tostring)")
+                        end'
+            }
+
             # Get current week's data
-            echo "\nCurrent Week:"
-            query_metrics "$metric_query" "$WEEK_AGO" "$NOW" | \
-                jq '.series[0].pointlist[] | .[1]' | \
-                awk '{ sum += $1 } END { print "Total:", sum, "\nAverage:", sum/NR }'
+            fetch_metrics "$WEEK_AGO" "$NOW" "Current Week"
 
             # Get previous week's data
-            echo "\nPrevious Week:"
-            query_metrics "$metric_query" "$TWO_WEEKS_AGO" "$WEEK_AGO" | \
-                jq '.series[0].pointlist[] | .[1]' | \
-                awk '{ sum += $1 } END { print "Total:", sum, "\nAverage:", sum/NR }'
+            fetch_metrics "$TWO_WEEKS_AGO" "$WEEK_AGO" "Previous Week"
 
             # If detailed analysis requested, show hourly breakdown
             if [ "$detailed_analysis" = "true" ]; then
                 echo "\n=== Hourly Breakdown ==="
-                query_metrics "$metric_query" "$WEEK_AGO" "$NOW" | \
-                    jq -r '.series[0].pointlist[] | [.[0], .[1]] | @csv' | \
-                    awk -F, '{
-                        timestamp = strftime("%Y-%m-%d %H:00", $1/1000);
-                        count[$timestamp] += $2
-                    } END {
-                        for (hour in count) {
-                            printf "%s: %.2f\n", hour, count[hour]
-                        }
-                    }' | sort
+                curl -s -X GET "https://api.$DD_SITE/api/v1/query/metrics?from=$WEEK_AGO&to=$NOW&query=$ENCODED_QUERY" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" | \
+                    jq -r '
+                        if .series then
+                            .series[0].pointlist[] | 
+                            "\(.[0] | todate | strftime("%Y-%m-%d %H:00")): \(.[1])"
+                        else
+                            "No data available for detailed analysis"
+                        end' | sort
             fi
             """,
             args=[
                 Arg(name="metric_query",
                     description="Custom metric query for error rate",
-                    required=False),
+                    required=True),
                 Arg(name="detailed_analysis",
                     description="Show detailed hourly breakdown",
                     required=False)
