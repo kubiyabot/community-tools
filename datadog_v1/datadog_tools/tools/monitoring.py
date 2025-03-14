@@ -82,29 +82,35 @@ class MonitoringTools:
             echo "Comparing error rates for service: $service"
 
             fetch_logs() {
-                local start="$1"
-                local end="$2"
-                local period="$3"
+                local start_ts="$1"
+                local end_ts="$2"
+                local period_name="$3"
 
-                echo "\n=== Fetching logs for $period ==="
+                echo "\n=== Fetching logs for $period_name ==="
+
+                JSON_PAYLOAD=$(cat <<EOF
+                {
+                "filter": {
+                    "from": $start_ts,
+                    "to": $end_ts,
+                    "query": "@service:$service @status:error"
+                },
+                "compute": [
+                    { "aggregation": "count" }
+                ],
+                "group_by": [
+                    { "facet": "@service" },
+                    { "facet": "@status" }
+                ]
+                }
+    EOF
+                )
+
                 RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
                     -H "DD-API-KEY: $DD_API_KEY" \
                     -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                     -H "Content-Type: application/json" \
-                    --data-binary "{
-                    \"filter\": {
-                        \"from\": $start,
-                        \"to\": $end,
-                        \"query\": \"@service:$service @status:error\"
-                    },
-                    \"compute\": [
-                        { \"aggregation\": \"count\" }
-                    ],
-                    \"group_by\": [
-                        { \"facet\": \"@service\" },
-                        { \"facet\": \"@status\" }
-                    ]
-                    }")
+                    --data-binary "$JSON_PAYLOAD")
 
                 echo "Raw API Response:"
                 echo "$RESPONSE" | jq
@@ -112,9 +118,9 @@ class MonitoringTools:
                 ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
 
                 if [ "$ERROR_COUNT" -eq "0" ]; then
-                    echo "No errors found for $period"
+                    echo "No errors found for $period_name"
                 else
-                    echo "Total Errors in $period: $ERROR_COUNT"
+                    echo "Total Errors in $period_name: $ERROR_COUNT"
                 fi
             }
 
@@ -131,7 +137,7 @@ class MonitoringTools:
             name="query_logs",
             description="Fetch logs based on alert context",
             content="""
-            apk add --no-cache jq coreutils
+            apk add --no-cache jq
             validate_datadog_connection
 
             if [ -z "$service" ] || [ -z "$status" ]; then
@@ -139,11 +145,8 @@ class MonitoringTools:
                 exit 1
             fi
 
-            NOW=$(date +%s)
-            FROM=$((NOW - 3600))
-
             echo "Fetching logs for service: $service with status: $status"
-            curl -s -X POST "https://api.$DD_SITE/api/v2/logs/events/search" \
+            RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/events/search" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Content-Type: application/json" \
@@ -153,11 +156,29 @@ class MonitoringTools:
                         \"to\": \"now\",
                         \"query\": \"service:$service status:$status\"
                     },
-                    \"sort\": \"desc\",
+                    \"sort\": \"timestamp\",
                     \"page\": {
-                        \"limit\": 5
+                        \"limit\": 10
                     }
-                }" | jq '.data[] | "Timestamp: \(.attributes.timestamp), Message: \(.attributes.message)"'
+                }")
+
+            # Check if response is empty
+            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
+                echo "No logs found for the given criteria"
+                exit 0
+            fi
+
+            # Format and output the logs
+            echo "$RESPONSE" | jq -r '
+                "=== Found \(.meta.page.total // 0) logs ===\n" +
+                (.data | map(
+                    "Time: \(.attributes.timestamp)\n" +
+                    "Service: \(.attributes.service)\n" +
+                    "Status: \(.attributes.status)\n" +
+                    "Message: \(.attributes.message)\n" +
+                    "---"
+                ) | join("\n"))
+            '
             """,
             args=[
                 Arg(name="service", description="Service name from alert", required=True),
