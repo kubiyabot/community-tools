@@ -122,26 +122,16 @@ class FlagAnalyzer:
             # Validate LaunchDarkly connection
             validate_launchdarkly_connection
 
-            # Set default limit if not provided
-            LIMIT=${limit:-50}
-            
             # Get flag audit log
             curl -s -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/history?limit=$LIMIT" | \
-                jq '.items[] | {
-                    date: .date,
-                    action: .action,
-                    member: (.member.email // "System"),
-                    description: .description,
-                    changes: .changes
-                }'
+                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/history"
             """,
             args=[
                 Arg(name="flag_key",
                     description="Key of the feature flag",
                     required=True),
                 Arg(name="limit",
-                    description="Number of history entries to return (default: 50)",
+                    description="Number of history entries to return",
                     required=False)
             ],
             image="curlimages/curl:8.1.2"
