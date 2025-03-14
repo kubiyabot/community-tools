@@ -12,8 +12,7 @@ class MonitoringTools:
             tools = [
                 self.get_alert_details(),
                 self.compare_error_rates(),
-                self.query_logs(),
-                self.get_metrics()
+                self.query_logs()
             ]
             
             for tool in tools:
