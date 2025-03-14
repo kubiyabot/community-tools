@@ -151,30 +151,26 @@ class FlagAnalyzer:
             # Validate LaunchDarkly connection
             validate_launchdarkly_connection
 
-            # Get flag states in both environments
-            ENV1_STATE=$(curl -s -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/environments/$env1")
-            ENV2_STATE=$(curl -s -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/environments/$env2")
+            # Get flag status across environments
+            FLAG_STATUS=$(curl -s -H "Authorization: $LD_API_KEY" \
+                "https://app.launchdarkly.com/api/v2/flag-status/$PROJECT_KEY/$flag_key")
 
             echo "=== Flag Comparison ==="
             echo "Flag: $flag_key"
+            
+            # Extract and format environment data
             echo "\n$env1 Environment:"
-            echo "$ENV1_STATE" | jq '{
-                enabled: .enabled,
-                version: .version,
-                lastModified: .lastModified,
-                targets: .targets,
-                rules: .rules
+            echo "$FLAG_STATUS" | jq --arg env "$env1" '.environments[$env] | {
+                status: .name,
+                lastRequested: .lastRequested,
+                defaultValue: .default
             }'
 
             echo "\n$env2 Environment:"
-            echo "$ENV2_STATE" | jq '{
-                enabled: .enabled,
-                version: .version,
-                lastModified: .lastModified,
-                targets: .targets,
-                rules: .rules
+            echo "$FLAG_STATUS" | jq --arg env "$env2" '.environments[$env] | {
+                status: .name,
+                lastRequested: .lastRequested,
+                defaultValue: .default
             }'
             """,
             args=[
