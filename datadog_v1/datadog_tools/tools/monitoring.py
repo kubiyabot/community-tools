@@ -28,10 +28,10 @@ class MonitoringTools:
             raise
 
     def get_alert_details(self) -> DatadogTool:
-        """Dynamically get alert details & auto-check history if active."""
+        """Retrieve details for a DataDog alert event."""
         return DatadogTool(
             name="datadog_alert_details",
-            description="Retrieve details for a DataDog alert",
+            description="Retrieve details of a triggered DataDog alert (event)",
             content="""
             apk add --no-cache jq
             validate_datadog_connection
@@ -41,35 +41,21 @@ class MonitoringTools:
                 exit 1
             fi
 
-            ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id" \
+            ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY")
-
-            ALERT_STATE=$(echo "$ALERT_DATA" | jq -r '.overall_state // "N/A"')
 
             echo "=== Alert Details ==="
             echo "$ALERT_DATA" | jq -r '
                 "ID: \(.id)",
-                "Name: \(.name // "N/A")",
-                "Status: \(.overall_state // "N/A")",
-                "Query: \(.query // "N/A")",
-                "Triggered: \(.created | strftime("%Y-%m-%d %H:%M:%S") // "N/A")"
+                "Title: \(.attributes.title // "N/A")",
+                "Message: \(.attributes.message // "N/A")",
+                "Service: \(.attributes.service // "N/A")",
+                "Status: \(.attributes.status // "N/A")",
+                "Timestamp: \(.attributes.timestamp // "N/A")"
             '
-
-            # Auto-fetch history if alert is still active
-            if [ "$ALERT_STATE" = "Alert" ]; then
-                echo "Fetching alert history..."
-                HISTORY_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$alert_id/history" \
-                    -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
-
-                echo "$HISTORY_DATA" | jq -r '
-                    if .errors then "Error retrieving history" 
-                    else .[] | "Timestamp: \(.date_happened | strftime("%Y-%m-%d %H:%M:%S")), Status: \(.status), Message: \(.message)"
-                    end'
-            fi
             """,
-            args=[Arg(name="alert_id", description="ID of the alert", required=True)],
+            args=[Arg(name="alert_id", description="ID of the alert event", required=True)],
             image="curlimages/curl:8.1.2"
         )
 
