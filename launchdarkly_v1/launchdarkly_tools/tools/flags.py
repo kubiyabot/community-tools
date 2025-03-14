@@ -124,7 +124,7 @@ class FlagAnalyzer:
 
             # Get flag audit log
             curl -s -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/history"
+                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key"
             """,
             args=[
                 Arg(name="flag_key",
