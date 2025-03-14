@@ -60,45 +60,57 @@ class MonitoringTools:
         )
 
     def compare_error_rates(self) -> DatadogTool:
-        """Dynamically compare error rates for the service from alert."""
+        """Compare error rates using log-based aggregation from DataDog."""
         return DatadogTool(
             name="compare_error_rates",
-            description="Compare error rates using alert's service name",
+            description="Compare error rates for the past week vs the previous week using log aggregation",
             content="""
             apk add --no-cache jq coreutils
             validate_datadog_connection
-
-            NOW=$(date +%s)
-            WEEK_AGO=$((NOW - 604800))
-            TWO_WEEKS_AGO=$((WEEK_AGO - 604800))
 
             if [ -z "$service" ]; then
                 echo "Error: Service name is required"
                 exit 1
             fi
 
-            QUERY="logs(\"service:$service status:error\").index(\"*\").rollup(\"count\").last(\"1h\")"
-
             echo "Comparing error rates for service: $service"
-            fetch_metrics() {
-                local start=$1
-                local end=$2
+
+            fetch_logs() {
+                local start="$1"
+                local end="$2"
                 local period="$3"
 
-                echo "\n$period:"
-                curl -s -X GET "https://api.$DD_SITE/api/v1/query?from=$start&to=$end&query=$QUERY" \
+                echo "\n=== $period ==="
+                RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
                     -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" | jq -r '
-                        if .series then
-                            "Average: \(.series[0].pointlist | map(.[1]) | add / length)",
-                            "Total: \(.series[0].pointlist | map(.[1]) | add)"
-                        else
-                            "No data for $period"
-                        end'
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    --data-binary "{
+                    \"filter\": {
+                        \"from\": \"$start\",
+                        \"to\": \"$end\",
+                        \"query\": \"service:$service status:error\"
+                    },
+                    \"compute\": [
+                        { \"aggregation\": \"count\" }
+                    ],
+                    \"group_by\": [
+                        { \"facet\": \"@service\" },
+                        { \"facet\": \"@status\" }
+                    ]
+                    }")
+
+                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
+
+                if [ "$ERROR_COUNT" -eq "0" ]; then
+                    echo "No errors found for $period"
+                else
+                    echo "Total Errors in $period: $ERROR_COUNT"
+                fi
             }
 
-            fetch_metrics "$WEEK_AGO" "$NOW" "Current Week"
-            fetch_metrics "$TWO_WEEKS_AGO" "$WEEK_AGO" "Previous Week"
+            fetch_logs "now-7d" "now" "Current Week"
+            fetch_logs "now-14d" "now-7d" "Previous Week"
             """,
             args=[Arg(name="service", description="Service name from alert", required=True)],
             image="curlimages/curl:8.1.2"
