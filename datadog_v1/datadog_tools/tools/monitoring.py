@@ -81,10 +81,11 @@ class MonitoringTools:
 
             echo "Comparing error rates for service: $service"
 
-            # Set timestamps as environment variables
-            export NOW_TS=$(date +%s)
-            export WEEK_AGO_TS=$(date -d "@$NOW_TS - 7 days" +%s)
-            export TWO_WEEKS_AGO_TS=$(date -d "@$NOW_TS - 14 days" +%s)
+            # Calculate timestamps (in seconds)
+            NOW_TS=$(date +%s)
+            WEEK_SEC=604800  # 7 days in seconds
+            WEEK_AGO_TS=$((NOW_TS - WEEK_SEC))
+            TWO_WEEKS_AGO_TS=$((NOW_TS - (2 * WEEK_SEC)))
 
             fetch_current_week_logs() {
                 echo "=== Fetching logs for Current Week ==="
@@ -95,8 +96,8 @@ class MonitoringTools:
                     -H "Content-Type: application/json" \
                     -d '{
                         "filter": {
-                            "from": '"${WEEK_AGO_TS}"',
-                            "to": '"${NOW_TS}"',
+                            "from": '"$WEEK_AGO_TS"',
+                            "to": '"$NOW_TS"',
                             "query": "@service:'"$service"' @status:error"
                         },
                         "compute": [{"aggregation": "count"}],
@@ -106,14 +107,14 @@ class MonitoringTools:
                         ]
                     }')
 
-                if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+                if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
                     echo "Error: Invalid JSON response from API"
-                    echo "Raw response: ${RESPONSE}"
+                    echo "Raw response: $RESPONSE"
                     exit 1
                 fi
 
-                ERROR_COUNT=$(echo "${RESPONSE}" | jq -r '.data.buckets[0].computes.c0 // "0"')
-                echo "Total Errors in Current Week: ${ERROR_COUNT}"
+                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Current Week: $ERROR_COUNT"
             }
 
             fetch_previous_week_logs() {
@@ -125,8 +126,8 @@ class MonitoringTools:
                     -H "Content-Type: application/json" \
                     -d '{
                         "filter": {
-                            "from": '"${TWO_WEEKS_AGO_TS}"',
-                            "to": '"${WEEK_AGO_TS}"',
+                            "from": '"$TWO_WEEKS_AGO_TS"',
+                            "to": '"$WEEK_AGO_TS"',
                             "query": "@service:'"$service"' @status:error"
                         },
                         "compute": [{"aggregation": "count"}],
@@ -136,14 +137,14 @@ class MonitoringTools:
                         ]
                     }')
 
-                if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+                if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
                     echo "Error: Invalid JSON response from API"
-                    echo "Raw response: ${RESPONSE}"
+                    echo "Raw response: $RESPONSE"
                     exit 1
                 fi
 
-                ERROR_COUNT=$(echo "${RESPONSE}" | jq -r '.data.buckets[0].computes.c0 // "0"')
-                echo "Total Errors in Previous Week: ${ERROR_COUNT}"
+                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Previous Week: $ERROR_COUNT"
             }
 
             # Execute the log fetching functions
