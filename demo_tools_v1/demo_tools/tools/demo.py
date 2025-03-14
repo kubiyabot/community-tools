@@ -117,7 +117,7 @@ class DemoTools:
                             "status": "error",
                             "message": "⚠️ Deployment failure: Service degradation after deployment - '"$i"'",
                             "attributes": {
-                                "log_category": "deployment-error",
+                                "log_category": "deployment-failure",
                                 "error_code": 503,
                                 "deployment_id": "deploy-'"$i"'",
                                 "affected_service": "demo-service",
