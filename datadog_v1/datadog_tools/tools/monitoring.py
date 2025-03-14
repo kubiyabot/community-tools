@@ -81,51 +81,74 @@ class MonitoringTools:
 
             echo "Comparing error rates for service: $service"
 
-            fetch_logs() {
-                local start_ts="$1"
-                local end_ts="$2"
-                local period_name="$3"
+            # Set timestamps as environment variables
+            export NOW_TS=$(date +%s)
+            export WEEK_AGO_TS=$(date -d "@$NOW_TS - 7 days" +%s)
+            export TWO_WEEKS_AGO_TS=$(date -d "@$NOW_TS - 14 days" +%s)
 
-                echo "\n=== Fetching logs for $period_name ==="
-
-                JSON_PAYLOAD=$(cat <<EOF
-                {
-                "filter": {
-                    "from": $start_ts,
-                    "to": $end_ts,
-                    "query": "@service:$service @status:error"
-                },
-                "compute": [
-                    { "aggregation": "count" }
-                ],
-                "group_by": [
-                    { "facet": "@service" },
-                    { "facet": "@status" }
-                ]
-                }
-    EOF
-                )
+            fetch_current_week_logs() {
+                echo "=== Fetching logs for Current Week ==="
 
                 RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
                     -H "DD-API-KEY: $DD_API_KEY" \
                     -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                     -H "Content-Type: application/json" \
-                    --data-binary "$JSON_PAYLOAD")
+                    -d '{
+                        "filter": {
+                            "from": '"${WEEK_AGO_TS}"',
+                            "to": '"${NOW_TS}"',
+                            "query": "@service:'"$service"' @status:error"
+                        },
+                        "compute": [{"aggregation": "count"}],
+                        "group_by": [
+                            {"facet": "@service"},
+                            {"facet": "@status"}
+                        ]
+                    }')
 
-                echo "Raw API Response:"
-                echo "$RESPONSE" | jq
-
-                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
-
-                if [ "$ERROR_COUNT" -eq "0" ]; then
-                    echo "No errors found for $period_name"
-                else
-                    echo "Total Errors in $period_name: $ERROR_COUNT"
+                if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+                    echo "Error: Invalid JSON response from API"
+                    echo "Raw response: ${RESPONSE}"
+                    exit 1
                 fi
+
+                ERROR_COUNT=$(echo "${RESPONSE}" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Current Week: ${ERROR_COUNT}"
             }
 
-            fetch_logs "$(($(date +%s) - 604800))" "$(date +%s)" "Current Week"
-            fetch_logs "$(($(date +%s) - 1209600))" "$(($(date +%s) - 604800))" "Previous Week"
+            fetch_previous_week_logs() {
+                echo "=== Fetching logs for Previous Week ==="
+
+                RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "filter": {
+                            "from": '"${TWO_WEEKS_AGO_TS}"',
+                            "to": '"${WEEK_AGO_TS}"',
+                            "query": "@service:'"$service"' @status:error"
+                        },
+                        "compute": [{"aggregation": "count"}],
+                        "group_by": [
+                            {"facet": "@service"},
+                            {"facet": "@status"}
+                        ]
+                    }')
+
+                if ! echo "${RESPONSE}" | jq empty 2>/dev/null; then
+                    echo "Error: Invalid JSON response from API"
+                    echo "Raw response: ${RESPONSE}"
+                    exit 1
+                fi
+
+                ERROR_COUNT=$(echo "${RESPONSE}" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Previous Week: ${ERROR_COUNT}"
+            }
+
+            # Execute the log fetching functions
+            fetch_current_week_logs
+            fetch_previous_week_logs
             """,
             args=[Arg(name="service", description="Service name from alert", required=True)],
             image="curlimages/curl:8.1.2"
