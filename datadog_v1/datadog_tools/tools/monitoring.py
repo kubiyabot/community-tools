@@ -94,9 +94,9 @@ class MonitoringTools:
                     -H "Content-Type: application/json" \
                     --data-binary "{
                     \"filter\": {
-                        \"from\": \"$start\",
-                        \"to\": \"$end\",
-                        \"query\": \"service:$service status:error\"
+                        \"from\": $start,
+                        \"to\": $end,
+                        \"query\": \"@service:$service @status:error\"
                     },
                     \"compute\": [
                         { \"aggregation\": \"count\" }
@@ -116,12 +116,13 @@ class MonitoringTools:
                 fi
             }
 
-            fetch_logs "now-7d" "now" "Current Week"
-            fetch_logs "now-14d" "now-7d" "Previous Week"
+            fetch_logs "$(($(date +%s) - 604800))" "$(date +%s)" "Current Week"
+            fetch_logs "$(($(date +%s) - 1209600))" "$(($(date +%s) - 604800))" "Previous Week"
             """,
             args=[Arg(name="service", description="Service name from alert", required=True)],
             image="curlimages/curl:8.1.2"
         )
+
 
     def query_logs(self) -> DatadogTool:
         """Dynamically query logs based on the alert's service and status."""
