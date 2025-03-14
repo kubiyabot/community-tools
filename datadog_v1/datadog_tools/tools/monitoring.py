@@ -65,7 +65,6 @@ class MonitoringTools:
             image="curlimages/curl:8.1.2"
         )
 
-
     def compare_error_rates(self) -> DatadogTool:
         """Compare error rates using log-based aggregation from DataDog."""
         return DatadogTool(
@@ -87,7 +86,7 @@ class MonitoringTools:
                 local end="$2"
                 local period="$3"
 
-                echo "\n=== $period ==="
+                echo "\n=== Fetching logs for $period ==="
                 RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
                     -H "DD-API-KEY: $DD_API_KEY" \
                     -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
@@ -107,6 +106,9 @@ class MonitoringTools:
                     ]
                     }")
 
+                echo "Raw API Response:"
+                echo "$RESPONSE" | jq
+
                 ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
 
                 if [ "$ERROR_COUNT" -eq "0" ]; then
@@ -122,7 +124,6 @@ class MonitoringTools:
             args=[Arg(name="service", description="Service name from alert", required=True)],
             image="curlimages/curl:8.1.2"
         )
-
 
     def query_logs(self) -> DatadogTool:
         """Dynamically query logs based on the alert's service and status."""
