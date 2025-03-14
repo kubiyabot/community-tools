@@ -40,7 +40,7 @@ class DemoTools:
             successful_submissions=0
             failed_submissions=0
 
-            for i in {1..10}; do
+            for i in $(seq 1 10); do
                 echo "Sending log entry $i/10..."
                 response=$(curl -s -w "\\n%{http_code}" -X POST "https://http-intake.logs.$DD_SITE/api/v2/logs" \
                     -H "DD-API-KEY: $DD_API_KEY" \
@@ -105,7 +105,7 @@ class DemoTools:
             successful_submissions=0
             failed_submissions=0
 
-            for i in {1..10}; do
+            for i in $(seq 1 10); do
                 echo "Sending log entry $i/10..."
                 response=$(curl -s -w "\\n%{http_code}" -X POST "https://http-intake.logs.$DD_SITE/api/v2/logs" \
                     -H "DD-API-KEY: $DD_API_KEY" \
