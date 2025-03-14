@@ -125,37 +125,16 @@ class FlagAnalyzer:
             # Set default limit if not provided
             LIMIT=${limit:-50}
             
-            # Get flag audit log with error handling
-            RESPONSE=$(curl -s -w "\\n%{http_code}" -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/auditlog/$PROJECT_KEY/flags/$flag_key?limit=$LIMIT")
-            
-            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-            BODY=$(echo "$RESPONSE" | sed '$ d')
-            
-            if [ "$HTTP_CODE" != "200" ]; then
-                echo "Error: Failed to fetch flag history. HTTP Code: $HTTP_CODE"
-                echo "Response: $BODY"
-                exit 1
-            fi
-            
-            # Check if response is empty
-            if [ -z "$BODY" ] || [ "$BODY" = "null" ]; then
-                echo "No history found for flag: $flag_key"
-                exit 0
-            fi
-            
-            # Process the response with error handling
-            echo "$BODY" | jq --exit-status '.items[] | {
-                date: .date,
-                action: .action,
-                member: (.member.email // "System"),
-                description: .description,
-                changes: .changes
-            }' || {
-                echo "Error: Failed to parse flag history"
-                echo "Raw response: $BODY"
-                exit 1
-            }
+            # Get flag audit log
+            curl -s -H "Authorization: $LD_API_KEY" \
+                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key/history?limit=$LIMIT" | \
+                jq '.items[] | {
+                    date: .date,
+                    action: .action,
+                    member: (.member.email // "System"),
+                    description: .description,
+                    changes: .changes
+                }'
             """,
             args=[
                 Arg(name="flag_key",
