@@ -42,21 +42,29 @@ class MonitoringTools:
 
             ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
 
             echo "=== Alert Details ==="
             echo "$ALERT_DATA" | jq -r '
-                "ID: \(.id)",
-                "Title: \(.attributes.title // "N/A")",
-                "Message: \(.attributes.message // "N/A")",
-                "Service: \(.attributes.service // "N/A")",
-                "Status: \(.attributes.status // "N/A")",
-                "Timestamp: \(.attributes.timestamp // "N/A")"
+                "ID: \(.data.id)",
+                "Title: \(.data.attributes.attributes.title // "N/A")",
+                "Message: \(.data.attributes.message // "N/A")",
+                "Service: \(.data.attributes.attributes.service // "N/A")",
+                "Status: \(.data.attributes.attributes.status // "N/A")",
+                "Timestamp: \(.data.attributes.attributes.timestamp // "N/A")",
+                "Monitor Name: \(.data.attributes.attributes.monitor.name // "N/A")",
+                "Monitor Query: \(.data.attributes.attributes.monitor.query // "N/A")",
+                "Monitor Priority: \(.data.attributes.attributes.monitor.priority // "N/A")",
+                "Monitor Logs URL: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.logs_url // "N/A")",
+                "Monitor Status URL: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.alert_url // "N/A")"
             '
             """,
             args=[Arg(name="alert_id", description="ID of the alert event", required=True)],
             image="curlimages/curl:8.1.2"
         )
+
 
     def compare_error_rates(self) -> DatadogTool:
         """Compare error rates using log-based aggregation from DataDog."""
