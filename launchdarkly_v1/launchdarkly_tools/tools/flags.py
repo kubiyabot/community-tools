@@ -122,9 +122,22 @@ class FlagAnalyzer:
             # Validate LaunchDarkly connection
             validate_launchdarkly_connection
 
-            # Get flag audit log
+            # Get flag audit log and format timestamps
             curl -s -H "Authorization: $LD_API_KEY" \
-                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key"
+                "https://app.launchdarkly.com/api/v2/flags/$PROJECT_KEY/$flag_key" | \
+                jq '
+                    def format_timestamp:
+                        (. / 1000) | strftime("%Y-%m-%d %H:%M:%S UTC");
+                    
+                    . + {
+                        creationDate: (.creationDate | format_timestamp),
+                        environments: (.environments | map_values(
+                            . + {
+                                lastModified: (.lastModified | format_timestamp)
+                            }
+                        ))
+                    }
+                '
             """,
             args=[
                 Arg(name="flag_key",
