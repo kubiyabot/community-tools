@@ -1,0 +1,17 @@
+name: tool_wf
+description: Example DAG using the best practices for tool definition
+
+steps:
+  - name: execute-combined-tool
+    description: Execute a tool with a well-formed definition
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: inline-docker-alpine
+          description: An inline Docker-based tool using Alpine
+          type: docker
+          content: "echo hi how r u doing?"
+          image: python:3.12-slim-bullseye
+
+

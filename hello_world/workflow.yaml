@@ -1,0 +1,11 @@
+name: Inline_tool
+description: Example DAG showing how to use an inline tool
+
+steps:
+  - name: execute-inline-docker-tool
+    description: Execute a Docker-based tool with an inline definition
+    executor:
+      type: tool
+      config:
+        inline: true
+        tool_def: "{\"name\":\"inline-docker-alpine\",\"description\":\"An inline Docker-based tool using Alpine\",\"type\":\"docker\",\"image\":\"alpine:latest\",\"entrypoint\":[\"/bin/sh\",\"-c\",\"echo hi how r u doing?\"]}"

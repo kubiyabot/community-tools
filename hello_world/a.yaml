@@ -1,0 +1,105 @@
+name: tool_chaining_example
+description: Example DAG demonstrating data flow between tool steps
+steps:
+  - name: generate-data
+    description: First tool generates data for the second step
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: data-generator
+          description: Generates sample data for the next step
+          type: docker
+          image: python:3.12-slim-bullseye
+          with_files:
+            - destination: /tmp/ascript.py
+              content: |
+                #!/usr/bin/env python3
+                import json
+                import random
+
+                # Generate some random data
+                data = {
+                    "id": random.randint(1000, 9999),
+                    "values": [random.randint(1, 100) for _ in range(5)],
+                    "name": f"Sample-{random.choice(['A','B', 'C'])}"
+                }
+
+                # Output the data as JSON
+                print(json.dumps(data))
+          content: | 
+            set -e
+            python  /tmp/ascript.py
+    output: GENERATED_DATA
+
+
+  - name: process-data
+    description: Second tool processes data from first tool
+    depends:
+      - generate-data
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: data-processor
+          description: Processes data from previous step
+          type: docker
+          image: python:3.12-slim-bullseye
+          with_files:
+            - destination: /tmp/ascript.py
+              content: |
+                #!/usr/bin/env python3
+                import os
+                import json
+
+                # Get the data from the previous step
+                input_data = os.environ.get('data')
+                print(f"Received data: {input_data}")
+
+                try:
+                    # Parse the JSON data
+                    data = json.loads(input_data)
+
+                    # Process the data
+                    total = sum(data.get('values', [0]))
+                    avg = total / len(data.get('values', [1]))
+
+                    # Output the results
+                    result = {
+                        "source_id": data.get('id'),
+                        "source_name": data.get('name'),
+                        "processed": {
+                            "total": total,
+                            "average": avg,
+                            "count": len(data.get('values', []))
+                        }
+                    }
+
+                    print(f"Processing results: {json.dumps(result, indent=2)}")
+
+                except json.JSONDecodeError:
+                    print(f"Error parsing data: {input_data}")
+                    raise
+          content: |
+            set -e
+            python  /tmp/ascript.py
+
+          args:
+            - name: data
+              type: string
+              description: JSON data from previous step
+              required: true
+        args:
+          data: "${GENERATED_DATA}"
+    output: PROCESSED_DATA
+
+  - name: send-to-slack
+    executor:
+      type: agent
+      config:
+        teammate_name: "demo_teammate"
+        message: "Send a Slack msg to channel #tf-test saying $PROCESSED_DATA , before sending make ths msg nice and readable "
+    output: SLACK_RESPONSE
+    depends:
+      - process-data
+      - generate-data
