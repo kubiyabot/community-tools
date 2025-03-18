@@ -1,0 +1,23 @@
+name: "workflow-test"
+params:
+  - key: KUBIYA_API_KEY
+steps:
+  - name: ask-kubiya
+    executor:
+      type: agent
+      config:
+        api_key: $KUBIYA_API_KEY
+        teammate_name: "demo_teammate"
+        message: "run cluster health"
+    output: AGENT_RESPONSE
+
+  - name: send-to-slack
+    executor:
+      type: agent
+      config:
+        api_key: $KUBIYA_API_KEY
+        teammate_name: "demo_teammate"
+        message: "Send a Slack msg to channel #tf-test saying $AGENT_RESPONSE , before sending make ths msg nice and readable "
+    output: SLACK_RESPONSE
+    depends:
+      - ask-kubiya
