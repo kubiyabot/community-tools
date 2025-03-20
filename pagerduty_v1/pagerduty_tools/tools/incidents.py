@@ -2,9 +2,6 @@ from typing import List
 from .base import PagerDutyTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
-import json
-import os
-import requests
 
 class IncidentManager:
     """Manage PagerDuty incidents."""
@@ -114,9 +111,10 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="list_incidents",
             description="List PagerDuty incidents",
-            content="""
+            content="""#!/usr/bin/env python3
 # Install required packages
-pip install --quiet requests
+import subprocess
+subprocess.check_call(['pip', 'install', '--quiet', 'requests'])
 
 import requests
 import json
