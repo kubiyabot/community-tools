@@ -37,16 +37,24 @@ class PagerDutyTool(Tool):
     description: str
     content: str = ""
     args: List[Arg] = []
-    image: str = "curlimages/curl:latest"
+    image: str = "python:3.9-slim"
     icon_url: str = PAGERDUTY_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
     
-    def __init__(self, name, description, content, args=None, image="curlimages/curl:latest"):
+    def __init__(self, name, description, content, args=None, image="python:3.9-slim"):
+        # Add setup commands to install requirements
+        setup_commands = """
+# Install required packages
+pip install --quiet requests
+
+"""
+        content_with_setup = setup_commands + content
+
         super().__init__(
             name=name,
             description=description,
-            content=content,
+            content=content_with_setup,
             args=args or [],
             image=image,
             icon_url=PAGERDUTY_ICON_URL,
