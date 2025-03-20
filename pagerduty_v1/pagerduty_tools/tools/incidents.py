@@ -115,6 +115,9 @@ if __name__ == "__main__":
             name="list_incidents",
             description="List PagerDuty incidents",
             content="""
+# Install required packages
+pip install --quiet requests
+
 import requests
 import json
 import os

@@ -43,18 +43,10 @@ class PagerDutyTool(Tool):
     mermaid: str = DEFAULT_MERMAID
     
     def __init__(self, name, description, content, args=None, image="python:3.9-slim"):
-        # Add setup commands to install requirements
-        setup_commands = """
-# Install required packages
-pip install --quiet requests
-
-"""
-        content_with_setup = setup_commands + content
-
         super().__init__(
             name=name,
             description=description,
-            content=content_with_setup,
+            content=content,
             args=args or [],
             image=image,
             icon_url=PAGERDUTY_ICON_URL,
