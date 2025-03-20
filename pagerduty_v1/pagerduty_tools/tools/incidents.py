@@ -240,7 +240,17 @@ curl -s \
             description="Get historical PagerDuty incidents with optional date filters",
             content="""#!/bin/bash
 # Set default values for date range if not provided
-since=${since:-$(date -d '30 days ago' -u +"%Y-%m-%dT%H:%M:%SZ")}
+if [ -z "$since" ]; then
+    # Calculate 30 days ago in a more portable way
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        since=$(date -v-30d -u +"%Y-%m-%dT%H:%M:%SZ")
+    else
+        # Linux and others
+        since=$(date --date="-30 days" -u +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+fi
+
 until=${until:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
 status=${status:-"all"}
 
