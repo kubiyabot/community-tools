@@ -86,10 +86,12 @@ curl -s -X POST \
         """List PagerDuty incidents."""
         return PagerDutyTool(
             name="list_incidents",
-            description="List PagerDuty incidents with optional filters",
+            description="List PagerDuty incidents with optional filters and pagination",
             content="""#!/bin/bash
 # Build base query parameters
-params="time_zone=UTC&limit=100"
+limit=${limit:-25}  # Default to 25 items per page
+offset=${offset:-0}  # Default to first page
+params="time_zone=UTC&limit=${limit}&offset=${offset}"
 
 # Add service ID filter if provided
 if [ ! -z "$service_id" ]; then
@@ -124,12 +126,33 @@ fi
 sort_by=${sort_by:-"created_at:desc"}
 params="${params}&sort_by=${sort_by}"
 
-curl -s \
+# Make the API call
+response=$(curl -s \
   "https://api.pagerduty.com/incidents?${params}" \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}"
+  -H "Authorization: Token token=${PD_API_KEY}")
+
+# Extract and display pagination information
+total=$(echo "$response" | grep -o '"total":[0-9]*' | cut -d':' -f2)
+more=$(echo "$response" | grep -o '"more":true' || echo "false")
+
+# Display pagination info as a comment
+echo "# Total incidents: ${total:-'unknown'}"
+echo "# Page: $((offset/limit + 1))"
+echo "# Items per page: $limit"
+echo "# Has more: ${more:-false}"
+echo
+
+# Output the response
+echo "$response"
 """,
             args=[
+                Arg(name="limit",
+                    description="Number of incidents per page (max 100)",
+                    required=False),
+                Arg(name="offset",
+                    description="Number of incidents to skip (for pagination)",
+                    required=False),
                 Arg(name="service_id",
                     description="Filter by service ID",
                     required=False),
