@@ -37,12 +37,12 @@ class PagerDutyTool(Tool):
     description: str
     content: str = ""
     args: List[Arg] = []
-    image: str = "python:3.9-slim"
+    image: str = "curlimages/curl:latest"
     icon_url: str = PAGERDUTY_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
     
-    def __init__(self, name, description, content, args=None, image="python:3.9-slim"):
+    def __init__(self, name, description, content, args=None, image="curlimages/curl:latest"):
         super().__init__(
             name=name,
             description=description,

@@ -38,61 +38,36 @@ class IncidentManager:
         return PagerDutyTool(
             name="create_incident",
             description="Create a new PagerDuty incident",
-            content="""
-import requests
-import json
-import os
-import sys
+            content="""#!/bin/bash
+if [ -z "$title" ] || [ -z "$urgency" ]; then
+    echo "Error: Title and urgency are required"
+    exit 1
+fi
 
-def create_pd_incident():
-    if not os.getenv('title') or not os.getenv('urgency'):
-        print("Error: Title and urgency are required")
-        sys.exit(1)
+description=${description:-""}
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}",
-        'Content-Type': 'application/json',
-        'From': os.getenv('KUBIYA_USER_EMAIL')
+curl -s -X POST \
+  'https://api.pagerduty.com/incidents' \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -H "From: ${KUBIYA_USER_EMAIL}" \
+  -d "{
+    \"incident\": {
+      \"type\": \"incident\",
+      \"title\": \"${title}\",
+      \"service\": {
+        \"id\": \"${SERVICE_ID}\",
+        \"type\": \"service_reference\"
+      },
+      \"urgency\": \"${urgency}\",
+      \"body\": {
+        \"type\": \"incident_body\",
+        \"details\": \"${description}\"
+      }
     }
-
-    payload = {
-        "incident": {
-            "type": "incident",
-            "title": os.getenv('title'),
-            "service": {
-                "id": os.getenv('SERVICE_ID'),
-                "type": "service_reference"
-            },
-            "urgency": os.getenv('urgency'),
-            "body": {
-                "type": "incident_body",
-                "details": os.getenv('description', '')
-            }
-        }
-    }
-
-    try:
-        response = requests.post(
-            'https://api.pagerduty.com/incidents',
-            headers=headers,
-            json=payload
-        )
-        
-        if response.status_code == 401:
-            print("Error: Authentication failed. Please check your API token permissions.")
-            sys.exit(1)
-        
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error creating incident: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    create_pd_incident()
-            """,
+  }" | jq '.'
+""",
             args=[
                 Arg(name="title",
                     description="Title of the incident",
@@ -111,37 +86,12 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="list_incidents",
             description="List PagerDuty incidents",
-            content="""#!/usr/bin/env python3
-# Install required packages
-import subprocess
-subprocess.check_call(['pip', 'install', '--quiet', 'requests'])
-
-import requests
-import json
-import os
-import sys
-
-def list_pd_incidents():
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            f"https://api.pagerduty.com/incidents?service_ids[]={os.getenv('SERVICE_ID')}",
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error listing incidents: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    list_pd_incidents()
-            """
+            content="""#!/bin/bash
+curl -s \
+  "https://api.pagerduty.com/incidents?service_ids[]=${SERVICE_ID}" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+"""
         )
 
     def get_incident_details(self) -> PagerDutyTool:
@@ -149,38 +99,17 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="get_incident_details",
             description="Get detailed information about a specific incident",
-            content="""
-import requests
-import json
-import os
-import sys
+            content="""#!/bin/bash
+if [ -z "$incident_id" ]; then
+    echo "Error: Incident ID not specified"
+    exit 1
+fi
 
-def get_pd_incident_details():
-    incident_id = os.getenv('incident_id')
-    if not incident_id:
-        print("Error: Incident ID not specified")
-        sys.exit(1)
-
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            f"https://api.pagerduty.com/incidents/{incident_id}",
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error getting incident details: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    get_pd_incident_details()
-            """,
+curl -s \
+  "https://api.pagerduty.com/incidents/${incident_id}" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+""",
             args=[
                 Arg(name="incident_id",
                     description="ID of the incident",
@@ -193,50 +122,27 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="update_incident",
             description="Update an incident's status",
-            content="""
-import requests
-import json
-import os
-import sys
+            content="""#!/bin/bash
+if [ -z "$incident_id" ] || [ -z "$status" ]; then
+    echo "Error: Incident ID and status are required"
+    exit 1
+fi
 
-def update_pd_incident():
-    incident_id = os.getenv('incident_id')
-    status = os.getenv('status')
-    
-    if not incident_id or not status:
-        print("Error: Incident ID and status are required")
-        sys.exit(1)
+resolution=${resolution:-""}
 
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}",
-        'Content-Type': 'application/json'
+curl -s -X PUT \
+  "https://api.pagerduty.com/incidents/${incident_id}" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d "{
+    \"incident\": {
+      \"type\": \"incident\",
+      \"status\": \"${status}\",
+      \"resolution\": \"${resolution}\"
     }
-
-    payload = {
-        "incident": {
-            "type": "incident",
-            "status": status,
-            "resolution": os.getenv('resolution', '')
-        }
-    }
-    
-    try:
-        response = requests.put(
-            f"https://api.pagerduty.com/incidents/{incident_id}",
-            headers=headers,
-            json=payload
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error updating incident: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    update_pd_incident()
-            """,
+  }" | jq '.'
+""",
             args=[
                 Arg(name="incident_id",
                     description="ID of the incident",
@@ -255,33 +161,12 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="list_services",
             description="List all available PagerDuty services",
-            content="""
-import requests
-import json
-import os
-import sys
-
-def list_pd_services():
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            "https://api.pagerduty.com/services",
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error listing services: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    list_pd_services()
-            """
+            content="""#!/bin/bash
+curl -s \
+  'https://api.pagerduty.com/services' \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+"""
         )
 
     def list_users(self) -> PagerDutyTool:
@@ -289,33 +174,12 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="list_users",
             description="List all PagerDuty users",
-            content="""
-import requests
-import json
-import os
-import sys
-
-def list_pd_users():
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            "https://api.pagerduty.com/users",
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error listing users: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    list_pd_users()
-            """
+            content="""#!/bin/bash
+curl -s \
+  'https://api.pagerduty.com/users' \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+"""
         )
 
     def list_teams(self) -> PagerDutyTool:
@@ -323,33 +187,12 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="list_teams",
             description="List all PagerDuty teams",
-            content="""
-import requests
-import json
-import os
-import sys
-
-def list_pd_teams():
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            "https://api.pagerduty.com/teams",
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error listing teams: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    list_pd_teams()
-            """
+            content="""#!/bin/bash
+curl -s \
+  'https://api.pagerduty.com/teams' \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+"""
         )
 
     def get_oncall_engineers(self) -> PagerDutyTool:
@@ -357,57 +200,30 @@ if __name__ == "__main__":
         return PagerDutyTool(
             name="get_oncall_engineers",
             description="Get the currently on-call engineers for a specific escalation policy",
-            content="""
-import requests
-import json
-import os
-import sys
-from datetime import datetime
+            content="""#!/bin/bash
+if [ -z "$policy" ]; then
+    echo "Error: Policy name is required"
+    exit 1
+fi
 
-def get_pd_oncall():
-    policy = os.getenv('policy')
-    if not policy:
-        print("Error: Policy name is required")
-        sys.exit(1)
+# Map policy name to ID
+case "$policy" in
+    "Default")
+        policy_id="PAJUKLV"
+        ;;
+    *)
+        echo "Error: Unknown policy name. Available options: Default"
+        exit 1
+        ;;
+esac
 
-    # Map policy name to ID
-    policy_mapping = {
-        "Default": "PAJUKLV"
-    }
-    
-    policy_id = policy_mapping.get(policy)
-    if not policy_id:
-        print("Error: Unknown policy name. Available options: Default")
-        sys.exit(1)
+current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-    current_time = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    
-    headers = {
-        'Accept': 'application/vnd.pagerduty+json;version=2',
-        'Authorization': f"Token token={os.getenv('PD_API_KEY')}"
-    }
-    
-    try:
-        response = requests.get(
-            f"https://api.pagerduty.com/oncalls",
-            params={
-                'time_zone': 'UTC',
-                'since': current_time,
-                'until': current_time,
-                'escalation_policy_ids[]': policy_id
-            },
-            headers=headers
-        )
-        response.raise_for_status()
-        print(json.dumps(response.json(), indent=2))
-        
-    except requests.exceptions.RequestException as e:
-        print(f"Error getting on-call engineers: {str(e)}")
-        sys.exit(1)
-
-if __name__ == "__main__":
-    get_pd_oncall()
-            """,
+curl -s \
+  "https://api.pagerduty.com/oncalls?time_zone=UTC&since=${current_time}&until=${current_time}&escalation_policy_ids[]=${policy_id}" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+""",
             args=[
                 Arg(name="policy",
                     description="Name of the escalation policy (Available options: Default)",
