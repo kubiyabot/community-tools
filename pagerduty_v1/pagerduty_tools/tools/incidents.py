@@ -2,7 +2,6 @@ from typing import List
 from .base import PagerDutyTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
-import jq
 
 class IncidentManager:
     """Manage PagerDuty incidents."""
