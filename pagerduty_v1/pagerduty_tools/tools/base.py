@@ -52,7 +52,7 @@ class PagerDutyTool(Tool):
             icon_url=PAGERDUTY_ICON_URL,
             type="docker",
             secrets=["PD_API_KEY"],
-            env=["SERVICE_ID", "KUBIYA_USER_EMAIL"]
+            env=["KUBIYA_USER_EMAIL"]
         )
 
     def get_args(self) -> List[Arg]:
