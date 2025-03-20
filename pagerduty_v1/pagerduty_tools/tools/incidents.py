@@ -87,7 +87,7 @@ curl -s -X POST \
         """List PagerDuty incidents."""
         return PagerDutyTool(
             name="list_incidents",
-            description="List PagerDuty incidents with optional filters and pagination",
+            description="List PagerDuty incidents with optional filters (shows up to 20 most recent incidents)",
             content="""#!/bin/bash
 # Install jq if not present
 if ! command -v jq &> /dev/null; then
@@ -96,8 +96,8 @@ if ! command -v jq &> /dev/null; then
 fi
 
 # Build base query parameters
-limit=${limit:-25}  # Default to 25 items per page
-offset=${offset:-0}  # Default to first page
+limit=20  # Fixed limit to prevent overwhelming output
+offset=${offset:-0}
 params="time_zone=UTC&limit=${limit}&offset=${offset}"
 
 # Add service ID filter if provided
@@ -141,13 +141,16 @@ response=$(curl -s \
 
 # Extract pagination information
 total=$(echo "$response" | grep -o '"total":[0-9]*' | cut -d':' -f2)
-more=$(echo "$response" | grep -o '"more":true' || echo "false")
 
-# Display pagination info as a comment
-echo "# Total incidents: ${total:-'unknown'}"
-echo "# Page: $((offset/limit + 1))"
-echo "# Items per page: $limit"
-echo "# Has more: ${more:-false}"
+# Display summary header
+echo "=== PagerDuty Incidents ==="
+if [ ! -z "$total" ] && [ "$total" -gt "$limit" ]; then
+    echo "Showing ${limit} most recent incidents out of ${total} total incidents"
+    echo "Use --offset parameter to view more incidents"
+else
+    echo "Found ${total:-0} incidents"
+fi
+echo "----------------------------------------"
 echo
 
 # Process and format the incidents for better readability
@@ -162,13 +165,18 @@ echo "$response" | jq -r '
   (if .assigned_to then "Assigned to: \(.assigned_to[].summary)" else "Assigned to: Unassigned" end) +
   "\nURL: \(.html_url)\n"
 '
+
+# If there are more incidents, show a footer message
+if [ ! -z "$total" ] && [ "$total" -gt "$limit" ]; then
+    echo "----------------------------------------"
+    remaining=$((total - limit))
+    echo "There are ${remaining} more incidents available."
+    echo "Use --offset ${limit} to see the next page of results."
+fi
 """,
             args=[
-                Arg(name="limit",
-                    description="Number of incidents per page (max 100)",
-                    required=False),
                 Arg(name="offset",
-                    description="Number of incidents to skip (for pagination)",
+                    description="Number of incidents to skip (for viewing older incidents)",
                     required=False),
                 Arg(name="service_id",
                     description="Filter by service ID",
