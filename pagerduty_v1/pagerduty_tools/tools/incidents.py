@@ -18,8 +18,7 @@ class IncidentManager:
                 self.list_services(),
                 self.list_users(),
                 self.list_teams(),
-                self.get_oncall_engineers(),
-                self.get_incident_history()
+                self.get_oncall_engineers()
             ]
             
             for tool in tools:
