@@ -86,13 +86,72 @@ curl -s -X POST \
         """List PagerDuty incidents."""
         return PagerDutyTool(
             name="list_incidents",
-            description="List PagerDuty incidents",
+            description="List PagerDuty incidents with optional filters",
             content="""#!/bin/bash
+# Build base query parameters
+params="time_zone=UTC&limit=100"
+
+# Add service ID filter if provided
+if [ ! -z "$service_id" ]; then
+    params="${params}&service_ids[]=${service_id}"
+fi
+
+# Add status filter if provided
+if [ ! -z "$status" ]; then
+    params="${params}&statuses[]=${status}"
+fi
+
+# Add urgency filter if provided
+if [ ! -z "$urgency" ]; then
+    params="${params}&urgencies[]=${urgency}"
+fi
+
+# Add team filter if provided
+if [ ! -z "$team_ids" ]; then
+    params="${params}&team_ids[]=${team_ids}"
+fi
+
+# Add date range if provided
+if [ ! -z "$since" ]; then
+    params="${params}&since=${since}"
+fi
+
+if [ ! -z "$until" ]; then
+    params="${params}&until=${until}"
+fi
+
+# Add sort parameter if provided
+sort_by=${sort_by:-"created_at:desc"}
+params="${params}&sort_by=${sort_by}"
+
 curl -s \
-  "https://api.pagerduty.com/incidents?service_ids[]=${SERVICE_ID}" \
+  "https://api.pagerduty.com/incidents?${params}" \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
   -H "Authorization: Token token=${PD_API_KEY}"
-"""
+""",
+            args=[
+                Arg(name="service_id",
+                    description="Filter by service ID",
+                    required=False),
+                Arg(name="status",
+                    description="Filter by status (triggered/acknowledged/resolved)",
+                    required=False),
+                Arg(name="urgency",
+                    description="Filter by urgency (high/low)",
+                    required=False),
+                Arg(name="team_ids",
+                    description="Filter by team IDs (comma-separated)",
+                    required=False),
+                Arg(name="since",
+                    description="Start date in ISO8601 format (e.g., 2023-01-01T00:00:00Z)",
+                    required=False),
+                Arg(name="until",
+                    description="End date in ISO8601 format (e.g., 2023-12-31T23:59:59Z)",
+                    required=False),
+                Arg(name="sort_by",
+                    description="Sort field (created_at:asc/created_at:desc/resolved_at:asc/resolved_at:desc/urgency:asc/urgency:desc)",
+                    required=False)
+            ]
         )
 
     def get_incident_details(self) -> PagerDutyTool:

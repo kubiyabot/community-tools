@@ -171,7 +171,17 @@ if [ -z "$service_id" ]; then
     exit 1
 fi
 
-since=${since:-$(date -v-7d -u +"%Y-%m-%dT%H:%M:%SZ")}
+# Handle date calculation in a portable way
+if [ -z "$since" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        since=$(date -v-7d -u +"%Y-%m-%dT%H:%M:%SZ")
+    else
+        # Linux and others
+        since=$(date --date="-7 days" -u +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+fi
+
 until=${until:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
 
 curl -s \
@@ -289,7 +299,17 @@ if [ -z "$service_id" ]; then
     exit 1
 fi
 
-since=${since:-$(date -v-30d -u +"%Y-%m-%dT%H:%M:%SZ")}
+# Handle date calculation in a portable way
+if [ -z "$since" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        since=$(date -v-30d -u +"%Y-%m-%dT%H:%M:%SZ")
+    else
+        # Linux and others
+        since=$(date --date="-30 days" -u +"%Y-%m-%dT%H:%M:%SZ")
+    fi
+fi
+
 until=${until:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
 
 curl -s \
