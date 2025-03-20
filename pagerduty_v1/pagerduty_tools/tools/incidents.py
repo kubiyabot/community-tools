@@ -66,7 +66,7 @@ curl -s -X POST \
         \"details\": \"${description}\"
       }
     }
-  }" | jq '.'
+  }"
 """,
             args=[
                 Arg(name="title",
@@ -90,7 +90,7 @@ curl -s -X POST \
 curl -s \
   "https://api.pagerduty.com/incidents?service_ids[]=${SERVICE_ID}" \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """
         )
 
@@ -108,7 +108,7 @@ fi
 curl -s \
   "https://api.pagerduty.com/incidents/${incident_id}" \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """,
             args=[
                 Arg(name="incident_id",
@@ -141,7 +141,7 @@ curl -s -X PUT \
       \"status\": \"${status}\",
       \"resolution\": \"${resolution}\"
     }
-  }" | jq '.'
+  }"
 """,
             args=[
                 Arg(name="incident_id",
@@ -165,7 +165,7 @@ curl -s -X PUT \
 curl -s \
   'https://api.pagerduty.com/services' \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """
         )
 
@@ -178,7 +178,7 @@ curl -s \
 curl -s \
   'https://api.pagerduty.com/users' \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """
         )
 
@@ -191,14 +191,14 @@ curl -s \
 curl -s \
   'https://api.pagerduty.com/teams' \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """
         )
 
     def get_oncall_engineers(self) -> PagerDutyTool:
         """Get current on-call engineers."""
         return PagerDutyTool(
-            name="get_oncall_engineers",
+            name="get_oncall_engineers", 
             description="Get the currently on-call engineers for a specific escalation policy",
             content="""#!/bin/bash
 if [ -z "$policy" ]; then
@@ -206,27 +206,28 @@ if [ -z "$policy" ]; then
     exit 1
 fi
 
-# Map policy name to ID
-case "$policy" in
-    "Default")
-        policy_id="PAJUKLV"
-        ;;
-    *)
-        echo "Error: Unknown policy name. Available options: Default"
-        exit 1
-        ;;
-esac
+# First, get the policy ID by searching through escalation policies
+policy_id=$(curl -s \
+  "https://api.pagerduty.com/escalation_policies?query=${policy}" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}" \
+  | grep -o '"id":"[^"]*' | head -1 | cut -d'"' -f4)
+
+if [ -z "$policy_id" ]; then
+    echo "Error: Could not find escalation policy with name: ${policy}"
+    exit 1
+fi
 
 current_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 curl -s \
   "https://api.pagerduty.com/oncalls?time_zone=UTC&since=${current_time}&until=${current_time}&escalation_policy_ids[]=${policy_id}" \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}" | jq '.'
+  -H "Authorization: Token token=${PD_API_KEY}"
 """,
             args=[
                 Arg(name="policy",
-                    description="Name of the escalation policy (Available options: Default)",
+                    description="Name of the escalation policy to search for",
                     required=True)
             ]
         )
