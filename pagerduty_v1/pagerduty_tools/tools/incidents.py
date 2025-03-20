@@ -40,8 +40,8 @@ class IncidentManager:
             name="create_incident",
             description="Create a new PagerDuty incident",
             content="""#!/bin/bash
-if [ -z "$title" ] || [ -z "$urgency" ]; then
-    echo "Error: Title and urgency are required"
+if [ -z "$title" ] || [ -z "$urgency" ] || [ -z "$service_id" ]; then
+    echo "Error: Title, urgency, and service_id are required"
     exit 1
 fi
 
@@ -58,7 +58,7 @@ curl -s -X POST \
       \"type\": \"incident\",
       \"title\": \"${title}\",
       \"service\": {
-        \"id\": \"${SERVICE_ID}\",
+        \"id\": \"${service_id}\",
         \"type\": \"service_reference\"
       },
       \"urgency\": \"${urgency}\",
@@ -75,6 +75,9 @@ curl -s -X POST \
                     required=True),
                 Arg(name="urgency",
                     description="Incident urgency (high/low)",
+                    required=True),
+                Arg(name="service_id",
+                    description="ID of the service to create the incident for",
                     required=True),
                 Arg(name="description",
                     description="Detailed description of the incident",
@@ -336,51 +339,6 @@ curl -s \
                 Arg(name="policy",
                     description="Name of the escalation policy to search for",
                     required=True)
-            ]
-        )
-
-    def get_incident_history(self) -> PagerDutyTool:
-        """Get historical PagerDuty incidents."""
-        return PagerDutyTool(
-            name="get_incident_history",
-            description="Get historical PagerDuty incidents with optional date filters",
-            content="""#!/bin/bash
-# Set default values for date range if not provided
-if [ -z "$since" ]; then
-    # Calculate 30 days ago in a more portable way
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        since=$(date -v-30d -u +"%Y-%m-%dT%H:%M:%SZ")
-    else
-        # Linux and others
-        since=$(date --date="-30 days" -u +"%Y-%m-%dT%H:%M:%SZ")
-    fi
-fi
-
-until=${until:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
-status=${status:-"all"}
-
-# Construct the status filter if specific status is provided
-status_filter=""
-if [ "$status" != "all" ]; then
-    status_filter="&statuses[]=${status}"
-fi
-
-curl -s \
-  "https://api.pagerduty.com/incidents?service_ids[]=${SERVICE_ID}&since=${since}&until=${until}${status_filter}&time_zone=UTC&sort_by=created_at:desc&limit=100" \
-  -H 'Accept: application/vnd.pagerduty+json;version=2' \
-  -H "Authorization: Token token=${PD_API_KEY}"
-""",
-            args=[
-                Arg(name="since",
-                    description="Start date in ISO8601 format (e.g., 2023-01-01T00:00:00Z). Defaults to 30 days ago",
-                    required=False),
-                Arg(name="until",
-                    description="End date in ISO8601 format (e.g., 2023-12-31T23:59:59Z). Defaults to current time",
-                    required=False),
-                Arg(name="status",
-                    description="Filter by incident status (triggered/acknowledged/resolved/all). Defaults to all",
-                    required=False)
             ]
         )
 
