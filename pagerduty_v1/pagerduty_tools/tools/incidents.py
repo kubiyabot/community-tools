@@ -2,6 +2,7 @@ from typing import List
 from .base import PagerDutyTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
+import jq
 
 class IncidentManager:
     """Manage PagerDuty incidents."""
@@ -88,6 +89,12 @@ curl -s -X POST \
             name="list_incidents",
             description="List PagerDuty incidents with optional filters and pagination",
             content="""#!/bin/bash
+# Install jq if not present
+if ! command -v jq &> /dev/null; then
+    echo "Installing jq..."
+    apk add --no-cache jq
+fi
+
 # Build base query parameters
 limit=${limit:-25}  # Default to 25 items per page
 offset=${offset:-0}  # Default to first page
@@ -132,7 +139,7 @@ response=$(curl -s \
   -H 'Accept: application/vnd.pagerduty+json;version=2' \
   -H "Authorization: Token token=${PD_API_KEY}")
 
-# Extract and display pagination information
+# Extract pagination information
 total=$(echo "$response" | grep -o '"total":[0-9]*' | cut -d':' -f2)
 more=$(echo "$response" | grep -o '"more":true' || echo "false")
 
@@ -143,8 +150,18 @@ echo "# Items per page: $limit"
 echo "# Has more: ${more:-false}"
 echo
 
-# Output the response
-echo "$response"
+# Process and format the incidents for better readability
+echo "$response" | jq -r '
+  .incidents[] | 
+  "=== Incident #\(.incident_number) ===\n" +
+  "Title: \(.title)\n" +
+  "Status: \(.status)\n" +
+  "Urgency: \(.urgency)\n" +
+  "Created: \(.created_at)\n" +
+  "Service: \(.service.summary)\n" +
+  (if .assigned_to then "Assigned to: \(.assigned_to[].summary)" else "Assigned to: Unassigned" end) +
+  "\nURL: \(.html_url)\n"
+'
 """,
             args=[
                 Arg(name="limit",
