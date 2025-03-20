@@ -18,7 +18,8 @@ class IncidentManager:
                 self.list_services(),
                 self.list_users(),
                 self.list_teams(),
-                self.get_oncall_engineers()
+                self.get_oncall_engineers(),
+                self.list_escalation_policies()
             ]
             
             for tool in tools:
@@ -339,6 +340,28 @@ curl -s \
                     description="Name of the escalation policy to search for",
                     required=True)
             ]
+        )
+
+    def list_escalation_policies(self) -> PagerDutyTool:
+        """List all PagerDuty escalation policies."""
+        return PagerDutyTool(
+            name="list_escalation_policies",
+            description="List all available PagerDuty escalation policies",
+            content="""#!/bin/bash
+# Install jq if not present
+if ! command -v jq &> /dev/null; then
+    echo "Installing jq..."
+    apk add --no-cache jq
+fi
+
+response=$(curl -s \
+  'https://api.pagerduty.com/escalation_policies' \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}")
+
+echo "=== PagerDuty Escalation Policies ==="
+echo "$response" | jq -r '.escalation_policies[] | "ID: \(.id)\nName: \(.name)\nDescription: \(.description // "No description")\n---"'
+"""
         )
 
 # Initialize when module is imported
