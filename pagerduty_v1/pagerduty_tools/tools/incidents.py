@@ -18,7 +18,8 @@ class IncidentManager:
                 self.list_services(),
                 self.list_users(),
                 self.list_teams(),
-                self.get_oncall_engineers()
+                self.get_oncall_engineers(),
+                self.get_incident_history()
             ]
             
             for tool in tools:
@@ -232,6 +233,40 @@ curl -s \
             ]
         )
 
+    def get_incident_history(self) -> PagerDutyTool:
+        """Get historical PagerDuty incidents."""
+        return PagerDutyTool(
+            name="get_incident_history",
+            description="Get historical PagerDuty incidents with optional date filters",
+            content="""#!/bin/bash
+# Set default values for date range if not provided
+since=${since:-$(date -d '30 days ago' -u +"%Y-%m-%dT%H:%M:%SZ")}
+until=${until:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}
+status=${status:-"all"}
+
+# Construct the status filter if specific status is provided
+status_filter=""
+if [ "$status" != "all" ]; then
+    status_filter="&statuses[]=${status}"
+fi
+
+curl -s \
+  "https://api.pagerduty.com/incidents?service_ids[]=${SERVICE_ID}&since=${since}&until=${until}${status_filter}&time_zone=UTC&sort_by=created_at:desc&limit=100" \
+  -H 'Accept: application/vnd.pagerduty+json;version=2' \
+  -H "Authorization: Token token=${PD_API_KEY}"
+""",
+            args=[
+                Arg(name="since",
+                    description="Start date in ISO8601 format (e.g., 2023-01-01T00:00:00Z). Defaults to 30 days ago",
+                    required=False),
+                Arg(name="until",
+                    description="End date in ISO8601 format (e.g., 2023-12-31T23:59:59Z). Defaults to current time",
+                    required=False),
+                Arg(name="status",
+                    description="Filter by incident status (triggered/acknowledged/resolved/all). Defaults to all",
+                    required=False)
+            ]
+        )
 
 # Initialize when module is imported
 IncidentManager() 
