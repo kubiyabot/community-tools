@@ -37,32 +37,38 @@ class GrafanaTools:
             name="search_logs",
             description="Search Grafana logs with specific criteria",
             content="""
-            #!/usr/bin/env python3
-            import os
-            import json
-            from grafana_api.grafana_face import GrafanaFace
-            from datetime import datetime, timezone
+            #!/bin/bash
+            
+            # Check required environment variables
+            if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
+                echo "Error: GRAFANA_API_TOKEN and request_id are required"
+                exit 1
+            fi
 
-            # Initialize Grafana client
-            grafana = GrafanaFace(
-                auth=os.environ['GRAFANA_API_TOKEN'],
-                host=os.environ.get('GRAFANA_HOST', 'localhost')
-            )
+            # Set default values
+            GRAFANA_HOST=${GRAFANA_HOST:-localhost}
+            LIMIT=${limit:-100}
+            
+            # Build the query string
+            QUERY="{request_id=\\\"$request_id\\\"}"
+            
+            # Build the API URL
+            URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query"
+            
+            # Add time range if specified
+            TIME_PARAMS=""
+            if [ ! -z "$start_time" ]; then
+                TIME_PARAMS="&start=$(date -d "$start_time" +%s)"
+            fi
+            if [ ! -z "$end_time" ]; then
+                TIME_PARAMS="${TIME_PARAMS}&end=$(date -d "$end_time" +%s)"
+            fi
 
-            # Build query
-            query = {
-                'expr': f'{{request_id="{os.environ["request_id"]}"}}',
-                'limit': int(os.environ.get('limit', '100'))
-            }
-
-            if 'start_time' in os.environ:
-                query['start'] = datetime.fromisoformat(os.environ['start_time'])
-            if 'end_time' in os.environ:
-                query['end'] = datetime.fromisoformat(os.environ['end_time'])
-
-            # Execute query
-            result = grafana.search.search_logs(query)
-            print(json.dumps(result, default=str))
+            # Make the API call using curl
+            curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
+                 -H "Content-Type: application/json" \\
+                 "${URL}?query=${QUERY}&limit=${LIMIT}${TIME_PARAMS}" | \\
+                 jq '.'
             """,
             args=[
                 Arg(name="request_id",

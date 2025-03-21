@@ -54,12 +54,12 @@ class SlackBaseTool(MonitoringTool):
         )
 
 class GrafanaBaseTool(MonitoringTool):
-    """Base class for Grafana tools using the Python API."""
+    """Base class for Grafana tools using Bash."""
     
     def __init__(self, name: str, description: str, content: str, args: List[Arg] = None):
         install_packages = """
-        # Install Grafana API client
-        pip install --no-cache-dir grafana-api python-dateutil
+        # Install required packages
+        apt-get update && apt-get install -y curl jq
         """
         content = install_packages + "\n" + content
         
@@ -68,7 +68,7 @@ class GrafanaBaseTool(MonitoringTool):
             description=description,
             content=content,
             args=args,
-            image="python:3.9-slim",
+            image="debian:bullseye-slim",
             secrets=["GRAFANA_API_TOKEN"],
             env=["GRAFANA_HOST"]
         )
