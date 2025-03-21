@@ -57,18 +57,13 @@ class GrafanaBaseTool(MonitoringTool):
     """Base class for Grafana tools using Bash."""
     
     def __init__(self, name: str, description: str, content: str, args: List[Arg] = None):
-        install_packages = """
-        # Install required packages
-        apt-get update && apt-get install -y curl jq
-        """
-        content = install_packages + "\n" + content
-        
+        # No need for install_packages since we'll install jq directly in the tools
         super().__init__(
             name=name,
             description=description,
             content=content,
             args=args,
-            image="debian:bullseye-slim",
+            image="curlimages/curl:latest",
             secrets=["GRAFANA_API_TOKEN"],
             env=["GRAFANA_HOST"]
         )
