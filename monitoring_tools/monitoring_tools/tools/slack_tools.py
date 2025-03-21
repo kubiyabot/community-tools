@@ -1,5 +1,5 @@
 from typing import List
-from ..tools.base import SlackBaseTool
+from .base import SlackBaseTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
 

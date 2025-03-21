@@ -1,6 +1,5 @@
-from typing import List, Optional, Dict, Any, Set
-from kubiya_sdk.tools import Tool, Arg, FileSpec
-from abc import ABC, abstractmethod
+from typing import List, Optional, Dict, Any
+from kubiya_sdk.tools import Tool, Arg
 
 class MonitoringTool(Tool):
     """Base class for all monitoring tools."""
