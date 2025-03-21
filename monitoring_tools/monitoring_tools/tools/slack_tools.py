@@ -1,4 +1,3 @@
-from typing import List
 from .base import SlackBaseTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
@@ -59,8 +58,7 @@ class SlackTools:
                 Arg(name="blocks",
                     description="Message blocks in JSON format",
                     required=False)
-            ],
-            image="python:3.9-slim"
+            ]
         )
 
     def post_error_report(self) -> SlackBaseTool:
@@ -133,8 +131,7 @@ class SlackTools:
                 Arg(name="service",
                     description="Affected service name",
                     required=False)
-            ],
-            image="python:3.9-slim"
+            ]
         )
 
     def search_messages(self) -> SlackBaseTool:
@@ -183,8 +180,7 @@ class SlackTools:
                 Arg(name="count",
                     description="Number of results to return",
                     required=False)
-            ],
-            image="python:3.9-slim"
+            ]
         )
 
     def get_channel_history(self) -> SlackBaseTool:
@@ -228,8 +224,7 @@ class SlackTools:
                 Arg(name="limit",
                     description="Number of messages to return",
                     required=False)
-            ],
-            image="python:3.9-slim"
+            ]
         )
 
 # Initialize when module is imported

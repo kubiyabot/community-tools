@@ -1,5 +1,5 @@
 from typing import List
-from .base import MonitoringTool, LoggingTool
+from .base import MonitoringTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
 

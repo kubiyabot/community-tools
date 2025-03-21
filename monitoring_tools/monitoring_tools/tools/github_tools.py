@@ -1,4 +1,3 @@
-from typing import List
 from .base import GitHubBaseTool
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry

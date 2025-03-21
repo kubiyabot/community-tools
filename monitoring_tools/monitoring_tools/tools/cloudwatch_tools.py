@@ -1,4 +1,3 @@
-from typing import List
 from ..tools.base import AwsBaseTool, LoggingArgsMixin, MetricsArgsMixin
 from kubiya_sdk.tools import Arg
 from kubiya_sdk.tools.registry import tool_registry
@@ -68,8 +67,7 @@ class CloudWatchTools:
                 Arg(name="log_stream",
                     description="CloudWatch Log Stream name",
                     required=True)
-            ],
-            image="amazon/aws-cli:latest"  # Using official AWS CLI image
+            ]
         )
 
     def get_metrics(self) -> CloudWatchMetricTool:
@@ -107,8 +105,7 @@ class CloudWatchTools:
                 Arg(name="namespace",
                     description="CloudWatch metrics namespace",
                     required=True)
-            ],
-            image="amazon/aws-cli:latest"
+            ]
         )
 
     def describe_alarms(self) -> AwsBaseTool:
@@ -142,8 +139,7 @@ class CloudWatchTools:
                 Arg(name="state",
                     description="Filter by alarm state",
                     required=False)
-            ],
-            image="alpine:latest"
+            ]
         )
 
     def get_metric_statistics(self) -> CloudWatchMetricTool:
@@ -181,8 +177,7 @@ class CloudWatchTools:
                 Arg(name="service_name",
                     description="Name of the service",
                     required=False)
-            ],
-            image="alpine:latest"
+            ]
         )
 
 # Initialize when module is imported
