@@ -2,7 +2,7 @@ import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops
 
 
 class BaseCreationIssueTool(JiraPythonTool):
@@ -128,6 +128,122 @@ add_comment_issue_tool = JiraPythonTool(
         )
     ])
 
+update_issue_status_tool = JiraPythonTool(
+    name="update_issue_status",
+    description="Update the status of a Jira issue",
+    content="""python /tmp/update_issue_status.py "{{ .issue_key }}" "{{ .status }}" """,
+    args=[
+        Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
+        Arg(name="status", type="str", description="New status (e.g., 'In Progress', 'Done')", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/update_issue_status.py",
+            content=inspect.getsource(update_issue_status),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+assign_issue_tool = JiraPythonTool(
+    name="assign_issue",
+    description="Assign or unassign a Jira issue",
+    content="""python /tmp/assign_issue.py "{{ .issue_key }}" "{{ .assignee_email }}" """,
+    args=[
+        Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
+        Arg(name="assignee_email", type="str", description="Email of user to assign (leave empty to unassign)", required=False),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/assign_issue.py",
+            content=inspect.getsource(assign_issue),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+create_sprint_tool = JiraPythonTool(
+    name="create_sprint",
+    description="Create a new sprint",
+    content="""python /tmp/sprint_ops.py create "{{ .board_id }}" "{{ .name }}" --goal="{{ .goal }}" --start-date="{{ .start_date }}" --end-date="{{ .end_date }}" """,
+    args=[
+        Arg(name="board_id", type="int", description="Board ID", required=True),
+        Arg(name="name", type="str", description="Sprint name", required=True),
+        Arg(name="goal", type="str", description="Sprint goal", required=False),
+        Arg(name="start_date", type="str", description="Sprint start date (YYYY-MM-DD)", required=False),
+        Arg(name="end_date", type="str", description="Sprint end date (YYYY-MM-DD)", required=False),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/sprint_ops.py",
+            content=inspect.getsource(sprint_ops),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+update_sprint_state_tool = JiraPythonTool(
+    name="update_sprint_state",
+    description="Start or close a sprint",
+    content="""python /tmp/sprint_ops.py state "{{ .sprint_id }}" "{{ .state }}" """,
+    args=[
+        Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
+        Arg(name="state", type="str", description="New state (active/closed)", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/sprint_ops.py",
+            content=inspect.getsource(sprint_ops),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+move_to_sprint_tool = JiraPythonTool(
+    name="move_to_sprint",
+    description="Move issues to a sprint",
+    content="""python /tmp/sprint_ops.py move "{{ .sprint_id }}" {{ .issue_keys }} """,
+    args=[
+        Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
+        Arg(name="issue_keys", type="str", description="Space-separated list of issue keys", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/sprint_ops.py",
+            content=inspect.getsource(sprint_ops),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
+view_sprint_tool = JiraPythonTool(
+    name="view_sprint",
+    description="View sprint details and issues",
+    content="""python /tmp/sprint_ops.py list "{{ .sprint_id }}" """,
+    args=[
+        Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/sprint_ops.py",
+            content=inspect.getsource(sprint_ops),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 [
     register_jira_tool(tool) for tool in [
         create_task_tool,
@@ -137,6 +253,12 @@ add_comment_issue_tool = JiraPythonTool(
         create_story_tool,
         view_issue_tool,
         list_issue_tool,
-        add_comment_issue_tool
+        add_comment_issue_tool,
+        update_issue_status_tool,
+        assign_issue_tool,
+        create_sprint_tool,
+        update_sprint_state_tool,
+        move_to_sprint_tool,
+        view_sprint_tool,
     ]
 ]
