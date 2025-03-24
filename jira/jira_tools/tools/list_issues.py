@@ -64,7 +64,7 @@ def main():
     
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira Project key")
-    parser.add_argument("--issues_number", type=str, help="Number of issues to list")
+    parser.add_argument("--issues_number", type=int, help="Number of issues to list", default=5)
     parser.add_argument("--status", type=str, help="Issues status, such as Done")
     parser.add_argument("--assignee", type=str, help="Filter by assignee")
     parser.add_argument("--priority", type=str, help="Filter by priority")
