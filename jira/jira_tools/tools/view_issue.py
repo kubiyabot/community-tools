@@ -11,21 +11,46 @@ def extract_relevant_fields(data):
     if not data:
         return {}
         
-    fields = data.get("fields") or {}
+    fields = data.get("fields")
+    if not fields:
+        return {
+            "issuetype_name": "N/A",
+            "description_content": "N/A",
+            "project_self": "N/A",
+            "project_key": "N/A",
+            "project_name": "N/A",
+            "project_type": "N/A",
+            "priority_name": "N/A",
+            "created": "N/A",
+            "assignee_email": "N/A",
+            "assignee_displayName": "N/A",
+            "reporter_email": "N/A",
+            "reporter_displayName": "N/A",
+        }
+
+    def safe_get(obj, *keys):
+        current = obj
+        for key in keys:
+            if not isinstance(current, dict):
+                return "N/A"
+            current = current.get(key)
+            if current is None:
+                return "N/A"
+        return current
 
     filtered_data = {
-        "issuetype_name": fields.get("issuetype", {}).get("name") or "N/A",
-        "description_content": fields.get("description") or "N/A",
-        "project_self": fields.get("project", {}).get("self") or "N/A",
-        "project_key": fields.get("project", {}).get("key") or "N/A",
-        "project_name": fields.get("project", {}).get("name") or "N/A",
-        "project_type": fields.get("project", {}).get("projectTypeKey") or "N/A",
-        "priority_name": fields.get("priority", {}).get("name") or "N/A",
-        "created": fields.get("created") or "N/A",
-        "assignee_email": fields.get("assignee", {}).get("emailAddress") or "N/A",
-        "assignee_displayName": fields.get("assignee", {}).get("displayName") or "N/A",
-        "reporter_email": fields.get("reporter", {}).get("emailAddress") or "N/A",
-        "reporter_displayName": fields.get("reporter", {}).get("displayName") or "N/A",
+        "issuetype_name": safe_get(fields, "issuetype", "name"),
+        "description_content": safe_get(fields, "description"),
+        "project_self": safe_get(fields, "project", "self"),
+        "project_key": safe_get(fields, "project", "key"),
+        "project_name": safe_get(fields, "project", "name"),
+        "project_type": safe_get(fields, "project", "projectTypeKey"),
+        "priority_name": safe_get(fields, "priority", "name"),
+        "created": safe_get(fields, "created"),
+        "assignee_email": safe_get(fields, "assignee", "emailAddress"),
+        "assignee_displayName": safe_get(fields, "assignee", "displayName"),
+        "reporter_email": safe_get(fields, "reporter", "emailAddress"),
+        "reporter_displayName": safe_get(fields, "reporter", "displayName"),
     }
 
     return filtered_data
