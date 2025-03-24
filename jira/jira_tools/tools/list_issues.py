@@ -65,7 +65,7 @@ def main():
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira Project key")
     parser.add_argument(
-        "--issues_number", default=5, type=int, help="Number of issue to list"
+        "--issues_number", default=5, type=str, help="Number of issue to list"
     )
     parser.add_argument(
         "--status", default=None, type=str, help="Issues status, such as Done"
@@ -81,14 +81,21 @@ def main():
     )
     args = parser.parse_args()
 
+    # Handle "<no value>" cases
+    issues_number = 5 if args.issues_number == "<no value>" else int(args.issues_number)
+    status = None if args.status == "<no value>" else args.status
+    assignee = None if args.assignee == "<no value>" else args.assignee
+    priority = None if args.priority == "<no value>" else args.priority
+    reporter = None if args.reporter == "<no value>" else args.reporter
+
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number,
-            args.status,
-            args.assignee,
-            args.priority,
-            args.reporter,
+            issues_number,
+            status,
+            assignee,
+            priority,
+            reporter,
         )
         for issue in latest_issues:
             print(
