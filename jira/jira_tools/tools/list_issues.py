@@ -81,16 +81,14 @@ def main():
     )
     args = parser.parse_args()
 
-    no_value = "<no value>"  # when no value is injected
-
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if args.issues_number != no_value else 5,
-            args.status if args.status != no_value else None,
-            args.assignee if args.assignee != no_value else None,
-            args.priority if args.priority != no_value else None,
-            args.reporter if args.reporter != no_value else None,
+            args.issues_number,
+            args.status,
+            args.assignee,
+            args.priority,
+            args.reporter,
         )
         for issue in latest_issues:
             print(
