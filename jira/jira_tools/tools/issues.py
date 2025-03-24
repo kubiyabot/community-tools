@@ -89,7 +89,7 @@ view_issue_tool = JiraPythonTool(
 list_issue_tool = JiraPythonTool(
     name="issue_list",
     description="List Jira issues",
-    content="""python /tmp/list_issues.py "{{ .project_key }}" {% if .issues_number %}--issues_number="{{ .issues_number }}"{% endif %} --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" """,
+    content="""python /tmp/list_issues.py "{{ .project_key }}" --issues_number="{{ .issues_number }}" --status="{{ .status }}" --assignee="{{ .assignee }}" --priority="{{ .priority }}" --reporter="{{ .reporter }}" """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
         Arg(name="issues_number", type="str", description="Number of issue to list", required=False),
