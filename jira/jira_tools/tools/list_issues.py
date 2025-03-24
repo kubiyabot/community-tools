@@ -65,7 +65,7 @@ def main():
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira Project key")
     parser.add_argument(
-        "--issues_number", type=int, help="Number of issue to list"
+        "--issues_number", type=str, help="Number of issue to list"
     )
     parser.add_argument(
         "--status", type=str, help="Issues status, such as Done"
@@ -82,19 +82,29 @@ def main():
     args = parser.parse_args()
 
     try:
+        # Convert empty strings to None and convert issues_number to int if present
+        issues_number = int(args.issues_number) if args.issues_number else None
+        status = None if not args.status else args.status
+        assignee = None if not args.assignee else args.assignee
+        priority = None if not args.priority else args.priority
+        reporter = None if not args.reporter else args.reporter
+
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if args.issues_number is not None else 5,
-            args.status,
-            args.assignee,
-            args.priority,
-            args.reporter,
+            issues_number,
+            status,
+            assignee,
+            priority,
+            reporter,
         )
         for issue in latest_issues:
             print(
                 f"{issue['key']}: {issue['summary']} - Created on {issue['created']})"
             )
 
+    except ValueError as e:
+        print(f"Invalid number format for issues_number: {e}")
+        raise RuntimeError(f"Invalid number format for issues_number: {e}")
     except Exception as e:
         print(f"Failed to list issues: {e}")
         raise RuntimeError(f"Failed to list issues: {e}")
