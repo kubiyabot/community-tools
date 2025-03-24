@@ -8,21 +8,24 @@ import requests
 
 
 def extract_relevant_fields(data):
-    fields = data.get("fields", {})
+    if not data:
+        return {}
+        
+    fields = data.get("fields") or {}
 
     filtered_data = {
-        "issuetype_name": fields.get("issuetype", {}).get("name", {}),
-        "description_content": fields.get("description", {}),
-        "project_self": fields.get("project", {}).get("self", {}),
-        "project_key": fields.get("project", {}).get("key", {}),
-        "project_name": fields.get("project", {}).get("name", {}),
-        "project_type": fields.get("project", {}).get("projectTypeKey", {}),
-        "priority_name": fields.get("priority", {}).get("name", {}),
-        "created": fields.get("created", {}),
-        "assignee_email": fields.get("assignee", {}).get("emailAddress", {}),
-        "assignee_displayName": fields.get("assignee", {}).get("displayName", {}),
-        "reporter_email": fields.get("reporter", {}).get("emailAddress", {}),
-        "reporter_displayName": fields.get("reporter", {}).get("displayName", {}),
+        "issuetype_name": fields.get("issuetype", {}).get("name") or "N/A",
+        "description_content": fields.get("description") or "N/A",
+        "project_self": fields.get("project", {}).get("self") or "N/A",
+        "project_key": fields.get("project", {}).get("key") or "N/A",
+        "project_name": fields.get("project", {}).get("name") or "N/A",
+        "project_type": fields.get("project", {}).get("projectTypeKey") or "N/A",
+        "priority_name": fields.get("priority", {}).get("name") or "N/A",
+        "created": fields.get("created") or "N/A",
+        "assignee_email": fields.get("assignee", {}).get("emailAddress") or "N/A",
+        "assignee_displayName": fields.get("assignee", {}).get("displayName") or "N/A",
+        "reporter_email": fields.get("reporter", {}).get("emailAddress") or "N/A",
+        "reporter_displayName": fields.get("reporter", {}).get("displayName") or "N/A",
     }
 
     return filtered_data
@@ -38,7 +41,13 @@ def main():
 
     try:
         response = requests.get(get_issue_url, headers=get_jira_basic_headers())
-        print(extract_relevant_fields(response.json()))
+        if not response.ok:
+            print(f"Failed to fetch issue: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return
+        
+        data = response.json()
+        print(extract_relevant_fields(data))
     except Exception as e:
         print(f"Failed to view issues: {e}")
         raise RuntimeError(f"Failed to view issues: {e}")
