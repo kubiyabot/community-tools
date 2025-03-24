@@ -33,8 +33,8 @@ repo_create = GitHubCliTool(
         Arg(name="private", type="bool", description="Create private repository", required=False),
         Arg(name="description", type="str", description="Repository description", required=False),
         Arg(name="homepage", type="str", description="Repository homepage URL", required=False),
-        Arg(name="has_issues", type="bool", description="Enable issues", required=False, default=True),
-        Arg(name="has_wiki", type="bool", description="Enable wiki", required=False, default=True),
+        Arg(name="has_issues", type="bool", description="Enable issues", required=False),
+        Arg(name="has_wiki", type="bool", description="Enable wiki", required=False),
     ],
 )
 
@@ -67,7 +67,7 @@ fi
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="branch_name", type="str", description="Name for the new branch", required=True),
-        Arg(name="base_branch", type="str", description="Base branch to create from (default: main)", required=False),
+        Arg(name="base_branch", type="str", description="Base branch to create from (default: main)", required=False)
     ],
 )
 
