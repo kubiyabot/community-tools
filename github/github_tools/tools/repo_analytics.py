@@ -170,12 +170,30 @@ COMMITS=$(echo "$COMMITS" | jq '[
 
 # Get recent activity (last 4 weeks) with error handling
 echo "📊 Analyzing recent activity..."
-echo "Raw API output:"
-gh api "repos/$repo/stats/commit_activity" | tee /dev/stderr
-ACTIVITY=$(gh api "repos/$repo/stats/commit_activity" || echo '{"last_month":0,"last_week":0,"by_day":[0,0,0,0,0,0,0]}')
+ACTIVITY_DATA=$(gh api "repos/$repo/stats/commit_activity" || echo '[]')
+
+# Validate and clean the JSON data
+echo "Validating data..."
+ACTIVITY_DATA=$(echo "$ACTIVITY_DATA" | jq -c '.' || echo '[]')
+
+if [ "$ACTIVITY_DATA" = "[]" ] || [ "$ACTIVITY_DATA" = "null" ]; then
+    ACTIVITY='{
+        "last_month": 0,
+        "last_week": 0,
+        "by_day": [0,0,0,0,0,0,0]
+    }'
+else
+    ACTIVITY=$(echo "$ACTIVITY_DATA" | jq '
+        {
+            last_month: ([.[-4:] // [] | .[].total // 0] | add),
+            last_week: (.[-1].total // 0),
+            by_day: (.[-1].days // [0,0,0,0,0,0,0])
+        }
+    ')
+fi
 
 # Format output with error handling
-if [ "$format" = "json" ]; then
+if [ "${format:-text}" = "json" ]; then
     jq -n --argjson commits "$COMMITS" \
           --argjson activity "$ACTIVITY" \
         '{
