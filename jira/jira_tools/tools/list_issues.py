@@ -73,11 +73,15 @@ def main():
     args = parser.parse_args()
 
     try:
-        issues_number = int(args.issues_number) if args.issues_number else 5
-        status = args.status if args.status else None
-        assignee = args.assignee if args.assignee else None
-        priority = args.priority if args.priority else None
-        reporter = args.reporter if args.reporter else None
+        # Handle '<no value>' as None
+        issues_number = args.issues_number if args.issues_number and args.issues_number != '<no value>' else None
+        status = args.status if args.status and args.status != '<no value>' else None
+        assignee = args.assignee if args.assignee and args.assignee != '<no value>' else None
+        priority = args.priority if args.priority and args.priority != '<no value>' else None
+        reporter = args.reporter if args.reporter and args.reporter != '<no value>' else None
+
+        # Convert issues_number to int if present, otherwise use default
+        issues_number = int(issues_number) if issues_number else 5
 
         latest_issues = list_issues_in_project(
             args.project_key,
