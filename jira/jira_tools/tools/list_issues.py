@@ -11,7 +11,7 @@ import requests
 
 def list_issues_in_project(
     project_key: str,
-    num_issues: int = 5,
+    num_issues: str = "5",
     status: str = None,
     assignee: str = None,
     priority: str = None,
