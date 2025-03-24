@@ -144,30 +144,44 @@ set -euo pipefail
 echo "📜 Analyzing commit history for: $repo"
 LIMIT="${limit:-5}"  # Default to 5 commits if not specified
 
-# Get recent commits (limited)
+# Get recent commits (limited) with error handling
 echo "🔍 Fetching recent commits..."
-COMMITS=$(gh api "repos/$repo/commits?per_page=$LIMIT" --jq '[
+COMMITS=$(gh api "repos/$repo/commits?per_page=$LIMIT" || echo '[]')
+if [ "$COMMITS" = "[]" ]; then
+    echo "❌ Failed to fetch commits. Please check if:"
+    echo "  • The repository exists and is accessible"
+    echo "  • You have the required permissions"
+    echo "  • The repository has any commits"
+    exit 1
+fi
+
+COMMITS=$(echo "$COMMITS" | jq '[
     .[] | {
         sha: .sha[0:7],  # Short SHA
-        author: .author.login,
+        author: (.author.login // "unknown"),
         date: .commit.author.date,
         message: (.commit.message | split("\\n")[0]),  # Just first line
         changes: {
-            additions: .stats.additions,
-            deletions: .stats.deletions
+            additions: (.stats.additions // 0),
+            deletions: (.stats.deletions // 0)
         }
     }
 ]')
 
-# Get recent activity (last 4 weeks)
+# Get recent activity (last 4 weeks) with error handling
 echo "📊 Analyzing recent activity..."
-ACTIVITY=$(gh api "repos/$repo/stats/commit_activity" --jq '{
-    last_month: ([.[-4:] | .[] | .total] | add),
-    last_week: .[-1].total,
-    by_day: .[-1].days
-}')
+ACTIVITY=$(gh api "repos/$repo/stats/commit_activity" || echo '{"last_month":0,"last_week":0,"by_day":[0,0,0,0,0,0,0]}')
+if [ "$ACTIVITY" != "null" ]; then
+    ACTIVITY=$(echo "$ACTIVITY" | jq '{
+        last_month: ([.[-4:] | .[] | .total] | add // 0),
+        last_week: (.[-1].total // 0),
+        by_day: (.[-1].days // [0,0,0,0,0,0,0])
+    }')
+else
+    ACTIVITY='{"last_month":0,"last_week":0,"by_day":[0,0,0,0,0,0,0]}'
+fi
 
-# Format output
+# Format output with error handling
 if [ "$format" = "json" ]; then
     jq -n --argjson commits "$COMMITS" \
           --argjson activity "$ACTIVITY" \
@@ -176,10 +190,15 @@ if [ "$format" = "json" ]; then
             recent_activity: $activity
         }'
 else
-    echo "=== Recent Commits ==="
-    echo "$COMMITS" | jq -r '.[] |
-        "🔨 \(.date | fromdate | strftime("%Y-%m-%d")):\\n   By: \(.author)\\n   SHA: \(.sha)\\n   Message: \(.message)\\n   Changes: +\(.changes.additions)/-\(.changes.deletions)\\n"
-    '
+    if [ "$(echo "$COMMITS" | jq '. | length')" -gt 0 ]; then
+        echo "=== Recent Commits ==="
+        echo "$COMMITS" | jq -r '.[] |
+            "🔨 \(.date | fromdate | strftime("%Y-%m-%d")):\\n   By: \(.author)\\n   SHA: \(.sha)\\n   Message: \(.message)\\n   Changes: +\(.changes.additions)/-\(.changes.deletions)\\n"
+        '
+    else
+        echo "=== Recent Commits ==="
+        echo "ℹ️  No commits found in the specified period"
+    fi
     
     echo "=== Recent Activity ==="
     echo "$ACTIVITY" | jq -r '
