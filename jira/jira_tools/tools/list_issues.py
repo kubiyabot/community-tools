@@ -100,19 +100,24 @@ class ListIssuesInProject(JiraPythonTool):
             issues_number = getattr(args, 'issues_number', 5)
             if issues_number == "<no value>" or issues_number is None:
                 issues_number = 5
+            else:
+                try:
+                    issues_number = int(issues_number)
+                except (ValueError, TypeError):
+                    issues_number = 5
 
             # For other optional parameters, default to None if not present or "<no value>"
             status = getattr(args, 'status', None)
-            status = None if status == "<no value>" else status
+            status = None if status in ["<no value>", None, ""] else status
 
             assignee = getattr(args, 'assignee', None)
-            assignee = None if assignee == "<no value>" else assignee
+            assignee = None if assignee in ["<no value>", None, ""] else assignee
 
             priority = getattr(args, 'priority', None)
-            priority = None if priority == "<no value>" else priority
+            priority = None if priority in ["<no value>", None, ""] else priority
 
             reporter = getattr(args, 'reporter', None)
-            reporter = None if reporter == "<no value>" else reporter
+            reporter = None if reporter in ["<no value>", None, ""] else reporter
 
             latest_issues = list_issues_in_project(
                 project_key,
