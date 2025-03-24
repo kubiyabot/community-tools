@@ -23,6 +23,19 @@ def base_jira_payload(
     if not project_key or not name or not description or not issue_type:
         raise ValueError("project_key, name, description, and issue_type are required")
 
+    # Normalize issue type name
+    # Jira is case-sensitive for issue types
+    issue_type_mapping = {
+        "bug": "Bug",
+        "task": "Task",
+        "story": "Story",
+        "epic": "Epic",
+        "sub-task": "Sub-task",
+        "subtask": "Sub-task"
+    }
+    
+    normalized_type = issue_type_mapping.get(issue_type.lower(), issue_type)
+    
     payload = {
         "fields": {
             "project": {"key": project_key},
@@ -37,7 +50,7 @@ def base_jira_payload(
                     }
                 ],
             },
-            "issuetype": {"name": issue_type},
+            "issuetype": {"name": normalized_type},
         }
     }
 

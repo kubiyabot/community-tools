@@ -45,7 +45,7 @@ create_epic_tool = BaseCreationIssueTool(
 )
 
 create_task_tool = BaseCreationIssueTool(
-    name="create_epic",
+    name="create_task",
     issue_type="Task"
 )
 
