@@ -1,11 +1,11 @@
 from typing import List
-
+from kubiya_sdk.tools import Tool, Arg
 from basic_funcs import (
     get_jira_cloud_id,
     get_jira_basic_headers,
     ATLASSIAN_JIRA_API_URL,
 )
-
+from ..base import JiraPythonTool, register_jira_tool
 import requests
 
 
@@ -59,53 +59,46 @@ def list_issues_in_project(
         return []
 
 
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(description="List Jira issues")
-    parser.add_argument("project_key", help="Jira Project key")
-    parser.add_argument(
-        "--issues_number", default=5, type=str, help="Number of issue to list"
-    )
-    parser.add_argument(
-        "--status", default=None, type=str, help="Issues status, such as Done"
-    )
-    parser.add_argument(
-        "--assignee", default=None, type=str, help="including assignee user"
-    )
-    parser.add_argument(
-        "--priority", default=None, type=str, help="including issues priority"
-    )
-    parser.add_argument(
-        "--reporter", default=None, type=str, help="including assignee reporter"
-    )
-    args = parser.parse_args()
-
-    # Handle "<no value>" cases
-    issues_number = 5 if args.issues_number == "<no value>" else int(args.issues_number)
-    status = None if args.status == "<no value>" else args.status
-    assignee = None if args.assignee == "<no value>" else args.assignee
-    priority = None if args.priority == "<no value>" else args.priority
-    reporter = None if args.reporter == "<no value>" else args.reporter
-
-    try:
-        latest_issues = list_issues_in_project(
-            args.project_key,
-            issues_number,
-            status,
-            assignee,
-            priority,
-            reporter,
+class ListIssuesInProject(JiraPythonTool):
+    def __init__(self):
+        super().__init__(
+            name="list_issues",
+            description="List Jira issues in a project",
+            content=self.run,
+            args=[
+                Arg("project_key", str, "Jira Project key"),
+                Arg("issues_number", int, "Number of issues to list", default=5),
+                Arg("status", str, "Issues status, such as Done", default=None),
+                Arg("assignee", str, "Filter by assignee", default=None),
+                Arg("priority", str, "Filter by priority", default=None),
+                Arg("reporter", str, "Filter by reporter", default=None),
+            ],
         )
-        for issue in latest_issues:
-            print(
-                f"{issue['key']}: {issue['summary']} - Created on {issue['created']})"
+
+    def run(self, args):
+        try:
+            latest_issues = list_issues_in_project(
+                args.project_key,
+                args.issues_number,
+                args.status,
+                args.assignee,
+                args.priority,
+                args.reporter,
             )
+            for issue in latest_issues:
+                print(
+                    f"{issue['key']}: {issue['summary']} - Created on {issue['created']})"
+                )
+            return latest_issues
 
-    except Exception as e:
-        print(f"Failed to list issues: {e}")
-        raise RuntimeError(f"Failed to list issues: {e}")
+        except Exception as e:
+            print(f"Failed to list issues: {e}")
+            raise RuntimeError(f"Failed to list issues: {e}")
 
+# Register the tool
+register_jira_tool(ListIssuesInProject())
 
 if __name__ == "__main__":
-    main()
+    import sys
+    tool = ListIssuesInProject()
+    tool.run(tool.parse_args(sys.argv[1:]))
