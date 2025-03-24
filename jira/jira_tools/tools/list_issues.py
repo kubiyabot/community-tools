@@ -63,31 +63,21 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="List Jira issues")
-    parser.add_argument("project_key", help="Jira Project key")
-    parser.add_argument(
-        "--issues_number", type=str, help="Number of issue to list"
-    )
-    parser.add_argument(
-        "--status", type=str, help="Issues status, such as Done"
-    )
-    parser.add_argument(
-        "--assignee", type=str, help="including assignee user"
-    )
-    parser.add_argument(
-        "--priority", type=str, help="including issues priority"
-    )
-    parser.add_argument(
-        "--reporter", type=str, help="including assignee reporter"
-    )
+    parser.add_argument("project_key", help="Jira project key")
+    parser.add_argument("issues_number", nargs='?', type=str, help="Number of issues to list")
+    parser.add_argument("status", nargs='?', type=str, help="Issues status, such as Done")
+    parser.add_argument("assignee", nargs='?', type=str, help="Including assignee user")
+    parser.add_argument("priority", nargs='?', type=str, help="Including issues priority")
+    parser.add_argument("reporter", nargs='?', type=str, help="Including assignee reporter")
+    
     args = parser.parse_args()
 
     try:
-        # Convert empty strings to None and convert issues_number to int if present
-        issues_number = int(args.issues_number) if args.issues_number else None
-        status = None if not args.status else args.status
-        assignee = None if not args.assignee else args.assignee
-        priority = None if not args.priority else args.priority
-        reporter = None if not args.reporter else args.reporter
+        issues_number = int(args.issues_number) if args.issues_number else 5
+        status = args.status if args.status else None
+        assignee = args.assignee if args.assignee else None
+        priority = args.priority if args.priority else None
+        reporter = args.reporter if args.reporter else None
 
         latest_issues = list_issues_in_project(
             args.project_key,
