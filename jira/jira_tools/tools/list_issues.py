@@ -65,32 +65,30 @@ def main():
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira Project key")
     parser.add_argument(
-        "--issues_number", default=5, type=int, help="Number of issue to list"
+        "--issues_number", type=int, help="Number of issue to list"
     )
     parser.add_argument(
-        "--status", default=None, type=str, help="Issues status, such as Done"
+        "--status", type=str, help="Issues status, such as Done"
     )
     parser.add_argument(
-        "--assignee", default=None, type=str, help="including assignee user"
+        "--assignee", type=str, help="including assignee user"
     )
     parser.add_argument(
-        "--priority", default=None, type=str, help="including issues priority"
+        "--priority", type=str, help="including issues priority"
     )
     parser.add_argument(
-        "--reporter", default=None, type=str, help="including assignee reporter"
+        "--reporter", type=str, help="including assignee reporter"
     )
     args = parser.parse_args()
-
-    no_value = "<no value>"  # when no value is injected
 
     try:
         latest_issues = list_issues_in_project(
             args.project_key,
-            args.issues_number if args.issues_number != no_value else 5,
-            args.status if args.status != no_value else None,
-            args.assignee if args.assignee != no_value else None,
-            args.priority if args.priority != no_value else None,
-            args.reporter if args.reporter != no_value else None,
+            args.issues_number if args.issues_number is not None else 5,
+            args.status,
+            args.assignee,
+            args.priority,
+            args.reporter,
         )
         for issue in latest_issues:
             print(
