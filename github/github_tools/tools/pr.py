@@ -157,7 +157,7 @@ fi
 pr_review = GitHubCliTool(
     name="github_pr_review",
     description="Add a review to a pull request.",
-    content="gh pr review --repo \"$repo\" \"$number\" --$review_type $([[ -n \"$body\" ]] && echo \"--body '$body'\")",
+    content="gh pr review \"$number\" --repo \"$repo\" --$review_type $([ -n \"$body\" ] && echo \"--body \\\"$body\\\"\")",
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="number", type="int", description="Pull request number. Example: 123", required=True),
