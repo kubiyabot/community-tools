@@ -59,6 +59,22 @@ def list_issues_in_project(
         return []
 
 
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="List Jira issues")
+    parser.add_argument("project_key", help="Jira Project key")
+    parser.add_argument("--issues_number", type=str, help="Number of issues to list")
+    parser.add_argument("--status", type=str, help="Issues status, such as Done")
+    parser.add_argument("--assignee", type=str, help="Filter by assignee")
+    parser.add_argument("--priority", type=str, help="Filter by priority")
+    parser.add_argument("--reporter", type=str, help="Filter by reporter")
+    
+    args = parser.parse_args()
+    tool = ListIssuesInProject()
+    tool.run(args)
+
+
 class ListIssuesInProject(JiraPythonTool):
     def __init__(self):
         super().__init__(
@@ -77,13 +93,34 @@ class ListIssuesInProject(JiraPythonTool):
 
     def run(self, args):
         try:
+            # Get project_key (required)
+            project_key = args.project_key
+
+            # Handle optional parameters - they might not exist in args at all
+            issues_number = getattr(args, 'issues_number', 5)
+            if issues_number == "<no value>" or issues_number is None:
+                issues_number = 5
+
+            # For other optional parameters, default to None if not present or "<no value>"
+            status = getattr(args, 'status', None)
+            status = None if status == "<no value>" else status
+
+            assignee = getattr(args, 'assignee', None)
+            assignee = None if assignee == "<no value>" else assignee
+
+            priority = getattr(args, 'priority', None)
+            priority = None if priority == "<no value>" else priority
+
+            reporter = getattr(args, 'reporter', None)
+            reporter = None if reporter == "<no value>" else reporter
+
             latest_issues = list_issues_in_project(
-                args.project_key,
-                args.issues_number,
-                args.status,
-                args.assignee,
-                args.priority,
-                args.reporter,
+                project_key,
+                issues_number,
+                status,
+                assignee,
+                priority,
+                reporter,
             )
             for issue in latest_issues:
                 print(
@@ -99,6 +136,4 @@ class ListIssuesInProject(JiraPythonTool):
 register_jira_tool(ListIssuesInProject())
 
 if __name__ == "__main__":
-    import sys
-    tool = ListIssuesInProject()
-    tool.run(tool.parse_args(sys.argv[1:]))
+    main()
