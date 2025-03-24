@@ -67,7 +67,7 @@ fi
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="branch_name", type="str", description="Name for the new branch", required=True),
-        Arg(name="base_branch", type="str", description="Base branch to create from (default: main)", required=False, default="main"),
+        Arg(name="base_branch", type="str", description="Base branch to create from (default: main)", required=False),
     ],
 )
 
