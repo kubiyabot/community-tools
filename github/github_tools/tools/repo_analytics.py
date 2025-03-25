@@ -192,38 +192,27 @@ else
     ')
 fi
 
-# Format output with error handling
-if [ "${format:-text}" = "json" ]; then
-    jq -n --argjson commits "$COMMITS" \
-          --argjson activity "$ACTIVITY" \
-        '{
-            recent_commits: $commits,
-            recent_activity: $activity
-        }'
-else
-    if [ "$(echo "$COMMITS" | jq '. | length')" -gt 0 ]; then
-        echo "=== Recent Commits ==="
-        echo "$COMMITS" | jq -r '.[] |
-            "🔨 \(.date | fromdate | strftime("%Y-%m-%d")):\\n   By: \(.author)\\n   SHA: \(.sha)\\n   Message: \(.message)\\n   Changes: +\(.changes.additions)/-\(.changes.deletions)\\n"
-        '
-    else
-        echo "=== Recent Commits ==="
-        echo "ℹ️  No commits found in the specified period"
-    fi
-    
-    echo "=== Recent Activity ==="
-    echo "$ACTIVITY" | jq -r '
-        "📊 Last Month: \(.last_month) commits\\n" +
-        "📈 Last Week: \(.last_week) commits\\n" +
-        "📅 Last Week by Day (Sun-Sat):\\n   " + 
-        (.by_day | map(tostring) | join(" "))
+if [ "$(echo "$COMMITS" | jq '. | length')" -gt 0 ]; then
+    echo "=== Recent Commits ==="
+    echo "$COMMITS" | jq -r '.[] |
+        "🔨 \(.date | fromdate | strftime("%Y-%m-%d")):\\n   By: \(.author)\\n   SHA: \(.sha)\\n   Message: \(.message)\\n   Changes: +\(.changes.additions)/-\(.changes.deletions)\\n"
     '
+else
+    echo "=== Recent Commits ==="
+    echo "ℹ️  No commits found in the specified period"
 fi
+
+echo "=== Recent Activity ==="
+echo "$ACTIVITY" | jq -r '
+    "📊 Last Month: \(.last_month) commits\\n" +
+    "📈 Last Week: \(.last_week) commits\\n" +
+    "📅 Last Week by Day (Sun-Sat):\\n   " + 
+    (.by_day | map(tostring) | join(" "))
+'
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="limit", type="str", description="Number of commits to show (default: 5)", required=False, default="5"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
     ],
 )
 
