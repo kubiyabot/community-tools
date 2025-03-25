@@ -31,6 +31,28 @@ def get_project_issue_types(project_key: str) -> List[str]:
         return []
 
 
+def get_priority_id(priority_name: str) -> str:
+    """Get priority ID from priority name"""
+    cloud_id = get_jira_cloud_id()
+    url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/priority"
+    
+    response = requests.get(
+        url,
+        headers=get_jira_basic_headers()
+    )
+    
+    if response.status_code == 200:
+        priorities = response.json()
+        for p in priorities:
+            if p['name'].lower() == priority_name.lower():
+                return p['id']
+        print(f"Warning: Priority '{priority_name}' not found in available priorities")
+        return None
+    else:
+        print(f"Failed to fetch priorities. Status code: {response.status_code}")
+        return None
+
+
 def base_jira_payload(
         project_key: str,
         name: str,
@@ -73,7 +95,11 @@ def base_jira_payload(
         if priority and priority != "<no value>":
             valid_priorities = ["Low", "Medium", "High"]
             if priority in valid_priorities:
-                payload["fields"]["priority"] = {"name": priority}
+                priority_id = get_priority_id(priority)
+                if priority_id:
+                    payload["fields"]["priority"] = {"id": priority_id}
+                else:
+                    print(f"Warning: Could not find ID for priority '{priority}', skipping priority field")
             else:
                 print(f"Warning: Priority '{priority}' not in {valid_priorities}, skipping priority field")
     except Exception as e:
