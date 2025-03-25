@@ -64,30 +64,36 @@ class JobManager:
             # Add debug output
             echo "Debug: Using trigger URL: $TRIGGER_URL"
 
-            # Use curl with additional options for better error handling
-            RESPONSE=$(curl -sS -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
+            # Get both headers and body in the response
+            RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
+            
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
-            RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+            QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location: " | cut -d' ' -f2 | tr -d '\\r')
+            RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:" | grep -v "^HTTP/" | grep -v "^location:")
 
             echo "Debug: HTTP Status: $HTTP_STATUS"
+            echo "Debug: Queue URL: $QUEUE_URL"
             echo "Debug: Response Body: $RESPONSE_BODY"
 
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build triggered successfully"
                 
-                # Get queue item location from headers
-                QUEUE_URL=$(curl -sS -I -u "$JENKINS_USER:$JENKINS_TOKEN" "$TRIGGER_URL" | grep -i "Location:" | cut -d' ' -f2 | tr -d '\\r')
-                
                 if [ ! -z "$QUEUE_URL" ]; then
-                    echo "Queue URL: $QUEUE_URL"
+                    echo "Build queued at: $QUEUE_URL"
                     
                     if [ "$wait_for_start" = "true" ]; then
                         echo "Waiting for build to start..."
                         # Poll queue item until it converts to a build
                         for i in {1..30}; do
                             sleep 2
-                            BUILD_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "${QUEUE_URL}api/json")
+                            # Add api/json to the queue URL if it's not already there
+                            QUEUE_API_URL="${QUEUE_URL%/}/api/json"
+                            BUILD_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$QUEUE_API_URL")
+                            
+                            # Debug queue response
+                            echo "Debug: Queue API Response: $BUILD_INFO"
+                            
                             BUILD_NUMBER=$(echo "$BUILD_INFO" | jq -r '.executable.number // empty')
                             
                             if [ ! -z "$BUILD_NUMBER" ]; then
@@ -99,7 +105,10 @@ class JobManager:
                         echo "Warning: Build queued but didn't start within timeout"
                     fi
                 else
-                    echo "Warning: Build triggered but couldn't get queue information"
+                    # If we can't get the queue URL, try to get the latest build number
+                    sleep 2
+                    LATEST_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json" | jq -r '.number')
+                    echo "Build triggered - Latest build number: #$LATEST_BUILD"
                 fi
             else
                 echo "Error: Failed to trigger build"
