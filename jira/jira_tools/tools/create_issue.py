@@ -68,12 +68,16 @@ def base_jira_payload(
         }
     }
 
-    # Validate and set priority if provided
-    if priority:
-        valid_priorities = ["Low", "Medium", "High"]
-        if priority not in valid_priorities:
-            raise ValueError(f"Priority must be one of: {', '.join(valid_priorities)}")
-        payload["fields"]["priority"] = {"name": priority}
+    # Only set priority if provided and not "<no value>"
+    if priority and priority != "<no value>":
+        try:
+            valid_priorities = ["Low", "Medium", "High"]
+            if priority not in valid_priorities:
+                print(f"Warning: Priority '{priority}' not in {valid_priorities}, skipping priority field")
+            else:
+                payload["fields"]["priority"] = {"name": priority}
+        except Exception as e:
+            print(f"Warning: Could not set priority: {e}")
 
     # Set assignee if provided
     if assignee_email and assignee_email != "<no value>":
