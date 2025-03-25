@@ -251,6 +251,30 @@ ec2_get_instance_tags = AWSCliTool(
     """
 )
 
+ec2_create_instance = AWSCliTool(
+    name="ec2_create_instance",
+    description="Create a new EC2 instance",
+    content="""
+    aws ec2 run-instances \
+        --image-id $ami_id \
+        --instance-type $instance_type \
+        --key-name $key_name \
+        $([[ -n "$subnet_id" ]] && echo "--subnet-id $subnet_id") \
+        $([[ -n "$security_group_ids" ]] && echo "--security-group-ids $security_group_ids") \
+        $([[ -n "$user_data" ]] && echo "--user-data $user_data") \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance_name}]"
+    """,
+    args=[
+        Arg(name="ami_id", type="str", description="ID of the AMI to use", required=True),
+        Arg(name="instance_type", type="str", description="Instance type (e.g., 't2.micro')", required=True),
+        Arg(name="key_name", type="str", description="Name of the key pair to use", required=True),
+        Arg(name="instance_name", type="str", description="Name tag for the instance", required=True),
+        Arg(name="subnet_id", type="str", description="ID of the subnet to launch the instance in", required=False),
+        Arg(name="security_group_ids", type="str", description="Comma-separated list of security group IDs", required=False),
+        Arg(name="user_data", type="str", description="Base64-encoded user data script", required=False),
+    ],
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -259,3 +283,4 @@ tool_registry.register("aws", ec2_describe_instance_status)
 tool_registry.register("aws", ec2_get_instance_metrics)
 tool_registry.register("aws", ec2_describe_instance_types)
 tool_registry.register("aws", ec2_get_instance_tags)
+tool_registry.register("aws", ec2_create_instance)
