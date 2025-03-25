@@ -58,7 +58,6 @@ def base_jira_payload(
         name: str,
         description: str,
         issue_type: str,
-        priority: str = None,
         assignee_email: str = None,
         label: str = None,
 ) -> Dict:
@@ -89,21 +88,6 @@ def base_jira_payload(
             "issuetype": {"name": issue_type},
         }
     }
-
-    # Only attempt to set priority if provided
-    try:
-        if priority and priority != "<no value>":
-            valid_priorities = ["Low", "Medium", "High"]
-            if priority in valid_priorities:
-                priority_id = get_priority_id(priority)
-                if priority_id:
-                    payload["fields"]["priority"] = {"id": priority_id}
-                else:
-                    print(f"Warning: Could not find ID for priority '{priority}', skipping priority field")
-            else:
-                print(f"Warning: Priority '{priority}' not in {valid_priorities}, skipping priority field")
-    except Exception as e:
-        print(f"Warning: Could not set priority: {e}")
 
     # Set assignee if provided
     if assignee_email and assignee_email != "<no value>":
@@ -147,7 +131,6 @@ def main():
             name=args.name,
             description=args.description,
             issue_type=args.issue_type,
-            priority=args.priority if args.priority != no_value else None,
             assignee_email=args.assignee_email if args.assignee_email != no_value else None,
             label=args.label if args.label != no_value else None,
         )
