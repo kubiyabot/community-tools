@@ -61,31 +61,50 @@ class JobManager:
                 TRIGGER_URL="$JENKINS_URL/job/$job_name/buildWithParameters"
             fi
 
-            # Use eval to properly handle the parameters string
-            RESPONSE=$(eval "curl -sS -X POST -u \"$JENKINS_USER:$JENKINS_TOKEN\" $PARAMS $TRIGGER_URL")
-            
-            # Get queue item location
-            QUEUE_URL=$(curl -sS -I -u "$JENKINS_USER:$JENKINS_TOKEN" "$TRIGGER_URL" | grep "Location:" | cut -d' ' -f2 | tr -d '\\r')
-            
-            if [ ! -z "$QUEUE_URL" ]; then
+            # Add debug output
+            echo "Debug: Using trigger URL: $TRIGGER_URL"
+
+            # Use curl with additional options for better error handling
+            RESPONSE=$(curl -sS -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
+            HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
+            RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+
+            echo "Debug: HTTP Status: $HTTP_STATUS"
+            echo "Debug: Response Body: $RESPONSE_BODY"
+
+            # Check HTTP status code
+            if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build triggered successfully"
-                echo "Queue URL: $QUEUE_URL"
                 
-                if [ "$wait_for_start" = "true" ]; then
-                    echo "Waiting for build to start..."
-                    # Poll queue item until it converts to a build
-                    for i in {1..30}; do
-                        sleep 2
-                        BUILD_NUMBER=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$QUEUE_URL"api/json | jq -r '.executable.number // empty')
-                        if [ ! -z "$BUILD_NUMBER" ]; then
-                            echo "Build started - Build #$BUILD_NUMBER"
-                            echo "Build URL: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
-                            break
-                        fi
-                    done
+                # Get queue item location from headers
+                QUEUE_URL=$(curl -sS -I -u "$JENKINS_USER:$JENKINS_TOKEN" "$TRIGGER_URL" | grep -i "Location:" | cut -d' ' -f2 | tr -d '\\r')
+                
+                if [ ! -z "$QUEUE_URL" ]; then
+                    echo "Queue URL: $QUEUE_URL"
+                    
+                    if [ "$wait_for_start" = "true" ]; then
+                        echo "Waiting for build to start..."
+                        # Poll queue item until it converts to a build
+                        for i in {1..30}; do
+                            sleep 2
+                            BUILD_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "${QUEUE_URL}api/json")
+                            BUILD_NUMBER=$(echo "$BUILD_INFO" | jq -r '.executable.number // empty')
+                            
+                            if [ ! -z "$BUILD_NUMBER" ]; then
+                                echo "Build started - Build #$BUILD_NUMBER"
+                                echo "Build URL: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
+                                exit 0
+                            fi
+                        done
+                        echo "Warning: Build queued but didn't start within timeout"
+                    fi
+                else
+                    echo "Warning: Build triggered but couldn't get queue information"
                 fi
             else
-                echo "Failed to trigger build"
+                echo "Error: Failed to trigger build"
+                echo "Status code: $HTTP_STATUS"
+                echo "Response: $RESPONSE_BODY"
                 exit 1
             fi
             """,
