@@ -212,7 +212,7 @@ echo "$ACTIVITY" | jq -r '
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="limit", type="str", description="Number of commits to show (default: 5)", required=False, default="5"),
+        Arg(name="limit", type="str", description="[Optional] Maximum number of commits to show (defaults to 5 if not provided)", required=False, default="5"),
     ],
 )
 
