@@ -1,6 +1,6 @@
 import json
 import requests
-from typing import Dict
+from typing import Dict, List
 
 from basic_funcs import (
     get_jira_cloud_id,
@@ -8,6 +8,27 @@ from basic_funcs import (
     ATLASSIAN_JIRA_API_URL,
     get_jira_user_id,
 )
+
+
+def get_project_issue_types(project_key: str) -> List[str]:
+    """Fetch available issue types for the project"""
+    cloud_id = get_jira_cloud_id()
+    url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/project/{project_key}"
+    
+    response = requests.get(
+        url,
+        headers=get_jira_basic_headers()
+    )
+    
+    if response.status_code == 200:
+        project_data = response.json()
+        issue_types = [it['name'] for it in project_data.get('issueTypes', [])]
+        print(f"Available issue types for project {project_key}: {issue_types}")
+        return issue_types
+    else:
+        print(f"Failed to fetch project issue types. Status code: {response.status_code}")
+        print(f"Error details: {response.text}")
+        return []
 
 
 def base_jira_payload(
@@ -23,18 +44,11 @@ def base_jira_payload(
     if not project_key or not name or not description or not issue_type:
         raise ValueError("project_key, name, description, and issue_type are required")
 
-    # Normalize issue type name
-    # Jira is case-sensitive for issue types
-    issue_type_mapping = {
-        "bug": "Bug",
-        "task": "Task",
-        "story": "Story",
-        "epic": "Epic",
-        "sub-task": "Sub-task",
-        "subtask": "Sub-task"
-    }
-    
-    normalized_type = issue_type_mapping.get(issue_type.lower(), issue_type)
+    # Get available issue types for the project
+    available_types = get_project_issue_types(project_key)
+    if available_types:
+        if issue_type not in available_types:
+            raise ValueError(f"Invalid issue type '{issue_type}'. Available types are: {', '.join(available_types)}")
     
     payload = {
         "fields": {
@@ -50,7 +64,7 @@ def base_jira_payload(
                     }
                 ],
             },
-            "issuetype": {"name": normalized_type},
+            "issuetype": {"name": issue_type},
         }
     }
 
