@@ -37,6 +37,49 @@ vpc_create_internet_gateway = AWSCliTool(
     ],
 )
 
+vpc_list = AWSCliTool(
+    name="vpc_list",
+    description="List all VPCs in the region",
+    content="aws ec2 describe-vpcs",
+    args=[],
+)
+
+vpc_delete = AWSCliTool(
+    name="vpc_delete",
+    description="Delete a VPC",
+    content="aws ec2 delete-vpc --vpc-id $vpc_id",
+    args=[
+        Arg(name="vpc_id", type="str", description="ID of the VPC to delete", required=True),
+    ],
+)
+
+vpc_create_route_table = AWSCliTool(
+    name="vpc_create_route_table",
+    description="Create a new route table for a VPC",
+    content="aws ec2 create-route-table --vpc-id $vpc_id",
+    args=[
+        Arg(name="vpc_id", type="str", description="ID of the VPC", required=True),
+    ],
+)
+
+vpc_create_route = AWSCliTool(
+    name="vpc_create_route",
+    description="Create a route in a route table",
+    content="""aws ec2 create-route \
+        --route-table-id $route_table_id \
+        --destination-cidr-block $destination_cidr \
+        --gateway-id $gateway_id""",
+    args=[
+        Arg(name="route_table_id", type="str", description="ID of the route table", required=True),
+        Arg(name="destination_cidr", type="str", description="Destination CIDR block", required=True),
+        Arg(name="gateway_id", type="str", description="ID of the internet gateway", required=True),
+    ],
+)
+
 tool_registry.register("aws", vpc_create)
 tool_registry.register("aws", vpc_create_subnet)
-tool_registry.register("aws", vpc_create_internet_gateway) 
+tool_registry.register("aws", vpc_create_internet_gateway)
+tool_registry.register("aws", vpc_list)
+tool_registry.register("aws", vpc_delete)
+tool_registry.register("aws", vpc_create_route_table)
+tool_registry.register("aws", vpc_create_route) 

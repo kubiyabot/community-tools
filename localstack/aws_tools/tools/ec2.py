@@ -275,6 +275,32 @@ ec2_create_instance = AWSCliTool(
     ],
 )
 
+ec2_list_instance_types = AWSCliTool(
+    name="ec2_list_instance_types",
+    description="List available EC2 instance types",
+    content="aws ec2 describe-instance-types",
+    args=[],
+)
+
+ec2_list_amis = AWSCliTool(
+    name="ec2_list_amis",
+    description="List available AMIs",
+    content="""aws ec2 describe-images \
+        --owners $owner \
+        $([[ -n "$filters" ]] && echo "--filters $filters")""",
+    args=[
+        Arg(name="owner", type="str", description="Owner of the AMIs (e.g., 'amazon', 'self')", required=True),
+        Arg(name="filters", type="str", description="Additional filters in JSON format", required=False),
+    ],
+)
+
+ec2_list_key_pairs = AWSCliTool(
+    name="ec2_list_key_pairs",
+    description="List EC2 key pairs",
+    content="aws ec2 describe-key-pairs",
+    args=[],
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -284,3 +310,6 @@ tool_registry.register("aws", ec2_get_instance_metrics)
 tool_registry.register("aws", ec2_describe_instance_types)
 tool_registry.register("aws", ec2_get_instance_tags)
 tool_registry.register("aws", ec2_create_instance)
+tool_registry.register("aws", ec2_list_instance_types)
+tool_registry.register("aws", ec2_list_amis)
+tool_registry.register("aws", ec2_list_key_pairs)

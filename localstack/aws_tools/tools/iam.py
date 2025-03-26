@@ -31,6 +31,39 @@ iam_list_policies = AWSCliTool(
     ],
 )
 
+iam_list_roles = AWSCliTool(
+    name="iam_list_roles",
+    description="List IAM roles",
+    content="aws iam list-roles",
+    args=[],
+)
+
+iam_create_role = AWSCliTool(
+    name="iam_create_role",
+    description="Create a new IAM role",
+    content="""aws iam create-role \
+        --role-name $role_name \
+        --assume-role-policy-document file://$policy_document \
+        $([[ -n "$description" ]] && echo "--description '$description'")""",
+    args=[
+        Arg(name="role_name", type="str", description="Name of the role to create", required=True),
+        Arg(name="policy_document", type="str", description="Path to the trust relationship policy document", required=True),
+        Arg(name="description", type="str", description="Description of the role", required=False),
+    ],
+)
+
+iam_delete_role = AWSCliTool(
+    name="iam_delete_role",
+    description="Delete an IAM role",
+    content="aws iam delete-role --role-name $role_name",
+    args=[
+        Arg(name="role_name", type="str", description="Name of the role to delete", required=True),
+    ],
+)
+
 tool_registry.register("aws", iam_create_policy)
 tool_registry.register("aws", iam_attach_role_policy)
-tool_registry.register("aws", iam_list_policies) 
+tool_registry.register("aws", iam_list_policies)
+tool_registry.register("aws", iam_list_roles)
+tool_registry.register("aws", iam_create_role)
+tool_registry.register("aws", iam_delete_role) 
