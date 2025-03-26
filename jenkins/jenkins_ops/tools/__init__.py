@@ -204,7 +204,7 @@ def create_jenkins_tool(job_name: str, job_info: Dict[str, Any], config: Dict[st
             "parameters": job_info.get('parameters', {}),
             "auth": config['auth']
         },
-        "long_running": True,
+        "long_running": False,
         "stream_logs": config.get('defaults', DEFAULT_CONFIG)['stream_logs'],
         "poll_interval": config.get('defaults', DEFAULT_CONFIG)['poll_interval']
     }
