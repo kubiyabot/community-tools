@@ -62,7 +62,7 @@ class JobManager:
                 TRIGGER_URL="$JENKINS_URL/job/$job_name/buildWithParameters"
             fi
 
-            # Trigger the build
+            # Trigger the build and store full response
             RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
             
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
@@ -73,15 +73,22 @@ class JobManager:
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 # Extract queue ID from the location URL
                 QUEUE_ID=$(echo "$QUEUE_URL" | grep -o '[0-9]*$')
+                
+                if [ -z "$QUEUE_ID" ]; then
+                    echo "Error: Could not extract queue ID from response"
+                    echo "Response: $RESPONSE"
+                    exit 1
+                fi
+                
                 echo "Build triggered successfully"
                 echo "Queue ID: $QUEUE_ID"
+                echo "Queue URL: $QUEUE_URL"
                 echo "Checking for build number (30 second timeout)..."
                 
                 # Try to get build number for 30 seconds using queue item
-                for i in {1..15}; do
-                    sleep 2
+                for i in {1..30}; do
                     # Get queue item info
-                    QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "${QUEUE_URL%/}/api/json")
+                    QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/queue/item/$QUEUE_ID/api/json")
                     
                     # Check if the build has started
                     BUILD_NUMBER=$(echo "$QUEUE_INFO" | jq -r '.executable.number // empty')
@@ -92,10 +99,12 @@ class JobManager:
                         echo "build_url: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
                         exit 0
                     fi
+                    
+                    sleep 1
                 done
                 
                 # If we get here, build hasn't started within timeout
-                echo "Build still in queue:"
+                echo "Build still in queue after 30 seconds:"
                 echo "queue_id: $QUEUE_ID"
                 echo ""
                 echo "To get the build number once it starts, run:"
