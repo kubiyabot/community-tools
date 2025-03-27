@@ -37,10 +37,12 @@ class JobManager:
             content="""
             # Install jq if not present
             if ! command -v jq &> /dev/null; then
+                echo "Installing jq..."
                 apk add --no-cache jq
             fi
 
             # Validate Jenkins connection
+            echo "Validating Jenkins connection..."
             validate_jenkins_connection
 
             if [ -z "$job_name" ]; then
@@ -51,32 +53,46 @@ class JobManager:
             # Construct parameters string if provided
             PARAMS=""
             if [ ! -z "$parameters" ]; then
+                echo "Parameters provided, constructing parameters string..."
                 PARAMS="--data-urlencode json='{\"parameter\": $parameters}'"
+                echo "Parameters string: $PARAMS"
             fi
 
-            # Trigger the build
-            echo "Triggering job: $job_name"
+            # Prepare trigger URL
             TRIGGER_URL="$JENKINS_URL/job/$job_name/build"
-            
             if [ ! -z "$parameters" ]; then
                 TRIGGER_URL="$JENKINS_URL/job/$job_name/buildWithParameters"
             fi
+            echo "Using trigger URL: $TRIGGER_URL"
 
             # Trigger the build and store full response
+            echo "Sending POST request to Jenkins..."
             RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
+            echo "Received response from Jenkins"
             
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
+            echo "HTTP Status Code: $HTTP_STATUS"
+            
             QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location: " | cut -d' ' -f2 | tr -d '\\r')
+            echo "Queue URL from response: $QUEUE_URL"
+            
             RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:" | grep -v "^HTTP/")
+            echo "Response headers:"
+            echo "$RESPONSE" | grep "^HTTP\|^Location\|^Date"
 
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
-                # Extract queue ID from the location URL
-                QUEUE_ID=$(echo "$QUEUE_URL" | grep -o '[0-9]*$')
+                echo "Build request successful, extracting queue ID..."
+                
+                # Extract queue ID from the location URL using a more robust method
+                QUEUE_ID=$(echo "$QUEUE_URL" | sed -n 's/.*queue\/item\/\([0-9]*\).*/\1/p')
+                echo "Extracted queue ID: '$QUEUE_ID'"
                 
                 if [ -z "$QUEUE_ID" ]; then
                     echo "Error: Could not extract queue ID from response"
-                    echo "Response: $RESPONSE"
+                    echo "Location URL: $QUEUE_URL"
+                    echo "Full response for debugging:"
+                    echo "$RESPONSE"
                     exit 1
                 fi
                 
@@ -87,11 +103,18 @@ class JobManager:
                 
                 # Try to get build number for 30 seconds using queue item
                 for i in {1..30}; do
+                    echo "Attempt $i/30: Checking build status..."
+                    
                     # Get queue item info
-                    QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/queue/item/$QUEUE_ID/api/json")
+                    QUEUE_INFO_URL="$JENKINS_URL/queue/item/$QUEUE_ID/api/json"
+                    echo "Fetching queue info from: $QUEUE_INFO_URL"
+                    
+                    QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$QUEUE_INFO_URL")
+                    echo "Queue info response: $QUEUE_INFO"
                     
                     # Check if the build has started
                     BUILD_NUMBER=$(echo "$QUEUE_INFO" | jq -r '.executable.number // empty')
+                    echo "Build number from queue info: '$BUILD_NUMBER'"
                     
                     if [ ! -z "$BUILD_NUMBER" ]; then
                         echo "Build started:"
@@ -100,19 +123,23 @@ class JobManager:
                         exit 0
                     fi
                     
+                    echo "Build not started yet, waiting 1 second..."
                     sleep 1
                 done
                 
                 # If we get here, build hasn't started within timeout
                 echo "Build still in queue after 30 seconds:"
                 echo "queue_id: $QUEUE_ID"
+                echo "queue_url: $QUEUE_URL"
                 echo ""
                 echo "To get the build number once it starts, run:"
                 echo "get_queue_item queue_id=$QUEUE_ID"
             else
                 echo "Error: Failed to trigger build"
                 echo "Status code: $HTTP_STATUS"
-                echo "Response: $RESPONSE_BODY"
+                echo "Response body: $RESPONSE_BODY"
+                echo "Full response for debugging:"
+                echo "$RESPONSE"
                 exit 1
             fi
             """,
