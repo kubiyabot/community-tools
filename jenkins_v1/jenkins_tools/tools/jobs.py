@@ -73,10 +73,10 @@ class JobManager:
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build triggered successfully"
-                echo "Checking for build number (15 second timeout)..."
+                echo "Checking for build number (30 second timeout)..."
                 
-                # Try to get build number for 15 seconds
-                for i in {1..7}; do
+                # Try to get build number for 30 seconds
+                for i in {1..15}; do
                     sleep 2
                     CURRENT_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
                     CURRENT_BUILD_NUMBER=$(echo "$CURRENT_BUILD" | jq -r '.number // "0"')
