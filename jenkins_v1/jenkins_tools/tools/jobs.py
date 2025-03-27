@@ -68,6 +68,7 @@ class JobManager:
             RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
             
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
+            QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location: " | cut -d' ' -f2 | tr -d '\\r')
             RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:" | grep -v "^HTTP/")
 
             # Check HTTP status code
@@ -75,21 +76,24 @@ class JobManager:
                 echo "Build triggered successfully"
                 echo "Checking for build number (30 second timeout)..."
                 
-                # Try to get build number for 30 seconds
+                # Try to get build number for 30 seconds using queue item
                 for i in {1..15}; do
                     sleep 2
-                    CURRENT_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
-                    CURRENT_BUILD_NUMBER=$(echo "$CURRENT_BUILD" | jq -r '.number // "0"')
+                    # Get queue item info
+                    QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "${QUEUE_URL%/}/api/json")
                     
-                    if [ "$CURRENT_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
-                        echo "Build started - Build #$CURRENT_BUILD_NUMBER"
-                        BUILD_URL=$(echo "$CURRENT_BUILD" | jq -r '.url')
-                        echo "Build URL: $BUILD_URL"
+                    # Check if the build has started
+                    BUILD_NUMBER=$(echo "$QUEUE_INFO" | jq -r '.executable.number // empty')
+                    
+                    if [ ! -z "$BUILD_NUMBER" ]; then
+                        echo "Build started - Build #$BUILD_NUMBER"
+                        echo "Build URL: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
                         exit 0
                     fi
                 done
                 
                 echo "Build triggered - waiting in queue"
+                echo "You can track the build status using 'get_build_status' with job name: $job_name"
             else
                 echo "Error: Failed to trigger build"
                 echo "Status code: $HTTP_STATUS"
