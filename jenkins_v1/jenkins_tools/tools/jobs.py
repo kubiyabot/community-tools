@@ -61,54 +61,48 @@ class JobManager:
                 TRIGGER_URL="$JENKINS_URL/job/$job_name/buildWithParameters"
             fi
 
-            # Add debug output
-            echo "Debug: Using trigger URL: $TRIGGER_URL"
+            # Get initial last build number before triggering
+            LAST_BUILD_BEFORE=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json" | jq -r '.number // "0"')
 
-            # Get both headers and body in the response
+            # Trigger the build
             RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
             
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d':' -f2)
-            QUEUE_URL=$(echo "$RESPONSE" | grep -i "^location: " | cut -d' ' -f2 | tr -d '\\r')
-            RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:" | grep -v "^HTTP/" | grep -v "^location:")
-
-            echo "Debug: HTTP Status: $HTTP_STATUS"
-            echo "Debug: Queue URL: $QUEUE_URL"
-            echo "Debug: Response Body: $RESPONSE_BODY"
+            RESPONSE_BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:" | grep -v "^HTTP/")
 
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build triggered successfully"
                 
-                if [ ! -z "$QUEUE_URL" ]; then
-                    echo "Build queued at: $QUEUE_URL"
-                    
-                    if [ "$wait_for_start" = "true" ]; then
-                        echo "Waiting for build to start..."
-                        # Poll queue item until it converts to a build
-                        for i in {1..30}; do
-                            sleep 2
-                            # Add api/json to the queue URL if it's not already there
-                            QUEUE_API_URL="${QUEUE_URL%/}/api/json"
-                            BUILD_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$QUEUE_API_URL")
-                            
-                            # Debug queue response
-                            echo "Debug: Queue API Response: $BUILD_INFO"
-                            
-                            BUILD_NUMBER=$(echo "$BUILD_INFO" | jq -r '.executable.number // empty')
-                            
-                            if [ ! -z "$BUILD_NUMBER" ]; then
-                                echo "Build started - Build #$BUILD_NUMBER"
-                                echo "Build URL: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
-                                exit 0
-                            fi
-                        done
-                        echo "Warning: Build queued but didn't start within timeout"
-                    fi
+                if [ "$wait_for_start" = "true" ]; then
+                    echo "Waiting for build to start..."
+                    # Poll for new build number
+                    for i in {1..30}; do
+                        sleep 2
+                        CURRENT_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
+                        CURRENT_BUILD_NUMBER=$(echo "$CURRENT_BUILD" | jq -r '.number // "0"')
+                        
+                        if [ "$CURRENT_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
+                            echo "Build started - Build #$CURRENT_BUILD_NUMBER"
+                            BUILD_URL=$(echo "$CURRENT_BUILD" | jq -r '.url')
+                            echo "Build URL: $BUILD_URL"
+                            exit 0
+                        fi
+                    done
+                    echo "Warning: Build triggered but couldn't get build number within timeout"
                 else
-                    # If we can't get the queue URL, try to get the latest build number
+                    # Get the new build number after a short delay
                     sleep 2
-                    LATEST_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json" | jq -r '.number')
-                    echo "Build triggered - Latest build number: #$LATEST_BUILD"
+                    NEW_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
+                    NEW_BUILD_NUMBER=$(echo "$NEW_BUILD" | jq -r '.number // "0"')
+                    
+                    if [ "$NEW_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
+                        echo "Build started - Build #$NEW_BUILD_NUMBER"
+                        BUILD_URL=$(echo "$NEW_BUILD" | jq -r '.url')
+                        echo "Build URL: $BUILD_URL"
+                    else
+                        echo "Build triggered - waiting in queue"
+                    fi
                 fi
             else
                 echo "Error: Failed to trigger build"
