@@ -84,8 +84,8 @@ class JobManager:
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build request successful, extracting queue ID..."
                 
-                # Extract queue ID from the location URL using a more robust method
-                QUEUE_ID=$(echo "$QUEUE_URL" | sed -n 's/.*queue\/item\/\([0-9]*\).*/\1/p')
+                # Extract queue ID from the location URL using a simpler method
+                QUEUE_ID=$(echo "$QUEUE_URL" | grep -o '/[0-9]*/' | tr -d '/')
                 echo "Extracted queue ID: '$QUEUE_ID'"
                 
                 if [ -z "$QUEUE_ID" ]; then
@@ -102,8 +102,9 @@ class JobManager:
                 echo "Checking for build number (30 second timeout)..."
                 
                 # Try to get build number for 30 seconds using queue item
-                for i in {1..30}; do
-                    echo "Attempt $i/30: Checking build status..."
+                COUNTER=1
+                while [ $COUNTER -le 30 ]; do
+                    echo "Attempt $COUNTER/30: Checking build status..."
                     
                     # Get queue item info
                     QUEUE_INFO_URL="$JENKINS_URL/queue/item/$QUEUE_ID/api/json"
@@ -125,6 +126,7 @@ class JobManager:
                     
                     echo "Build not started yet, waiting 1 second..."
                     sleep 1
+                    COUNTER=$((COUNTER + 1))
                 done
                 
                 # If we get here, build hasn't started within timeout
