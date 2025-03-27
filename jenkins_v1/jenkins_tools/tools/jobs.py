@@ -73,37 +73,23 @@ class JobManager:
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 echo "Build triggered successfully"
+                echo "Checking for build number (15 second timeout)..."
                 
-                if [ "$wait_for_start" = "true" ]; then
-                    echo "Waiting for build to start..."
-                    # Poll for new build number
-                    for i in {1..30}; do
-                        sleep 2
-                        CURRENT_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
-                        CURRENT_BUILD_NUMBER=$(echo "$CURRENT_BUILD" | jq -r '.number // "0"')
-                        
-                        if [ "$CURRENT_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
-                            echo "Build started - Build #$CURRENT_BUILD_NUMBER"
-                            BUILD_URL=$(echo "$CURRENT_BUILD" | jq -r '.url')
-                            echo "Build URL: $BUILD_URL"
-                            exit 0
-                        fi
-                    done
-                    echo "Warning: Build triggered but couldn't get build number within timeout"
-                else
-                    # Get the new build number after a short delay
+                # Try to get build number for 15 seconds
+                for i in {1..7}; do
                     sleep 2
-                    NEW_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
-                    NEW_BUILD_NUMBER=$(echo "$NEW_BUILD" | jq -r '.number // "0"')
+                    CURRENT_BUILD=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json")
+                    CURRENT_BUILD_NUMBER=$(echo "$CURRENT_BUILD" | jq -r '.number // "0"')
                     
-                    if [ "$NEW_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
-                        echo "Build started - Build #$NEW_BUILD_NUMBER"
-                        BUILD_URL=$(echo "$NEW_BUILD" | jq -r '.url')
+                    if [ "$CURRENT_BUILD_NUMBER" -gt "$LAST_BUILD_BEFORE" ]; then
+                        echo "Build started - Build #$CURRENT_BUILD_NUMBER"
+                        BUILD_URL=$(echo "$CURRENT_BUILD" | jq -r '.url')
                         echo "Build URL: $BUILD_URL"
-                    else
-                        echo "Build triggered - waiting in queue"
+                        exit 0
                     fi
-                fi
+                done
+                
+                echo "Build triggered - waiting in queue"
             else
                 echo "Error: Failed to trigger build"
                 echo "Status code: $HTTP_STATUS"
@@ -117,9 +103,6 @@ class JobManager:
                     required=True),
                 Arg(name="parameters",
                     description="JSON string of build parameters",
-                    required=False),
-                Arg(name="wait_for_start",
-                    description="Wait for the build to start and get build number",
                     required=False)
             ],
             image="curlimages/curl:8.1.2"
