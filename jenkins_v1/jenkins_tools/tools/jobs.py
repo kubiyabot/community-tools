@@ -13,7 +13,8 @@ class JobManager:
                 self.trigger_job(),
                 self.get_build_status(),
                 self.list_jobs(),
-                self.get_job_logs()
+                self.get_job_logs(),
+                self.get_queue_item()
             ]
             
             for tool in tools:
@@ -73,7 +74,9 @@ class JobManager:
 
             # Check HTTP status code
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
-                echo "Build triggered successfully"
+                # Extract queue ID from the location URL
+                QUEUE_ID=$(echo "$QUEUE_URL" | grep -o '[0-9]*$')
+                echo "Build triggered successfully - Queue ID: $QUEUE_ID"
                 echo "Checking for build number (30 second timeout)..."
                 
                 # Try to get build number for 30 seconds using queue item
@@ -93,7 +96,10 @@ class JobManager:
                 done
                 
                 echo "Build triggered - waiting in queue"
-                echo "You can track the build status using 'get_build_status' with job name: $job_name"
+                echo "Queue ID: $QUEUE_ID"
+                echo "You can track the build status using either:"
+                echo "1. Queue ID: $QUEUE_ID (to find which build number it becomes)"
+                echo "2. 'get_build_status' with job name: $job_name (once build number is known)"
             else
                 echo "Error: Failed to trigger build"
                 echo "Status code: $HTTP_STATUS"
@@ -281,6 +287,73 @@ class JobManager:
                 Arg(name="highlight_errors",
                     description="Highlight error messages in the log",
                     required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def get_queue_item(self) -> JenkinsTool:
+        """Get build information from a queue item ID."""
+        return JenkinsTool(
+            name="get_queue_item",
+            description="Get build information for a specific queue item",
+            content="""
+            # Install jq if not present
+            if ! command -v jq &> /dev/null; then
+                apk add --no-cache jq
+            fi
+
+            # Validate Jenkins connection
+            validate_jenkins_connection
+
+            if [ -z "$queue_id" ]; then
+                echo "Error: Queue ID is required"
+                exit 1
+            fi
+
+            # Get queue item information
+            QUEUE_URL="$JENKINS_URL/queue/item/$queue_id/api/json"
+            QUEUE_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$QUEUE_URL")
+            
+            # Check if request was successful
+            if [ $? -ne 0 ]; then
+                echo "Error: Failed to get queue item information"
+                exit 1
+            fi
+
+            # Extract relevant information
+            TASK_NAME=$(echo "$QUEUE_INFO" | jq -r '.task.name')
+            WHY=$(echo "$QUEUE_INFO" | jq -r '.why // "N/A"')
+            STUCK=$(echo "$QUEUE_INFO" | jq -r '.stuck')
+            BUILDABLE=$(echo "$QUEUE_INFO" | jq -r '.buildable')
+            BUILD_NUMBER=$(echo "$QUEUE_INFO" | jq -r '.executable.number // empty')
+            
+            echo "=== Queue Item Information ==="
+            echo "Queue ID: $queue_id"
+            echo "Job Name: $TASK_NAME"
+            
+            if [ ! -z "$BUILD_NUMBER" ]; then
+                echo "Status: BUILDING"
+                echo "Build Number: #$BUILD_NUMBER"
+                echo "Build URL: $JENKINS_URL/job/$TASK_NAME/$BUILD_NUMBER"
+                
+                # Get build status if build has started
+                BUILD_INFO=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$TASK_NAME/$BUILD_NUMBER/api/json")
+                BUILD_RESULT=$(echo "$BUILD_INFO" | jq -r '.result // "IN PROGRESS"')
+                BUILDING=$(echo "$BUILD_INFO" | jq -r '.building')
+                
+                echo "Build Status: $BUILD_RESULT"
+                echo "Still Building: $BUILDING"
+            else
+                echo "Status: QUEUED"
+                echo "Why Waiting: $WHY"
+                echo "Stuck: $STUCK"
+                echo "Buildable: $BUILDABLE"
+            fi
+            """,
+            args=[
+                Arg(name="queue_id",
+                    description="Jenkins queue item ID to look up",
+                    required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
