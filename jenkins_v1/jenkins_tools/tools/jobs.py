@@ -62,9 +62,6 @@ class JobManager:
                 TRIGGER_URL="$JENKINS_URL/job/$job_name/buildWithParameters"
             fi
 
-            # Get initial last build number before triggering
-            LAST_BUILD_BEFORE=$(curl -sS -u "$JENKINS_USER:$JENKINS_TOKEN" "$JENKINS_URL/job/$job_name/lastBuild/api/json" | jq -r '.number // "0"')
-
             # Trigger the build
             RESPONSE=$(curl -sS -i -w "\\nHTTP_STATUS:%{http_code}" -X POST -u "$JENKINS_USER:$JENKINS_TOKEN" $PARAMS "$TRIGGER_URL")
             
@@ -76,7 +73,8 @@ class JobManager:
             if [ "$HTTP_STATUS" -eq 201 ] || [ "$HTTP_STATUS" -eq 200 ]; then
                 # Extract queue ID from the location URL
                 QUEUE_ID=$(echo "$QUEUE_URL" | grep -o '[0-9]*$')
-                echo "Build triggered successfully - Queue ID: $QUEUE_ID"
+                echo "Build triggered successfully"
+                echo "Queue ID: $QUEUE_ID"
                 echo "Checking for build number (30 second timeout)..."
                 
                 # Try to get build number for 30 seconds using queue item
@@ -89,17 +87,19 @@ class JobManager:
                     BUILD_NUMBER=$(echo "$QUEUE_INFO" | jq -r '.executable.number // empty')
                     
                     if [ ! -z "$BUILD_NUMBER" ]; then
-                        echo "Build started - Build #$BUILD_NUMBER"
-                        echo "Build URL: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
+                        echo "Build started:"
+                        echo "build_number: $BUILD_NUMBER"
+                        echo "build_url: $JENKINS_URL/job/$job_name/$BUILD_NUMBER"
                         exit 0
                     fi
                 done
                 
-                echo "Build triggered - waiting in queue"
-                echo "Queue ID: $QUEUE_ID"
-                echo "You can track the build status using either:"
-                echo "1. Queue ID: $QUEUE_ID (to find which build number it becomes)"
-                echo "2. 'get_build_status' with job name: $job_name (once build number is known)"
+                # If we get here, build hasn't started within timeout
+                echo "Build still in queue:"
+                echo "queue_id: $QUEUE_ID"
+                echo ""
+                echo "To get the build number once it starts, run:"
+                echo "get_queue_item queue_id=$QUEUE_ID"
             else
                 echo "Error: Failed to trigger build"
                 echo "Status code: $HTTP_STATUS"
