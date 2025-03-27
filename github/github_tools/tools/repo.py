@@ -1,9 +1,9 @@
 from kubiya_sdk.tools import Arg
-from .base import GitHubCliTool
+from .base import GitHubCliTool, GitHubRepolessCliTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Core repository operations
-repo_create = GitHubCliTool(
+repo_create = GitHubRepolessCliTool(
     name="github_repo_create",
     description="Create a new GitHub repository",
     content="""
@@ -35,7 +35,7 @@ repo_create = GitHubCliTool(
         Arg(name="homepage", type="str", description="Repository homepage URL", required=False),
         Arg(name="has_issues", type="bool", description="Enable issues", required=False),
         Arg(name="has_wiki", type="bool", description="Enable wiki", required=False),
-    ],
+    ]
 )
 
 create_branch = GitHubCliTool(
