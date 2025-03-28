@@ -2,7 +2,7 @@ import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraPythonTool, register_jira_tool
-from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, change_issue_status
 
 
 class BaseCreationIssueTool(JiraPythonTool):
@@ -128,6 +128,26 @@ add_comment_issue_tool = JiraPythonTool(
         )
     ])
 
+change_issue_status_tool = JiraPythonTool(
+    name="issue_change_status",
+    description="Change the status of a Jira issue",
+    content="""python /tmp/change_issue_status.py "{{ .issue_key }}" "{{ .status }}" {{ if .list_transitions }}--list-transitions{{ end }}""",
+    args=[
+        Arg(name="issue_key", type="str", description="Issue key (e.g., 'PROJ-123')", required=True),
+        Arg(name="status", type="str", description="The target status (e.g., 'In Progress', 'Done')", required=True),
+        Arg(name="list_transitions", type="bool", description="List available transitions only", required=False),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/change_issue_status.py",
+            content=inspect.getsource(change_issue_status),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 [
     register_jira_tool(tool) for tool in [
         create_task_tool,
@@ -137,6 +157,7 @@ add_comment_issue_tool = JiraPythonTool(
         create_story_tool,
         view_issue_tool,
         list_issue_tool,
-        add_comment_issue_tool
+        add_comment_issue_tool,
+        change_issue_status_tool
     ]
 ]
