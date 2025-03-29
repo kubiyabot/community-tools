@@ -26,11 +26,16 @@ approve_access_tool = JustInTimeAccessTool(
         "If you need to request access instead of approving it, use the 'request_tool_access' tool.\n"
         "This tool processes approval actions and automatically notifies requesters of the decision."
     ),
+    on_build="""
+    echo "Installing requests..."
+    python -m venv /opt/venv > /dev/null
+    . /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]' > /dev/null
+    """,
     content="""
     set -e
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
-    pip install requests==2.32.3 2>&1 | grep -v '[notice]'
 
     # Run the access approval handler script
     python /opt/scripts/access_approval_handler.py "{{ .request_id }}" "{{ .approval_action }}" "{{ .ttl }}"
