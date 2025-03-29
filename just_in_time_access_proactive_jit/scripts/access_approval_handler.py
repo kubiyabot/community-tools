@@ -150,7 +150,7 @@ def approve_access(request_id: str, approval_action: str, ttl: str | None = None
         sys.exit(1)
 
 
-def notify_user(request_id, status, user_email, approver_email):
+def notify_user(request_id, status, user_email, approver_email, ttl: str = ""):
     slack_token = os.environ["SLACK_API_TOKEN"]
     enforcer_base_url = "http://enforcer.kubiya:5001"
 
@@ -187,116 +187,111 @@ def notify_user(request_id, status, user_email, approver_email):
                 "text": {
                     "type": "plain_text",
                     "text": f"{emoji} Access Request {approval_status.capitalize()}",
-                    "emoji": True
-                }
+                    "emoji": True,
+                },
+            },
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"Hi <@{user_id}> :wave:"},
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Hi <@{user_id}> :wave:"
-                }
+                    "text": f"Your access request has been *{approval_status}* by {approver_email}.",
+                },
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Your access request has been *{approval_status}* by {approver_email}."
-                }
+                    "text": f"*📝 Request ID:* {request_id}",
+                },
             },
-            {
-                "type": "divider"
-            },
+            {"type": "divider"},
             {
                 "type": "section",
                 "fields": [
-                    {
-                        "type": "mrkdwn",
-                        "text": "*🔑 Tool:*\n" + tool_name
-                    },
-                    {
-                        "type": "mrkdwn",
-                        "text": "*📝 Request ID:*\n" + request_id
-                    }
-                ]
+                    {"type": "mrkdwn", "text": "*🔑 Tool:*\n" + tool_name},
+                    {"type": "mrkdwn", "text": "* Duration:*\n" + ttl},
+                ],
             },
+            {"type": "section", "text": {"type": "mrkdwn", "text": "*⚙️ Parameters:*"}},
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*⚙️ Parameters:*"
-                }
+                    "text": f"```{json.dumps(tool_params, indent=2)}```",
+                },
             },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"```{json.dumps(tool_params, indent=2)}```"
-                }
-            }
-        ]
+        ],
     }
 
     # Add status-specific content
     if status == "approved":
-        message["blocks"].extend([
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": ":rocket: *Ready to use your new access?*\nClick the button below to execute the approved tool right away!"
-                }
-            },
-            {
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "🚀 Use your new access",
-                            "emoji": True
-                        },
-                        "style": "primary",
-                        "value": json.dumps({
-                            "agent_uuid": os.environ.get("KUBIYA_AGENT_UUID", ""),
-                            "message": f"I just got approved to perform tool {tool_name} with params {json.dumps(tool_params)} - execute it right away"
-                        }),
-                        "action_id": "agent.process_message_1"
-                    }
-                ]
-            }
-        ])
-    else:
-        message["blocks"].extend([
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": ":information_source: If you believe this rejection was a mistake or need to discuss further, please reach out to the approver."
-                }
-            }
-        ])
-
-    # Add footer with additional information
-    message["blocks"].extend([
-        {
-            "type": "divider"
-        },
-        {
-            "type": "context",
-            "elements": [
+        message["blocks"].extend(
+            [
                 {
-                    "type": "mrkdwn",
-                    "text": f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": ":rocket: *Ready to use your new access?*\nClick the button below to execute the approved tool right away!",
+                    },
                 },
                 {
-                    "type": "mrkdwn",
-                    "text": f"👤 Approved by: {approver_email}"
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "🚀 Use your new access",
+                                "emoji": True,
+                            },
+                            "style": "primary",
+                            "value": json.dumps(
+                                {
+                                    "agent_uuid": os.environ.get(
+                                        "KUBIYA_AGENT_UUID", ""
+                                    ),
+                                    "message": f"I just got approved to perform tool {tool_name} with params {json.dumps(tool_params)} - execute it right away",
+                                }
+                            ),
+                            "action_id": "agent.process_message_1",
+                        }
+                    ],
+                },
+            ]
+        )
+    else:
+        message["blocks"].extend(
+            [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": ":information_source: If you believe this rejection was a mistake or need to discuss further, please reach out to the approver.",
+                    },
                 }
             ]
-        }
-    ])
+        )
+
+    # Add footer with additional information
+    message["blocks"].extend(
+        [
+            {"type": "divider"},
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
+                    },
+                    {"type": "mrkdwn", "text": f"👤 Approved by: {approver_email}"},
+                ],
+            },
+        ]
+    )
 
     # Send the message to Slack
     headers = {
