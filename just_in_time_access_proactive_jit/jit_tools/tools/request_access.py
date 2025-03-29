@@ -24,13 +24,18 @@ request_access_tool = JustInTimeAccessTool(
         "NOTE: You typically won't need to run this tool directly - it can be used when another tool fails due to insufficient permissions."
         "On failure, you'll see an error message containing a 'Request ID'. ASK THE USER if he wants to submit an access request for the operation. Do not assume."
     ),
+    on_build="""
+    echo "Installing requests..."
+    python -m venv /opt/venv > /dev/null
+    . /opt/venv/bin/activate > /dev/null
+    pip install requests==2.32.3 2>&1 | grep -v '[notice]' > /dev/null
+    """,
     content="""
     set -e
     echo "🚀 Submitting your access request..."
     echo "⏳ Please wait while we process your request..."
     python -m venv /opt/venv > /dev/null
     . /opt/venv/bin/activate > /dev/null
-    pip install requests==2.32.3 2>&1 | grep -v '[notice]' > /dev/null
 
     # Run the access request handler script
     python /opt/scripts/access_request_handler.py "{{ .request_id }}" "{{ .ttl }}"
@@ -51,7 +56,7 @@ request_access_tool = JustInTimeAccessTool(
             description=(
                 "How long you need the access for. Try to get it from the context of the conversation, before asking for it\n"
                 "Examples:\n"
-                "- '1h' for one hour access\n" 
+                "- '1h' for one hour access\n"
                 "- '30m' for 30 minutes access\n"
                 "- '2h' for two hours access"
             ),

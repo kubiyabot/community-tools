@@ -17,6 +17,7 @@ class JustInTimeAccessTool(Tool):
         image="python:3.11-slim",
         mermaid=None,
         with_volumes=None,
+        on_build=None,
     ):
         super().__init__(
             name=name,
@@ -32,4 +33,5 @@ class JustInTimeAccessTool(Tool):
             with_files=with_files,
             mermaid=mermaid,
             with_volumes=with_volumes,
+            on_build=on_build,
         )
