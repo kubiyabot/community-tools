@@ -136,7 +136,7 @@ def approve_access(request_id: str, approval_action: str, ttl: str | None = None
         approve(request_id, ttl, approver_email, enforcer_base_url)
 
         # Notify requester in Slack
-        notify_user(request_id, "approved", requester_email, approver_email)
+        notify_user(request_id, "approved", requester_email, approver_email, ttl=ttl)
 
         print("Access request approved successfully.")
 
