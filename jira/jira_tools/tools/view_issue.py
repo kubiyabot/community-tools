@@ -26,6 +26,7 @@ def extract_relevant_fields(data):
             "assignee_displayName": "N/A",
             "reporter_email": "N/A",
             "reporter_displayName": "N/A",
+            "labels": "N/A",
         }
 
     def safe_get(obj, *keys):
@@ -51,6 +52,7 @@ def extract_relevant_fields(data):
         "assignee_displayName": safe_get(fields, "assignee", "displayName"),
         "reporter_email": safe_get(fields, "reporter", "emailAddress"),
         "reporter_displayName": safe_get(fields, "reporter", "displayName"),
+        "labels": fields.get("labels", []),
     }
 
     return filtered_data
