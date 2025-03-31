@@ -1,6 +1,6 @@
 import json
 import requests
-from typing import Dict
+from typing import Dict, List
 
 from basic_funcs import (
     get_jira_cloud_id,
@@ -10,12 +10,54 @@ from basic_funcs import (
 )
 
 
+def get_project_issue_types(project_key: str) -> List[str]:
+    """Fetch available issue types for the project"""
+    cloud_id = get_jira_cloud_id()
+    url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/project/{project_key}"
+    
+    response = requests.get(
+        url,
+        headers=get_jira_basic_headers()
+    )
+    
+    if response.status_code == 200:
+        project_data = response.json()
+        issue_types = [it['name'] for it in project_data.get('issueTypes', [])]
+        print(f"Available issue types for project {project_key}: {issue_types}")
+        return issue_types
+    else:
+        print(f"Failed to fetch project issue types. Status code: {response.status_code}")
+        print(f"Error details: {response.text}")
+        return []
+
+
+def get_priority_id(priority_name: str) -> str:
+    """Get priority ID from priority name"""
+    cloud_id = get_jira_cloud_id()
+    url = f"{ATLASSIAN_JIRA_API_URL}/{cloud_id}/rest/api/3/priority"
+    
+    response = requests.get(
+        url,
+        headers=get_jira_basic_headers()
+    )
+    
+    if response.status_code == 200:
+        priorities = response.json()
+        for p in priorities:
+            if p['name'].lower() == priority_name.lower():
+                return p['id']
+        print(f"Warning: Priority '{priority_name}' not found in available priorities")
+        return None
+    else:
+        print(f"Failed to fetch priorities. Status code: {response.status_code}")
+        return None
+
+
 def base_jira_payload(
         project_key: str,
         name: str,
         description: str,
         issue_type: str,
-        priority: str = None,
         assignee_email: str = None,
         label: str = None,
 ) -> Dict:
@@ -23,6 +65,12 @@ def base_jira_payload(
     if not project_key or not name or not description or not issue_type:
         raise ValueError("project_key, name, description, and issue_type are required")
 
+    # Get available issue types for the project
+    available_types = get_project_issue_types(project_key)
+    if available_types:
+        if issue_type not in available_types:
+            raise ValueError(f"Invalid issue type '{issue_type}'. Available types are: {', '.join(available_types)}")
+    
     payload = {
         "fields": {
             "project": {"key": project_key},
@@ -40,13 +88,6 @@ def base_jira_payload(
             "issuetype": {"name": issue_type},
         }
     }
-
-    # Validate and set priority if provided
-    if priority:
-        valid_priorities = ["Low", "Medium", "High"]
-        if priority not in valid_priorities:
-            raise ValueError(f"Priority must be one of: {', '.join(valid_priorities)}")
-        payload["fields"]["priority"] = {"name": priority}
 
     # Set assignee if provided
     if assignee_email and assignee_email != "<no value>":
@@ -90,7 +131,6 @@ def main():
             name=args.name,
             description=args.description,
             issue_type=args.issue_type,
-            priority=args.priority if args.priority != no_value else None,
             assignee_email=args.assignee_email if args.assignee_email != no_value else None,
             label=args.label if args.label != no_value else None,
         )
