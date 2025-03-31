@@ -11,44 +11,37 @@ with open(HANDLER_PATH) as f:
 
 # Initialize tools dictionary at module level
 tools = {}
-
+s3_tools = {}
 
 def create_jit_tool(config, action):
     """Create a JIT tool from configuration."""
     args = []
-
+    
     if action == "revoke":
         args.append(
             Arg(name="user_email", description="The email of the user to revoke access for", type="str")
         )
     elif action == "grant":
         args.append(
-            Arg(name="duration",
-                description=f"How long you need the access for.\n"
-                            "Examples:\n"
-                            "- '1h' for one hour access\n"
-                            "- '30m' for 30 minutes access\n"
-                            "- '2h' for two hours access\n"
-                            "- 'PT1H' for one hour access\n"
-                            "ISO8601 format also accepted (maximum {config['session_duration']}",
-                type="str",
-                # This is the recommended duration for the access token (controlled on scripts/config) - does not guarantee the duration
+            Arg(name="duration", 
+                description="How long you need the access for.\n"
+                "Examples:\n"
+                "- '1h' for one hour access\n" 
+                "- '30m' for 30 minutes access\n"
+                "- '2h' for two hours access\n"
+                "- 'PT1H' ISO8601 format also accepted",
+                type="str", 
                 default=config['session_duration'])
         )
 
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        FileSpec(destination="/opt/scripts/utils/aws_utils.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
-        FileSpec(destination="/opt/scripts/utils/notifications.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
-        FileSpec(destination="/opt/scripts/utils/slack_client.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
-        FileSpec(destination="/opt/scripts/utils/slack_messages.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
-        FileSpec(destination="/opt/scripts/utils/webhook_handler.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
+        FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
+        FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
+        FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
     mermaid_diagram = f"""
@@ -64,12 +57,12 @@ def create_jit_tool(config, action):
         I-->>-T: 📄 User Details
         T->>+S: 🔑 Get Permission Set: {config['permission_set']}
         S-->>-T: 🆔 Permission Set ARN
-        T->>+S: {"🔧 Create Assignment" if action == "grant" else "❌ Delete Assignment"}
+        T->>+S: { "🔧 Create Assignment" if action == "grant" else "❌ Delete Assignment" }
         Note over T,S: Account: {config['account_id']}
-        S-->>-T: {"✅ Assignment Created" if action == "grant" else "🔓 Assignment Deleted"}
+        S-->>-T: { "✅ Assignment Created" if action == "grant" else "🔓 Assignment Deleted" }
         T->>+N: Send Notification
         N-->>-T: Notification Sent
-        T-->>-U: {"Access Granted 🎉" if action == "grant" else "Access Revoked 🔒"}
+        T-->>-U: { "Access Granted 🎉" if action == "grant" else "Access Revoked 🔒" }
     """
 
     action_prefix = "jit_session_" + ("grant_" if action == "grant" else "revoke_")
@@ -102,42 +95,35 @@ python /opt/scripts/access_handler.py {action} {"--user-email $KUBIYA_USER_EMAIL
         mermaid=mermaid_diagram
     )
 
-
 def create_s3_jit_tool(config, action):
     """Create a JIT tool for S3 bucket access from configuration."""
     args = []
-
+    
     if action == "revoke":
         args.append(
             Arg(name="user_email", description="The email of the user to revoke access for", type="str")
         )
     elif action == "grant":
         args.append(
-            Arg(name="duration",
-                description=f"How long you need the access for.\n"
-                            "Examples:\n"
-                            "- '1h' for one hour access\n"
-                            "- '30m' for 30 minutes access\n"
-                            "- '2h' for two hours access\n"
-                            "- 'PT1H' for one hour access\n"
-                            "ISO8601 format also accepted (maximum {config['session_duration']}",
-                type="str",
+            Arg(name="duration", 
+                description="How long you need the access for.\n"
+                "Examples:\n"
+                "- '1h' for one hour access\n" 
+                "- '30m' for 30 minutes access\n"
+                "- '2h' for two hours access\n"
+                "- 'PT1H' ISO8601 format also accepted",
+                type="str", 
                 default=config['session_duration'])
         )
 
     # Define file specifications for all necessary files
     file_specs = [
         FileSpec(destination="/opt/scripts/access_handler.py", content=HANDLER_CODE),
-        FileSpec(destination="/opt/scripts/utils/aws_utils.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
-        FileSpec(destination="/opt/scripts/utils/notifications.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
-        FileSpec(destination="/opt/scripts/utils/slack_client.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
-        FileSpec(destination="/opt/scripts/utils/slack_messages.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
-        FileSpec(destination="/opt/scripts/utils/webhook_handler.py",
-                 content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
+        FileSpec(destination="/opt/scripts/utils/aws_utils.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'aws_utils.py').read()),
+        FileSpec(destination="/opt/scripts/utils/notifications.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'notifications.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_client.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_client.py').read()),
+        FileSpec(destination="/opt/scripts/utils/slack_messages.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'slack_messages.py').read()),
+        FileSpec(destination="/opt/scripts/utils/webhook_handler.py", content=open(Path(__file__).parent.parent / 'scripts' / 'utils' / 'webhook_handler.py').read()),
     ]
 
     buckets_list = ", ".join(config['buckets'])
@@ -177,8 +163,8 @@ echo ">> Processing request... ⏳"
 pip install -q boto3 requests jinja2 jsonschema argparse
 
 # Export bucket names and policy template from config
-export S3_CONFIG="{config}"
 export BUCKETS="{','.join(config['buckets'])}"
+export POLICY_TEMPLATE="{config['policy_template']}"
 export MAX_DURATION="{config['session_duration']}"
 
 touch /opt/scripts/__init__.py
@@ -195,7 +181,6 @@ done
         long_running=False,
     )
 
-
 # Load configurations and create tools
 try:
     ACCESS_CONFIGS = get_access_configs()
@@ -210,7 +195,7 @@ try:
 
         for access_type, config in S3_ACCESS_CONFIGS.items():
             tool = create_s3_jit_tool(config, action)
-            tools[tool.name] = tool
+            s3_tools[tool.name] = tool
             tool_registry.register("aws_jit", tool)
 
 except Exception as e:
@@ -218,4 +203,4 @@ except Exception as e:
     raise
 
 # Export all tools
-__all__ = ['tools']
+__all__ = ['tools', 's3_tools'] 
