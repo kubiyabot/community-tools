@@ -1,6 +1,5 @@
-import yaml
 import requests
-from typing import Dict, Any, List
+from typing import List
 import os
 import boto3
 from dataclasses import dataclass
@@ -20,6 +19,8 @@ class IAMAccessConfig:
 
     def _load_config(self):
         """Load configuration from URL specified in environment variable."""
+        import yaml
+
         config_url = os.getenv('AWS_IAM_CONFIG_URL')
         if not config_url:
             raise ValueError("AWS_IAM_CONFIG_URL environment variable not set")
