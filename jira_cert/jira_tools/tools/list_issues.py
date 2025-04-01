@@ -1,3 +1,5 @@
+import warnings
+import urllib3
 from typing import List
 
 from basic_funcs import (
@@ -8,6 +10,8 @@ from basic_funcs import (
 
 import requests
 
+# Suppress only the specific InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def list_issues_in_project(
     project_key: str,
@@ -34,8 +38,9 @@ def list_issues_in_project(
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
-        "fields": "summary,created,labels",
+        "fields": "summary,created,labels,status",
     }
+    
     try:
         server_url = get_jira_server_url()
         search_url = f"{server_url}/rest/api/3/search"
@@ -48,6 +53,11 @@ def list_issues_in_project(
             cert=(cert_path, key_path),
             verify=False
         )
+        
+        if response.status_code == 401:
+            print("Authentication failed. Please check your credentials and certificates.")
+            return []
+            
         response.raise_for_status()
 
         issues = response.json().get("issues", [])
@@ -57,6 +67,7 @@ def list_issues_in_project(
                 "summary": issue["fields"]["summary"],
                 "created": issue["fields"]["created"],
                 "labels": issue["fields"].get("labels", []),
+                "status": issue["fields"]["status"]["name"] if "status" in issue["fields"] else "Unknown"
             }
             for issue in issues
         ]
@@ -65,6 +76,9 @@ def list_issues_in_project(
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+        if hasattr(e, 'response'):
+            print(f"Response status code: {e.response.status_code}")
+            print(f"Response body: {e.response.text}")
         return []
 
 
@@ -106,7 +120,7 @@ def main():
         for issue in latest_issues:
             labels_str = f" - Labels: {', '.join(issue['labels'])}" if issue['labels'] else ""
             print(
-                f"{issue['key']}: {issue['summary']} - Created on {issue['created']}{labels_str}"
+                f"{issue['key']}: {issue['summary']} - Created on {issue['created']} - Status: {issue['status']}{labels_str}"
             )
 
     except ValueError as e:

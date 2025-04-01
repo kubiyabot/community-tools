@@ -32,7 +32,8 @@ def get_jira_basic_headers() -> dict:
     """Get basic headers for Jira API requests"""
     return {
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-Atlassian-Token": "no-check"  # Add CSRF token header
     }
 
 def setup_client_cert_files():
@@ -56,5 +57,8 @@ def setup_client_cert_files():
         f.write(CLIENT_CERT)
     with open(key_path, 'w') as f:
         f.write(CLIENT_KEY)
+
+    # Set proper permissions on key file
+    os.chmod(key_path, 0o600)
 
     return cert_path, key_path 
