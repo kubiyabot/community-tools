@@ -67,4 +67,7 @@ except Exception as e:
 
 # Generate and register tools
 for tool in generate_iam_access_tools():
-    tool_registry.register("aws", tool) 
+    tool_registry.register("aws", tool)
+
+# Add this line at the end of the file to export the function
+__all__ = ['generate_iam_access_tools'] 
