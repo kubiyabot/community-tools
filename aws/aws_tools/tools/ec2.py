@@ -346,6 +346,105 @@ ec2_create_from_template = AWSCliTool(
     """
 )
 
+ec2_terminate_instance = AWSCliTool(
+    name="ec2_terminate_instance",
+    description="Terminate an EC2 instance",
+    content="aws ec2 terminate-instances --instance-ids $instance_id",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to terminate (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Terminate EC2 instance| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS terminates the instance ❌]
+        F --> G[Instance state changes to 'terminated' 🚫]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    """
+)
+
+ec2_create_snapshot = AWSCliTool(
+    name="ec2_create_snapshot",
+    description="Create a snapshot of an EBS volume",
+    content="aws ec2 create-snapshot --volume-id $volume_id --description \"$description\"",
+    args=[
+        Arg(name="volume_id", type="str", description="Volume ID to snapshot (e.g., 'vol-1234567890abcdef0')", required=True),
+        Arg(name="description", type="str", description="Description for the snapshot", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Create volume snapshot| B[🤖 TeamMate]
+        B --> C{{"Volume details?" 💾}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS creates snapshot 📸]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
+ec2_get_instance_volumes = AWSCliTool(
+    name="ec2_get_instance_volumes",
+    description="List EBS volumes attached to an EC2 instance",
+    content="aws ec2 describe-volumes --filters Name=attachment.instance-id,Values=$instance_id",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to get volumes for (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List instance volumes| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves volume list 💾]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
+ec2_get_instance_security_groups = AWSCliTool(
+    name="ec2_get_instance_security_groups",
+    description="List security groups associated with an EC2 instance",
+    content="aws ec2 describe-instance-attribute --instance-id $instance_id --attribute groupSet",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to get security groups for (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List security groups| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves security groups 🛡️]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -358,3 +457,7 @@ tool_registry.register("aws", ec2_list_instances)
 tool_registry.register("aws", ec2_reboot_instance)
 tool_registry.register("aws", ec2_modify_instance_type)
 tool_registry.register("aws", ec2_create_from_template)
+tool_registry.register("aws", ec2_terminate_instance)
+tool_registry.register("aws", ec2_create_snapshot)
+tool_registry.register("aws", ec2_get_instance_volumes)
+tool_registry.register("aws", ec2_get_instance_security_groups)

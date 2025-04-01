@@ -81,8 +81,99 @@ print(result)
     ],
 )
 
+cost_get_cost_by_service = AWSCliTool(
+    name="cost_get_cost_by_service",
+    description="Get AWS costs broken down by service",
+    content="""aws ce get-cost-and-usage \
+        --time-period Start=$(python3 -c "from datetime import datetime, timedelta; print((datetime.now() - timedelta(days=int('$time_ago'.replace('d', '')))).strftime('%Y-%m-%d'))"),End=$(date +%Y-%m-%d) \
+        --granularity MONTHLY \
+        --metrics UnblendedCost \
+        --group-by Type=DIMENSION,Key=SERVICE""",
+    args=[
+        Arg(name="time_ago", type="str", description="Time period to analyze (e.g., '30d' for last 30 days)", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Cost by service| B[🤖 TeamMate]
+        B --> C{{"Time period?" ⏰}}
+        C --> D[User provides period ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves cost data 💰]
+        F --> G[Group by service 📊]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    """
+)
+
+cost_get_cost_by_tag = AWSCliTool(
+    name="cost_get_cost_by_tag",
+    description="Get AWS costs broken down by specific tag",
+    content="""aws ce get-cost-and-usage \
+        --time-period Start=$(python3 -c "from datetime import datetime, timedelta; print((datetime.now() - timedelta(days=int('$time_ago'.replace('d', '')))).strftime('%Y-%m-%d'))"),End=$(date +%Y-%m-%d) \
+        --granularity MONTHLY \
+        --metrics UnblendedCost \
+        --group-by Type=TAG,Key=$tag_key""",
+    args=[
+        Arg(name="time_ago", type="str", description="Time period to analyze (e.g., '30d' for last 30 days)", required=True),
+        Arg(name="tag_key", type="str", description="Tag key to group costs by (e.g., 'Environment', 'Project')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Cost by tag| B[🤖 TeamMate]
+        B --> C{{"Time period and tag?" 🏷️}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves cost data 💰]
+        F --> G[Group by tag value 📊]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    """
+)
+
+cost_get_anomalies = AWSCliTool(
+    name="cost_get_anomalies",
+    description="Get cost anomalies detected by AWS Cost Explorer",
+    content="""aws ce get-anomalies \
+        --date-interval Start=$(python3 -c "from datetime import datetime, timedelta; print((datetime.now() - timedelta(days=int('$time_ago'.replace('d', '')))).strftime('%Y-%m-%d'))"),End=$(date +%Y-%m-%d)""",
+    args=[
+        Arg(name="time_ago", type="str", description="Time period to analyze (e.g., '30d' for last 30 days)", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Cost anomalies| B[🤖 TeamMate]
+        B --> C{{"Time period?" ⏰}}
+        C --> D[User provides period ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS analyzes cost patterns 📊]
+        F --> G[Identify anomalies ⚠️]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#fef08a,stroke:#ca8a04,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", cost_get_cost_and_usage)
 tool_registry.register("aws", cost_get_cost_forecast)
 tool_registry.register("aws", cost_get_reservation_utilization)
 tool_registry.register("aws", cost_get_savings_plans_utilization)
 tool_registry.register("aws", cost_get_rightsizing_recommendation)
+tool_registry.register("aws", cost_get_cost_by_service)
+tool_registry.register("aws", cost_get_cost_by_tag)
+tool_registry.register("aws", cost_get_anomalies)
