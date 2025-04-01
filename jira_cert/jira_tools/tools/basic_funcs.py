@@ -2,6 +2,7 @@ import os
 import logging
 import requests
 from requests.exceptions import HTTPError
+import json
 
 # Configure logging
 logging.basicConfig(
@@ -60,8 +61,12 @@ def setup_client_cert_files():
     if not CLIENT_CERT or not CLIENT_KEY:
         raise ValueError("JIRA_CLIENT_CERT and JIRA_CLIENT_KEY environment variables must be set")
 
-    logger.debug(f"Certificate length: {len(CLIENT_CERT)} characters")
-    logger.debug(f"Private key length: {len(CLIENT_KEY)} characters")
+    # Log certificate details (safely)
+    logger.info("Certificate validation:")
+    logger.info(f"Certificate length: {len(CLIENT_CERT)} characters")
+    logger.info(f"Private key length: {len(CLIENT_KEY)} characters")
+    logger.info(f"Certificate starts with: {CLIENT_CERT[:25]}...")
+    logger.info(f"Private key starts with: {CLIENT_KEY[:25]}...")
 
     # Create temporary paths for the cert files
     cert_path = "/tmp/jira_client.crt"
@@ -71,35 +76,44 @@ def setup_client_cert_files():
     try:
         # Ensure the certificate content is properly formatted
         if "BEGIN CERTIFICATE" not in CLIENT_CERT:
-            logger.debug("Adding certificate markers to certificate content")
+            logger.info("Adding certificate markers")
             CLIENT_CERT = f"-----BEGIN CERTIFICATE-----\n{CLIENT_CERT}\n-----END CERTIFICATE-----"
         if "BEGIN PRIVATE KEY" not in CLIENT_KEY:
-            logger.debug("Adding private key markers to key content")
+            logger.info("Adding private key markers")
             CLIENT_KEY = f"-----BEGIN PRIVATE KEY-----\n{CLIENT_KEY}\n-----END PRIVATE KEY-----"
 
-        logger.debug(f"Writing certificate to: {cert_path}")
+        logger.info(f"Writing certificate to: {cert_path}")
         with open(cert_path, 'w') as f:
             f.write(CLIENT_CERT)
         
-        logger.debug(f"Writing private key to: {key_path}")
+        logger.info(f"Writing private key to: {key_path}")
         with open(key_path, 'w') as f:
             f.write(CLIENT_KEY)
 
         # Set proper permissions
-        logger.debug("Setting file permissions...")
         os.chmod(cert_path, 0o644)
         os.chmod(key_path, 0o600)
 
         # Verify files exist and have content
-        cert_size = os.path.getsize(cert_path)
-        key_size = os.path.getsize(key_path)
-        logger.debug(f"Certificate file size: {cert_size} bytes")
-        logger.debug(f"Private key file size: {key_size} bytes")
-        
         if not os.path.exists(cert_path) or not os.path.exists(key_path):
             raise ValueError("Certificate files were not created properly")
+        
+        cert_size = os.path.getsize(cert_path)
+        key_size = os.path.getsize(key_path)
+        logger.info(f"Certificate file size: {cert_size} bytes")
+        logger.info(f"Private key file size: {key_size} bytes")
+        
         if cert_size == 0 or key_size == 0:
             raise ValueError("Certificate files are empty")
+
+        # Read back files to verify content
+        with open(cert_path, 'r') as f:
+            cert_content = f.read()
+            logger.info(f"Certificate file contains BEGIN/END markers: {('BEGIN CERTIFICATE' in cert_content)} / {('END CERTIFICATE' in cert_content)}")
+        
+        with open(key_path, 'r') as f:
+            key_content = f.read()
+            logger.info(f"Key file contains BEGIN/END markers: {('BEGIN PRIVATE KEY' in key_content)} / {('END PRIVATE KEY' in key_content)}")
 
         return cert_path, key_path
 
@@ -110,7 +124,7 @@ def setup_client_cert_files():
 def test_jira_connection():
     """Test the Jira connection with current credentials"""
     try:
-        logger.info("=== Testing Jira Connection ===")
+        logger.info("\n=== Testing Jira Connection ===")
         server_url = get_jira_server_url()
         cert_path, key_path = setup_client_cert_files()
         
@@ -119,7 +133,7 @@ def test_jira_connection():
         logger.info(f"Testing connection to: {test_url}")
         
         headers = get_jira_basic_headers()
-        logger.debug(f"Using headers: {headers}")
+        logger.info(f"Request headers: {headers}")
         
         logger.info("Making test request...")
         response = requests.get(
@@ -129,22 +143,37 @@ def test_jira_connection():
             verify=False
         )
         
-        logger.info(f"Connection test status code: {response.status_code}")
-        logger.debug(f"Response headers: {dict(response.headers)}")
+        logger.info(f"Response status code: {response.status_code}")
+        logger.info(f"Response headers: {dict(response.headers)}")
+        
+        if response.status_code == 401:
+            logger.error("Authentication failed (401)")
+            logger.error(f"Response body: {response.text}")
+            try:
+                error_details = response.json()
+                logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+            except:
+                logger.error("Could not parse error response as JSON")
         
         if response.status_code == 200:
             logger.info("Successfully connected to Jira!")
-            logger.debug(f"Response body: {response.text}")
+            logger.info(f"Response body: {response.text}")
             return True
         else:
             logger.error(f"Failed to connect. Status code: {response.status_code}")
             logger.error(f"Response body: {response.text}")
             return False
             
+    except requests.exceptions.SSLError as e:
+        logger.error("SSL Error occurred:")
+        logger.error(str(e))
+        if "certificate verify failed" in str(e):
+            logger.error("Certificate verification failed. This might indicate an issue with the certificate format or content.")
+        return False
+    except requests.exceptions.ConnectionError as e:
+        logger.error("Connection Error occurred:")
+        logger.error(str(e))
+        return False
     except Exception as e:
         logger.error(f"Connection test failed with exception: {str(e)}")
-        if isinstance(e, requests.exceptions.SSLError):
-            logger.error("SSL Error - This might indicate a certificate problem")
-        elif isinstance(e, requests.exceptions.ConnectionError):
-            logger.error("Connection Error - This might indicate a network or URL problem")
         return False 

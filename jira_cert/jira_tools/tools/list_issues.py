@@ -2,6 +2,7 @@ import warnings
 import logging
 import urllib3
 from typing import List
+import json
 
 from basic_funcs import (
     get_jira_server_url,
@@ -54,7 +55,7 @@ def list_issues_in_project(
         "maxResults": num_issues,
         "fields": "summary,created,labels,status",
     }
-    logger.debug(f"Request parameters: {params}")
+    logger.info(f"Request parameters: {params}")
     
     try:
         server_url = get_jira_server_url()
@@ -63,7 +64,7 @@ def list_issues_in_project(
         
         cert_path, key_path = setup_client_cert_files()
         headers = get_jira_basic_headers()
-        logger.debug(f"Using headers: {headers}")
+        logger.info(f"Using headers: {headers}")
         
         logger.info("Sending request...")
         response = requests.get(
@@ -75,11 +76,16 @@ def list_issues_in_project(
         )
         
         logger.info(f"Response status code: {response.status_code}")
-        logger.debug(f"Response headers: {dict(response.headers)}")
+        logger.info(f"Response headers: {dict(response.headers)}")
         
         if response.status_code == 401:
             logger.error("Authentication failed. Please check your credentials and certificates.")
             logger.error(f"Response body: {response.text}")
+            try:
+                error_details = response.json()
+                logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
+            except:
+                logger.error("Could not parse error response as JSON")
             return []
             
         response.raise_for_status()
@@ -101,8 +107,14 @@ def list_issues_in_project(
 
         return latest_issues
 
+    except requests.exceptions.SSLError as e:
+        logger.error("\nSSL Error occurred:")
+        logger.error(str(e))
+        if "certificate verify failed" in str(e):
+            logger.error("Certificate verification failed. This might indicate an issue with the certificate format or content.")
+        return []
     except requests.exceptions.RequestException as e:
-        logger.error("=== Request Error ===")
+        logger.error("\n=== Request Error ===")
         logger.error(f"Error type: {type(e).__name__}")
         logger.error(f"Error message: {str(e)}")
         if hasattr(e, 'response'):
