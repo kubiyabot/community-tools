@@ -7,7 +7,6 @@ from basic_funcs import (
 )
 
 import requests
-import argparse
 
 
 def list_issues_in_project(
@@ -70,6 +69,8 @@ def list_issues_in_project(
 
 
 def main():
+    import argparse
+    
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira project key")
     parser.add_argument("issues_number", nargs='?', type=str, help="Number of issues to list")

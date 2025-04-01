@@ -5,7 +5,6 @@ from basic_funcs import (
 )
 
 import requests
-import argparse
 
 
 def extract_relevant_fields(data):
@@ -60,6 +59,8 @@ def extract_relevant_fields(data):
 
 
 def main():
+    import argparse
+    
     parser = argparse.ArgumentParser(description="Get Jira issues")
     parser.add_argument("issue_key", help="Issue key for the Jira issue")
     args = parser.parse_args()
