@@ -85,6 +85,78 @@ rds_list_snapshots = AWSCliTool(
     ],
 )
 
+rds_describe_events = AWSCliTool(
+    name="rds_describe_events",
+    description="List RDS events from the past 24 hours",
+    content="aws rds describe-events --duration 1440",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List RDS events| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves events 📅]
+        D --> E[User receives event list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+rds_describe_db_parameters = AWSCliTool(
+    name="rds_describe_db_parameters",
+    description="Describe database parameters for an RDS instance",
+    content="aws rds describe-db-parameters --db-parameter-group-name $parameter_group",
+    args=[
+        Arg(name="parameter_group", type="str", description="Name of the DB parameter group", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get DB parameters| B[🤖 TeamMate]
+        B --> C{{"Parameter group?" 🔢}}
+        C --> D[User provides group name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves parameters ⚙️]
+        F --> G[User receives parameter list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+rds_describe_backups = AWSCliTool(
+    name="rds_describe_backups",
+    description="List automated backups for an RDS instance",
+    content="aws rds describe-db-instance-automated-backups --db-instance-identifier $identifier",
+    args=[
+        Arg(name="identifier", type="str", description="RDS instance identifier", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List backups| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves backup list 💾]
+        F --> G[User receives backup information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", rds_create_instance)
 tool_registry.register("aws", rds_delete_instance)
 tool_registry.register("aws", rds_describe_instances)
@@ -92,3 +164,6 @@ tool_registry.register("aws", rds_start_instance)
 tool_registry.register("aws", rds_stop_instance)
 tool_registry.register("aws", rds_create_snapshot)
 tool_registry.register("aws", rds_list_snapshots)
+tool_registry.register("aws", rds_describe_events)
+tool_registry.register("aws", rds_describe_db_parameters)
+tool_registry.register("aws", rds_describe_backups)

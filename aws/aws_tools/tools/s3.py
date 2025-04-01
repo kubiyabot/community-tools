@@ -131,6 +131,84 @@ s3_download_file = AWSCliTool(
     ],
 )
 
+s3_get_bucket_policy = AWSCliTool(
+    name="s3_get_bucket_policy",
+    description="Get the bucket policy for an S3 bucket",
+    content="aws s3api get-bucket-policy --bucket $bucket_name",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get bucket policy| B[🤖 TeamMate]
+        B --> C{{"Bucket name?" 🪣}}
+        C --> D[User provides bucket name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves policy 📜]
+        F --> G[User receives policy details 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+s3_get_bucket_versioning = AWSCliTool(
+    name="s3_get_bucket_versioning",
+    description="Get versioning status for an S3 bucket",
+    content="aws s3api get-bucket-versioning --bucket $bucket_name",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get versioning status| B[🤖 TeamMate]
+        B --> C{{"Bucket name?" 🪣}}
+        C --> D[User provides bucket name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves versioning status 🔄]
+        F --> G[User receives status information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+s3_get_bucket_lifecycle = AWSCliTool(
+    name="s3_get_bucket_lifecycle",
+    description="Get lifecycle configuration for an S3 bucket",
+    content="aws s3api get-bucket-lifecycle-configuration --bucket $bucket_name",
+    args=[
+        Arg(name="bucket_name", type="str", description="Name of the bucket", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get lifecycle rules| B[🤖 TeamMate]
+        B --> C{{"Bucket name?" 🪣}}
+        C --> D[User provides bucket name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves lifecycle rules ⚙️]
+        F --> G[User receives lifecycle configuration 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", s3_list_buckets)
 tool_registry.register("aws", s3_create_bucket)
 tool_registry.register("aws", s3_delete_bucket)
@@ -139,3 +217,6 @@ tool_registry.register("aws", s3_bulk_delete)
 tool_registry.register("aws", s3_bucket_size_analyzer)
 tool_registry.register("aws", s3_upload_file)
 tool_registry.register("aws", s3_download_file)
+tool_registry.register("aws", s3_get_bucket_policy)
+tool_registry.register("aws", s3_get_bucket_versioning)
+tool_registry.register("aws", s3_get_bucket_lifecycle)

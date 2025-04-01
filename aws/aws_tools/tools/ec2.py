@@ -419,6 +419,118 @@ ec2_get_instance_security_groups = AWSCliTool(
     """
 )
 
+ec2_describe_instance_types_all = AWSCliTool(
+    name="ec2_describe_instance_types_all",
+    description="List all available EC2 instance types and their specifications",
+    content="aws ec2 describe-instance-types",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List instance types| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves instance types 📋]
+        D --> E[User receives instance types list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_describe_availability_zones = AWSCliTool(
+    name="ec2_describe_availability_zones",
+    description="List available Availability Zones in the current region",
+    content="aws ec2 describe-availability-zones",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List AZs| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves AZ list 🌍]
+        D --> E[User receives AZ information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_describe_images = AWSCliTool(
+    name="ec2_describe_images",
+    description="Describe EC2 AMIs owned by your account",
+    content="aws ec2 describe-images --owners self",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List AMIs| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves AMI list 💿]
+        D --> E[User receives AMI details 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_get_instance_cpu_info = AWSCliTool(
+    name="ec2_get_instance_cpu_info",
+    description="Get CPU info for an EC2 instance",
+    content="aws ec2 describe-instance-types --instance-types $(aws ec2 describe-instances --instance-ids $instance_id --query 'Reservations[].Instances[].InstanceType' --output text) --query 'InstanceTypes[].{Type:InstanceType,vCPUs:VCpuInfo.DefaultVCpus,Memory:MemoryInfo.SizeInMiB}'",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to get CPU info for (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get CPU info| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves CPU details 💻]
+        F --> G[User receives CPU information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_describe_network_interfaces = AWSCliTool(
+    name="ec2_describe_network_interfaces",
+    description="Describe network interfaces of an EC2 instance",
+    content="aws ec2 describe-network-interfaces --filters Name=attachment.instance-id,Values=$instance_id",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to get network interfaces for (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get network interfaces| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves network details 🌐]
+        F --> G[User receives interface information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -434,3 +546,8 @@ tool_registry.register("aws", ec2_create_from_template)
 tool_registry.register("aws", ec2_create_snapshot)
 tool_registry.register("aws", ec2_get_instance_volumes)
 tool_registry.register("aws", ec2_get_instance_security_groups)
+tool_registry.register("aws", ec2_describe_instance_types_all)
+tool_registry.register("aws", ec2_describe_availability_zones)
+tool_registry.register("aws", ec2_describe_images)
+tool_registry.register("aws", ec2_get_instance_cpu_info)
+tool_registry.register("aws", ec2_describe_network_interfaces)

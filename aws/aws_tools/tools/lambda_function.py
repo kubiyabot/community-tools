@@ -59,8 +59,62 @@ lambda_invoke_function = AWSCliTool(
     ],
 )
 
+lambda_get_function_config = AWSCliTool(
+    name="lambda_get_function_config",
+    description="Get Lambda function configuration",
+    content="aws lambda get-function-configuration --function-name $function_name",
+    args=[
+        Arg(name="function_name", type="str", description="Name of the Lambda function", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get function config| B[🤖 TeamMate]
+        B --> C{{"Function name?" 📝}}
+        C --> D[User provides function name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves configuration ⚙️]
+        F --> G[User receives function config 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+lambda_list_versions = AWSCliTool(
+    name="lambda_list_versions",
+    description="List versions of a Lambda function",
+    content="aws lambda list-versions-by-function --function-name $function_name",
+    args=[
+        Arg(name="function_name", type="str", description="Name of the Lambda function", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List versions| B[🤖 TeamMate]
+        B --> C{{"Function name?" 📝}}
+        C --> D[User provides function name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves versions 🔢]
+        F --> G[User receives version list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", lambda_list_functions)
 tool_registry.register("aws", lambda_create_function)
 tool_registry.register("aws", lambda_update_function)
 tool_registry.register("aws", lambda_delete_function)
 tool_registry.register("aws", lambda_invoke_function)
+tool_registry.register("aws", lambda_get_function_config)
+tool_registry.register("aws", lambda_list_versions)
