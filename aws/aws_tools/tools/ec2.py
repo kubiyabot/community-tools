@@ -251,6 +251,101 @@ ec2_get_instance_tags = AWSCliTool(
     """
 )
 
+ec2_list_instances = AWSCliTool(
+    name="ec2_list_instances",
+    description="List EC2 instances with detailed information",
+    content="aws ec2 describe-instances",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List EC2 instances| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves instance list 📋]
+        D --> E[User receives instance list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_reboot_instance = AWSCliTool(
+    name="ec2_reboot_instance",
+    description="Reboot an EC2 instance",
+    content="aws ec2 reboot-instances --instance-ids $instance_id",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to reboot (e.g., 'i-1234567890abcdef0')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Reboot EC2 instance| B[🤖 TeamMate]
+        B --> C{{"Instance ID?" 🔢}}
+        C --> D[User provides instance ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS reboots the instance 🔄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
+ec2_modify_instance_type = AWSCliTool(
+    name="ec2_modify_instance_type",
+    description="Modify EC2 instance type",
+    content="aws ec2 modify-instance-attribute --instance-id $instance_id --instance-type $instance_type",
+    args=[
+        Arg(name="instance_id", type="str", description="Instance ID to modify (e.g., 'i-1234567890abcdef0')", required=True),
+        Arg(name="instance_type", type="str", description="New instance type (e.g., 't2.micro', 'm5.large')", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Modify instance type| B[🤖 TeamMate]
+        B --> C{{"Instance details?" 🔢}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS modifies the instance 🔧]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
+ec2_create_from_template = AWSCliTool(
+    name="ec2_create_from_template",
+    description="Create EC2 instance from a launch template",
+    content="aws ec2 run-instances --launch-template LaunchTemplateName=$template_name,Version=$version --count $count",
+    args=[
+        Arg(name="template_name", type="str", description="Name of the launch template", required=True),
+        Arg(name="version", type="str", description="Version of the launch template (default is latest)", required=False, default="$Latest"),
+        Arg(name="count", type="int", description="Number of instances to launch", required=False, default="1"),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Create from template| B[🤖 TeamMate]
+        B --> C{{"Template details?" 📋}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS launches instance(s) 🚀]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -259,3 +354,7 @@ tool_registry.register("aws", ec2_describe_instance_status)
 tool_registry.register("aws", ec2_get_instance_metrics)
 tool_registry.register("aws", ec2_describe_instance_types)
 tool_registry.register("aws", ec2_get_instance_tags)
+tool_registry.register("aws", ec2_list_instances)
+tool_registry.register("aws", ec2_reboot_instance)
+tool_registry.register("aws", ec2_modify_instance_type)
+tool_registry.register("aws", ec2_create_from_template)
