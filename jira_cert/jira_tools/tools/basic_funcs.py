@@ -2,17 +2,6 @@ import os
 import requests
 from requests.exceptions import HTTPError
 
-def get_cert_paths():
-    """Get paths to the certificate and key files"""
-    cert_path = "/tmp/jira_client.crt"
-    key_path = "/tmp/jira_client.key"
-    
-    # Verify files exist
-    if not os.path.exists(cert_path) or not os.path.exists(key_path):
-        raise ValueError("Certificate or key file not found. Please ensure JIRA_CLIENT_CERT and JIRA_CLIENT_KEY are properly set.")
-    
-    return (cert_path, key_path)
-
 def get_jira_server_url() -> str:
     """Get the Jira server URL from environment"""
     server_url = os.getenv("JIRA_SERVER_URL")
@@ -24,14 +13,14 @@ def get_jira_user_id(email: str) -> str:
     """Get user account ID by email"""
     server_url = get_jira_server_url()
     user_search_url = f"{server_url}/rest/api/3/user/search?query={email}"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
 
     try:
         response = requests.get(
             user_search_url, 
             cert=(cert_path, key_path),
             headers={"Accept": "application/json"},
-            verify=False  # Often needed for self-hosted instances with self-signed certs
+            verify=False
         )
         response.raise_for_status()
         return response.json()[0]["accountId"]
@@ -44,4 +33,28 @@ def get_jira_basic_headers() -> dict:
     return {
         "Accept": "application/json",
         "Content-Type": "application/json"
-    } 
+    }
+
+def setup_client_cert_files():
+    """
+    Gets client certificate and key from environment variables and writes them to files.
+    Returns tuple of (cert_path, key_path).
+    """
+    # Get certificate and key content from environment variables
+    CLIENT_CERT = os.getenv("JIRA_CLIENT_CERT")
+    CLIENT_KEY = os.getenv("JIRA_CLIENT_KEY")
+
+    if not CLIENT_CERT or not CLIENT_KEY:
+        raise ValueError("JIRA_CLIENT_CERT and JIRA_CLIENT_KEY environment variables must be set")
+
+    # Create temporary paths for the cert files
+    cert_path = "/tmp/jira_client.crt"
+    key_path = "/tmp/jira_client.key"
+
+    # Write the certificates to files
+    with open(cert_path, 'w') as f:
+        f.write(CLIENT_CERT)
+    with open(key_path, 'w') as f:
+        f.write(CLIENT_KEY)
+
+    return cert_path, key_path 

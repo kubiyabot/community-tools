@@ -3,7 +3,7 @@ import requests
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
     get_jira_user_id
 )
 
@@ -22,7 +22,7 @@ def assign_issue(issue_key: str, assignee_email: str):
         "accountId": user_id
     } if user_id else {"accountId": None}  # None to unassign
     
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     response = requests.put(
         assign_url,
         headers=get_jira_basic_headers(),

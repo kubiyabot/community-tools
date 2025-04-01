@@ -1,7 +1,7 @@
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
 )
 
 import json
@@ -32,7 +32,7 @@ def main():
 
     server_url = get_jira_server_url()
     comment_url = f"{server_url}/rest/api/3/issue/{args.issue_key}/comment"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     try:
         response = requests.post(

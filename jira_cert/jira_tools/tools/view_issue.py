@@ -1,10 +1,11 @@
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
 )
 
 import requests
+import argparse
 
 
 def extract_relevant_fields(data):
@@ -59,15 +60,13 @@ def extract_relevant_fields(data):
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser(description="Get Jira issues")
     parser.add_argument("issue_key", help="Issue key for the Jira issue")
     args = parser.parse_args()
 
+    cert_path, key_path = setup_client_cert_files()
     server_url = get_jira_server_url()
     get_issue_url = f"{server_url}/rest/api/3/issue/{args.issue_key}"
-    cert_path, key_path = get_cert_paths()
 
     try:
         response = requests.get(

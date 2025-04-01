@@ -4,14 +4,14 @@ from typing import List, Optional
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
 )
 
 def create_sprint(board_id: int, name: str, goal: str = None, start_date: str = None, end_date: str = None) -> dict:
     """Create a new sprint"""
     server_url = get_jira_server_url()
     create_url = f"{server_url}/rest/agile/1.0/sprint"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     payload = {
         "name": name,
@@ -38,7 +38,7 @@ def get_sprint_status(sprint_id: int) -> dict:
     """Get sprint details and status"""
     server_url = get_jira_server_url()
     sprint_url = f"{server_url}/rest/agile/1.0/sprint/{sprint_id}"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     response = requests.get(
         sprint_url,
@@ -53,7 +53,7 @@ def update_sprint_state(sprint_id: int, state: str) -> dict:
     """Update sprint state (start/close)"""
     server_url = get_jira_server_url()
     state_url = f"{server_url}/rest/agile/1.0/sprint/{sprint_id}"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     if state not in ["active", "closed"]:
         raise ValueError("State must be either 'active' or 'closed'")
@@ -73,7 +73,7 @@ def move_issues_to_sprint(sprint_id: int, issue_keys: List[str]) -> bool:
     """Move issues to a sprint"""
     server_url = get_jira_server_url()
     move_url = f"{server_url}/rest/agile/1.0/sprint/{sprint_id}/issue"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     payload = {
         "issues": issue_keys
@@ -92,7 +92,7 @@ def get_sprint_issues(sprint_id: int) -> List[dict]:
     """Get all issues in a sprint"""
     server_url = get_jira_server_url()
     issues_url = f"{server_url}/rest/agile/1.0/sprint/{sprint_id}/issue"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     response = requests.get(
         issues_url,

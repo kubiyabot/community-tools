@@ -3,13 +3,13 @@ import requests
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
 )
 
 def get_available_transitions(issue_key: str):
     server_url = get_jira_server_url()
     transitions_url = f"{server_url}/rest/api/3/issue/{issue_key}/transitions"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     response = requests.get(
         transitions_url,
@@ -38,7 +38,7 @@ def update_issue_status(issue_key: str, status_name: str):
     # Perform transition
     server_url = get_jira_server_url()
     transition_url = f"{server_url}/rest/api/3/issue/{issue_key}/transitions"
-    cert_path, key_path = get_cert_paths()
+    cert_path, key_path = setup_client_cert_files()
     
     payload = {
         "transition": {
@@ -60,8 +60,8 @@ def main():
     import argparse
     
     parser = argparse.ArgumentParser(description="Update Jira issue status")
-    parser.add_argument("issue_key", help="The key of the Jira issue")
-    parser.add_argument("status", help="The new status to set")
+    parser.add_argument("issue_key", help="Issue key for the Jira issue")
+    parser.add_argument("status", help="New status for the issue")
     
     args = parser.parse_args()
     

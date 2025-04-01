@@ -3,10 +3,11 @@ from typing import List
 from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
-    get_cert_paths,
+    setup_client_cert_files,
 )
 
 import requests
+import argparse
 
 
 def list_issues_in_project(
@@ -39,7 +40,7 @@ def list_issues_in_project(
     try:
         server_url = get_jira_server_url()
         search_url = f"{server_url}/rest/api/3/search"
-        cert_path, key_path = get_cert_paths()
+        cert_path, key_path = setup_client_cert_files()
         
         response = requests.get(
             search_url, 
@@ -69,8 +70,6 @@ def list_issues_in_project(
 
 
 def main():
-    import argparse
-
     parser = argparse.ArgumentParser(description="List Jira issues")
     parser.add_argument("project_key", help="Jira project key")
     parser.add_argument("issues_number", nargs='?', type=str, help="Number of issues to list")
