@@ -1,9 +1,26 @@
+import os
 import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraCertTool, register_jira_tool
 from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops
 
+def get_cert_files():
+    # Get certificate and key content from environment variables
+    CLIENT_CERT = os.getenv("JIRA_CLIENT_CERT")
+    CLIENT_KEY = os.getenv("JIRA_CLIENT_KEY")
+
+    if not CLIENT_CERT or not CLIENT_KEY:
+        raise ValueError("JIRA_CLIENT_CERT and JIRA_CLIENT_KEY environment variables must be set")
+
+    # Create temporary paths for the cert files
+    cert_path = "/tmp/jira_client.crt"
+    key_path = "/tmp/jira_client.key"
+
+    return [
+        FileSpec(destination=cert_path, content=CLIENT_CERT),
+        FileSpec(destination=key_path, content=CLIENT_KEY)
+    ]
 
 class BaseCreationIssueTool(JiraCertTool):
     def __init__(self, name: str, issue_type: str, extra_content: str = "",
@@ -20,21 +37,26 @@ class BaseCreationIssueTool(JiraCertTool):
             Arg(name="label", default="", type="str", description=f"{issue_type} label", required=False),
         ]
         args.extend(extra_args)
+        
+        # Combine cert files with tool-specific files
+        tool_files = [
+            FileSpec(
+                destination="/tmp/create_issue.py",
+                content=inspect.getsource(create_issue),
+            ),
+            FileSpec(
+                destination="/tmp/basic_funcs.py",
+                content=inspect.getsource(basic_funcs),
+            )
+        ]
+        all_files = get_cert_files() + tool_files
+
         super().__init__(
             name=name,
             description=description,
             content=content,
             args=args,
-            with_files=[
-                FileSpec(
-                    destination="/tmp/create_issue.py",
-                    content=inspect.getsource(create_issue),
-                ),
-                FileSpec(
-                    destination="/tmp/basic_funcs.py",
-                    content=inspect.getsource(basic_funcs),
-                )
-            ])
+            with_files=all_files)
 
 
 create_task_tool = BaseCreationIssueTool(name="create_task", issue_type="Task")
@@ -55,7 +77,7 @@ view_issue_tool = JiraCertTool(
     args=[
         Arg(name="issue_key", type="str", description="Issue key", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/view_issue.py",
             content=inspect.getsource(view_issue),
@@ -79,7 +101,7 @@ list_issue_tool = JiraCertTool(
         Arg(name="reporter", type="str", description="Filter by reporter", required=False),
         Arg(name="label", type="str", description="Filter by label", required=False),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/list_issues.py",
             content=inspect.getsource(list_issues),
@@ -98,7 +120,7 @@ add_comment_issue_tool = JiraCertTool(
         Arg(name="issue_key", type="str", description="Issue key", required=True),
         Arg(name="comment", type="str", description="Comment text", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/create_issue_comment.py",
             content=inspect.getsource(create_issue_comment),
@@ -117,7 +139,7 @@ update_issue_status_tool = JiraCertTool(
         Arg(name="issue_key", type="str", description="Issue key", required=True),
         Arg(name="status", type="str", description="New status", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/update_issue_status.py",
             content=inspect.getsource(update_issue_status),
@@ -136,7 +158,7 @@ assign_issue_tool = JiraCertTool(
         Arg(name="issue_key", type="str", description="Issue key", required=True),
         Arg(name="assignee_email", type="str", description="Assignee email", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/assign_issue.py",
             content=inspect.getsource(assign_issue),
@@ -159,7 +181,7 @@ create_sprint_tool = JiraCertTool(
         Arg(name="start_date", type="str", description="Start date (YYYY-MM-DD)", required=False),
         Arg(name="end_date", type="str", description="End date (YYYY-MM-DD)", required=False),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/sprint_ops.py",
             content=inspect.getsource(sprint_ops),
@@ -178,7 +200,7 @@ update_sprint_state_tool = JiraCertTool(
         Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
         Arg(name="state", type="str", description="New state (active/closed)", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/sprint_ops.py",
             content=inspect.getsource(sprint_ops),
@@ -197,7 +219,7 @@ move_to_sprint_tool = JiraCertTool(
         Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
         Arg(name="issue_keys", type="str", description="Space-separated issue keys", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/sprint_ops.py",
             content=inspect.getsource(sprint_ops),
@@ -215,7 +237,7 @@ view_sprint_tool = JiraCertTool(
     args=[
         Arg(name="sprint_id", type="int", description="Sprint ID", required=True),
     ],
-    with_files=[
+    with_files=get_cert_files() + [
         FileSpec(
             destination="/tmp/sprint_ops.py",
             content=inspect.getsource(sprint_ops),
