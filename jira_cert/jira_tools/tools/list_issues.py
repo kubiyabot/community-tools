@@ -1,4 +1,5 @@
 import warnings
+import logging
 import urllib3
 from typing import List
 
@@ -6,9 +7,13 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
+    test_jira_connection,
 )
 
 import requests
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Suppress only the specific InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -23,6 +28,13 @@ def list_issues_in_project(
     label: str = None,
 )-> List[dict]:
 
+    logger.info(f"=== Listing Issues for Project: {project_key} ===")
+    
+    # Test connection first
+    if not test_jira_connection():
+        logger.error("Failed to establish connection to Jira. Please check your configuration.")
+        return []
+
     jql_query = f"project = {project_key}"
     if status:
         jql_query += f" AND status = '{status}'"
@@ -35,32 +47,47 @@ def list_issues_in_project(
     if label:
         jql_query += f" AND labels = '{label}'"
 
+    logger.info(f"Using JQL query: {jql_query}")
+
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
         "fields": "summary,created,labels,status",
     }
+    logger.debug(f"Request parameters: {params}")
     
     try:
         server_url = get_jira_server_url()
         search_url = f"{server_url}/rest/api/3/search"
-        cert_path, key_path = setup_client_cert_files()
+        logger.info(f"Making request to: {search_url}")
         
+        cert_path, key_path = setup_client_cert_files()
+        headers = get_jira_basic_headers()
+        logger.debug(f"Using headers: {headers}")
+        
+        logger.info("Sending request...")
         response = requests.get(
             search_url, 
-            headers=get_jira_basic_headers(), 
+            headers=headers, 
             params=params,
             cert=(cert_path, key_path),
             verify=False
         )
         
+        logger.info(f"Response status code: {response.status_code}")
+        logger.debug(f"Response headers: {dict(response.headers)}")
+        
         if response.status_code == 401:
-            print("Authentication failed. Please check your credentials and certificates.")
+            logger.error("Authentication failed. Please check your credentials and certificates.")
+            logger.error(f"Response body: {response.text}")
             return []
             
         response.raise_for_status()
 
-        issues = response.json().get("issues", [])
+        data = response.json()
+        logger.info(f"Total issues found: {data.get('total', 0)}")
+        
+        issues = data.get("issues", [])
         latest_issues = [
             {
                 "key": issue["key"],
@@ -75,10 +102,17 @@ def list_issues_in_project(
         return latest_issues
 
     except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
+        logger.error("=== Request Error ===")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
         if hasattr(e, 'response'):
-            print(f"Response status code: {e.response.status_code}")
-            print(f"Response body: {e.response.text}")
+            logger.error(f"Response status code: {e.response.status_code}")
+            logger.error(f"Response headers: {dict(e.response.headers)}")
+            logger.error(f"Response body: {e.response.text}")
+        if isinstance(e, requests.exceptions.SSLError):
+            logger.error("SSL Error - This might indicate a certificate problem")
+        elif isinstance(e, requests.exceptions.ConnectionError):
+            logger.error("Connection Error - This might indicate a network or URL problem")
         return []
 
 
