@@ -14,18 +14,6 @@ class JiraCertTool(Tool):
         # Create temporary paths for the cert files
         cert_path = "/tmp/jira_client.crt"
         key_path = "/tmp/jira_client.key"
-        
-        # Create FileSpecs for the cert and key using the environment variable content
-        cert_files = [
-            FileSpec(
-                destination=cert_path,
-                content=CLIENT_CERT
-            ),
-            FileSpec(
-                destination=key_path,
-                content=CLIENT_KEY
-            )
-        ]
 
         super().__init__(
             name=name,
@@ -40,7 +28,10 @@ pip install kubiya-sdk > /dev/null
             args=args,
             env=["JIRA_SERVER_URL"],
             secrets=["JIRA_CLIENT_CERT", "JIRA_CLIENT_KEY"],
-            with_files=cert_files,
+            with_files=[
+                FileSpec(destination=cert_path, content=CLIENT_CERT),
+                FileSpec(destination=key_path, content=CLIENT_KEY)
+            ],
             mermaid=mermaid_diagram,
             icon_url="https://logos-world.net/wp-content/uploads/2021/02/Jira-Emblem.png",
         )
