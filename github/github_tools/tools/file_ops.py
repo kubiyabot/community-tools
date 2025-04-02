@@ -496,18 +496,16 @@ echo "🌱 Branch: ${branch_name:-main}"
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
-# Clone repository using token authentication
+# Clone repository using gh cli
 echo "📥 Cloning repository..."
 if ! gh repo clone "$repo" .; then
     echo "❌ Failed to clone repository"
     exit 1
 fi
 
-# Configure git with token authentication
+# Configure git
 git config user.name "Kubiya Bot"
 git config user.email "bot@kubiya.ai"
-git config --global credential.helper store
-echo "https://${GH_TOKEN}@github.com" > ~/.git-credentials
 
 # Create or checkout branch
 if [ -n "$branch_name" ]; then
@@ -533,14 +531,15 @@ if ! git diff --cached --quiet; then
     echo "💾 Committing changes..."
     git commit -m "${commit_message:-Create new file: $file_path}"
     
-    # Push changes
+    # Push changes using token directly
     echo "🚀 Pushing changes..."
+    REPO_URL="https://${GH_TOKEN}@github.com/${repo}.git"
     if [ -n "$branch_name" ]; then
-        git push -u origin "$branch_name"
+        git push "$REPO_URL" "$branch_name"
         echo "✨ Changes pushed to branch: $branch_name"
         echo "🔗 Create PR: https://github.com/$repo/compare/$branch_name"
     else
-        git push origin HEAD
+        git push "$REPO_URL" HEAD:$(git rev-parse --abbrev-ref HEAD)
         echo "✨ Changes pushed to default branch"
     fi
 else
@@ -550,7 +549,6 @@ fi
 # Cleanup
 cd - >/dev/null
 rm -rf "$TEMP_DIR"
-rm -f ~/.git-credentials
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
