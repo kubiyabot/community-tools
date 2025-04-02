@@ -469,3 +469,96 @@ edit_file = GitHubCliTool(
 # Register tool
 tool_registry.register("github", edit_file)
 __all__.append('edit_file')
+
+
+create_file = GitHubCliTool(
+    name="github_create_file",
+    description="""Create a new file in a GitHub repository with specified content.
+    
+COMMON USES:
+- Creating CI/CD configuration files
+- Generating Helm charts
+- Adding deployment configurations
+- Creating new documentation
+
+The tool will:
+1. Create the file in the specified path
+2. Commit the changes with a descriptive message
+3. Create a new branch if specified""",
+    content="""
+#!/bin/sh
+set -e
+
+echo "📝 Creating new file in repository: $repo"
+echo "📄 File path: $file_path"
+echo "🌱 Branch: ${branch_name:-main}"
+
+# Create temporary directory for operation
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR"
+
+# Clone repository
+echo "📥 Cloning repository..."
+if ! gh repo clone "$repo" .; then
+    echo "❌ Failed to clone repository"
+    exit 1
+fi
+
+# Configure git
+git config user.name "Kubiya Bot"
+git config user.email "bot@kubiya.ai"
+
+# Create or checkout branch
+if [ -n "$branch_name" ]; then
+    echo "🌿 Creating/checking out branch: $branch_name"
+    git checkout -B "$branch_name"
+else
+    echo "🔄 Using default branch"
+    git checkout $(git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
+fi
+
+# Create directory structure if needed
+mkdir -p "$(dirname "$file_path")"
+
+# Create file with content
+echo "$content" > "$file_path"
+
+# Add file to git
+git add "$file_path"
+
+# Check if there are changes to commit
+if ! git diff --cached --quiet; then
+    # Commit changes
+    echo "💾 Committing changes..."
+    git commit -m "${commit_message:-Create new file: $file_path}"
+    
+    # Push changes
+    echo "🚀 Pushing changes..."
+    if [ -n "$branch_name" ]; then
+        git push -u origin "$branch_name"
+        echo "✨ Changes pushed to branch: $branch_name"
+        echo "🔗 Create PR: https://github.com/$repo/compare/$branch_name"
+    else
+        git push
+        echo "✨ Changes pushed to default branch"
+    fi
+else
+    echo "ℹ️ No changes to commit"
+fi
+
+# Cleanup
+cd - >/dev/null
+rm -rf "$TEMP_DIR"
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
+        Arg(name="file_path", type="str", description="Path to the file to create (e.g. '.github/workflows/ci.yml' or 'helm/myapp/Chart.yaml')", required=True),
+        Arg(name="content", type="str", description="Content of the file to create", required=True),
+        Arg(name="branch_name", type="str", description="Branch to create/update (optional - uses default branch if not specified)", required=False),
+        Arg(name="commit_message", type="str", description="Custom commit message (optional)", required=False),
+    ],
+)
+
+# Register the new tool
+tool_registry.register("github", create_file)
+__all__.append('create_file')
