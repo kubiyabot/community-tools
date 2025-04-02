@@ -1,5 +1,5 @@
 from typing import List
-from .base import ArgoCDTool, Arg
+from .base import ArgoCDTool, ArgoCDGitTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
 
@@ -19,7 +19,8 @@ class ApplicationManager:
                 self.refresh_application(),
                 self.list_outdated_applications(),
                 self.get_application_history(),
-                self.get_health_status()
+                self.get_health_status(),
+                self.setup_helm_environment()
             ]
             
             for tool in tools:
@@ -229,6 +230,93 @@ class ApplicationManager:
             argocd app list --output json | jq -r '.[] | {name: .metadata.name, health: .status.health.status}'
             """,
             args=[]
+        )
+
+    def setup_helm_environment(self) -> ArgoCDGitTool:
+        """Set up an ArgoCD environment using a Helm chart from a GitHub repository."""
+        return ArgoCDGitTool(
+            name="setup_helm_environment",
+            description="Set up an ArgoCD environment using a Helm chart from a GitHub repository",
+            content="""
+            if [ -z "$repo_url" ] || [ -z "$chart_path" ]; then
+                echo "Error: Repository URL and chart path are required"
+                exit 1
+            fi
+
+            # Clone the repository
+            echo "📦 Cloning repository..."
+            git clone "$repo_url" repo || {
+                echo "Failed to clone repository"
+                exit 1
+            }
+            cd repo
+
+            # Validate Helm chart
+            echo "🔍 Validating Helm chart..."
+            if [ ! -d "$chart_path" ]; then
+                echo "❌ Chart path '$chart_path' not found in repository"
+                exit 1
+            fi
+
+            if [ ! -f "$chart_path/Chart.yaml" ]; then
+                echo "❌ No Chart.yaml found in '$chart_path'"
+                exit 1
+            fi
+
+            # Create ArgoCD application
+            echo "🚀 Creating ArgoCD application..."
+            argocd app create "$app_name" \
+                --repo "$repo_url" \
+                --path "$chart_path" \
+                --dest-server "$dest_server" \
+                --dest-namespace "$dest_namespace" \
+                $([[ -n "$helm_values" ]] && echo "--helm-set $helm_values") \
+                --insecure || {
+                echo "Failed to create ArgoCD application"
+                exit 1
+            }
+
+            # Configure sync policy if automated
+            if [ "$sync_policy" = "automated" ]; then
+                echo "⚙️ Configuring automated sync policy..."
+                argocd app set "$app_name" --sync-policy automated --self-heal --allow-empty --insecure || {
+                    echo "Failed to set sync policy"
+                    exit 1
+                }
+            fi
+
+            # Initial sync if auto-sync is not enabled
+            if [ "$sync_policy" != "automated" ]; then
+                echo "🔄 Performing initial sync..."
+                argocd app sync "$app_name" --insecure
+            fi
+
+            echo "✅ ArgoCD environment setup completed successfully"
+            """,
+            args=[
+                Arg(name="repo_url",
+                    description="GitHub repository URL containing the Helm chart",
+                    required=True),
+                Arg(name="chart_path",
+                    description="Path to the Helm chart within the repository",
+                    required=True),
+                Arg(name="app_name",
+                    description="Name for the ArgoCD application",
+                    required=True),
+                Arg(name="dest_server",
+                    description="Destination Kubernetes cluster server URL",
+                    required=True),
+                Arg(name="dest_namespace",
+                    description="Destination namespace for the application",
+                    required=True),
+                Arg(name="helm_values",
+                    description="Helm values to set (comma-separated key=value pairs, e.g. 'key1=value1,key2=value2')",
+                    required=False),
+                Arg(name="sync_policy",
+                    description="Sync policy (manual/automated)",
+                    required=False,
+                    default="manual")
+            ]
         )
 
 
