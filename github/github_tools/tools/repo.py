@@ -14,13 +14,19 @@ repo_create = GitHubRepolessCliTool(
 
     REPO_NAME="$([[ -n "${org}" ]] && echo "${org}/${name}" || echo "${name}")"
 
-    if ! gh repo create "${REPO_NAME}" \
-        --source=. \
+    # Construct the command
+    CMD="gh repo create \"${REPO_NAME}\" \
         $([ "${private}" == "true" ] && echo "--private" || echo "--public") \
-        $([ -n "${description}" ] && echo "--description \"${description}\"") \
-        $([ -n "${homepage}" ] && echo "--homepage \"${homepage}\"") \
+        $([ -n "${description}" ] && echo "--description=${description}") \
+        $([ -n "${homepage}" ] && echo "--homepage=${homepage}") \
         $([ "${has_issues}" == "false" ] && echo "--disable-issues") \
-        $([ "${has_wiki}" == "false" ] && echo "--disable-wiki"); then
+        $([ "${has_wiki}" == "false" ] && echo "--disable-wiki")"
+
+    # Echo the command for debugging
+    echo "📋 Executing command: ${CMD}"
+
+    # Execute the command
+    if ! eval "${CMD}"; then
         echo "❌ Failed to create repository"
         exit 1
     fi
