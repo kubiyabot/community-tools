@@ -16,8 +16,8 @@ repo_create = GitHubRepolessCliTool(
 
     if ! gh repo create "${REPO_NAME}" \
         $([ "${private}" == "true" ] && echo "--private" || echo "--public") \
-        $([ -n "${description}" ] && echo "--description \"${description}\"") \
-        $([ -n "${homepage}" ] && echo "--homepage ${homepage}") \
+        $([ -n "${description}" ] && echo "--description=${description}") \
+        $([ -n "${homepage}" ] && echo "--homepage=${homepage}") \
         $([ "${has_issues}" == "false" ] && echo "--disable-issues") \
         $([ "${has_wiki}" == "false" ] && echo "--disable-wiki"); then
         echo "❌ Failed to create repository"
