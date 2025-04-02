@@ -341,21 +341,33 @@ class ApplicationManager:
                 }
             fi
 
-            # Check if application exists
+            # Check if application exists and get details
             echo "🔍 Checking application status..."
             if ! argocd app get "$app_name" --insecure &>/dev/null; then
                 echo "❌ Application '$app_name' not found"
                 exit 1
             fi
 
-            # Get initial state
+            # Get initial state and source details
             echo "📊 Initial application state:"
-            argocd app get "$app_name" --insecure
+            app_info=$(argocd app get "$app_name" --insecure -o json)
+            echo "$app_info" | jq '.'
 
-            # Sync the application
+            # Get source repo and path
+            repo_url=$(echo "$app_info" | jq -r '.spec.source.repoURL')
+            repo_path=$(echo "$app_info" | jq -r '.spec.source.path')
+            echo "📁 Source: $repo_url -> $repo_path"
+
+            # Refresh application to ensure latest state
+            echo "🔄 Refreshing application state..."
+            argocd app refresh "$app_name" --insecure
+
+            # Sync the application with debug info
             echo "🔄 Syncing application..."
-            if ! argocd app sync "$app_name" --insecure; then
+            if ! argocd app sync "$app_name" --insecure --prune; then
                 echo "❌ Failed to sync application"
+                echo "📝 Sync error details:"
+                argocd app get "$app_name" --insecure
                 exit 1
             fi
 
@@ -376,20 +388,13 @@ class ApplicationManager:
                 if [ "$status" = "Synced" ] && [ "$health" = "Healthy" ]; then
                     echo "✅ Application deployed successfully!"
                     
-                    # Get deployment details
-                    echo "📋 Deployment Summary:"
-                    echo "$app_state" | jq -r '{
-                        name: .metadata.name,
-                        namespace: .spec.destination.namespace,
-                        sync_status: .status.sync.status,
-                        health: .status.health.status,
-                        resources: [.status.resources[] | select(. != null) | {
-                            kind: .kind,
-                            name: .name,
-                            status: .status,
-                            health: (.health.status // "Unknown")
-                        }]
-                    }'
+                    # Show full application state for debugging
+                    echo "📋 Full Application State:"
+                    echo "$app_state" | jq '.'
+
+                    # Show manifest details
+                    echo "\n📄 Manifest Details:"
+                    argocd app manifests "$app_name" --insecure
 
                     # Show application resources
                     echo "\n📦 Application Resources:"
@@ -397,7 +402,20 @@ class ApplicationManager:
 
                     # Show Kubernetes events
                     echo "\n📝 Recent Kubernetes events:"
-                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp'
+
+                    # Check if any resources were actually created
+                    if ! kubectl get all -n "$namespace" 2>/dev/null | grep -q .; then
+                        echo "⚠️ Warning: No resources were created in the namespace"
+                        echo "🔍 Debugging information:"
+                        echo "- Checking Helm chart..."
+                        if [ -n "$repo_url" ] && [ -n "$repo_path" ]; then
+                            echo "- Validating Helm chart at $repo_path"
+                            argocd app get "$app_name" --insecure --values
+                        fi
+                        exit 1
+                    fi
+
                     exit 0
                 fi
                 
@@ -407,6 +425,8 @@ class ApplicationManager:
                     argocd app history "$app_name" --insecure
                     echo "\n📝 Recent Kubernetes events:"
                     kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp'
+                    echo "\n🔍 Application Diff:"
+                    argocd app diff "$app_name" --insecure
                     exit 1
                 fi
                 
@@ -415,10 +435,12 @@ class ApplicationManager:
             done
 
             echo "❌ Deployment timed out after ${timeout}s"
-            echo "📝 Application state:"
+            echo "📝 Final Application State:"
             argocd app get "$app_name" --insecure
             echo "\n📝 Recent events:"
             kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp'
+            echo "\n🔍 Application Diff:"
+            argocd app diff "$app_name" --insecure
             exit 1
             """,
             args=[
