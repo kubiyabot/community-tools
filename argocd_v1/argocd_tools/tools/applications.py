@@ -347,7 +347,7 @@ class ApplicationManager:
 
             # Sync the application
             echo "🔄 Syncing application..."
-            if ! argocd app sync "$app_name" --insecure ${prune:+--prune} ${replace:+--replace}; then
+            if ! argocd app sync "$app_name" --insecure; then
                 echo "❌ Failed to sync application"
                 exit 1
             fi
@@ -408,15 +408,7 @@ class ApplicationManager:
                     required=True),
                 Arg(name="namespace",
                     description="Kubernetes namespace where the application will be deployed",
-                    required=True),
-                Arg(name="prune",
-                    description="Prune resources that are no longer needed",
-                    required=False,
-                    default=False),
-                Arg(name="replace",
-                    description="Replace resources instead of applying changes",
-                    required=False,
-                    default=False)
+                    required=True)
             ]
         )
 
