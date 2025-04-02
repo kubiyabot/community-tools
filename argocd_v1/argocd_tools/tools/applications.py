@@ -334,8 +334,11 @@ class ApplicationManager:
             # Verify namespace exists
             echo "🔍 Verifying namespace '$namespace' exists..."
             if ! kubectl get namespace "$namespace" &>/dev/null; then
-                echo "❌ Namespace '$namespace' not found"
-                exit 1
+                echo "Creating namespace '$namespace'..."
+                kubectl create namespace "$namespace" || {
+                    echo "❌ Failed to create namespace '$namespace'"
+                    exit 1
+                }
             fi
 
             # Check if application exists
@@ -344,6 +347,10 @@ class ApplicationManager:
                 echo "❌ Application '$app_name' not found"
                 exit 1
             fi
+
+            # Get initial state
+            echo "📊 Initial application state:"
+            argocd app get "$app_name" --insecure
 
             # Sync the application
             echo "🔄 Syncing application..."
@@ -357,8 +364,12 @@ class ApplicationManager:
             timeout=300  # 5 minutes timeout
             elapsed=0
             while [ $elapsed -lt $timeout ]; do
-                status=$(argocd app get "$app_name" --insecure -o json | jq -r '.status.sync.status')
-                health=$(argocd app get "$app_name" --insecure -o json | jq -r '.status.health.status')
+                # Get full application state
+                app_state=$(argocd app get "$app_name" --insecure -o json)
+                
+                # Extract status information
+                status=$(echo "$app_state" | jq -r '.status.sync.status // "Unknown"')
+                health=$(echo "$app_state" | jq -r '.status.health.status // "Unknown"')
                 
                 echo "📊 Current status: Sync=$status, Health=$health"
                 
@@ -367,18 +378,22 @@ class ApplicationManager:
                     
                     # Get deployment details
                     echo "📋 Deployment Summary:"
-                    argocd app get "$app_name" --insecure -o json | jq -r '{
+                    echo "$app_state" | jq -r '{
                         name: .metadata.name,
                         namespace: .spec.destination.namespace,
                         sync_status: .status.sync.status,
                         health: .status.health.status,
-                        resources: .status.resources | map({
+                        resources: [.status.resources[] | select(. != null) | {
                             kind: .kind,
                             name: .name,
                             status: .status,
-                            health: .health.status
-                        })
+                            health: (.health.status // "Unknown")
+                        }]
                     }'
+
+                    # Show application resources
+                    echo "\n📦 Application Resources:"
+                    kubectl get all -n "$namespace"
 
                     # Show Kubernetes events
                     echo "\n📝 Recent Kubernetes events:"
@@ -388,8 +403,10 @@ class ApplicationManager:
                 
                 if [ "$status" = "OutOfSync" ] || [ "$health" = "Degraded" ]; then
                     echo "⚠️ Application is in a degraded state"
-                    echo "📝 Recent events:"
-                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+                    echo "📝 Application Events:"
+                    argocd app history "$app_name" --insecure
+                    echo "\n📝 Recent Kubernetes events:"
+                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp'
                     exit 1
                 fi
                 
@@ -398,8 +415,10 @@ class ApplicationManager:
             done
 
             echo "❌ Deployment timed out after ${timeout}s"
-            echo "📝 Recent events:"
-            kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+            echo "📝 Application state:"
+            argocd app get "$app_name" --insecure
+            echo "\n📝 Recent events:"
+            kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp'
             exit 1
             """,
             args=[
