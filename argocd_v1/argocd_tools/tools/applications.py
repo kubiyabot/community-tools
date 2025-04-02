@@ -1,5 +1,5 @@
 from typing import List
-from .base import ArgoCDTool, ArgoCDGitTool, Arg
+from .base import ArgoCDTool, ArgoCDGitTool, ArgoCDKubeTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
 
@@ -20,7 +20,8 @@ class ApplicationManager:
                 self.list_outdated_applications(),
                 self.get_application_history(),
                 self.get_health_status(),
-                self.setup_helm_environment()
+                self.setup_helm_environment(),
+                self.deploy_application()
             ]
             
             for tool in tools:
@@ -316,6 +317,106 @@ class ApplicationManager:
                     description="Sync policy (manual/automated)",
                     required=False,
                     default="manual")
+            ]
+        )
+
+    def deploy_application(self) -> ArgoCDKubeTool:
+        """Deploy an ArgoCD application to Kubernetes and monitor its status."""
+        return ArgoCDKubeTool(
+            name="deploy_application",
+            description="Deploy and sync an ArgoCD application to Kubernetes, then monitor its status",
+            content="""
+            if [ -z "$app_name" ]; then
+                echo "Error: Application name not specified"
+                exit 1
+            fi
+
+            # Verify namespace exists
+            echo "🔍 Verifying namespace '$namespace' exists..."
+            if ! kubectl get namespace "$namespace" &>/dev/null; then
+                echo "❌ Namespace '$namespace' not found"
+                exit 1
+            fi
+
+            # Check if application exists
+            echo "🔍 Checking application status..."
+            if ! argocd app get "$app_name" --insecure &>/dev/null; then
+                echo "❌ Application '$app_name' not found"
+                exit 1
+            fi
+
+            # Sync the application
+            echo "🔄 Syncing application..."
+            if ! argocd app sync "$app_name" --insecure ${prune:+--prune} ${replace:+--replace}; then
+                echo "❌ Failed to sync application"
+                exit 1
+            fi
+
+            # Wait for sync to complete
+            echo "⏳ Waiting for sync to complete..."
+            timeout=300  # 5 minutes timeout
+            elapsed=0
+            while [ $elapsed -lt $timeout ]; do
+                status=$(argocd app get "$app_name" --insecure -o json | jq -r '.status.sync.status')
+                health=$(argocd app get "$app_name" --insecure -o json | jq -r '.status.health.status')
+                
+                echo "📊 Current status: Sync=$status, Health=$health"
+                
+                if [ "$status" = "Synced" ] && [ "$health" = "Healthy" ]; then
+                    echo "✅ Application deployed successfully!"
+                    
+                    # Get deployment details
+                    echo "📋 Deployment Summary:"
+                    argocd app get "$app_name" --insecure -o json | jq -r '{
+                        name: .metadata.name,
+                        namespace: .spec.destination.namespace,
+                        sync_status: .status.sync.status,
+                        health: .status.health.status,
+                        resources: .status.resources | map({
+                            kind: .kind,
+                            name: .name,
+                            status: .status,
+                            health: .health.status
+                        })
+                    }'
+
+                    # Show Kubernetes events
+                    echo "\n📝 Recent Kubernetes events:"
+                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+                    exit 0
+                fi
+                
+                if [ "$status" = "OutOfSync" ] || [ "$health" = "Degraded" ]; then
+                    echo "⚠️ Application is in a degraded state"
+                    echo "📝 Recent events:"
+                    kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+                    exit 1
+                fi
+                
+                sleep 10
+                elapsed=$((elapsed + 10))
+            done
+
+            echo "❌ Deployment timed out after ${timeout}s"
+            echo "📝 Recent events:"
+            kubectl get events --namespace "$namespace" --sort-by='.lastTimestamp' | tail -n 5
+            exit 1
+            """,
+            args=[
+                Arg(name="app_name",
+                    description="Name of the ArgoCD application to deploy",
+                    required=True),
+                Arg(name="namespace",
+                    description="Kubernetes namespace where the application will be deployed",
+                    required=True),
+                Arg(name="prune",
+                    description="Prune resources that are no longer needed",
+                    required=False,
+                    default=False),
+                Arg(name="replace",
+                    description="Replace resources instead of applying changes",
+                    required=False,
+                    default=False)
             ]
         )
 

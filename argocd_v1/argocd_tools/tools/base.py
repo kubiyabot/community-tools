@@ -30,6 +30,102 @@ classDiagram
 ```
 """
 
+class ArgoCDKubeTool(Tool):
+    """Base class for ArgoCD tools that need kubectl access."""
+    
+    name: str
+    description: str
+    content: str = ""
+    args: List[Arg] = []
+    image: str = "alpine:3.18"
+    icon_url: str = ARGOCD_ICON_URL
+    type: str = "docker"
+    
+    def __init__(self, name, description, content, args=None, image="alpine:3.18"):
+        # Enhanced setup script with kubectl and ArgoCD support
+        setup_script = """
+# Install required packages
+apk add --no-cache curl jq git && \
+VERSION=$(curl --silent "https://api.github.com/repos/argoproj/argo-cd/releases/latest" | jq -r .tag_name) && \
+curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64 && \
+chmod +x /usr/local/bin/argocd
+
+# Install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+chmod +x kubectl && \
+mv kubectl /usr/local/bin/
+
+# Verify environment variables
+if [ -z "$ARGOCD_SERVER" ]; then
+    echo "Error: ARGOCD_SERVER environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$ARGOCD_PASSWORD" ]; then
+    echo "Error: ARGOCD_PASSWORD environment variable is not set"
+    exit 1
+fi
+
+# Set up kubectl configuration using service account
+TOKEN_LOCATION="/tmp/kubernetes_context_token"
+CERT_LOCATION="/tmp/kubernetes_context_cert"
+
+if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
+    KUBE_TOKEN=$(cat $TOKEN_LOCATION)
+    kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc \
+                                        --certificate-authority=$CERT_LOCATION > /dev/null 2>&1
+    kubectl config set-credentials in-cluster --token=$KUBE_TOKEN > /dev/null 2>&1
+    kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster > /dev/null 2>&1
+    kubectl config use-context in-cluster > /dev/null 2>&1
+else
+    echo "Error: Kubernetes context token or cert file not found"
+    exit 1
+fi
+
+# Login to ArgoCD
+if ! argocd login "$ARGOCD_SERVER" --username admin --password "$ARGOCD_PASSWORD" --insecure; then
+    echo "Error: Failed to login to ArgoCD"
+    exit 1
+fi
+
+# Test connections
+if ! argocd version; then
+    echo "Error: Failed to verify ArgoCD CLI installation"
+    exit 1
+fi
+
+if ! kubectl version --client; then
+    echo "Error: Failed to verify kubectl installation"
+    exit 1
+fi
+
+"""
+        enhanced_content = setup_script + "\n" + content
+        
+        file_specs = [
+            FileSpec(
+                source="/var/run/secrets/kubernetes.io/serviceaccount/token",
+                destination="/tmp/kubernetes_context_token"
+            ),
+            FileSpec(
+                source="/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+                destination="/tmp/kubernetes_context_cert"
+            )
+        ]
+
+        super().__init__(
+            name=name,
+            description=description,
+            content=enhanced_content,
+            args=args or [],
+            image=image,
+            icon_url=ARGOCD_ICON_URL,
+            type="docker",
+            secrets=["ARGOCD_PASSWORD"],
+            env=["ARGOCD_SERVER"],
+            with_files=file_specs
+        )
+
 class ArgoCDGitTool(Tool):
     """Base class for ArgoCD tools that interact with Git repositories."""
     
