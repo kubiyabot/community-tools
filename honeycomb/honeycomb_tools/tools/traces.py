@@ -4,28 +4,31 @@ from kubiya_sdk.tools.registry import tool_registry
 
 analyze_traces = HoneycombTool(
     name="analyze_traces",
-    description="Analyze traces in Honeycomb",
+    description="Retrieve trace data from Honeycomb for AI analysis",
     content="""
         # Validate Honeycomb connection
         validate_honeycomb_connection
-
+        
         # Parse arguments
         if [ -z "$dataset" ] || [ -z "$service_name" ] || [ -z "$start_time" ]; then
-            echo "Error: Required arguments missing"
+            echo '{"error": "Required arguments missing"}'
             exit 1
         fi
 
-        # Calculate time range
-        START_TIME=$(date -u -d "-${start_time} minutes" +"%Y-%m-%dT%H:%M:%SZ")
-        END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        # Calculate time range using the helper function
+        TIME_RANGE=$(calculate_time_range "$start_time")
+        START_TIME=$(echo $TIME_RANGE | cut -d' ' -f1)
+        END_TIME=$(echo $TIME_RANGE | cut -d' ' -f2)
 
         # Build query JSON
         QUERY=$(cat <<EOF
 {
     "calculations": [
         {"op": "P99", "column": "duration_ms"},
+        {"op": "AVG", "column": "duration_ms"},
         {"op": "COUNT"},
-        {"op": "RATE", "column": "error"}
+        {"op": "RATE", "column": "error"},
+        {"op": "HEATMAP", "column": "duration_ms"}
     ],
     "filter": [
         {
@@ -37,7 +40,8 @@ analyze_traces = HoneycombTool(
     "time_range": {
         "start": "$START_TIME",
         "end": "$END_TIME"
-    }
+    },
+    "granularity": 60
 }
 EOF
 )
@@ -48,13 +52,34 @@ EOF
             VALUE=$(echo $filter_str | cut -d= -f2)
             QUERY=$(echo $QUERY | jq --arg col "$COLUMN" --arg val "$VALUE" '.filter += [{"column": $col, "op": "equals", "value": $val}]')
         fi
-
-        # Make API request
-        curl -s -X POST \
+        
+        # Make API request - use the read-only endpoint
+        RESPONSE=$(curl -s -X POST \
             -H "X-Honeycomb-Team: $HONEYCOMB_API_KEY" \
             -H "Content-Type: application/json" \
             -d "$QUERY" \
-            "https://api.honeycomb.io/1/queries/$dataset" | jq '.'
+            "https://api.honeycomb.io/1/query/$dataset")
+            
+        # Check for errors
+        if echo "$RESPONSE" | grep -q "error"; then
+            echo "$RESPONSE"
+            exit 1
+        fi
+        
+        # Add metadata to help AI with analysis
+        RESULT=$(echo "$RESPONSE" | jq --arg start "$START_TIME" --arg end "$END_TIME" --arg service "$service_name" '{
+            "metadata": {
+                "service": $service,
+                "time_range": {
+                    "start": $start,
+                    "end": $end
+                }
+            },
+            "data": .
+        }')
+        
+        # Output clean JSON for AI analysis
+        echo "$RESULT"
     """,
     args=[
         Arg(name="dataset", type="str", description="Honeycomb dataset", required=True),
