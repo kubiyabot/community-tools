@@ -360,7 +360,35 @@ class ApplicationManager:
 
             # Force refresh and sync
             echo "🔄 Syncing application..."
-            argocd app get "$app_name" --refresh --hard --insecure >/dev/null
+            argocd app refresh "$app_name" --insecure
+            
+            # Check if manifests are being generated
+            echo "\n📋 Checking generated manifests..."
+            if ! argocd app manifests "$app_name" --insecure | grep -q .; then
+                echo "❌ No manifests generated from source"
+                echo "🔍 Debugging Helm chart..."
+                
+                # Clone repo to check Helm chart
+                temp_dir=$(mktemp -d)
+                git clone "$repo_url" "$temp_dir"
+                cd "$temp_dir/$repo_path"
+                
+                echo "\n📁 Helm chart contents:"
+                ls -la
+                
+                if [ -f "Chart.yaml" ]; then
+                    echo "\n📋 Chart.yaml:"
+                    cat Chart.yaml
+                    echo "\n🔍 Running helm template..."
+                    helm template .
+                fi
+                
+                cd - > /dev/null
+                rm -rf "$temp_dir"
+                exit 1
+            fi
+
+            # Sync with force
             if ! argocd app sync "$app_name" --force --prune --replace --insecure; then
                 echo "❌ Failed to sync application"
                 echo "\n📝 Error details from controller:"
