@@ -2,7 +2,7 @@ import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraCertTool, register_jira_tool
-from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops, list_projects
 
 class BaseCreationIssueTool(JiraCertTool):
     def __init__(self, name: str, issue_type: str, extra_content: str = "",
@@ -228,6 +228,22 @@ view_sprint_tool = JiraCertTool(
         )
     ])
 
+list_projects_tool = JiraCertTool(
+    name="list_projects",
+    description="List all accessible Jira projects",
+    content="python /tmp/list_projects.py",
+    args=[],
+    with_files=[
+        FileSpec(
+            destination="/tmp/list_projects.py",
+            content=inspect.getsource(list_projects),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 [
     register_jira_tool(tool) for tool in [
         create_task_tool,
@@ -244,5 +260,6 @@ view_sprint_tool = JiraCertTool(
         update_sprint_state_tool,
         move_to_sprint_tool,
         view_sprint_tool,
+        list_projects_tool,
     ]
 ] 
