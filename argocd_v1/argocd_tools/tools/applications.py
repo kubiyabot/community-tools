@@ -358,16 +358,119 @@ class ApplicationManager:
             repo_path=$(echo "$app_info" | jq -r '.spec.source.path')
             echo "📁 Source: $repo_url -> $repo_path"
 
+            # Clone and validate configuration
+            echo "🔍 Validating application source..."
+            temp_dir=$(mktemp -d)
+            if ! git clone "$repo_url" "$temp_dir"; then
+                echo "❌ Failed to clone repository"
+                rm -rf "$temp_dir"
+                exit 1
+            fi
+
+            cd "$temp_dir/$repo_path"
+            
+            echo "📁 Directory contents:"
+            ls -la
+
+            # Detect configuration type
+            if [ -f "Chart.yaml" ]; then
+                echo "📦 Detected Helm chart"
+                echo "📋 Chart.yaml contents:"
+                cat Chart.yaml
+                
+                echo "\n📋 Values.yaml contents (if exists):"
+                if [ -f "values.yaml" ]; then
+                    cat values.yaml
+                else
+                    echo "No values.yaml found"
+                fi
+                
+                echo "\n🔍 Running helm lint..."
+                helm lint .
+                
+                echo "\n🔍 Running helm template..."
+                helm template . --debug
+
+            elif [ -f "kustomization.yaml" ] || [ -f "kustomization.yml" ]; then
+                echo "📦 Detected Kustomize configuration"
+                echo "📋 Kustomization contents:"
+                cat kustomization.ya?ml
+                
+                echo "\n🔍 Running kustomize build..."
+                kustomize build .
+
+            elif [ -f "values.yaml" ] || [ -f "values.yml" ]; then
+                echo "📦 Detected values configuration"
+                echo "📋 Values contents:"
+                cat values.ya?ml
+                
+                echo "\n📁 Looking for associated manifests..."
+                find . -type f -name "*.yaml" -o -name "*.yml" | while read -r file; do
+                    if [ "$file" != "./values.yaml" ] && [ "$file" != "./values.yml" ]; then
+                        echo "\n📄 Contents of $file:"
+                        cat "$file"
+                    fi
+                done
+
+            else
+                echo "📦 Looking for Kubernetes manifests..."
+                yaml_files=$(find . -type f -name "*.yaml" -o -name "*.yml")
+                if [ -n "$yaml_files" ]; then
+                    echo "Found YAML files:"
+                    echo "$yaml_files"
+                    echo "\n📋 Contents of YAML files:"
+                    for file in $yaml_files; do
+                        echo "\n📄 $file:"
+                        cat "$file"
+                    done
+                else
+                    echo "⚠️ No YAML files found in $repo_path"
+                    echo "Directory contents:"
+                    ls -la
+                fi
+            fi
+
+            cd - > /dev/null
+            rm -rf "$temp_dir"
+
             # Refresh application to ensure latest state
             echo "🔄 Refreshing application state..."
             argocd app refresh "$app_name" --insecure
 
-            # Sync the application with debug info
-            echo "🔄 Syncing application..."
-            if ! argocd app sync "$app_name" --insecure --prune; then
+            # Show current ArgoCD application configuration
+            echo "📋 Current ArgoCD Application Configuration:"
+            argocd app get "$app_name" --insecure
+            
+            # Try to get more details about what ArgoCD is doing
+            echo "\n🔍 Checking ArgoCD controller logs..."
+            kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller --tail=50 | grep -i "$app_name"
+            
+            # Check if ArgoCD can access the repo
+            echo "\n🔍 Verifying repository access..."
+            argocd repo get "$repo_url" --insecure || {
+                echo "⚠️ Repository not registered with ArgoCD"
+                echo "Attempting to register repository..."
+                argocd repo add "$repo_url" --insecure
+            }
+
+            # Force a hard refresh of the application
+            echo "\n🔄 Force refreshing application..."
+            argocd app get "$app_name" --refresh --hard --insecure
+
+            # Show what ArgoCD thinks it should deploy
+            echo "\n📋 Expected resources to be created:"
+            argocd app manifests "$app_name" --insecure || echo "No manifests generated"
+
+            # Sync with more aggressive options
+            echo "\n🔄 Syncing application with force..."
+            if ! argocd app sync "$app_name" --force --prune --replace --insecure; then
                 echo "❌ Failed to sync application"
                 echo "📝 Sync error details:"
                 argocd app get "$app_name" --insecure
+                
+                echo "\n📝 ArgoCD controller logs:"
+                kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller --tail=100 | grep -i "$app_name"
+                
                 exit 1
             fi
 
@@ -393,7 +496,7 @@ class ApplicationManager:
                     echo "$app_state" | jq '.'
 
                     # Show manifest details
-                    echo "\n📄 Manifest Details:"
+                    echo "\n📄 Generated Manifests:"
                     argocd app manifests "$app_name" --insecure
 
                     # Show application resources
@@ -408,11 +511,22 @@ class ApplicationManager:
                     if ! kubectl get all -n "$namespace" 2>/dev/null | grep -q .; then
                         echo "⚠️ Warning: No resources were created in the namespace"
                         echo "🔍 Debugging information:"
-                        echo "- Checking Helm chart..."
-                        if [ -n "$repo_url" ] && [ -n "$repo_path" ]; then
-                            echo "- Validating Helm chart at $repo_path"
-                            argocd app get "$app_name" --insecure --values
-                        fi
+                        
+                        echo "\n📝 ArgoCD Application Status:"
+                        argocd app get "$app_name" --insecure
+                        
+                        echo "\n📝 ArgoCD Controller Logs:"
+                        kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller --tail=100 | grep -i "$app_name"
+                        
+                        echo "\n📝 ArgoCD Repo Server Logs:"
+                        kubectl logs -n argocd -l app.kubernetes.io/name=argocd-repo-server --tail=50
+                        
+                        echo "\n📝 Application Diff:"
+                        argocd app diff "$app_name" --insecure
+                        
+                        echo "\n📝 Expected Manifests:"
+                        argocd app manifests "$app_name" --insecure || echo "No manifests generated"
+                        
                         exit 1
                     fi
 
