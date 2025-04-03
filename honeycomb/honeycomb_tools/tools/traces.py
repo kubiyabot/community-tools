@@ -7,6 +7,10 @@ import json
 import requests
 from datetime import datetime, timedelta
 
+analyze_traces = HoneycombTool(
+    name="analyze_traces",
+    description="Query Honeycomb for trace stats like P99 and error rate for a given service",
+    content="""
 def validate_honeycomb_connection():
     if not os.getenv('HONEYCOMB_API_KEY'):
         return json.dumps({"error": "HONEYCOMB_API_KEY environment variable is not set"})
@@ -28,10 +32,6 @@ def make_honeycomb_request(url: str, data: dict) -> dict:
     response = requests.post(url, json=data, headers=headers)
     return response.json()
 
-analyze_traces = HoneycombTool(
-    name="analyze_traces",
-    description="Query Honeycomb for trace stats like P99 and error rate for a given service",
-    content="""
 # Validate required arguments
 if not all([dataset, service_name, start_time]):
     print(json.dumps({"error": "Missing required arguments: dataset, service_name, or start_time"}))
