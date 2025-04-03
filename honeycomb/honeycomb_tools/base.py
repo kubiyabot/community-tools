@@ -34,13 +34,12 @@ class HoneycombTool(Tool):
         description: str,
         content: str,
         args: List[Arg] = None,
-        image: str = "curlimages/curl:8.1.2"
+        image: str = "alpine:3.18"
     ):
         # Add helper functions to the content
         helper_functions = """
-            # Install required packages
-            apk --no-cache add jq python3 py3-pip
-            pip3 install requests
+            # Install minimal required packages
+            apk --no-cache add curl jq
 
             # Helper functions for Honeycomb tools
             validate_honeycomb_connection() {
@@ -50,21 +49,11 @@ class HoneycombTool(Tool):
                 fi
             }
             
-            # Alpine-compatible date calculation function
+            # Date calculation using date command
             calculate_time_range() {
                 local minutes_ago=$1
                 local now=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-                
-                # Use python for date calculation since Alpine's date doesn't support -d
-                local start_time=$(python3 -c "
-import datetime
-import sys
-from datetime import timezone
-now = datetime.datetime.now(timezone.utc)
-start = now - datetime.timedelta(minutes=int(sys.argv[1]))
-print(start.strftime('%Y-%m-%dT%H:%M:%SZ'))
-" "$minutes_ago")
-                
+                local start_time=$(date -u -d "@$(($(date -u +%s) - minutes_ago * 60))" +"%Y-%m-%dT%H:%M:%SZ")
                 echo "$start_time $now"
             }
         """
