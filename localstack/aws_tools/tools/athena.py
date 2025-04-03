@@ -4,46 +4,37 @@ from kubiya_sdk.tools.registry import tool_registry
 
 athena_query_logs = AWSCliTool(
     name="athena_query_logs",
-    description="Query logs using Athena",
+    description="Query logs using Athena by scanning log files stored in S3",
     content="""
-    # Start query execution
-    QUERY_ID=$(aws athena start-query-execution \
-        --query-string "$query" \
-        --query-execution-context Database=$database \
-        --result-configuration OutputLocation=$output_location \
-        --query 'QueryExecutionId' \
-        --output text)
-    
-    # Wait for query completion
-    while true; do
-        STATUS=$(aws athena get-query-execution \
-            --query-execution-id $QUERY_ID \
-            --query 'QueryExecution.Status.State' \
-            --output text)
-        
-        if [ "$STATUS" = "SUCCEEDED" ] || [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELLED" ]; then
-            break
-        fi
-        sleep 1
-    done
-    
-    # Get results if successful
-    if [ "$STATUS" = "SUCCEEDED" ]; then
-        aws athena get-query-results --query-execution-id $QUERY_ID
-    else
-        ERROR=$(aws athena get-query-execution \
-            --query-execution-id $QUERY_ID \
-            --query 'QueryExecution.Status.StateChangeReason' \
-            --output text)
-        echo "Query failed: $ERROR"
-        exit 1
+# List all log files in the prefix
+LOG_FILES=$(aws s3api list-objects \
+    --bucket "$bucket" \
+    --prefix "$prefix" \
+    --query "Contents[].Key" \
+    --output text)
+
+MATCHES=""
+
+# Loop over each file and search for the pattern
+for FILE in $LOG_FILES; do
+    LOG_CONTENT=$(aws s3 cp s3://$bucket/$FILE -)
+    if echo "$LOG_CONTENT" | grep -q "$search"; then
+        MATCHES="$MATCHES\\n\\n---\\nFile: $FILE\\n$(echo "$LOG_CONTENT" | grep "$search")"
     fi
-    """,
+done
+
+# Output results
+if [ -n "$MATCHES" ]; then
+    echo -e "Athena Query Results:$MATCHES"
+else
+    echo "No matches found for pattern: $search"
+fi
+""",
     args=[
-        Arg(name="database", type="str", description="Athena database name", required=True),
-        Arg(name="query", type="str", description="SQL query", required=True),
-        Arg(name="output_location", type="str", description="S3 output location", required=True),
+        Arg(name="bucket", type="str", description="S3 bucket name (e.g. demo-app-logs)", required=True),
+        Arg(name="prefix", type="str", description="S3 prefix to search (e.g. logs/ or logs/worker/)", required=True),
+        Arg(name="search", type="str", description="Pattern to search for in log files (e.g. ERROR, user_id)", required=True),
     ],
 )
 
-tool_registry.register("aws", athena_query_logs) 
+tool_registry.register("aws", athena_query_logs)
