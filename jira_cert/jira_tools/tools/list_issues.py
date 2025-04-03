@@ -29,12 +29,9 @@ def list_issues_in_project(
     reporter: str = None,
     label: str = None,
 )-> List[dict]:
-
-    logger.info(f"=== Listing Issues for Project: {project_key} ===")
-    
     # Test connection first
     if not test_jira_connection():
-        logger.error("Failed to establish connection to Jira. Please check your configuration.")
+        print("Failed to establish connection to Jira. Please check your configuration.")
         return []
 
     jql_query = f"project = {project_key}"
@@ -49,26 +46,20 @@ def list_issues_in_project(
     if label:
         jql_query += f" AND labels = '{label}'"
 
-    logger.info(f"Using JQL query: {jql_query}")
-
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
         "fields": "summary,created,labels,status",
     }
-    logger.info(f"Request parameters: {params}")
     
     try:
         server_url = get_jira_server_url()
         search_url = f"{server_url}/rest/api/2/search"
-        logger.info(f"Making request to: {search_url}")
         
         cert_path, key_path = setup_client_cert_files()
         auth = get_jira_auth()
         headers = get_jira_basic_headers()
-        logger.info(f"Using headers: {headers}")
         
-        logger.info("Sending request...")
         response = requests.get(
             search_url, 
             headers=headers, 
@@ -78,24 +69,13 @@ def list_issues_in_project(
             verify=False
         )
         
-        logger.info(f"Response status code: {response.status_code}")
-        logger.info(f"Response headers: {dict(response.headers)}")
-        
         if response.status_code == 401:
-            logger.error("Authentication failed. Please check your credentials and certificates.")
-            logger.error(f"Response body: {response.text}")
-            try:
-                error_details = response.json()
-                logger.error(f"Error details: {json.dumps(error_details, indent=2)}")
-            except:
-                logger.error("Could not parse error response as JSON")
+            print("Authentication failed. Please check your credentials and certificates.")
             return []
             
         response.raise_for_status()
 
         data = response.json()
-        logger.info(f"Total issues found: {data.get('total', 0)}")
-        
         issues = data.get("issues", [])
         latest_issues = [
             {
@@ -111,23 +91,10 @@ def list_issues_in_project(
         return latest_issues
 
     except requests.exceptions.SSLError as e:
-        logger.error("\nSSL Error occurred:")
-        logger.error(str(e))
-        if "certificate verify failed" in str(e):
-            logger.error("Certificate verification failed. This might indicate an issue with the certificate format or content.")
+        print("\nSSL Error occurred. Please check your certificates.")
         return []
     except requests.exceptions.RequestException as e:
-        logger.error("\n=== Request Error ===")
-        logger.error(f"Error type: {type(e).__name__}")
-        logger.error(f"Error message: {str(e)}")
-        if hasattr(e, 'response'):
-            logger.error(f"Response status code: {e.response.status_code}")
-            logger.error(f"Response headers: {dict(e.response.headers)}")
-            logger.error(f"Response body: {e.response.text}")
-        if isinstance(e, requests.exceptions.SSLError):
-            logger.error("SSL Error - This might indicate a certificate problem")
-        elif isinstance(e, requests.exceptions.ConnectionError):
-            logger.error("Connection Error - This might indicate a network or URL problem")
+        print(f"\nError occurred while fetching issues: {str(e)}")
         return []
 
 
