@@ -137,9 +137,10 @@ def test_jira_connection():
         logger.info("\n=== Testing Jira Connection ===")
         server_url = get_jira_server_url()
         cert_path, key_path = setup_client_cert_files()
+        auth = get_jira_auth()  # Get authentication credentials
         
         # Try to access a simple endpoint
-        test_url = f"{server_url}/rest/api/3/myself"
+        test_url = f"{server_url}/rest/api/2/myself"  # Changed from api/3 to api/2
         logger.info(f"Testing connection to: {test_url}")
         
         headers = get_jira_basic_headers()
@@ -149,6 +150,7 @@ def test_jira_connection():
         response = requests.get(
             test_url,
             headers=headers,
+            auth=auth,  # Added auth
             cert=(cert_path, key_path),
             verify=False
         )
