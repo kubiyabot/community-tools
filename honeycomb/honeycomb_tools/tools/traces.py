@@ -1,11 +1,6 @@
 from kubiya_sdk.tools import Arg
 from ..base import HoneycombTool
 from kubiya_sdk.tools.registry import tool_registry
-import sys
-import os
-import json
-import requests
-from datetime import datetime, timedelta
 
 analyze_traces = HoneycombTool(
     name="analyze_traces",
