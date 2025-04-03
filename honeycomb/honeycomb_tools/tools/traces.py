@@ -10,7 +10,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 
-def analyze_traces(api_key, dataset, service_name, start_time, filters=None):
+def analyze_traces(api_key, dataset, service_name, start_time, filter_str=None):
     headers = {
         'X-Honeycomb-Team': api_key,
         'Content-Type': 'application/json'
@@ -19,13 +19,11 @@ def analyze_traces(api_key, dataset, service_name, start_time, filters=None):
     now = datetime.utcnow()
     start = now - timedelta(minutes=start_time)
     
-    # Base query structure
     query = {
         'calculations': [
             {'op': 'P99', 'column': 'duration_ms'},
             {'op': 'COUNT'},
-            {'op': 'RATE', 'column': 'error'},
-            {'op': 'AVG', 'column': 'duration_ms'}
+            {'op': 'RATE', 'column': 'error'}
         ],
         'filter': [
             {
@@ -40,9 +38,14 @@ def analyze_traces(api_key, dataset, service_name, start_time, filters=None):
         }
     }
     
-    # Add additional filters if provided
-    if filters:
-        query['filter'].extend(filters)
+    # Add additional filter if provided (format: "column=value")
+    if filter_str:
+        col, val = filter_str.split('=')
+        query['filter'].append({
+            'column': col.strip(),
+            'op': 'equals',
+            'value': val.strip()
+        })
 
     response = requests.post(
         f'https://api.honeycomb.io/1/queries/{dataset}',
@@ -55,7 +58,7 @@ def analyze_traces(api_key, dataset, service_name, start_time, filters=None):
         
     return response.json()
 
-result = analyze_traces(api_key, dataset, service_name, start_time, filters)
+result = analyze_traces(api_key, dataset, service_name, start_time, filter_str)
 print(json.dumps(result, indent=2))
     """,
     args=[
@@ -63,7 +66,7 @@ print(json.dumps(result, indent=2))
         Arg(name="dataset", type="str", description="Honeycomb dataset", required=True),
         Arg(name="service_name", type="str", description="Service name to analyze", required=True),
         Arg(name="start_time", type="int", description="Start time in minutes ago", required=True),
-        Arg(name="filters", type="list", description="Additional filters to apply", required=False),
+        Arg(name="filter_str", type="str", description="Additional filter in format 'column=value'", required=False),
     ],
 )
 
