@@ -1,1 +1,3 @@
 kubiya-sdk
+boto3
+requests>=2.25.0

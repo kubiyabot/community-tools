@@ -1,0 +1,2 @@
+kubiya-sdk
+requests>=2.25.0 
