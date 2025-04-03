@@ -6,68 +6,62 @@ analyze_traces = HoneycombTool(
     name="analyze_traces",
     description="Analyze traces in Honeycomb",
     content="""
-import requests
-import json
-from datetime import datetime, timedelta
+        # Validate Honeycomb connection
+        validate_honeycomb_connection
 
-def analyze_traces(api_key, dataset, service_name, start_time, filter_str=None):
-    headers = {
-        'X-Honeycomb-Team': api_key,
-        'Content-Type': 'application/json'
-    }
-    
-    now = datetime.utcnow()
-    start = now - timedelta(minutes=start_time)
-    
-    query = {
-        'calculations': [
-            {'op': 'P99', 'column': 'duration_ms'},
-            {'op': 'COUNT'},
-            {'op': 'RATE', 'column': 'error'}
-        ],
-        'filter': [
-            {
-                'column': 'service_name',
-                'op': 'equals',
-                'value': service_name
-            }
-        ],
-        'time_range': {
-            'start': start.isoformat() + 'Z',
-            'end': now.isoformat() + 'Z'
+        # Parse arguments
+        if [ -z "$dataset" ] || [ -z "$service_name" ] || [ -z "$start_time" ]; then
+            echo "Error: Required arguments missing"
+            exit 1
+        fi
+
+        # Calculate time range
+        START_TIME=$(date -u -d "-${start_time} minutes" +"%Y-%m-%dT%H:%M:%SZ")
+        END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        # Build query JSON
+        QUERY=$(cat <<EOF
+{
+    "calculations": [
+        {"op": "P99", "column": "duration_ms"},
+        {"op": "COUNT"},
+        {"op": "RATE", "column": "error"}
+    ],
+    "filter": [
+        {
+            "column": "service_name",
+            "op": "equals",
+            "value": "$service_name"
         }
+    ],
+    "time_range": {
+        "start": "$START_TIME",
+        "end": "$END_TIME"
     }
-    
-    # Add additional filter if provided (format: "column=value")
-    if filter_str:
-        col, val = filter_str.split('=')
-        query['filter'].append({
-            'column': col.strip(),
-            'op': 'equals',
-            'value': val.strip()
-        })
+}
+EOF
+)
 
-    response = requests.post(
-        f'https://api.honeycomb.io/1/queries/{dataset}',
-        headers=headers,
-        json=query
-    )
-    
-    if response.status_code != 200:
-        raise Exception(f"Honeycomb API error: {response.text}")
-        
-    return response.json()
+        # Add additional filter if provided
+        if [ ! -z "$filter_str" ]; then
+            COLUMN=$(echo $filter_str | cut -d= -f1)
+            VALUE=$(echo $filter_str | cut -d= -f2)
+            QUERY=$(echo $QUERY | jq --arg col "$COLUMN" --arg val "$VALUE" '.filter += [{"column": $col, "op": "equals", "value": $val}]')
+        fi
 
-result = analyze_traces(api_key, dataset, service_name, start_time, filter_str)
-print(json.dumps(result, indent=2))
+        # Make API request
+        curl -s -X POST \
+            -H "X-Honeycomb-Team: $HONEYCOMB_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$QUERY" \
+            "https://api.honeycomb.io/1/queries/$dataset" | jq '.'
     """,
     args=[
-        Arg(name="api_key", type="str", description="Honeycomb API key", required=True),
         Arg(name="dataset", type="str", description="Honeycomb dataset", required=True),
         Arg(name="service_name", type="str", description="Service name to analyze", required=True),
         Arg(name="start_time", type="int", description="Start time in minutes ago", required=True),
         Arg(name="filter_str", type="str", description="Additional filter in format 'column=value'", required=False),
-    ],
+    ]
 )
 
 tool_registry.register("honeycomb", analyze_traces) 
