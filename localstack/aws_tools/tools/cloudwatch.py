@@ -4,19 +4,34 @@ from kubiya_sdk.tools.registry import tool_registry
 
 cloudwatch_get_metric_statistics = AWSCliTool(
     name="cloudwatch_get_metric_statistics",
-    description="Get CloudWatch metric statistics",
+    description="Get CloudWatch metric statistics (using get-metric-data for LocalStack compatibility)",
     content="""
-    aws cloudwatch get-metric-statistics \\
-        --namespace $namespace \\
-        --metric-name $metric_name \\
-        --dimensions Name=$dimension_name,Value=$dimension_value \\
-        --start-time $(date -d "-$start_time_offset minutes" -u +"%Y-%m-%dT%H:%M:%SZ") \\
-        --end-time $(date -u +"%Y-%m-%dT%H:%M:%SZ") \\
-        --period $period \\
-        --statistics Average Maximum Minimum
-    """,
+# Calculate time range
+START_TIME=$(date -d "-$start_time_offset minutes" -u +"%Y-%m-%dT%H:%M:%SZ")
+END_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Use get-metric-data for better support in LocalStack
+aws cloudwatch get-metric-data \\
+  --metric-data-queries '[{
+    "Id": "m1",
+    "MetricStat": {
+      "Metric": {
+        "Namespace": "'$namespace'",
+        "MetricName": "'$metric_name'",
+        "Dimensions": [
+          { "Name": "'$dimension_name'", "Value": "'$dimension_value'" }
+        ]
+      },
+      "Period": '$period',
+      "Stat": "Average"
+    },
+    "ReturnData": true
+  }]' \\
+  --start-time "$START_TIME" \\
+  --end-time "$END_TIME"
+""",
     args=[
-        Arg(name="namespace", type="str", description="CloudWatch namespace (e.g., 'AWS/EC2')", required=True),
+        Arg(name="namespace", type="str", description="CloudWatch namespace (e.g., 'AWS/ECS')", required=True),
         Arg(name="metric_name", type="str", description="Metric name (e.g., 'CPUUtilization')", required=True),
         Arg(name="dimension_name", type="str", description="Dimension name (e.g., 'ServiceName')", required=True),
         Arg(name="dimension_value", type="str", description="Dimension value (e.g., 'worker')", required=True),
