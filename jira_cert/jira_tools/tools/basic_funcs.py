@@ -39,12 +39,22 @@ def get_jira_user_id(email: str) -> str:
         logger.error(f"Failed to get user ID: {e}")
         raise RuntimeError(f"Failed to get user ID: {e}")
 
+def get_jira_auth() -> tuple:
+    """Get Jira username and password from environment"""
+    creds = os.getenv("JIRA_USER_CREDS")
+    if not creds:
+        raise ValueError("JIRA_USER_CREDS environment variable must be set (format: username:password)")
+    try:
+        username, password = creds.split(":")
+        return (username, password)
+    except ValueError:
+        raise ValueError("JIRA_USER_CREDS must be in format 'username:password'")
+
 def get_jira_basic_headers() -> dict:
     """Get basic headers for Jira API requests"""
     return {
         "Accept": "application/json",
-        "Content-Type": "application/json",
-        "X-Atlassian-Token": "no-check"
+        "Content-Type": "application/json"
     }
 
 def setup_client_cert_files():

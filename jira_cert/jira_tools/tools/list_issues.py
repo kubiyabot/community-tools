@@ -9,6 +9,7 @@ from basic_funcs import (
     get_jira_basic_headers,
     setup_client_cert_files,
     test_jira_connection,
+    get_jira_auth,
 )
 
 import requests
@@ -59,10 +60,11 @@ def list_issues_in_project(
     
     try:
         server_url = get_jira_server_url()
-        search_url = f"{server_url}/rest/api/3/search"
+        search_url = f"{server_url}/rest/api/2/search"
         logger.info(f"Making request to: {search_url}")
         
         cert_path, key_path = setup_client_cert_files()
+        auth = get_jira_auth()
         headers = get_jira_basic_headers()
         logger.info(f"Using headers: {headers}")
         
@@ -70,6 +72,7 @@ def list_issues_in_project(
         response = requests.get(
             search_url, 
             headers=headers, 
+            auth=auth,
             params=params,
             cert=(cert_path, key_path),
             verify=False

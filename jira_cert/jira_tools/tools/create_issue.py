@@ -6,7 +6,8 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
-    get_jira_user_id
+    get_jira_user_id,
+    get_jira_auth
 )
 
 def get_project_issue_types(project_key: str) -> List[str]:
@@ -110,8 +111,9 @@ def base_jira_payload(
 def create_issue(project_key: str, summary: str, description: str, issue_type: str, 
                 assignee_email: str = None, label: str = None, parent_id: str = None):
     server_url = get_jira_server_url()
-    issue_url = f"{server_url}/rest/api/3/issue"
+    issue_url = f"{server_url}/rest/api/2/issue"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
 
     try:
         # Create payload
@@ -135,8 +137,9 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
         response = requests.post(
             issue_url,
             headers=get_jira_basic_headers(),
+            auth=auth,
             cert=(cert_path, key_path),
-            verify=False,  # Often needed for self-hosted instances
+            verify=False,
             data=json.dumps(payload)
         )
 

@@ -5,6 +5,7 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
+    get_jira_auth,
 )
 
 def create_sprint(board_id: int, name: str, goal: str = None, start_date: str = None, end_date: str = None) -> dict:
@@ -12,6 +13,7 @@ def create_sprint(board_id: int, name: str, goal: str = None, start_date: str = 
     server_url = get_jira_server_url()
     create_url = f"{server_url}/rest/agile/1.0/sprint"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
     
     payload = {
         "name": name,
@@ -27,6 +29,7 @@ def create_sprint(board_id: int, name: str, goal: str = None, start_date: str = 
     response = requests.post(
         create_url,
         headers=get_jira_basic_headers(),
+        auth=auth,
         cert=(cert_path, key_path),
         verify=False,
         data=json.dumps(payload)

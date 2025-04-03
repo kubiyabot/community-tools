@@ -2,6 +2,7 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
+    get_jira_auth,
 )
 
 import requests
@@ -67,12 +68,14 @@ def main():
 
     cert_path, key_path = setup_client_cert_files()
     server_url = get_jira_server_url()
-    get_issue_url = f"{server_url}/rest/api/3/issue/{args.issue_key}"
+    auth = get_jira_auth()  # Get authentication credentials
+    get_issue_url = f"{server_url}/rest/api/2/issue/{args.issue_key}"  # Changed from api/3 to api/2
 
     try:
         response = requests.get(
             get_issue_url, 
             headers=get_jira_basic_headers(),
+            auth=auth,  # Added auth
             cert=(cert_path, key_path),
             verify=False
         )

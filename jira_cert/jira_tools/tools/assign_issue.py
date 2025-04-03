@@ -4,13 +4,15 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
-    get_jira_user_id
+    get_jira_user_id,
+    get_jira_auth
 )
 
 def assign_issue(issue_key: str, assignee_email: str):
     """Assign a Jira issue to a user"""
     server_url = get_jira_server_url()
-    assign_url = f"{server_url}/rest/api/3/issue/{issue_key}/assignee"
+    assign_url = f"{server_url}/rest/api/2/issue/{issue_key}/assignee"
+    auth = get_jira_auth()
     
     # Get user ID from email
     try:
@@ -26,6 +28,7 @@ def assign_issue(issue_key: str, assignee_email: str):
     response = requests.put(
         assign_url,
         headers=get_jira_basic_headers(),
+        auth=auth,
         cert=(cert_path, key_path),
         verify=False,
         data=json.dumps(payload)

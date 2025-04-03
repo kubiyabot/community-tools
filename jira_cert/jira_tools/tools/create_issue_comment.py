@@ -2,6 +2,7 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
+    get_jira_auth,
 )
 
 import json
@@ -31,13 +32,15 @@ def main():
     }
 
     server_url = get_jira_server_url()
-    comment_url = f"{server_url}/rest/api/3/issue/{args.issue_key}/comment"
+    comment_url = f"{server_url}/rest/api/2/issue/{args.issue_key}/comment"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
     
     try:
         response = requests.post(
             comment_url, 
             headers=get_jira_basic_headers(), 
+            auth=auth,
             data=json.dumps(payload),
             cert=(cert_path, key_path),
             verify=False

@@ -4,16 +4,19 @@ from basic_funcs import (
     get_jira_server_url,
     get_jira_basic_headers,
     setup_client_cert_files,
+    get_jira_auth,
 )
 
 def get_available_transitions(issue_key: str):
     server_url = get_jira_server_url()
-    transitions_url = f"{server_url}/rest/api/3/issue/{issue_key}/transitions"
+    transitions_url = f"{server_url}/rest/api/2/issue/{issue_key}/transitions"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
     
     response = requests.get(
         transitions_url,
         headers=get_jira_basic_headers(),
+        auth=auth,
         cert=(cert_path, key_path),
         verify=False
     )
@@ -37,8 +40,9 @@ def update_issue_status(issue_key: str, status_name: str):
     
     # Perform transition
     server_url = get_jira_server_url()
-    transition_url = f"{server_url}/rest/api/3/issue/{issue_key}/transitions"
+    transition_url = f"{server_url}/rest/api/2/issue/{issue_key}/transitions"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
     
     payload = {
         "transition": {
@@ -49,6 +53,7 @@ def update_issue_status(issue_key: str, status_name: str):
     response = requests.post(
         transition_url,
         headers=get_jira_basic_headers(),
+        auth=auth,
         cert=(cert_path, key_path),
         verify=False,
         data=json.dumps(payload)
