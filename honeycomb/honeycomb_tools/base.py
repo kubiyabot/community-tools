@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools import Tool, Arg, FileSpec
 
 HONEYCOMB_ICON = "https://www.honeycomb.io/wp-content/themes/honeycomb/assets/images/logo-honeycomb-color.svg"
 
@@ -34,18 +34,25 @@ class HoneycombTool(Tool):
         description: str,
         content: str,
         args: List[Arg] = None,
-        image: str = "python:3.9-slim"
+        with_files: List[FileSpec] = None,
+        image: str = "python:3.9-slim",
+        mermaid_diagram: str = None
     ):
         super().__init__(
             name=name,
             description=description,
+            type="docker",
+            image=image,
+            on_build="""
+pip install requests > /dev/null
+pip install kubiya-sdk > /dev/null
+            """,
             content=content,
             args=args or [],
-            image=image,
-            icon_url=HONEYCOMB_ICON,
-            type="python",
             secrets=["HONEYCOMB_API_KEY"],
-            mermaid=DEFAULT_MERMAID
+            with_files=with_files if with_files else [],
+            mermaid=mermaid_diagram if mermaid_diagram else DEFAULT_MERMAID,
+            icon_url=HONEYCOMB_ICON,
         )
 
     def get_args(self) -> List[Arg]:
