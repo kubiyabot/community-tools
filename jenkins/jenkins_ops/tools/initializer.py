@@ -139,7 +139,7 @@ def initialize_tools() -> List:
                             "username": jenkins_config['auth']['username']
                         }
                     },
-                    "long_running": True,
+                    "long_running": False,
                     "stream_logs": True,
                     "poll_interval": 30
                 }
