@@ -32,35 +32,36 @@ class GrafanaTools:
             tool_registry.register("grafana", tool)
 
     def search_logs(self) -> GrafanaLogTool:
-        """Search logs in Loki using a request_id label."""
+        """Search Loki logs in Grafana using request_id within the last 12 hours."""
         return GrafanaLogTool(
             name="search_logs",
-            description="Search Loki logs in Grafana using request_id",
+            description="Search Loki logs in Grafana using a request_id label within the last 12 hours",
             content="""
             #!/bin/sh
 
-            # Install jq if not present
             apk add --no-cache jq curl >/dev/null
 
-            # Required envs
+            # Validate env vars
             if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
                 echo "Missing GRAFANA_API_TOKEN or request_id"
                 exit 1
             fi
 
             GRAFANA_HOST=${GRAFANA_HOST:-localhost}
-            DS_UID="fei7g5i1kjpj4e"  # Replace with your actual Loki datasource UID
+            DS_UID="fei7g5i1kjpj4e"  # Replace with actual UID if different
 
-            # Escape query properly
+            # Build query param
             QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
 
-            # Build query URL (use /query not /query_range to avoid time issues)
-            URL="http://$GRAFANA_HOST/api/datasources/proxy/uid/$DS_UID/loki/api/v1/query?query=$QUERY"
+            NOW=$(date +%s)
+            START=$((NOW - 43200))  # 12 hours = 43200 seconds
+            START_NANO="${START}000000000"
+            END_NANO="${NOW}000000000"
 
-            # Run the query
+            URL="http://$GRAFANA_HOST/api/datasources/proxy/uid/$DS_UID/loki/api/v1/query_range?query=$QUERY&start=$START_NANO&end=$END_NANO"
+
             RESPONSE=$(curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" "$URL")
 
-            # Output raw and parsed response
             echo "Raw Response:"
             echo "$RESPONSE"
             echo ""
@@ -70,6 +71,7 @@ class GrafanaTools:
                 Arg(name="request_id", description="Request ID to search for", required=True)
             ]
         )
+
 
 
     def get_dashboard(self) -> GrafanaBaseTool:
