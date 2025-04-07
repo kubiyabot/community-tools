@@ -56,30 +56,12 @@ class GrafanaTools:
             QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
             
             # Build the API URL
-            URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query_range"
+            URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query"
             
-            # Add time range if specified
-            TIME_PARAMS=""
-            if [ ! -z "$start_time" ]; then
-                START_TS=$(date -d "$(echo "$start_time" | sed 's/T/ /;s/Z//')" +%s)
-                TIME_PARAMS="&start=${START_TS}000000000"
-            else
-                # Default to last hour if no start time specified
-                TIME_PARAMS="&start=$(( $(date +%s) - 3600 ))000000000"
-            fi
-            
-            if [ ! -z "$end_time" ]; then
-                END_TS=$(date -d "$end_time" +%s)
-                TIME_PARAMS="${TIME_PARAMS}&end=${END_TS}000000000"
-            else
-                # Default to now if no end time specified
-                TIME_PARAMS="${TIME_PARAMS}&end=$(date +%s)000000000"
-            fi
-
             # Make the API call using curl
             curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
                  -H "Content-Type: application/json" \\
-                 "${URL}?query=${QUERY}&limit=${LIMIT}${TIME_PARAMS}" | \\
+                 "${URL}?query=${QUERY}&limit=${LIMIT}" | \\
                  jq 'if has("data") then .data else . end'
             """,
             args=[
