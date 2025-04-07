@@ -52,8 +52,8 @@ class GrafanaTools:
             GRAFANA_HOST=${GRAFANA_HOST:-localhost}
             LIMIT=${limit:-100}
             
-            # URL encode the query string
-            QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
+            # Build the query string
+            QUERY='{request_id="'$request_id'"}'
             
             # Build the API URL
             URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query"
