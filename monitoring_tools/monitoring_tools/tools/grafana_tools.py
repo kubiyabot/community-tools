@@ -31,33 +31,33 @@ class GrafanaTools:
         for tool in tools:
             tool_registry.register("grafana", tool)
 
-def search_logs(self) -> GrafanaLogTool:
-    """Search Grafana logs for a specific request ID"""
-    return GrafanaLogTool(
-        name="search_logs",
-        description="Search Grafana logs for a specific request ID",
-        content="""
-        #!/bin/sh
+    def search_logs(self) -> GrafanaLogTool:
+        """Search Grafana logs for a specific request ID"""
+        return GrafanaLogTool(
+            name="search_logs",
+            description="Search Grafana logs for a specific request ID",
+            content="""
+            #!/bin/sh
 
-        apk add --no-cache jq curl
+            apk add --no-cache jq curl
 
-        if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
-            echo "Error: GRAFANA_API_TOKEN and request_id are required"
-            exit 1
-        fi
+            if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
+                echo "Error: GRAFANA_API_TOKEN and request_id are required"
+                exit 1
+            fi
 
-        GRAFANA_HOST=${GRAFANA_HOST:-localhost}
+            GRAFANA_HOST=${GRAFANA_HOST:-localhost}
 
-        QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
+            QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
 
-        curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
-             -H "Content-Type: application/json" \\
-             "http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}" | jq '.'
-        """,
-        args=[
-            Arg(name="request_id", description="Request ID to search for", required=True),
-        ]
-    )
+            curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
+                -H "Content-Type: application/json" \\
+                "http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}" | jq '.'
+            """,
+            args=[
+                Arg(name="request_id", description="Request ID to search for", required=True),
+            ]
+        )
 
     def get_dashboard(self) -> GrafanaBaseTool:
         """Get Grafana dashboard by UID."""
