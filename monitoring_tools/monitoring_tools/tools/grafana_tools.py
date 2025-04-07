@@ -58,11 +58,18 @@ class GrafanaTools:
             # Build the API URL
             URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query"
             
-            # Make the API call using curl
-            curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
-                 -H "Content-Type: application/json" \\
-                 "${URL}?query=${QUERY}&limit=${LIMIT}" | \\
-                 jq 'if has("data") then .data else . end'
+            # Make the API call using curl and debug the response
+            RESPONSE=$(curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
+                           -H "Content-Type: application/json" \\
+                           "${URL}?query=${QUERY}&limit=${LIMIT}")
+            
+            # Print raw response for debugging
+            echo "Raw API Response:"
+            echo "$RESPONSE"
+            echo ""
+            
+            # Try to parse as JSON
+            echo "$RESPONSE" | jq '.'
             """,
             args=[
                 Arg(name="request_id",
