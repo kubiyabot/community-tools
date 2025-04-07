@@ -32,48 +32,45 @@ class GrafanaTools:
             tool_registry.register("grafana", tool)
 
     def search_logs(self) -> GrafanaLogTool:
-        """Search Grafana logs with a request ID only — no time filtering."""
+        """Search logs in Loki using a request_id label."""
         return GrafanaLogTool(
             name="search_logs",
-            description="Search Grafana Loki logs by request_id only (simple query for demos)",
+            description="Search Loki logs in Grafana using request_id",
             content="""
             #!/bin/sh
 
-            # Install jq and curl if not already present
-            apk add --no-cache jq curl > /dev/null
+            # Install jq if not present
+            apk add --no-cache jq curl >/dev/null
 
-            # Check required environment variables
+            # Required envs
             if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
-                echo "Error: GRAFANA_API_TOKEN and request_id are required"
+                echo "Missing GRAFANA_API_TOKEN or request_id"
                 exit 1
             fi
 
-            # Set default host
             GRAFANA_HOST=${GRAFANA_HOST:-localhost}
+            DS_UID="fei7g5i1kjpj4e"  # Replace with your actual Loki datasource UID
 
-            # Encode the request_id for use in the URL
+            # Escape query properly
             QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
 
-            # Build the Loki query URL (no time range or limit)
-            URL="http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}"
+            # Build query URL (use /query not /query_range to avoid time issues)
+            URL="http://$GRAFANA_HOST/api/datasources/proxy/uid/$DS_UID/loki/api/v1/query?query=$QUERY"
 
-            # Perform the request
-            RESPONSE=$(curl -sS -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
-                            -H "Accept: application/json" \\
-                            "$URL")
+            # Run the query
+            RESPONSE=$(curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" "$URL")
 
-            # Output raw response and parsed JSON
-            echo "Raw API Response:"
+            # Output raw and parsed response
+            echo "Raw Response:"
             echo "$RESPONSE"
             echo ""
-            echo "$RESPONSE" | jq '.'
+            echo "$RESPONSE" | jq '.data.result[]?.values[]?[1]'
             """,
             args=[
-                Arg(name="request_id",
-                    description="Request ID to search for",
-                    required=True)
+                Arg(name="request_id", description="Request ID to search for", required=True)
             ]
         )
+
 
     def get_dashboard(self) -> GrafanaBaseTool:
         """Get Grafana dashboard by UID."""
