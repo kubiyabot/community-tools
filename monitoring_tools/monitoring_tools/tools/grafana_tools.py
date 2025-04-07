@@ -32,30 +32,46 @@ class GrafanaTools:
             tool_registry.register("grafana", tool)
 
     def search_logs(self) -> GrafanaLogTool:
-        """Search Grafana logs for a specific request ID"""
+        """Search Grafana logs with a request ID only — no time filtering."""
         return GrafanaLogTool(
             name="search_logs",
-            description="Search Grafana logs for a specific request ID",
+            description="Search Grafana Loki logs by request_id only (simple query for demos)",
             content="""
             #!/bin/sh
 
-            apk add --no-cache jq curl
+            # Install jq and curl if not already present
+            apk add --no-cache jq curl > /dev/null
 
+            # Check required environment variables
             if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
                 echo "Error: GRAFANA_API_TOKEN and request_id are required"
                 exit 1
             fi
 
+            # Set default host
             GRAFANA_HOST=${GRAFANA_HOST:-localhost}
 
+            # Encode the request_id for use in the URL
             QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
 
-            curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
-                -H "Content-Type: application/json" \\
-                "http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}" | jq '.'
+            # Build the Loki query URL (no time range or limit)
+            URL="http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}"
+
+            # Perform the request
+            RESPONSE=$(curl -sS -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
+                            -H "Accept: application/json" \\
+                            "$URL")
+
+            # Output raw response and parsed JSON
+            echo "Raw API Response:"
+            echo "$RESPONSE"
+            echo ""
+            echo "$RESPONSE" | jq '.'
             """,
             args=[
-                Arg(name="request_id", description="Request ID to search for", required=True),
+                Arg(name="request_id",
+                    description="Request ID to search for",
+                    required=True)
             ]
         )
 
