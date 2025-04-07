@@ -31,52 +31,33 @@ class GrafanaTools:
         for tool in tools:
             tool_registry.register("grafana", tool)
 
-    def search_logs(self) -> GrafanaLogTool:
-        """Search logs with specific criteria."""
-        return GrafanaLogTool(
-            name="search_logs",
-            description="Search Grafana logs with specific criteria",
-            content="""
-            #!/bin/sh
-            
-            # Install jq
-            apk add --no-cache jq
-            
-            # Check required environment variables
-            if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
-                echo "Error: GRAFANA_API_TOKEN and request_id are required"
-                exit 1
-            fi
+def search_logs(self) -> GrafanaLogTool:
+    """Search Grafana logs for a specific request ID"""
+    return GrafanaLogTool(
+        name="search_logs",
+        description="Search Grafana logs for a specific request ID",
+        content="""
+        #!/bin/sh
 
-            # Set default values
-            GRAFANA_HOST=${GRAFANA_HOST:-localhost}
-            LIMIT=${limit:-100}
-            
-            # Build the query string
-            QUERY='{request_id="'$request_id'"}'
-            
-            # Build the API URL
-            URL="http://${GRAFANA_HOST}/api/datasources/proxy/1/loki/api/v1/query"
-            
-            # Make the API call using curl and debug the response
-            RESPONSE=$(curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
-                           -H "Content-Type: application/json" \\
-                           "${URL}?query=${QUERY}&limit=${LIMIT}")
-            
-            # Print raw response for debugging
-            echo "Raw API Response:"
-            echo "$RESPONSE"
-            echo ""
-            
-            # Try to parse as JSON
-            echo "$RESPONSE" | jq '.'
-            """,
-            args=[
-                Arg(name="request_id",
-                    description="Request ID to search for",
-                    required=True)
-            ]
-        )
+        apk add --no-cache jq curl
+
+        if [ -z "$GRAFANA_API_TOKEN" ] || [ -z "$request_id" ]; then
+            echo "Error: GRAFANA_API_TOKEN and request_id are required"
+            exit 1
+        fi
+
+        GRAFANA_HOST=${GRAFANA_HOST:-localhost}
+
+        QUERY=$(printf '{request_id="%s"}' "$request_id" | jq -sRr @uri)
+
+        curl -s -H "Authorization: Bearer $GRAFANA_API_TOKEN" \\
+             -H "Content-Type: application/json" \\
+             "http://${GRAFANA_HOST}/loki/api/v1/query?query=${QUERY}" | jq '.'
+        """,
+        args=[
+            Arg(name="request_id", description="Request ID to search for", required=True),
+        ]
+    )
 
     def get_dashboard(self) -> GrafanaBaseTool:
         """Get Grafana dashboard by UID."""
