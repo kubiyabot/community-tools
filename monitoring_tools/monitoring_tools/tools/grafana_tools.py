@@ -61,7 +61,7 @@ class GrafanaTools:
             # Add time range if specified
             TIME_PARAMS=""
             if [ ! -z "$start_time" ]; then
-                START_TS=$(date -d "$start_time" +%s)
+                START_TS=$(date -d "$(echo "$start_time" | sed 's/T/ /;s/Z//')" +%s)
                 TIME_PARAMS="&start=${START_TS}000000000"
             else
                 # Default to last hour if no start time specified
