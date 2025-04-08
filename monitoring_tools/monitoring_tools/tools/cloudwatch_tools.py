@@ -112,17 +112,28 @@ class CloudWatchTools:
             content="""
             PARAMS=""
             if [ ! -z "$alarm_names" ]; then
-                PARAMS="--alarm-names $alarm_names"
+                PARAMS="$PARAMS --alarm-names $alarm_names"
+            fi
+            if [ ! -z "$state" ]; then
+                PARAMS="$PARAMS --state-value $state"
             fi
 
             aws cloudwatch describe-alarms $PARAMS
             """,
             args=[
-                Arg(name="alarm_names",
+                Arg(
+                    name="alarm_names",
                     description="Comma-separated list of alarm names",
-                    required=False)
+                    required=False
+                ),
+                Arg(
+                    name="state",
+                    description="Filter by alarm state (e.g., ALARM, OK, INSUFFICIENT_DATA)",
+                    required=False
+                )
             ]
         )
+
 
 
     def get_metric_statistics(self) -> CloudWatchMetricTool:
