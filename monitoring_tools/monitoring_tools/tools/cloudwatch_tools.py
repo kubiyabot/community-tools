@@ -66,15 +66,18 @@ class CloudWatchTools:
         )
 
     def get_metrics(self) -> CloudWatchMetricTool:
-        """Get CloudWatch metrics."""
+        """Get CloudWatch metrics data."""
         return CloudWatchMetricTool(
             name="get_metrics",
-            description="Get CloudWatch metrics data",
+            description="Get CloudWatch metrics data for the past hour.",
             content="""
             if [ -z "$metric_name" ] || [ -z "$namespace" ]; then
                 echo "Error: Metric name and namespace are required"
                 exit 1
             fi
+
+            START_TIME=$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%SZ)
+            END_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
             aws cloudwatch get-metric-data \
                 --metric-data-queries "[{
@@ -84,17 +87,24 @@ class CloudWatchTools:
                             \\"Namespace\\": \\"$namespace\\",
                             \\"MetricName\\": \\"$metric_name\\"
                         },
-                        \\"Period\\": ${period:-300},
-                        \\"Stat\\": \\"${statistics:-Average}\\"
+                        \\"Period\\": 300,
+                        \\"Stat\\": \\"Average\\"
                     }
                 }]" \
-                --start-time $start_time \
-                --end-time $end_time
+                --start-time "$START_TIME" \
+                --end-time "$END_TIME"
             """,
             args=[
-                Arg(name="namespace",
+                Arg(
+                    name="namespace",
                     description="CloudWatch metrics namespace",
-                    required=True)
+                    required=True
+                ),
+                Arg(
+                    name="metric_name",
+                    description="Name of the metric to retrieve",
+                    required=True
+                )
             ]
         )
 
