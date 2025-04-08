@@ -3,6 +3,9 @@ import logging
 import urllib3
 from typing import List
 import json
+import time
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 from basic_funcs import (
     get_jira_server_url,
@@ -19,6 +22,18 @@ logger = logging.getLogger(__name__)
 
 # Suppress only the specific InsecureRequestWarning
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def create_session_with_retry():
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
 
 def list_issues_in_project(
     project_key: str,
@@ -60,7 +75,17 @@ def list_issues_in_project(
         auth = get_jira_auth()
         headers = get_jira_basic_headers()
         
-        response = requests.get(
+        # Add browser-like headers
+        headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+        })
+        
+        session = create_session_with_retry()
+        response = session.get(
             search_url, 
             headers=headers, 
             auth=auth,
@@ -69,6 +94,13 @@ def list_issues_in_project(
             verify=False
         )
         
+        if response.status_code == 403:
+            if 'X-Authentication-Denied-Reason' in response.headers:
+                if 'CAPTCHA_CHALLENGE' in response.headers['X-Authentication-Denied-Reason']:
+                    print("CAPTCHA verification required. Please log in through the web interface first.")
+                    print("URL:", response.headers.get('X-Authentication-Denied-Reason').split('login-url=')[1])
+                    return []
+            
         if response.status_code == 401:
             print("Authentication failed. Please check your credentials and certificates.")
             return []
