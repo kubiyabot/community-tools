@@ -35,23 +35,19 @@ class CloudWatchTools:
         """Get log events from CloudWatch Logs."""
         return CloudWatchLogTool(
             name="get_log_events",
-            description="Get log events from CloudWatch Logs",
+            description="Get log events from the last hour of CloudWatch Logs",
             content="""
             if [ -z "$log_group" ] || [ -z "$log_stream" ]; then
                 echo "Error: Log group and stream names are required"
                 exit 1
             fi
 
+            # Get timestamps for the last 1 hour
+            end_epoch=$(date +%s%3N)
+            start_epoch=$(date -d '1 hour ago' +%s%3N)
+
             PARAMS="--log-group-name $log_group --log-stream-name $log_stream"
-            if [ ! -z "$start_time" ]; then
-                PARAMS="$PARAMS --start-time $start_time"
-            fi
-            if [ ! -z "$end_time" ]; then
-                PARAMS="$PARAMS --end-time $end_time"
-            fi
-            if [ ! -z "$limit" ]; then
-                PARAMS="$PARAMS --limit $limit"
-            fi
+            PARAMS="$PARAMS --start-time $start_epoch --end-time $end_epoch"
 
             aws logs get-log-events $PARAMS
             """,
@@ -64,6 +60,7 @@ class CloudWatchTools:
                     required=True)
             ]
         )
+
 
     def get_metrics(self) -> CloudWatchMetricTool:
         """Get CloudWatch metrics data."""
