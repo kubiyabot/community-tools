@@ -109,7 +109,6 @@ class CloudWatchTools:
         )
 
     def describe_alarms(self) -> AwsBaseTool:
-        """Describe CloudWatch alarms."""
         return AwsBaseTool(
             name="describe_alarms",
             description="Get details about CloudWatch alarms",
@@ -118,21 +117,16 @@ class CloudWatchTools:
             if [ ! -z "$alarm_names" ]; then
                 PARAMS="--alarm-names $alarm_names"
             fi
-            if [ ! -z "$state" ]; then
-                PARAMS="$PARAMS --state-value $state"
-            fi
 
             aws cloudwatch describe-alarms $PARAMS
             """,
             args=[
                 Arg(name="alarm_names",
                     description="Comma-separated list of alarm names",
-                    required=False),
-                Arg(name="state",
-                    description="Filter by alarm state",
                     required=False)
             ]
         )
+
 
     def get_metric_statistics(self) -> CloudWatchMetricTool:
         """Get detailed statistics for a metric."""
