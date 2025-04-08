@@ -5,7 +5,8 @@ class MonitoringTool(Tool):
     """Base class for all monitoring tools."""
     
     def __init__(self, name: str, description: str, content: str, args: List[Arg] = None, 
-                 image: str = "alpine:latest", icon_url: str = None, secrets: List[str] = [], env: List[str] = []):
+                 image: str = "alpine:latest", icon_url: str = None, secrets: List[str] = [], env: List[str] = [],
+                 long_running: bool = False, mermaid_diagram: str = None):
         super().__init__(
             name=name,
             description=description,
@@ -15,7 +16,9 @@ class MonitoringTool(Tool):
             icon_url=icon_url,
             type="docker",
             secrets=secrets,
-            env=env
+            env=env,
+            long_running=long_running,
+            mermaid_diagram=mermaid_diagram
         )
 
     def validate_args(self, args: Dict[str, Any]) -> bool:
@@ -71,15 +74,33 @@ class GrafanaBaseTool(MonitoringTool):
 class AwsBaseTool(MonitoringTool):
     """Base class for AWS tools using the AWS CLI."""
     
-    def __init__(self, name: str, description: str, content: str, args: List[Arg] = None):
+    def __init__(self, name: str, description: str, content: str, args: List[Arg] = None, 
+                 long_running: bool = False, mermaid_diagram: str = None):
+        # Add common AWS icon URL
+        aws_icon = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/2560px-Amazon_Web_Services_Logo.svg.png"
+        
+        # Add LocalStack endpoint configuration if needed
+        localstack_content = """
+        # Configure AWS CLI endpoint if AWS_ENDPOINT_URL is set
+        if [ ! -z "$AWS_ENDPOINT_URL" ]; then
+            ENDPOINT_ARGS="--endpoint-url $AWS_ENDPOINT_URL"
+        else
+            ENDPOINT_ARGS=""
+        fi
+        
+        # Replace aws commands with endpoint configuration
+        """ + content.replace("aws ", "aws $ENDPOINT_ARGS ")
+        
         super().__init__(
             name=name,
             description=description,
-            content=content,
-            args=args,
+            content=localstack_content,
+            args=args or [],
             image="amazon/aws-cli:latest",
-            secrets=["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
-            env=["AWS_REGION"]
+            icon_url=aws_icon,
+            env=["AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"],
+            long_running=long_running,
+            mermaid_diagram=mermaid_diagram
         )
 
 class GitHubBaseTool(MonitoringTool):

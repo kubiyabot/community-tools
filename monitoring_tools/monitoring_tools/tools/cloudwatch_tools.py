@@ -42,16 +42,6 @@ class CloudWatchTools:
                 exit 1
             fi
 
-            # Configure AWS credentials
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region ${AWS_DEFAULT_REGION:-us-east-1}
-
-            ENDPOINT=""
-            if [ ! -z "$AWS_ENDPOINT_URL" ]; then
-                ENDPOINT="--endpoint-url $AWS_ENDPOINT_URL"
-            fi
-
             PARAMS="--log-group-name $log_group --log-stream-name $log_stream"
             if [ ! -z "$start_time" ]; then
                 PARAMS="$PARAMS --start-time $start_time"
@@ -63,7 +53,7 @@ class CloudWatchTools:
                 PARAMS="$PARAMS --limit $limit"
             fi
 
-            aws logs get-log-events $ENDPOINT $PARAMS
+            aws logs get-log-events $PARAMS
             """,
             args=[
                 Arg(name="log_group",
@@ -86,17 +76,7 @@ class CloudWatchTools:
                 exit 1
             fi
 
-            # Configure AWS credentials
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region ${AWS_DEFAULT_REGION:-us-east-1}
-
-            ENDPOINT=""
-            if [ ! -z "$AWS_ENDPOINT_URL" ]; then
-                ENDPOINT="--endpoint-url $AWS_ENDPOINT_URL"
-            fi
-
-            aws cloudwatch get-metric-data $ENDPOINT \
+            aws cloudwatch get-metric-data \
                 --metric-data-queries "[{
                     \\"Id\\": \\"m1\\",
                     \\"MetricStat\\": {
@@ -124,19 +104,6 @@ class CloudWatchTools:
             name="describe_alarms",
             description="Get details about CloudWatch alarms",
             content="""
-            # Install AWS CLI
-            apk add --no-cache aws-cli
-
-            # Configure AWS credentials
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region ${AWS_DEFAULT_REGION:-us-east-1}
-
-            ENDPOINT=""
-            if [ ! -z "$AWS_ENDPOINT_URL" ]; then
-                ENDPOINT="--endpoint-url $AWS_ENDPOINT_URL"
-            fi
-
             PARAMS=""
             if [ ! -z "$alarm_names" ]; then
                 PARAMS="--alarm-names $alarm_names"
@@ -145,7 +112,7 @@ class CloudWatchTools:
                 PARAMS="$PARAMS --state-value $state"
             fi
 
-            aws cloudwatch describe-alarms $ENDPOINT $PARAMS
+            aws cloudwatch describe-alarms $PARAMS
             """,
             args=[
                 Arg(name="alarm_names",
@@ -168,20 +135,7 @@ class CloudWatchTools:
                 exit 1
             fi
 
-            # Install AWS CLI
-            apk add --no-cache aws-cli
-
-            # Configure AWS credentials
-            aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID
-            aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
-            aws configure set region ${AWS_DEFAULT_REGION:-us-east-1}
-
-            ENDPOINT=""
-            if [ ! -z "$AWS_ENDPOINT_URL" ]; then
-                ENDPOINT="--endpoint-url $AWS_ENDPOINT_URL"
-            fi
-
-            aws cloudwatch get-metric-statistics $ENDPOINT \
+            aws cloudwatch get-metric-statistics \
                 --namespace "$namespace" \
                 --metric-name "$metric_name" \
                 --dimensions Name=ServiceName,Value=${service_name:-*} \
