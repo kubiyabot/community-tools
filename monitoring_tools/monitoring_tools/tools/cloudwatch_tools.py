@@ -110,27 +110,9 @@ class CloudWatchTools:
             name="describe_alarms",
             description="Get details about CloudWatch alarms",
             content="""
-            PARAMS=""
-            if [ ! -z "$alarm_names" ]; then
-                PARAMS="$PARAMS --alarm-names $alarm_names"
-            fi
-            if [ ! -z "$state" ]; then
-                PARAMS="$PARAMS --state-value $state"
-            fi
-
-            aws cloudwatch describe-alarms $PARAMS
+            aws cloudwatch describe-alarms
             """,
             args=[
-                Arg(
-                    name="alarm_names",
-                    description="Comma-separated list of alarm names",
-                    required=False
-                ),
-                Arg(
-                    name="state",
-                    description="Filter by alarm state (e.g., ALARM, OK, INSUFFICIENT_DATA)",
-                    required=False
-                )
             ]
         )
 
