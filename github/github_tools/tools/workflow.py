@@ -424,7 +424,7 @@ echo "$LOGS" | awk \'
 \'
 echo "━━━━━━━━━━━━━━━━━━━━━━━"
 echo "\\n✨ Log analysis complete!"
-''',
+""",
     args=[
         Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
         Arg(name="run_id", type="str", description="Workflow run ID", required=True),
@@ -435,8 +435,7 @@ echo "\\n✨ Log analysis complete!"
 # Register all tools
 WORKFLOW_TOOLS = [
     workflow_list, workflow_view, workflow_run, workflow_logs,
-    workflow_enable, workflow_disable, workflow_run_logs_failed,
-    workflow_run_logs_failed_by_id
+    workflow_enable, workflow_disable, workflow_run_logs_failed
 ]
 
 for tool in WORKFLOW_TOOLS:
