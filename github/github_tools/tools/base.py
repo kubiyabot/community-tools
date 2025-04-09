@@ -47,19 +47,6 @@ set -e
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
 
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq (TODO:: install git as well for git operations)
-    apk add --quiet jq >/dev/null 2>&1
-fi
-
-if ! command -v python3 >/dev/null 2>&1; then
-    apk add --quiet python3 py3-pip >/dev/null 2>&1
-fi
-
-if ! python3 -c "import jinja2" >/dev/null 2>&1; then
-    apk add --quiet py3-jinja2 >/dev/null 2>&1
-fi
-
 # Function to add disclaimer
 add_disclaimer() {{
     local format="$1"
@@ -165,13 +152,6 @@ add_disclaimer() {{
                 "    E -->|Success| F[Return Data]",
                 "    E -->|Failure| G[Handle Error]"
             ])
-# Add this new tool for streaming GitHub Actions workflow logs
-stream_workflow_logs = GitHubCliTool(
-    name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
-    content="""
-#!/bin/sh
-set -e
 
         return "\n".join(diagram)
 
@@ -186,11 +166,6 @@ class GitHubRepolessCliTool(Tool):
 set -e
 
 echo "🔌 Connecting to GitHub..."
-
-if ! command -v jq >/dev/null 2>&1; then
-    # Silently install jq
-    apk add --quiet jq git >/dev/null 2>&1
-fi
 
 check_and_set_org() {{
     if [ -n "$org" ]; then
