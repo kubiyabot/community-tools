@@ -98,7 +98,6 @@ add_disclaimer() {{
             with_files=with_files,
         )
 
-<<<<<<< HEAD
     def _generate_mermaid_diagram(self, name, args):
         """Generate a GitHub operation-specific mermaid diagram."""
         diagram = ["graph TD"]
@@ -166,7 +165,6 @@ add_disclaimer() {{
                 "    E -->|Success| F[Return Data]",
                 "    E -->|Failure| G[Handle Error]"
             ])
-=======
 # Add this new tool for streaming GitHub Actions workflow logs
 stream_workflow_logs = GitHubCliTool(
     name="github_stream_workflow_logs",
@@ -174,7 +172,6 @@ stream_workflow_logs = GitHubCliTool(
     content="""
 #!/bin/sh
 set -e
->>>>>>> origin
 
         return "\n".join(diagram)
 
