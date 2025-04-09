@@ -162,50 +162,27 @@ workflow_list = GitHubCliTool(
     name="github_workflow_list",
     description="List GitHub Actions workflows in a repository.",
     content="""
-    # Check authentication status
-    if ! gh auth status &>/dev/null; then
-        echo "Error: Not authenticated with GitHub. Please run 'gh auth login' first"
-        exit 1
-    fi
-
-    # Get current user's info
-    USER_INFO=$(gh api user 2>/dev/null)
-    if [ $? -ne 0 ]; then
-        echo "Error: Could not fetch user information. Please verify your GitHub token has sufficient permissions"
-        exit 1
-    fi
-
-    # Check repository access with detailed error handling
-    REPO_INFO=$(gh api "repos/$repo" 2>&1)
-    if [ $? -ne 0 ]; then
-        if echo "$REPO_INFO" | grep -q "404"; then
-            echo "Error: Repository '$repo' does not exist"
-            echo "Please verify:"
-            echo "1. The repository name is correct"
-            echo "2. You are using the correct organization name"
-            echo "3. The repository is not private or has not been deleted"
-        elif echo "$REPO_INFO" | grep -q "403"; then
-            echo "Error: You don't have access to repository '$repo'"
-            echo "Please verify:"
-            echo "1. You have been granted access to this repository"
-            echo "2. If it's in an organization, you are a member of the organization"
-            echo "3. Your GitHub token has sufficient permissions"
+    # First verify repository access and GitHub Actions status
+    echo "Verifying access to repository: $repo"
+    
+    # Try to access the repository's GitHub Actions API endpoint
+    if gh api "repos/$repo/actions/workflows" &>/dev/null; then
+        # If successful, list the workflows
+        gh workflow list --repo $repo $([[ -n "$limit" ]] && echo "--limit $limit")
+    else
+        # Check if repository exists but Actions is disabled
+        if gh repo view "$repo" &>/dev/null; then
+            echo "Error: GitHub Actions appears to be disabled for repository '$repo'"
+            echo "You can enable it at: https://github.com/$repo/settings/actions"
         else
-            echo "Error accessing repository: $REPO_INFO"
+            echo "Error: Could not access repository '$repo'"
+            echo "Please verify:"
+            echo "1. The repository exists"
+            echo "2. You have the correct permissions"
+            echo "3. GitHub Actions is enabled"
         fi
         exit 1
     fi
-
-    # If we get here, repository exists and is accessible
-    # Check if GitHub Actions is enabled
-    if ! gh api "repos/$repo/actions/workflows" &>/dev/null; then
-        echo "Error: GitHub Actions is not enabled for repository '$repo'"
-        echo "You can enable it in repository settings: https://github.com/$repo/settings/actions"
-        exit 1
-    fi
-
-    # List the workflows
-    gh workflow list --repo $repo $([[ -n "$limit" ]] && echo "--limit $limit")
     """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
@@ -551,3 +528,4 @@ __all__ = [
     'workflow_visualize', 'workflow_dispatch_event', 'workflow_get_usage',
     'workflow_set_secret'
 ]
+
