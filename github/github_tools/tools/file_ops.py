@@ -290,7 +290,7 @@ remote_search "${{repo}}" "${{pattern}}" "${{file}}"
 )
 
 list_files = GitHubCliTool(
-    name="github_list_files", 
+    name="github_list_files",
     description="List files in a GitHub repository with optional filtering using GitHub API",
     content="""
 #!/bin/bash
