@@ -170,7 +170,7 @@ git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
 # Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username admin --password "$ARGOCD_PASSWORD" --insecure; then
+if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
     echo "Error: Failed to login to ArgoCD"
     exit 1
 fi
@@ -263,7 +263,7 @@ if [ -z "$ARGOCD_PASSWORD" ]; then
 fi
 
 # Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username admin --password "$ARGOCD_PASSWORD" --insecure; then
+if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
     echo "Error: Failed to login to ArgoCD"
     exit 1
 fi
