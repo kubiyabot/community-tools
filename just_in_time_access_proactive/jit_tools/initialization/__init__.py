@@ -6,6 +6,7 @@ import base64
 from typing import Dict, Any, Optional
 from kubiya_sdk.tools.registry import tool_registry
 
+
 def get_opa_policy_template(config: Dict[str, Any]) -> str:
     policy_template = '''package kubiya.tool_manager
 
@@ -112,6 +113,7 @@ metadata := {
     else:
         raise ConfigurationError("No configuration provided is required.")
 
+
 class ConfigurationError(Exception):
     """Custom exception for configuration related errors"""
     pass
@@ -139,7 +141,17 @@ class EnforcerConfigBuilder:
 
         settings.org = os.getenv("KUBIYA_USER_ORG")
         settings.runner = config.get('opa_runner_name')
-        settings.policy = get_opa_policy_template(config)
+        # Policy generation logic - either from AWS JIT config or use provided OPA policy
+        if config.get('aws_jit_config'):
+            print("📝 Found AWS JIT config, generating policy from template")
+            settings.policy = get_opa_policy_template(config)
+        elif config.get('opa_policy'):
+            print("📝 Using provided OPA policy")
+            settings.policy = config.get('opa_policy')
+        else:
+            raise ConfigurationError("Either aws_jit_config or opa_policy must be provided")
+
+        print(f"📝 Final policy set in settings: {settings.policy}")
 
         # Check for Okta configuration
         okta_fields = ['okta_base_url', 'okta_token_endpoint',

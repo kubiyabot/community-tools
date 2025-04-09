@@ -64,26 +64,6 @@ else
     log "✅ Kubiya namespace already exists"
 fi
 
-# Check if enforcer deployment already exists
-log "Checking if enforcer deployment exists..."
-if resource_exists "kubiya" "deployment" "enforcer"; then
-    log "⚠️ Enforcer deployment already exists in kubiya namespace - skipping installation"
-    exit 0
-fi
-log "✅ No existing enforcer deployment found - proceeding with installation"
-
-log "🚀 Initializing Enforcer tools..."
-
-# Clean up existing deployment
-log "Cleaning up existing deployment..."
-if kubectl get deployment enforcer -n kubiya &> /dev/null; then
-    kubectl delete deployment enforcer -n kubiya
-    check_command "Failed to remove existing deployment" "Existing deployment removed"
-fi
-if kubectl get secret enforcer -n kubiya &> /dev/null; then
-    kubectl delete secret enforcer -n kubiya
-fi
-
 # Build base secret data
 SECRET_DATA=$(cat <<EOF
   ORG_NAME: $BS64_ORG_NAME
@@ -254,6 +234,37 @@ else
               - key: nats.creds
                 path: nats.creds"
 fi
+
+# Check if enforcer deployment already exists
+log "Checking if enforcer deployment exists..."
+if resource_exists "kubiya" "deployment" "enforcer"; then
+    log "⚠️ Enforcer deployment already exists in kubiya namespace"
+
+    # Update the secret with new configuration
+    log "Updating enforcer secret with new configuration..."
+    kubectl delete secret enforcer -n kubiya --ignore-not-found
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: enforcer
+  namespace: kubiya
+type: Opaque
+data:
+$SECRET_DATA
+EOF
+    check_command "Failed to update enforcer secret" "Updated enforcer secret successfully"
+
+    # Restart the enforcer deployment to pick up new configuration
+    log "Restarting enforcer deployment to apply new configuration..."
+    kubectl rollout restart deployment/enforcer -n kubiya
+    check_command "Failed to restart enforcer deployment" "Enforcer restart initiated successfully"
+    
+    log "✅ Configuration updated and enforcer restart triggered!"
+    exit 0
+fi
+
+log "✅ No existing enforcer deployment found - proceeding with installation"
 
 # Deploy configuration
 log "Deploying Enforcer components..."

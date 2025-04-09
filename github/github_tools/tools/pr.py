@@ -159,19 +159,18 @@ pr_comment = GitHubCliTool(
     content="""
 # Format the timestamp in ISO format
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-GITHUB_ACTOR=$(gh api user --jq '.login')
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"$GITHUB_ACTOR\") | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"@me\") | .id" | head -n 1)
 echo "EXISTING_COMMENT_ID: $EXISTING_COMMENT_ID"
 
-if [ -n "$EXISTING_COMMENTS" ]; then
+if [ -n "$EXISTING_COMMENT_ID" ]; then
     echo "Found existing Kubiya comment(s)"
     # Get the most recent comment ID
-    COMMENT_ID=$(echo "$EXISTING_COMMENTS" | jq -r '.id' | tail -n1)
+    COMMENT_ID=$(echo "$EXISTING_COMMENT_ID")
     # Get existing content
-    EXISTING_BODY=$(echo "$EXISTING_COMMENTS" | jq -r '.body' | tail -n1)
+    EXISTING_BODY=$(gh api "repos/$repo/issues/$number/comments/$COMMENT_ID" --jq '.body')
     
     # Extract the previous content (everything between the header and the disclaimer)
     PREVIOUS_CONTENT=$(echo "$EXISTING_BODY" | awk '/### 💬 Comment Added via Kubiya AI/{p=1;next} /---/{p=0} p')
