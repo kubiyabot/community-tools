@@ -161,7 +161,23 @@ function search_logs_with_context() {
 workflow_list = GitHubCliTool(
     name="github_workflow_list",
     description="List GitHub Actions workflows in a repository.",
-    content="gh workflow list --repo $repo $([[ -n \"$limit\" ]] && echo \"--limit $limit\")",
+    content="""
+    # First check if the repository exists and is accessible
+    if ! gh repo view "$repo" &>/dev/null; then
+        echo "Error: Repository '$repo' does not exist or you don't have access to it"
+        exit 1
+    fi
+
+    # Check if GitHub Actions is enabled
+    if ! gh api "repos/$repo/actions/workflows" &>/dev/null; then
+        echo "Error: GitHub Actions is not enabled for repository '$repo'"
+        echo "You can enable it in repository settings: https://github.com/$repo/settings/actions"
+        exit 1
+    fi
+
+    # If all checks pass, list the workflows
+    gh workflow list --repo $repo $([[ -n "$limit" ]] && echo "--limit $limit")
+    """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
         Arg(name="limit", type="int", description="Maximum number of workflows to list. Example: 10", required=False),
