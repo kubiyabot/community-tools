@@ -257,20 +257,20 @@ if [ -z "$ARGOCD_SERVER" ]; then
     exit 1
 fi
 
-if [ -z "$ARGOCD_PASSWORD" ]; then
-    echo "Error: ARGOCD_PASSWORD environment variable is not set"
+if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+    echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
     exit 1
 fi
 
-# Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
-    echo "Error: Failed to login to ArgoCD"
+# Configure ArgoCD CLI with auth token
+if ! argocd context --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+    echo "Error: Failed to configure ArgoCD context with auth token"
     exit 1
 fi
 
 # Test connection
-if ! argocd version; then
-    echo "Error: Failed to verify ArgoCD CLI installation"
+if ! argocd version --grpc-web; then
+    echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
@@ -285,8 +285,8 @@ fi
             image=image,
             icon_url=ARGOCD_ICON_URL,
             type="docker",
-            secrets=["ARGOCD_PASSWORD"],
-            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"]
+            secrets=["ARGOCD_AUTH_TOKEN"],
+            env=["ARGOCD_SERVER"]
         )
 
     def get_args(self) -> List[Arg]:
