@@ -61,8 +61,8 @@ if [ -z "$ARGOCD_SERVER" ]; then
     exit 1
 fi
 
-if [ -z "$ARGOCD_PASSWORD" ]; then
-    echo "Error: ARGOCD_PASSWORD environment variable is not set"
+if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+    echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
     exit 1
 fi
 
@@ -82,15 +82,9 @@ else
     exit 1
 fi
 
-# Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
-    echo "Error: Failed to login to ArgoCD"
-    exit 1
-fi
-
 # Test connections
-if ! argocd version; then
-    echo "Error: Failed to verify ArgoCD CLI installation"
+if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+    echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
@@ -101,6 +95,9 @@ fi
 
 """
         enhanced_content = setup_script + "\n" + content
+        
+        # Add auth flags to all argocd commands in the content
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
         
         file_specs = [
             FileSpec(
@@ -121,8 +118,8 @@ fi
             image=image,
             icon_url=ARGOCD_ICON_URL,
             type="docker",
-            secrets=["ARGOCD_PASSWORD"],
-            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"],
+            secrets=["ARGOCD_AUTH_TOKEN"],
+            env=["ARGOCD_SERVER"],
             with_files=file_specs
         )
 
@@ -153,8 +150,8 @@ if [ -z "$ARGOCD_SERVER" ]; then
     exit 1
 fi
 
-if [ -z "$ARGOCD_PASSWORD" ]; then
-    echo "Error: ARGOCD_PASSWORD environment variable is not set"
+if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+    echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
     exit 1
 fi
 
@@ -169,15 +166,9 @@ echo "https://oauth2:${GH_TOKEN}@github.com" > ~/.git-credentials
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
-# Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
-    echo "Error: Failed to login to ArgoCD"
-    exit 1
-fi
-
 # Test ArgoCD connection
-if ! argocd version; then
-    echo "Error: Failed to verify ArgoCD CLI installation"
+if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+    echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
@@ -189,6 +180,9 @@ cd "$WORKSPACE"
 """
         enhanced_content = setup_script + "\n" + content + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
         
+        # Add auth flags to all argocd commands in the content
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        
         super().__init__(
             name=name,
             description=description,
@@ -197,8 +191,8 @@ cd "$WORKSPACE"
             image=image,
             icon_url=ARGOCD_ICON_URL,
             type="docker",
-            secrets=["ARGOCD_PASSWORD", "GH_TOKEN"],
-            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"]
+            secrets=["ARGOCD_AUTH_TOKEN", "GH_TOKEN"],
+            env=["ARGOCD_SERVER"]
         )
 
     def get_args(self) -> List[Arg]:
@@ -262,20 +256,17 @@ if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
     exit 1
 fi
 
-# Configure ArgoCD CLI with auth token
-if ! argocd context --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
-    echo "Error: Failed to configure ArgoCD context with auth token"
-    exit 1
-fi
-
 # Test connection
-if ! argocd version --grpc-web; then
+if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
     echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
 """
         enhanced_content = setup_script + "\n" + content
+        
+        # Add auth flags to all argocd commands in the content
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
         
         super().__init__(
             name=name,
