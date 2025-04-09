@@ -83,7 +83,7 @@ else
 fi
 
 # Login to ArgoCD
-if ! argocd login "$ARGOCD_SERVER" --username admin --password "$ARGOCD_PASSWORD" --insecure; then
+if ! argocd login "$ARGOCD_SERVER" --username "$ARGOCD_USERNAME" --password "$ARGOCD_PASSWORD" --insecure; then
     echo "Error: Failed to login to ArgoCD"
     exit 1
 fi
@@ -122,7 +122,7 @@ fi
             icon_url=ARGOCD_ICON_URL,
             type="docker",
             secrets=["ARGOCD_PASSWORD"],
-            env=["ARGOCD_SERVER"],
+            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"],
             with_files=file_specs
         )
 
