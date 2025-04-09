@@ -198,7 +198,7 @@ cd "$WORKSPACE"
             icon_url=ARGOCD_ICON_URL,
             type="docker",
             secrets=["ARGOCD_PASSWORD", "GH_TOKEN"],
-            env=["ARGOCD_SERVER"]
+            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"]
         )
 
     def get_args(self) -> List[Arg]:
@@ -286,7 +286,7 @@ fi
             icon_url=ARGOCD_ICON_URL,
             type="docker",
             secrets=["ARGOCD_PASSWORD"],
-            env=["ARGOCD_SERVER"]
+            env=["ARGOCD_SERVER", "ARGOCD_USERNAME"]
         )
 
     def get_args(self) -> List[Arg]:
