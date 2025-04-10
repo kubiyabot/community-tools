@@ -45,15 +45,34 @@ class ArgoCDKubeTool(Tool):
         # Enhanced setup script with kubectl and ArgoCD support
         setup_script = """
 # Install required packages
-apk add --no-cache curl jq git && \
-VERSION=$(curl --silent "https://api.github.com/repos/argoproj/argo-cd/releases/latest" | jq -r .tag_name) && \
-curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64 && \
-chmod +x /usr/local/bin/argocd
+echo "Installing required packages..." && \
+apk update && \
+apk add --no-cache curl jq git bash
+
+# Install ArgoCD CLI with error handling
+echo "Installing ArgoCD CLI..." && \
+DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo "Error: Failed to get ArgoCD download URL"
+    exit 1
+fi && \
+curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
+    echo "Error: Failed to download ArgoCD CLI"
+    exit 1
+} && \
+chmod +x /usr/local/bin/argocd || {
+    echo "Error: Failed to make ArgoCD CLI executable"
+    exit 1
+}
 
 # Install kubectl
+echo "Installing kubectl..." && \
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
 chmod +x kubectl && \
-mv kubectl /usr/local/bin/
+mv kubectl /usr/local/bin/ || {
+    echo "Error: Failed to install kubectl"
+    exit 1
+}
 
 # Verify environment variables
 if [ -z "$ARGOCD_SERVER" ]; then
@@ -70,24 +89,39 @@ fi
 TOKEN_LOCATION="/tmp/kubernetes_context_token"
 CERT_LOCATION="/tmp/kubernetes_context_cert"
 
-if [ -f $TOKEN_LOCATION ] && [ -f $CERT_LOCATION ]; then
-    KUBE_TOKEN=$(cat $TOKEN_LOCATION)
-    kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc \
-                                        --certificate-authority=$CERT_LOCATION > /dev/null 2>&1
-    kubectl config set-credentials in-cluster --token=$KUBE_TOKEN > /dev/null 2>&1
-    kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster > /dev/null 2>&1
-    kubectl config use-context in-cluster > /dev/null 2>&1
-else
+if [ ! -f $TOKEN_LOCATION ] || [ ! -f $CERT_LOCATION ]; then
     echo "Error: Kubernetes context token or cert file not found"
     exit 1
 fi
 
+echo "Configuring kubectl..." && \
+KUBE_TOKEN=$(cat $TOKEN_LOCATION)
+kubectl config set-cluster in-cluster --server=https://kubernetes.default.svc \
+                                    --certificate-authority=$CERT_LOCATION > /dev/null 2>&1 || {
+    echo "Error: Failed to set kubectl cluster configuration"
+    exit 1
+}
+kubectl config set-credentials in-cluster --token=$KUBE_TOKEN > /dev/null 2>&1 || {
+    echo "Error: Failed to set kubectl credentials"
+    exit 1
+}
+kubectl config set-context in-cluster --cluster=in-cluster --user=in-cluster > /dev/null 2>&1 || {
+    echo "Error: Failed to set kubectl context"
+    exit 1
+}
+kubectl config use-context in-cluster > /dev/null 2>&1 || {
+    echo "Error: Failed to switch kubectl context"
+    exit 1
+}
+
 # Test connections
-if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+echo "Testing ArgoCD connection..." && \
+if ! argocd version --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
     echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
+echo "Testing kubectl connection..." && \
 if ! kubectl version --client; then
     echo "Error: Failed to verify kubectl installation"
     exit 1
@@ -97,7 +131,7 @@ fi
         enhanced_content = setup_script + "\n" + content
         
         # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
         
         file_specs = [
             FileSpec(
@@ -139,10 +173,25 @@ class ArgoCDGitTool(Tool):
         # Enhanced setup script with Git and ArgoCD support
         setup_script = """
 # Install required packages
-apk add --no-cache curl jq git && \
-VERSION=$(curl --silent "https://api.github.com/repos/argoproj/argo-cd/releases/latest" | jq -r .tag_name) && \
-curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64 && \
-chmod +x /usr/local/bin/argocd
+echo "Installing required packages..." && \
+apk update && \
+apk add --no-cache curl jq git bash
+
+# Install ArgoCD CLI with error handling
+echo "Installing ArgoCD CLI..." && \
+DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo "Error: Failed to get ArgoCD download URL"
+    exit 1
+fi && \
+curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
+    echo "Error: Failed to download ArgoCD CLI"
+    exit 1
+} && \
+chmod +x /usr/local/bin/argocd || {
+    echo "Error: Failed to make ArgoCD CLI executable"
+    exit 1
+}
 
 # Verify environment variables
 if [ -z "$ARGOCD_SERVER" ]; then
@@ -161,18 +210,21 @@ if [ -z "$GH_TOKEN" ]; then
 fi
 
 # Configure Git
+echo "Configuring Git credentials..." && \
 git config --global credential.helper store
 echo "https://oauth2:${GH_TOKEN}@github.com" > ~/.git-credentials
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
 # Test ArgoCD connection
-if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+echo "Testing ArgoCD connection..." && \
+if ! argocd version --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
     echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
 # Create workspace for Git operations
+echo "Creating Git workspace..." && \
 WORKSPACE="/tmp/argocd_workspace"
 mkdir -p "$WORKSPACE"
 cd "$WORKSPACE"
@@ -181,7 +233,7 @@ cd "$WORKSPACE"
         enhanced_content = setup_script + "\n" + content + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
         
         # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
         
         super().__init__(
             name=name,
@@ -241,9 +293,25 @@ class ArgoCDTool(Tool):
         setup_script = """
 # Install required packages
 apk add --no-cache curl jq && \
-VERSION=$(curl --silent "https://api.github.com/repos/argoproj/argo-cd/releases/latest" | jq -r .tag_name) && \
-curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64 && \
-chmod +x /usr/local/bin/argocd
+echo "Installing required packages..." && \
+apk update && \
+apk add --no-cache curl jq bash
+
+# Install ArgoCD CLI with error handling
+echo "Installing ArgoCD CLI..." && \
+DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
+if [ -z "$DOWNLOAD_URL" ]; then
+    echo "Error: Failed to get ArgoCD download URL"
+    exit 1
+fi && \
+curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
+    echo "Error: Failed to download ArgoCD CLI"
+    exit 1
+} && \
+chmod +x /usr/local/bin/argocd || {
+    echo "Error: Failed to make ArgoCD CLI executable"
+    exit 1
+}
 
 # Verify environment variables
 if [ -z "$ARGOCD_SERVER" ]; then
@@ -256,8 +324,9 @@ if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
     exit 1
 fi
 
-# Test connection
-if ! argocd version --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+# Test connection with proper error handling
+echo "Testing ArgoCD connection..." && \
+if ! argocd version --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
     echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
@@ -266,7 +335,7 @@ fi
         enhanced_content = setup_script + "\n" + content
         
         # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --grpc-web --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
         
         super().__init__(
             name=name,
