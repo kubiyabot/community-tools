@@ -132,8 +132,9 @@ fi
 """
         enhanced_content = setup_script + "\n" + content
         
-        # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        # Add auth flags to all argocd commands in the content, but not in the setup script
+        content_with_auth = content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = setup_script + "\n" + content_with_auth
         
         file_specs = [
             FileSpec(
@@ -236,8 +237,9 @@ cd "$WORKSPACE"
 """
         enhanced_content = setup_script + "\n" + content + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
         
-        # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        # Add auth flags to all argocd commands in the content, but not in the setup script
+        content_with_auth = content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = setup_script + "\n" + content_with_auth + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
         
         super().__init__(
             name=name,
@@ -340,8 +342,9 @@ fi
 """
         enhanced_content = setup_script + "\n" + content
         
-        # Add auth flags to all argocd commands in the content
-        enhanced_content = enhanced_content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        # Add auth flags to all argocd commands in the content, but not in the setup script
+        content_with_auth = content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = setup_script + "\n" + content_with_auth
         
         super().__init__(
             name=name,
