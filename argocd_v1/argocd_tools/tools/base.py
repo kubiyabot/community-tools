@@ -51,11 +51,13 @@ apk add --no-cache curl jq git bash
 
 # Install ArgoCD CLI with error handling
 echo "Installing ArgoCD CLI..." && \
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo "Error: Failed to get ArgoCD download URL"
+VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \
+if [ -z "$VERSION" ]; then
+    echo "Error: Failed to get ArgoCD version"
     exit 1
 fi && \
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \
+echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \
 curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
     echo "Error: Failed to download ArgoCD CLI"
     exit 1
@@ -179,11 +181,13 @@ apk add --no-cache curl jq git bash
 
 # Install ArgoCD CLI with error handling
 echo "Installing ArgoCD CLI..." && \
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo "Error: Failed to get ArgoCD download URL"
+VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \
+if [ -z "$VERSION" ]; then
+    echo "Error: Failed to get ArgoCD version"
     exit 1
 fi && \
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \
+echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \
 curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
     echo "Error: Failed to download ArgoCD CLI"
     exit 1
@@ -299,11 +303,13 @@ apk add --no-cache curl jq bash
 
 # Install ArgoCD CLI with error handling
 echo "Installing ArgoCD CLI..." && \
-DOWNLOAD_URL=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r '.assets[] | select(.name == "argocd-linux-amd64") | .browser_download_url') && \
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo "Error: Failed to get ArgoCD download URL"
+VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \
+if [ -z "$VERSION" ]; then
+    echo "Error: Failed to get ArgoCD version"
     exit 1
 fi && \
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \
+echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \
 curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
     echo "Error: Failed to download ArgoCD CLI"
     exit 1
