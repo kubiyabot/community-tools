@@ -4,7 +4,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
 GITHUB_ICON_URL = "https://cdn-icons-png.flaticon.com/256/25/25231.png"
-GITHUB_CLI_DOCKER_IMAGE = "maniator/gh:latest"
+GITHUB_CLI_DOCKER_IMAGE = "kubiya/github:latest"
 
 KUBIYA_DISCLAIMER_MARKDOWN = '''
 
