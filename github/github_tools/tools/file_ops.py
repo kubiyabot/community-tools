@@ -297,11 +297,11 @@ list_files = GitHubCliTool(
 set -euo pipefail
 
 echo "📂 Listing files in repository: $repo"
-[[ -n "${filter:-}" ]] && echo "🔍 Filter: $filter" 
-[[ -n "${ref:-}" ]] && echo "🔖 Ref: $ref"
+[[ -n "$filter" ]] && echo "🔍 Filter: $filter"
+[[ -n "$ref" ]] && echo "🔖 Ref: $ref"
 
 # Build the API query
-API_PATH="repos/$repo/git/trees/$([[ -n "${ref:-}" ]] && echo "$ref" || echo "HEAD")?recursive=1"
+API_PATH="repos/$repo/git/trees/$([[ -n "$ref" ]] && echo "$ref" || echo "HEAD")?recursive=1"
 
 # Fetch repository tree
 echo "🔍 Fetching repository structure..."
@@ -328,7 +328,7 @@ echo "$TREE" | jq -r '
     end
 ' | while read -r line; do
     # Apply filters if specified
-    if [[ -n "${filter:-}" ]] && [[ ! "$line" =~ "$filter" ]]; then
+    if [ -n "$filter" ] && [[ ! "$line" =~ "$filter" ]]; then
         continue
     fi
     echo "$line"
