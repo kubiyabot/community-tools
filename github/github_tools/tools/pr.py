@@ -84,11 +84,16 @@ fi
 if [ -n "$assignee" ]; then
     echo "👥 Assignee: https://github.com/$assignee"
 fi
-if [ -n "$org" ]; then
+if [ -n "$org" ] && [ -z "$repo" ]; then
     echo "🏢 Organization: https://github.com/$org"
 fi
 
-RESULT=$(gh search prs $([[ -n "$repo" ]] && echo "--repo $repo") $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
+# If both repo and org are provided, prioritize repo over org
+if [ -n "$repo" ]; then
+    RESULT=$(gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
+else
+    RESULT=$(gh search prs $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
+fi
 
 echo "✨ Found pull requests:"
 echo "$RESULT"
@@ -99,7 +104,7 @@ echo "$RESULT"
         Arg(name="limit", type="str", description="Maximum number of pull requests to list. Example: 10", required=False),
         Arg(name="author", type="str", description="The github user's login of the pr's author. Example: joedoe. use `@me` to get prs authored by the user", required=False),
         Arg(name="assignee", type="str", description="The github user's login of the pr's assignee. Example: joe_doe.  use `@me` to get prs assigned to the user", required=False),
-        Arg(name="org", type="str", description="The github organization to look for prs in. Example: octocat", required=False),
+        Arg(name="org", type="str", description="The github organization to look for prs in. Only used if repo is not specified. Example: octocat", required=False),
     ],
 )
 
@@ -244,6 +249,57 @@ fi
     ],
 )
 
+pr_edit_comment_if_exists = GitHubCliTool(
+    name="github_pr_edit_comment_if_exists",
+    description="Add a formatted comment to a pull request with proper formatting and timestamp. Always creates a new comment.",
+    content="""
+# Format the timestamp in ISO format
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+# Create a formatted comment
+echo "📝 Creating new comment..."
+FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+
+$body
+
+---
+<sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
+
+# Add the comment to the PR
+COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to add comment"
+    echo "Error: $COMMENT_URL"
+    exit 1
+fi
+COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
+
+# Verify the comment
+echo "🔍 Verifying comment..."
+COMMENT_CHECK=$(gh api repos/$repo/issues/comments/$COMMENT_ID)
+if [ $? -eq 0 ]; then
+    echo "✅ Comment processed successfully for PR #$number"
+    echo "🔗 Comment URL: $COMMENT_URL"
+    echo "⏰ Timestamp: $TIMESTAMP"
+    
+    # Verify content matches
+    ACTUAL_BODY=$(echo "$COMMENT_CHECK" | jq -r .body)
+    if [[ "$ACTUAL_BODY" == *"$body"* ]] && [[ "$ACTUAL_BODY" == *"$TIMESTAMP"* ]]; then
+        echo "✅ Comment content verified"
+    else
+        echo "⚠️ Warning: Comment content may not match expected format"
+    fi
+else
+    echo "❌ Failed to verify comment"
+    exit 1
+fi
+""",
+    args=[
+        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
+        Arg(name="number", type="str", description="Pull request number. Example: 123", required=True),
+        Arg(name="body", type="str", description="Comment text. Example: 'Great work! Just a few minor suggestions.'", required=True),
+    ],
+)
 
 github_pr_comment_workflow_failure = GitHubCliTool(
     name="github_pr_comment_workflow_failure",
@@ -531,4 +587,4 @@ for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_edit_comment_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
