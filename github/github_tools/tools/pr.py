@@ -249,8 +249,8 @@ fi
     ],
 )
 
-pr_edit_comment_if_exists = GitHubCliTool(
-    name="github_pr_edit_comment_if_exists",
+pr_comment_and_edit_if_exists = GitHubCliTool(
+    name="github_pr_comment_and_edit_if_exists",
     description="Add a formatted comment to a pull request with proper formatting and timestamp. Always creates a new comment.",
     content="""
 # Format the timestamp in ISO format
@@ -583,8 +583,8 @@ echo "✅ Reviewer added successfully!"
 )
 
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
+for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_comment_and_edit_if_exists, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_edit_comment_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_comment_and_edit_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
