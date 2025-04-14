@@ -24,6 +24,9 @@ ARG USERNAME=$APPNAME
 # System deps
 RUN apk add --no-cache jq ca-certificates curl socat
 
+# Install GitHub CLI
+RUN apk add --no-cache github-cli
+
 # Create app user
 RUN addgroup -g 6009 $USERNAME && \
     adduser -D -G $USERNAME -u 6009 -h /app -s /sbin/nologin $USERNAME
