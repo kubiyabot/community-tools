@@ -12,7 +12,8 @@ class MonitoringTools:
             tools = [
                 self.get_alert_details(),
                 self.compare_error_rates(),
-                self.query_logs()
+                self.query_logs(),
+                self.get_alert_by_name()
             ]
             
             for tool in tools:
@@ -207,6 +208,56 @@ class MonitoringTools:
             args=[
                 Arg(name="service", description="Service name from alert", required=True),
                 Arg(name="status", description="Error status from alert", required=True)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def get_alert_by_name(self) -> DatadogTool:
+        """Search for recent alerts by monitor name."""
+        return DatadogTool(
+            name="get_alert_by_name",
+            description="Search for recent DataDog alerts by monitor name",
+            content="""
+            apk add --no-cache jq
+            validate_datadog_connection
+
+            if [ -z "$monitor_name" ]; then
+                echo "Error: Monitor name is required"
+                exit 1
+            fi
+
+            # Get current timestamp and 1 hour ago in milliseconds
+            NOW_MS=$(date +%s)000
+            HOUR_AGO_MS=$(($(date +%s) - 3600))000
+
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -G \
+                --data-urlencode "filter[from]=$HOUR_AGO_MS" \
+                --data-urlencode "filter[to]=$NOW_MS" \
+                --data-urlencode "filter[query]=monitor:*\\"$monitor_name\\"*")
+
+            # Check if response contains events
+            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
+                echo "No alerts found matching monitor name: $monitor_name"
+                exit 0
+            fi
+
+            echo "=== Found Alerts ==="
+            echo "$RESPONSE" | jq -r '.data[] | select(.attributes.attributes.monitor.name != null) | 
+                "ID: \(.id)",
+                "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")",
+                "Title: \(.attributes.attributes.title // "N/A")",
+                "Status: \(.attributes.attributes.status // "N/A")",
+                "Timestamp: \(.attributes.date_happened // "N/A")",
+                "Service: \(.attributes.attributes.service // "N/A")",
+                "---"
+            '
+            """,
+            args=[
+                Arg(name="monitor_name", description="Name of the monitor to search for", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
