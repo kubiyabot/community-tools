@@ -135,13 +135,25 @@ slack_remove_reaction = SlackTool(
 #Slack Get Channel History Tool
 slack_get_channel_history = SlackTool(
     name="slack_get_channel_history",
-    description="Get the message history of a Slack channel",
+    description="Get the message history of a Slack channel. Use 'oldest' param to filter messages (e.g. '1h' for last hour, '2d' for last 2 days, or Unix timestamp)",
     action="conversations_history",
     args=[
         Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
         Arg(name="limit", type="int", description="Number of messages to return (default 10)", required=False),
-        Arg(name="oldest", type="str", description="Only messages after this Unix timestamp will be included (e.g. 1234567890.123456)", required=False),
+        Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes), or Unix timestamp (e.g. 1234567890.123456)", required=False),
     ],
+)
+
+#Slack Get Recent Channel History Tool
+slack_get_recent_channel_history = SlackTool(
+    name="slack_get_recent_channel_history",
+    description="Get the message history of a Slack channel from the last hour",
+    action="conversations_history",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
+        Arg(name="limit", type="int", description="Number of messages to return (default 10)", required=False),
+    ],
+    env=["OLDEST_TIMESTAMP"]
 )
 
 # Update the all_tools list
@@ -158,6 +170,7 @@ all_tools = [
     slack_get_channel_info,
     slack_get_user_info,
     slack_get_channel_history,
+    slack_get_recent_channel_history,
     slack_send_message_to_predefined_channel,
 ]
 
