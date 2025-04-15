@@ -135,11 +135,24 @@ slack_remove_reaction = SlackTool(
 #Slack Get Channel History Tool
 slack_get_channel_history = SlackTool(
     name="slack_get_channel_history",
-    description="Get the message history of a Slack channel",
+    description="Get the message history of a Slack channel. Use 'oldest' param to filter messages (e.g. '1h' for last hour, '2d' for last 2 days, or Unix timestamp)",
     action="conversations_history",
     args=[
         Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
         Arg(name="limit", type="int", description="Number of messages to return (default 10)", required=False),
+        Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes), or Unix timestamp (e.g. 1234567890.123456)", required=False),
+    ],
+)
+
+#Slack Get Thread Replies Tool
+slack_get_thread_replies = SlackTool(
+    name="slack_get_thread_replies",
+    description="Get all replies in a thread for a specific message",
+    action="conversations_replies",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel containing the message thread", required=True),
+        Arg(name="ts", type="str", description="Timestamp of the parent message to get replies for", required=True),
+        Arg(name="limit", type="int", description="Number of replies to return (default 100)", required=False),
     ],
 )
 
@@ -158,6 +171,7 @@ all_tools = [
     slack_get_user_info,
     slack_get_channel_history,
     slack_send_message_to_predefined_channel,
+    slack_get_thread_replies,
 ]
 
 # Register all Slack tools

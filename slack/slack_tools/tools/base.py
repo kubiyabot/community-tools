@@ -123,6 +123,25 @@ def execute_slack_action(token, action, operation, **kwargs):
         else:
             logger.info(f"Executing action: {{action}}")
             method = getattr(client, action)
+            
+            # Handle time-based filtering for channel history
+            if action == "conversations_history" and 'oldest' in kwargs:
+                oldest_param = kwargs['oldest']
+                if isinstance(oldest_param, str):
+                    from time import time
+                    import re
+                    
+                    time_pattern = re.match(r'(\d+)([hdm])', oldest_param.lower())
+                    if time_pattern:
+                        amount = int(time_pattern.group(1))
+                        unit = time_pattern.group(2)
+                        seconds = {{'h': 3600, 'd': 86400, 'm': 60}}[unit]
+                        current_time = time()
+                        offset = amount * seconds
+                        target_time = current_time - offset
+                        kwargs['oldest'] = f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
+                        logger.info(f"Time conversion: current={{current_time}}, offset={{offset}}, target={{target_time}}, oldest_param={{kwargs['oldest']}}")
+            
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
             if 'ts' in response.data:
