@@ -321,7 +321,7 @@ class AlertTools:
         """Search for recent alerts by monitor name."""
         return DatadogTool(
             name="get_alert_by_name",
-            description="Search for recent DataDog alerts by monitor name",
+            description="Search for recent DataDog alerts by monitor name (excluding recovered alerts)",
             content="""
             apk add --no-cache jq
             validate_datadog_connection
@@ -331,7 +331,7 @@ class AlertTools:
                 exit 1
             fi
 
-            echo "🔍 Searching for alerts with monitor name: $monitor_name"
+            echo "🔍 Searching for active alerts with monitor name: $monitor_name"
 
             # Get current timestamp and 1 hour ago in milliseconds
             NOW_MS=$(date +%s)000
@@ -340,15 +340,11 @@ class AlertTools:
             # Debug time info
             echo "🕒 Current time: $(date)"
             echo "🕐 Hour ago: $(date -d "@$(( $(date +%s) - 3600 ))")"
-            echo "🔢 Current timestamp: $NOW_MS"
-            echo "🔢 Hour ago timestamp: $HOUR_AGO_MS"
             echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Escape the monitor name for the query
             ESCAPED_NAME=$(echo "$monitor_name" | sed 's/"/\\"/g')
-            echo "🔒 Escaped monitor name: $ESCAPED_NAME"
 
-            echo "📡 Making API request..."
             QUERY="*$ESCAPED_NAME*"
             echo "🔍 Query filter: $QUERY"
 
@@ -361,9 +357,6 @@ class AlertTools:
                 --data-urlencode "filter[to]=$NOW_MS" \
                 --data-urlencode "filter[query]=$QUERY")
 
-            echo "📥 Raw API Response:"
-            echo "$RESPONSE" | jq '.'
-
             # Check if response is valid JSON
             if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
                 echo "❌ Error: Invalid JSON response from API"
@@ -371,24 +364,18 @@ class AlertTools:
                 exit 1
             fi
 
-            echo "🔢 Total events in response:"
-            echo "$RESPONSE" | jq '.data | length'
-
-            echo "🔍 Filtering events for monitor name..."
+            echo "🔍 Filtering events for monitor name (excluding recovered alerts)..."
             FILTERED_DATA=$(echo "$RESPONSE" | jq -r --arg name "$monitor_name" '.data[] | 
                 select(.attributes.attributes.monitor.name != null) |
-                select(.attributes.attributes.monitor.name | contains($name))')
-
-            echo "📋 Filtered Data (raw):"
-            echo "$FILTERED_DATA"
+                select(.attributes.attributes.monitor.name | contains($name)) |
+                select(.attributes.attributes.title | contains("[Recovered]") | not)')
 
             if [ -z "$FILTERED_DATA" ]; then
-                echo "❌ No alerts found matching monitor name: $monitor_name"
+                echo "❌ No active alerts found matching monitor name: $monitor_name"
                 exit 0
             fi
 
-            echo "✅ Found matching alerts. Processing results..."
-            echo "=== Found Alerts ==="
+            echo "=== Found Active Alerts ==="
             echo "$FILTERED_DATA" | jq -r '
                 "ID: \(.attributes.attributes.evt.id)\n" +
                 "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")\n" +
