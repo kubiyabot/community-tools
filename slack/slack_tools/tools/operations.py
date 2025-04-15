@@ -144,18 +144,6 @@ slack_get_channel_history = SlackTool(
     ],
 )
 
-#Slack Get Recent Channel History Tool
-slack_get_recent_channel_history = SlackTool(
-    name="slack_get_recent_channel_history",
-    description="Get the message history of a Slack channel from the last hour",
-    action="conversations_history",
-    args=[
-        Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
-        Arg(name="limit", type="int", description="Number of messages to return (default 10)", required=False),
-    ],
-    env=["OLDEST_TIMESTAMP"]
-)
-
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -170,7 +158,6 @@ all_tools = [
     slack_get_channel_info,
     slack_get_user_info,
     slack_get_channel_history,
-    slack_get_recent_channel_history,
     slack_send_message_to_predefined_channel,
 ]
 
