@@ -75,8 +75,13 @@ class AlertTools:
             fi
 
             # Get current timestamp and 1 hour ago in milliseconds
-            NOW_MS=$(date +%s)000
-            HOUR_AGO_MS=$(($(date +%s) - 3600))000
+            NOW_MS=$(TZ=MST date +%s)000
+            HOUR_AGO_MS=$(( $(TZ=MST date +%s) - 3600 ))000
+            
+            # Debug time info
+            echo "🕒 Current time (MST): $(TZ=MST date)"
+            echo "🕐 Hour ago (MST): $(TZ=MST date -d "@$(( $(TZ=MST date +%s) - 3600 ))")"
+            echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Search for the alert by its numerical ID
             RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
@@ -327,8 +332,12 @@ class AlertTools:
             echo "🔍 Searching for alerts with monitor name: $monitor_name"
 
             # Get current timestamp and 1 hour ago in milliseconds
-            NOW_MS=$(date +%s)000
-            HOUR_AGO_MS=$(($(date +%s) - 3600))000
+            NOW_MS=$(TZ=MST date +%s)000
+            HOUR_AGO_MS=$(( $(TZ=MST date +%s) - 3600 ))000
+            
+            # Debug time info
+            echo "🕒 Current time (MST): $(TZ=MST date)"
+            echo "🕐 Hour ago (MST): $(TZ=MST date -d "@$(( $(TZ=MST date +%s) - 3600 ))")"
             echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Escape the monitor name for the query
