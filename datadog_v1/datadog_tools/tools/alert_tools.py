@@ -328,6 +328,9 @@ class AlertTools:
             NOW_MS=$(date +%s)000
             HOUR_AGO_MS=$(($(date +%s) - 3600))000
 
+            # Escape the monitor name for the query
+            ESCAPED_NAME=$(echo "$monitor_name" | sed 's/"/\\"/g')
+
             RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
@@ -335,27 +338,33 @@ class AlertTools:
                 -G \
                 --data-urlencode "filter[from]=$HOUR_AGO_MS" \
                 --data-urlencode "filter[to]=$NOW_MS" \
-                --data-urlencode "filter[query]=monitor:*\\"$monitor_name\\"*")
+                --data-urlencode "filter[query]=monitor:*\\"$ESCAPED_NAME\\"*")
+
+            # Check if response is valid JSON
+            if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                echo "Error: Invalid JSON response from API"
+                echo "Raw response: $RESPONSE"
+                exit 1
+            fi
 
             # Check if response contains events
-            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
+            if [ "$(echo "$RESPONSE" | jq '.data | length')" = "0" ]; then
                 echo "No alerts found matching monitor name: $monitor_name"
                 exit 0
             fi
 
             echo "=== Found Alerts ==="
-            echo "$RESPONSE" | jq -r '.data[] | 
+            echo "$RESPONSE" | jq -r --arg name "$monitor_name" '.data[] | 
                 select(.attributes.attributes.status != "info") |
                 select(.attributes.attributes.monitor.name != null) |
-                select(.attributes.attributes.monitor.name == "'$monitor_name'") |
-                "ID: \(.attributes.attributes.evt.id)",
-                "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")",
-                "Title: \(.attributes.attributes.title // "N/A")",
-                "Status: \(.attributes.attributes.status // "N/A")",
-                "Timestamp: \(.attributes.date_happened // "N/A")",
-                "Service: \(.attributes.attributes.service // "N/A")",
-                "---"
-            '
+                select(.attributes.attributes.monitor.name | contains($name)) |
+                "ID: \(.attributes.attributes.evt.id)\n" +
+                "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")\n" +
+                "Title: \(.attributes.attributes.title // "N/A")\n" +
+                "Status: \(.attributes.attributes.status // "N/A")\n" +
+                "Timestamp: \(.attributes.date_happened // "N/A")\n" +
+                "Service: \(.attributes.attributes.service // "N/A")\n" +
+                "---"'
             """,
             args=[
                 Arg(name="monitor_name", description="Name of the monitor to search for", required=True)
