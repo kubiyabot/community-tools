@@ -74,10 +74,12 @@ class AlertTools:
                 exit 1
             fi
 
-            # Query directly for the specific alert by ID
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/events/$alert_id" \
+            # Query for the specific alert by ID using v2 API
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
 
             if [ -z "$RESPONSE" ] || [ "$RESPONSE" = "null" ]; then
                 echo "Error: Could not find alert with ID $alert_id"
@@ -86,19 +88,26 @@ class AlertTools:
 
             echo "=== Alert Details ==="
             echo "$RESPONSE" | jq -r '
-                "Event ID: \(.id)\n" +
-                "Title: \(.title // "N/A")\n" +
-                "Message: \(.text // "N/A")\n" +
-                "Status: \(.status // "N/A")\n" +
-                "Service: \(.service // "N/A")\n" +
-                "Timestamp: \(.date_happened // "N/A")\n" +
+                "Event ID: \(.data.attributes.attributes.evt.id)\n" +
+                "Title: \(.data.attributes.attributes.title // "N/A")\n" +
+                "Message: \(.data.attributes.message // "N/A")\n" +
+                "Status: \(.data.attributes.attributes.status // "N/A")\n" +
+                "Service: \(.data.attributes.attributes.service // "N/A")\n" +
+                "Timestamp: \(.data.attributes.attributes.timestamp // "N/A")\n" +
                 "\nMonitor Details:" +
-                "\n  Name: \(.monitor.name // "N/A")" +
-                "\n  ID: \(.monitor.id // "N/A")" +
-                "\n  Query: \(.monitor.query // "N/A")" +
-                "\n  Type: \(.monitor.type // "N/A")" +
-                "\n  Priority: \(.priority // "N/A")" +
-                "\n\nTags: \(.tags // [] | join(", ") // "N/A")"
+                "\n  Name: \(.data.attributes.attributes.monitor.name // "N/A")" +
+                "\n  ID: \(.data.attributes.attributes.monitor.id // "N/A")" +
+                "\n  Query: \(.data.attributes.attributes.monitor.query // "N/A")" +
+                "\n  Type: \(.data.attributes.attributes.monitor.type // "N/A")" +
+                "\n  Priority: \(.data.attributes.attributes.priority // "N/A")" +
+                "\n  Created: \(.data.attributes.attributes.monitor.created_at // "N/A")" +
+                "\n  Modified: \(.data.attributes.attributes.monitor.modified // "N/A")" +
+                "\n\nThresholds:" +
+                "\n  Critical: \(.data.attributes.attributes.monitor.options.thresholds.critical // "N/A")" +
+                "\n\nLinks:" +
+                "\n  Alert: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.alert_url // "N/A")" +
+                "\n  Logs: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.logs_url // "N/A")" +
+                "\n\nTags: \(.data.attributes.tags // [] | join(", ") // "N/A")"
             '
             """,
             args=[
