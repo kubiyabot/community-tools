@@ -41,39 +41,49 @@ class MonitoringTools:
                 exit 1
             fi
 
-            # First try the events API
-            ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
-                -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                -H "Content-Type: application/json" \
-                -H "Accept: application/json")
+            # Extract monitor ID from alert ID if possible
+            MONITOR_ID=$(echo "$alert_id" | grep -o 'monitor:[0-9]*' | cut -d':' -f2)
 
-            # Check if we got valid data
-            if [ "$(echo "$ALERT_DATA" | jq '.data')" = "null" ]; then
-                echo "Warning: Could not find alert details. This could be because:"
-                echo "- The alert ID has expired"
-                echo "- The alert ID format is incorrect"
-                echo "- You don't have permission to access this alert"
-                echo "- The alert was deleted"
+            if [ -n "$MONITOR_ID" ]; then
+                # Try to get monitor details
+                MONITOR_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+
+                # Get state history
+                STATE_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID/states" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+
+                echo "=== Alert Details ==="
+                echo "$MONITOR_DATA" | jq -r '
+                    "Monitor ID: \(.id // "N/A")",
+                    "Name: \(.name // "N/A")",
+                    "Message: \(.message // "N/A")",
+                    "Query: \(.query // "N/A")",
+                    "Status: \(.overall_state // "N/A")",
+                    "Priority: \(.priority // "N/A")",
+                    "\nAlert Conditions:",
+                    "  Warning: \(.options.thresholds.warning // "N/A")",
+                    "  Critical: \(.options.thresholds.critical // "N/A")",
+                    "\nNotification Settings:",
+                    "  Notify No Data: \(.options.notify_no_data // false)",
+                    "  Renotify Interval: \(.options.renotify_interval // "N/A")",
+                    "\nTags: \(.tags // [] | join(", ") // "N/A")"
+                '
+
+                echo "\n=== Recent State History ==="
+                echo "$STATE_DATA" | jq -r '.[] | 
+                    "Time: \(.entered_at)",
+                    "State: \(.value)",
+                    "---"
+                '
+            else
+                echo "Warning: Could not extract monitor ID from alert ID."
+                echo "The alert details may no longer be available through the events API."
+                echo "Consider storing alert details when initially received for historical access."
                 exit 1
             fi
-
-            echo "=== Alert Details ==="
-            echo "$ALERT_DATA" | jq -r '
-                "ID: \(.data.id)",
-                "Title: \(.data.attributes.attributes.title // "N/A")",
-                "Message: \(.data.attributes.message // "N/A")",
-                "Service: \(.data.attributes.attributes.service // "N/A")",
-                "Status: \(.data.attributes.attributes.status // "N/A")",
-                "Timestamp: \(.data.attributes.attributes.timestamp // "N/A")",
-                "\nMonitor Details:",
-                "  Name: \(.data.attributes.attributes.monitor.name // "N/A")",
-                "  Query: \(.data.attributes.attributes.monitor.query // "N/A")",
-                "  Priority: \(.data.attributes.attributes.monitor.priority // "N/A")",
-                "\nLinks:",
-                "  Logs: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.logs_url // "N/A")",
-                "  Alert: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.alert_url // "N/A")"
-            '
             """,
             args=[Arg(name="alert_id", description="ID of the alert event", required=True)],
             image="curlimages/curl:8.1.2"
