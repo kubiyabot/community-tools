@@ -135,12 +135,12 @@ def execute_slack_action(token, action, operation, **kwargs):
                     if time_pattern:
                         amount = int(time_pattern.group(1))
                         unit = time_pattern.group(2)
-                        seconds = {'h': 3600, 'd': 86400, 'm': 60}[unit]
+                        seconds = {{'h': 3600, 'd': 86400, 'm': 60}}[unit]
                         current_time = time()
                         offset = amount * seconds
                         target_time = current_time - offset
                         kwargs['oldest'] = str(target_time)
-                        logger.info(f"Time conversion: current={current_time}, offset={offset}, target={target_time}")
+                        logger.info(f"Time conversion: current={{current_time}}, offset={{offset}}, target={{target_time}}")
             
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
