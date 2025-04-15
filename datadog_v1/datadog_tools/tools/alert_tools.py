@@ -62,7 +62,7 @@ class AlertTools:
         """Retrieve details for a specific alert event."""
         return DatadogTool(
             name="get_alert_details",
-            description="Retrieve details of a specific alert event",
+            description="Retrieve details of a specific alert by ID",
             content="""
             apk add --no-cache jq
             validate_datadog_connection
@@ -72,39 +72,35 @@ class AlertTools:
                 exit 1
             fi
 
-            echo "Fetching details for alert ID: $alert_id"
-
-            # Get current timestamp and 24 hours ago
-            NOW=$(date +%s)
-            DAY_AGO=$((NOW - 86400))
-
-            # Try to get monitor events from the past 24 hours
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
+            # Get the specific alert details
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                -G \
-                --data-urlencode "filter[from]=$DAY_AGO" \
-                --data-urlencode "filter[to]=$NOW" \
-                --data-urlencode "filter[query]=*")
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-            # Debug: Print raw response
-            echo "Debug - Raw API Response:"
-            echo "$RESPONSE" | jq '.'
-            echo
+            if [ "$(echo "$RESPONSE" | jq '.errors')" != "null" ]; then
+                echo "Error fetching alert: $(echo "$RESPONSE" | jq -r '.errors[0]')"
+                exit 1
+            fi
 
-            # Process and display events
-            echo "=== Alert Events (Last 24 hours) ==="
-            echo "$RESPONSE" | jq -r '.data[] | 
-                select(.id != null) |
+            echo "=== Alert Details ==="
+            echo "$RESPONSE" | jq -r '.data | 
                 "Event ID: \(.id)\n" +
                 "Title: \(.attributes.title // "N/A")\n" +
                 "Message: \(.attributes.message // "N/A")\n" +
                 "Status: \(.attributes.status // "N/A")\n" +
                 "Timestamp: \(.attributes.date_happened // "N/A")\n" +
-                "Alert Type: \(.attributes.alert_type // "N/A")\n" +
+                "Monitor Name: \(.attributes.monitor.name // "N/A")\n" +
+                "Monitor ID: \(.attributes.monitor.id // "N/A")\n" +
                 "Priority: \(.attributes.priority // "N/A")\n" +
                 "Tags: \(.attributes.tags // [] | join(", ") // "N/A")\n" +
-                "---\n"
+                "\nMonitor Details:" +
+                "\n  Query: \(.attributes.monitor.query // "N/A")" +
+                "\n  Threshold: \(.attributes.monitor.threshold // "N/A")" +
+                "\n  Window: \(.attributes.monitor.window // "N/A")" +
+                "\n\nLinks:" +
+                "\n  Alert: https://us5.datadoghq.com\(.attributes.monitor.result.alert_url // "N/A")" +
+                "\n  Logs: https://us5.datadoghq.com\(.attributes.monitor.result.logs_url // "N/A")" +
+                "\n---\n"
             '
             """,
             args=[
