@@ -13,7 +13,7 @@ steps:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: "Send a Slack msg to channel #tf-test saying $AGENT_RESPONSE , before sending make ths msg nice and readable "
+        message: "Send a Slack msg to channel #tf-test saying $AGENT_RESPONSE  "
     output: SLACK_RESPONSE
     depends:
       - ask-kubiya
