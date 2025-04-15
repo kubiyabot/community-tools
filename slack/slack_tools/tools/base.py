@@ -131,7 +131,6 @@ def execute_slack_action(token, action, operation, **kwargs):
                     from time import time
                     import re
                     
-                    # Check if it's a relative time format (e.g. '1h', '2d', '30m')
                     time_pattern = re.match(r'(\d+)([hdm])', oldest_param.lower())
                     if time_pattern:
                         amount = int(time_pattern.group(1))
@@ -140,7 +139,7 @@ def execute_slack_action(token, action, operation, **kwargs):
                         kwargs['oldest'] = str(time() - (amount * seconds))
             
             response = method(**kwargs)
-            result = {"success": True, "result": response.data}
+            result = {{"success": True, "result": response.data}}
             if 'ts' in response.data:
                 result['thread_ts'] = response.data['ts']
         
