@@ -74,56 +74,31 @@ class AlertTools:
                 exit 1
             fi
 
-            # Get current timestamp and 1 hour ago in milliseconds
-            NOW_MS=$(date +%s)000
-            HOUR_AGO_MS=$(( $(date +%s) - 3600 ))000
-            
-            # Debug time info
-            echo "🕒 Current time: $(date)"
-            echo "🕐 Hour ago: $(date -d "@$(( $(date +%s) - 3600 ))")"
-            echo "🔢 Current timestamp: $NOW_MS"
-            echo "🔢 Hour ago timestamp: $HOUR_AGO_MS"
-            echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
-
-            # Search for the alert by its numerical ID
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
+            # Query directly for the specific alert by ID
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                -G \
-                --data-urlencode "filter[from]=$HOUR_AGO_MS" \
-                --data-urlencode "filter[to]=$NOW_MS" \
-                --data-urlencode "filter[query]=*")
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-            # Find the specific alert by its evt.id
-            EVENT=$(echo "$RESPONSE" | jq --arg aid "$alert_id" '.data[] | select(.attributes.attributes.evt.id == $aid)')
-
-            if [ -z "$EVENT" ]; then
+            if [ -z "$RESPONSE" ] || [ "$RESPONSE" = "null" ]; then
                 echo "Error: Could not find alert with ID $alert_id"
                 exit 1
             fi
 
             echo "=== Alert Details ==="
-            echo "$EVENT" | jq -r '
-                "Event ID: \(.attributes.attributes.evt.id)\n" +
-                "Title: \(.attributes.attributes.title // "N/A")\n" +
-                "Message: \(.attributes.message // "N/A")\n" +
-                "Status: \(.attributes.attributes.status // "N/A")\n" +
-                "Service: \(.attributes.attributes.service // "N/A")\n" +
-                "Timestamp: \(.attributes.attributes.timestamp // "N/A")\n" +
+            echo "$RESPONSE" | jq -r '
+                "Event ID: \(.id)\n" +
+                "Title: \(.title // "N/A")\n" +
+                "Message: \(.text // "N/A")\n" +
+                "Status: \(.status // "N/A")\n" +
+                "Service: \(.service // "N/A")\n" +
+                "Timestamp: \(.date_happened // "N/A")\n" +
                 "\nMonitor Details:" +
-                "\n  Name: \(.attributes.attributes.monitor.name // "N/A")" +
-                "\n  ID: \(.attributes.attributes.monitor.id // "N/A")" +
-                "\n  Query: \(.attributes.attributes.monitor.query // "N/A")" +
-                "\n  Type: \(.attributes.attributes.monitor.type // "N/A")" +
-                "\n  Priority: \(.attributes.attributes.monitor.priority // "N/A")" +
-                "\n  Created: \(.attributes.attributes.monitor.created_at // "N/A")" +
-                "\n  Modified: \(.attributes.attributes.monitor.modified // "N/A")" +
-                "\n\nThresholds:" +
-                "\n  Critical: \(.attributes.attributes.monitor.options.thresholds.critical // "N/A")" +
-                "\n\nLinks:" +
-                "\n  Alert: https://us5.datadoghq.com\(.attributes.attributes.monitor.result.alert_url // "N/A")" +
-                "\n  Logs: https://us5.datadoghq.com\(.attributes.attributes.monitor.result.logs_url // "N/A")" +
-                "\n\nTags: \(.attributes.tags // [] | join(", ") // "N/A")"
+                "\n  Name: \(.monitor.name // "N/A")" +
+                "\n  ID: \(.monitor.id // "N/A")" +
+                "\n  Query: \(.monitor.query // "N/A")" +
+                "\n  Type: \(.monitor.type // "N/A")" +
+                "\n  Priority: \(.priority // "N/A")" +
+                "\n\nTags: \(.tags // [] | join(", ") // "N/A")"
             '
             """,
             args=[
