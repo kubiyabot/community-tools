@@ -140,6 +140,7 @@ slack_get_channel_history = SlackTool(
     args=[
         Arg(name="channel", type="str", description="The ID of the channel to fetch history from", required=True),
         Arg(name="limit", type="int", description="Number of messages to return (default 10)", required=False),
+        Arg(name="oldest", type="str", description="Only messages after this Unix timestamp will be included (e.g. 1234567890.123456)", required=False),
     ],
 )
 
