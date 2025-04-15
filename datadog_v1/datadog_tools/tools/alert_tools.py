@@ -74,84 +74,62 @@ class AlertTools:
 
             echo "Fetching details for alert ID: $alert_id"
 
-            # Try v2 events API first
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
+            # First try to get recent monitor alerts
+            NOW=$(date +%s)
+            HOUR_AGO=$((NOW - 3600))
+
+            MONITORS_RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-            # Debug: Print raw response
-            echo "Debug - Raw API Response:"
-            echo "$RESPONSE" | jq '.'
+            # Debug: Print monitors response
+            echo "Debug - Found Monitors:"
+            echo "$MONITORS_RESPONSE" | jq -r '.[] | select(.overall_state=="Alert") | .name'
             echo
 
-            # Check if we got valid data from v2 API
-            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
-                # Try extracting monitor ID
-                MONITOR_ID=$(echo "$alert_id" | grep -o 'monitor:[0-9]*' | cut -d':' -f2)
-                
-                if [ -n "$MONITOR_ID" ]; then
-                    echo "Falling back to monitor API with ID: $MONITOR_ID"
-                    
-                    # Get monitor details
-                    MONITOR_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID" \
+            # Get details of all alerting monitors
+            echo "=== Alert Details ==="
+            echo "$MONITORS_RESPONSE" | jq -r '.[] | select(.overall_state=="Alert") | 
+                "Monitor ID: \(.id)\n" +
+                "Name: \(.name)\n" +
+                "Message: \(.message // "N/A")\n" +
+                "Query: \(.query // "N/A")\n" +
+                "Status: \(.overall_state)\n" +
+                "Last Triggered: \(.last_triggered_ts // "Unknown")\n" +
+                "Priority: \(.priority // "None")\n" +
+                "\nAlert Conditions:" +
+                (if .options.thresholds then
+                    "\n  Warning: \(.options.thresholds.warning // "N/A")" +
+                    "\n  Critical: \(.options.thresholds.critical // "N/A")"
+                else
+                    "\n  N/A"
+                end) +
+                "\n\nNotification Settings:" +
+                "\n  Notify No Data: \(.options.notify_no_data // false)" +
+                "\n  Renotify Interval: \(.options.renotify_interval // "N/A")" +
+                "\n\nTags: \(.tags // [] | join(", ") // "N/A")" +
+                "\n---\n"
+            '
+
+            # Get state history for each alerting monitor
+            echo "$MONITORS_RESPONSE" | jq -r '.[] | select(.overall_state=="Alert") | .id' | while read -r monitor_id; do
+                if [ -n "$monitor_id" ]; then
+                    echo "=== State History for Monitor $monitor_id ==="
+                    STATE_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$monitor_id/states" \
                         -H "DD-API-KEY: $DD_API_KEY" \
                         -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-                    # Get state history
-                    STATE_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID/states" \
-                        -H "DD-API-KEY: $DD_API_KEY" \
-                        -H "DD-APPLICATION-KEY: $DD_APP_KEY")
-
-                    echo "=== Alert Details ==="
-                    echo "$MONITOR_DATA" | jq -r '
-                        "Monitor ID: \(.id // "N/A")",
-                        "Name: \(.name // "N/A")",
-                        "Message: \(.message // "N/A")",
-                        "Query: \(.query // "N/A")",
-                        "Status: \(.overall_state // "N/A")",
-                        "Priority: \(.priority // "N/A")",
-                        "\nAlert Conditions:",
-                        "  Warning: \(.options.thresholds.warning // "N/A")",
-                        "  Critical: \(.options.thresholds.critical // "N/A")",
-                        "\nNotification Settings:",
-                        "  Notify No Data: \(.options.notify_no_data // false)",
-                        "  Renotify Interval: \(.options.renotify_interval // "N/A")",
-                        "\nTags: \(.tags // [] | join(", ") // "N/A")"
-                    '
-
-                    echo "\n=== Recent State History ==="
                     echo "$STATE_DATA" | jq -r '.[] | 
                         "Time: \(.entered_at)",
                         "State: \(.value)",
                         "---"
                     '
-                else
-                    echo "Warning: Could not find alert details or extract monitor ID."
-                    echo "Alert ID format: $alert_id"
-                    exit 1
+                    echo
                 fi
-            else
-                # Process v2 events API response
-                echo "=== Alert Details ==="
-                echo "$RESPONSE" | jq -r '
-                    "ID: \(.data.id // "N/A")",
-                    "Title: \(.data.attributes.title // "N/A")",
-                    "Message: \(.data.attributes.message // "N/A")",
-                    "Service: \(.data.attributes.service // "N/A")",
-                    "Status: \(.data.attributes.status // "N/A")",
-                    "Timestamp: \(.data.attributes.timestamp // "N/A")",
-                    "\nMonitor Details:",
-                    "  Name: \(.data.attributes.monitor.name // "N/A")",
-                    "  Query: \(.data.attributes.monitor.query // "N/A")",
-                    "  Priority: \(.data.attributes.monitor.priority // "N/A")",
-                    "\nLinks:",
-                    "  Logs: https://us5.datadoghq.com\(.data.attributes.monitor.result.logs_url // "N/A")",
-                    "  Alert: https://us5.datadoghq.com\(.data.attributes.monitor.result.alert_url // "N/A")"
-                '
-            fi
+            done
             """,
             args=[
-                Arg(name="alert_id", description="ID of the alert event", required=True)
+                Arg(name="alert_id", description="ID of the alert event (optional - will show all current alerts if not specified)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
