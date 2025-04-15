@@ -139,8 +139,8 @@ def execute_slack_action(token, action, operation, **kwargs):
                         current_time = time()
                         offset = amount * seconds
                         target_time = current_time - offset
-                        kwargs['oldest'] = str(target_time)
-                        logger.info(f"Time conversion: current={{current_time}}, offset={{offset}}, target={{target_time}}")
+                        kwargs['oldest'] = f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
+                        logger.info(f"Time conversion: current={{current_time}}, offset={{offset}}, target={{target_time}}, oldest_param={{kwargs['oldest']}}")
             
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
