@@ -72,35 +72,28 @@ class AlertTools:
                 exit 1
             fi
 
-            # Get the specific alert details
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
+            # Get the specific alert details using v1 API
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-            if [ "$(echo "$RESPONSE" | jq '.errors')" != "null" ]; then
-                echo "Error fetching alert: $(echo "$RESPONSE" | jq -r '.errors[0]')"
+            if [ "$(echo "$RESPONSE" | jq '.event')" = "null" ]; then
+                echo "Error fetching alert: Could not find alert with ID $alert_id"
                 exit 1
             fi
 
             echo "=== Alert Details ==="
-            echo "$RESPONSE" | jq -r '.data | 
+            echo "$RESPONSE" | jq -r '.event | 
                 "Event ID: \(.id)\n" +
-                "Title: \(.attributes.title // "N/A")\n" +
-                "Message: \(.attributes.message // "N/A")\n" +
-                "Status: \(.attributes.status // "N/A")\n" +
-                "Timestamp: \(.attributes.date_happened // "N/A")\n" +
-                "Monitor Name: \(.attributes.monitor.name // "N/A")\n" +
-                "Monitor ID: \(.attributes.monitor.id // "N/A")\n" +
-                "Priority: \(.attributes.priority // "N/A")\n" +
-                "Tags: \(.attributes.tags // [] | join(", ") // "N/A")\n" +
-                "\nMonitor Details:" +
-                "\n  Query: \(.attributes.monitor.query // "N/A")" +
-                "\n  Threshold: \(.attributes.monitor.threshold // "N/A")" +
-                "\n  Window: \(.attributes.monitor.window // "N/A")" +
-                "\n\nLinks:" +
-                "\n  Alert: https://us5.datadoghq.com\(.attributes.monitor.result.alert_url // "N/A")" +
-                "\n  Logs: https://us5.datadoghq.com\(.attributes.monitor.result.logs_url // "N/A")" +
-                "\n---\n"
+                "Title: \(.title // "N/A")\n" +
+                "Text: \(.text // "N/A")\n" +
+                "Date: \(.date_happened // "N/A")\n" +
+                "Alert Type: \(.alert_type // "N/A")\n" +
+                "Priority: \(.priority // "N/A")\n" +
+                "Host: \(.host // "N/A")\n" +
+                "Tags: \(.tags // [] | join(", ") // "N/A")\n" +
+                "URL: \(.url // "N/A")\n" +
+                "---\n"
             '
             """,
             args=[
