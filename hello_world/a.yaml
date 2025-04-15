@@ -2,7 +2,7 @@ name: tool_chaining_example
 description: Example DAG demonstrating data flow between tool steps
 steps:
   - name: generate-data
-    description: First tool generates data for the second step
+    description: First tool generates data for the second step 1
     executor:
       type: tool
       config:
