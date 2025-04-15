@@ -27,68 +27,6 @@ class MonitoringTools:
             print(f"❌ Failed to register Datadog monitoring tools: {str(e)}", file=sys.stderr)
             raise
 
-    def get_alert_details(self) -> DatadogTool:
-        """Retrieve details for a DataDog alert event."""
-        return DatadogTool(
-            name="datadog_alert_details",
-            description="Retrieve details of a triggered DataDog alert (event)",
-            content="""
-            apk add --no-cache jq
-            validate_datadog_connection
-
-            if [ -z "$alert_id" ]; then
-                echo "Error: Alert ID is required"
-                exit 1
-            fi
-
-            # Extract monitor ID from alert ID if possible
-            MONITOR_ID=$(echo "$alert_id" | grep -o 'monitor:[0-9]*' | cut -d':' -f2)
-
-            if [ -n "$MONITOR_ID" ]; then
-                # Try to get monitor details
-                MONITOR_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID" \
-                    -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
-
-                # Get state history
-                STATE_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v1/monitor/$MONITOR_ID/states" \
-                    -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY")
-
-                echo "=== Alert Details ==="
-                echo "$MONITOR_DATA" | jq -r '
-                    "Monitor ID: \(.id // "N/A")",
-                    "Name: \(.name // "N/A")",
-                    "Message: \(.message // "N/A")",
-                    "Query: \(.query // "N/A")",
-                    "Status: \(.overall_state // "N/A")",
-                    "Priority: \(.priority // "N/A")",
-                    "\nAlert Conditions:",
-                    "  Warning: \(.options.thresholds.warning // "N/A")",
-                    "  Critical: \(.options.thresholds.critical // "N/A")",
-                    "\nNotification Settings:",
-                    "  Notify No Data: \(.options.notify_no_data // false)",
-                    "  Renotify Interval: \(.options.renotify_interval // "N/A")",
-                    "\nTags: \(.tags // [] | join(", ") // "N/A")"
-                '
-
-                echo "\n=== Recent State History ==="
-                echo "$STATE_DATA" | jq -r '.[] | 
-                    "Time: \(.entered_at)",
-                    "State: \(.value)",
-                    "---"
-                '
-            else
-                echo "Warning: Could not extract monitor ID from alert ID."
-                echo "The alert details may no longer be available through the events API."
-                echo "Consider storing alert details when initially received for historical access."
-                exit 1
-            fi
-            """,
-            args=[Arg(name="alert_id", description="ID of the alert event", required=True)],
-            image="curlimages/curl:8.1.2"
-        )
-
     def compare_error_rates(self) -> DatadogTool:
         """Compare error rates using log-based aggregation from DataDog."""
         return DatadogTool(
