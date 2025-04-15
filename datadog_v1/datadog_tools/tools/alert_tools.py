@@ -75,12 +75,14 @@ class AlertTools:
             fi
 
             # Get current timestamp and 1 hour ago in milliseconds
-            NOW_MS=$(TZ=MST date +%s)000
-            HOUR_AGO_MS=$(( $(TZ=MST date +%s) - 3600 ))000
+            NOW_MS=$(date -d "$(date)" +%s)000
+            HOUR_AGO_MS=$(( $(date -d "$(date) - 1 hour" +%s) ))000
             
             # Debug time info
-            echo "🕒 Current time (MST): $(TZ=MST date)"
-            echo "🕐 Hour ago (MST): $(TZ=MST date -d "@$(( $(TZ=MST date +%s) - 3600 ))")"
+            echo "🕒 Current time: $(date)"
+            echo "🕐 Hour ago: $(date -d "$(date) - 1 hour")"
+            echo "🔢 Current timestamp: $NOW_MS"
+            echo "🔢 Hour ago timestamp: $HOUR_AGO_MS"
             echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Search for the alert by its numerical ID
@@ -332,12 +334,14 @@ class AlertTools:
             echo "🔍 Searching for alerts with monitor name: $monitor_name"
 
             # Get current timestamp and 1 hour ago in milliseconds
-            NOW_MS=$(TZ=MST date +%s)000
-            HOUR_AGO_MS=$(( $(TZ=MST date +%s) - 3600 ))000
+            NOW_MS=$(date -d "$(date)" +%s)000
+            HOUR_AGO_MS=$(( $(date -d "$(date) - 1 hour" +%s) ))000
             
             # Debug time info
-            echo "🕒 Current time (MST): $(TZ=MST date)"
-            echo "🕐 Hour ago (MST): $(TZ=MST date -d "@$(( $(TZ=MST date +%s) - 3600 ))")"
+            echo "🕒 Current time: $(date)"
+            echo "🕐 Hour ago: $(date -d "$(date) - 1 hour")"
+            echo "🔢 Current timestamp: $NOW_MS"
+            echo "🔢 Hour ago timestamp: $HOUR_AGO_MS"
             echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Escape the monitor name for the query
