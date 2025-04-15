@@ -41,11 +41,22 @@ class MonitoringTools:
                 exit 1
             fi
 
+            # First try the events API
             ALERT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json")
+
+            # Check if we got valid data
+            if [ "$(echo "$ALERT_DATA" | jq '.data')" = "null" ]; then
+                echo "Warning: Could not find alert details. This could be because:"
+                echo "- The alert ID has expired"
+                echo "- The alert ID format is incorrect"
+                echo "- You don't have permission to access this alert"
+                echo "- The alert was deleted"
+                exit 1
+            fi
 
             echo "=== Alert Details ==="
             echo "$ALERT_DATA" | jq -r '
@@ -55,11 +66,13 @@ class MonitoringTools:
                 "Service: \(.data.attributes.attributes.service // "N/A")",
                 "Status: \(.data.attributes.attributes.status // "N/A")",
                 "Timestamp: \(.data.attributes.attributes.timestamp // "N/A")",
-                "Monitor Name: \(.data.attributes.attributes.monitor.name // "N/A")",
-                "Monitor Query: \(.data.attributes.attributes.monitor.query // "N/A")",
-                "Monitor Priority: \(.data.attributes.attributes.monitor.priority // "N/A")",
-                "Monitor Logs URL: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.logs_url // "N/A")",
-                "Monitor Status URL: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.alert_url // "N/A")"
+                "\nMonitor Details:",
+                "  Name: \(.data.attributes.attributes.monitor.name // "N/A")",
+                "  Query: \(.data.attributes.attributes.monitor.query // "N/A")",
+                "  Priority: \(.data.attributes.attributes.monitor.priority // "N/A")",
+                "\nLinks:",
+                "  Logs: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.logs_url // "N/A")",
+                "  Alert: https://us5.datadoghq.com\(.data.attributes.attributes.monitor.result.alert_url // "N/A")"
             '
             """,
             args=[Arg(name="alert_id", description="ID of the alert event", required=True)],
