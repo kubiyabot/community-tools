@@ -144,6 +144,18 @@ slack_get_channel_history = SlackTool(
     ],
 )
 
+#Slack Get Thread Replies Tool
+slack_get_thread_replies = SlackTool(
+    name="slack_get_thread_replies",
+    description="Get all replies in a thread for a specific message",
+    action="conversations_replies",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel containing the message thread", required=True),
+        Arg(name="ts", type="str", description="Timestamp of the parent message to get replies for", required=True),
+        Arg(name="limit", type="int", description="Number of replies to return (default 100)", required=False),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -159,6 +171,7 @@ all_tools = [
     slack_get_user_info,
     slack_get_channel_history,
     slack_send_message_to_predefined_channel,
+    slack_get_thread_replies,
 ]
 
 # Register all Slack tools
