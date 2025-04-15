@@ -72,28 +72,38 @@ class AlertTools:
                 exit 1
             fi
 
-            # Get the specific alert details using v1 API
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/events/$alert_id" \
+            # Get the specific alert details
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY")
 
-            if [ "$(echo "$RESPONSE" | jq '.event')" = "null" ]; then
-                echo "Error fetching alert: Could not find alert with ID $alert_id"
+            if [ "$(echo "$RESPONSE" | jq '.errors')" != "null" ]; then
+                echo "Error fetching alert: $(echo "$RESPONSE" | jq -r '.errors[0]')"
                 exit 1
             fi
 
             echo "=== Alert Details ==="
-            echo "$RESPONSE" | jq -r '.event | 
+            echo "$RESPONSE" | jq -r '.data | 
                 "Event ID: \(.id)\n" +
-                "Title: \(.title // "N/A")\n" +
-                "Text: \(.text // "N/A")\n" +
-                "Date: \(.date_happened // "N/A")\n" +
-                "Alert Type: \(.alert_type // "N/A")\n" +
-                "Priority: \(.priority // "N/A")\n" +
-                "Host: \(.host // "N/A")\n" +
-                "Tags: \(.tags // [] | join(", ") // "N/A")\n" +
-                "URL: \(.url // "N/A")\n" +
-                "---\n"
+                "Title: \(.attributes.attributes.title // "N/A")\n" +
+                "Message: \(.attributes.message // "N/A")\n" +
+                "Status: \(.attributes.attributes.status // "N/A")\n" +
+                "Service: \(.attributes.attributes.service // "N/A")\n" +
+                "Timestamp: \(.attributes.attributes.timestamp // "N/A")\n" +
+                "\nMonitor Details:" +
+                "\n  Name: \(.attributes.attributes.monitor.name // "N/A")" +
+                "\n  ID: \(.attributes.attributes.monitor.id // "N/A")" +
+                "\n  Query: \(.attributes.attributes.monitor.query // "N/A")" +
+                "\n  Type: \(.attributes.attributes.monitor.type // "N/A")" +
+                "\n  Priority: \(.attributes.attributes.monitor.priority // "N/A")" +
+                "\n  Created: \(.attributes.attributes.monitor.created_at // "N/A")" +
+                "\n  Modified: \(.attributes.attributes.monitor.modified // "N/A")" +
+                "\n\nThresholds:" +
+                "\n  Critical: \(.attributes.attributes.monitor.options.thresholds.critical // "N/A")" +
+                "\n\nLinks:" +
+                "\n  Alert: https://us5.datadoghq.com\(.attributes.attributes.monitor.result.alert_url // "N/A")" +
+                "\n  Logs: https://us5.datadoghq.com\(.attributes.attributes.monitor.result.logs_url // "N/A")" +
+                "\n\nTags: \(.attributes.tags // [] | join(", ") // "N/A")"
             '
             """,
             args=[
