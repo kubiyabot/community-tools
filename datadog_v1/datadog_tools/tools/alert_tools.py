@@ -14,7 +14,9 @@ class AlertTools:
                 self.get_alert_details(),
                 self.get_alert_history(),
                 self.compare_error_rates(),
-                self.query_alert_logs()
+                self.query_alert_logs(),
+                self.compare_error_rates(),
+                self.get_alert_by_name()
             ]
             
             for tool in tools:
@@ -72,19 +74,30 @@ class AlertTools:
                 exit 1
             fi
 
-            # Get the specific alert details
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events/$alert_id" \
-                -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY")
+            # Get current timestamp and 1 hour ago in milliseconds
+            NOW_MS=$(date +%s)000
+            HOUR_AGO_MS=$(($(date +%s) - 3600))000
 
-            if [ "$(echo "$RESPONSE" | jq '.errors')" != "null" ]; then
-                echo "Error fetching alert: $(echo "$RESPONSE" | jq -r '.errors[0]')"
+            # Search for the alert by its numerical ID
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -G \
+                --data-urlencode "filter[from]=$HOUR_AGO_MS" \
+                --data-urlencode "filter[to]=$NOW_MS" \
+                --data-urlencode "filter[query]=*")
+
+            # Find the specific alert by its evt.id
+            EVENT=$(echo "$RESPONSE" | jq --arg aid "$alert_id" '.data[] | select(.attributes.attributes.evt.id == $aid)')
+
+            if [ -z "$EVENT" ]; then
+                echo "Error: Could not find alert with ID $alert_id"
                 exit 1
             fi
 
             echo "=== Alert Details ==="
-            echo "$RESPONSE" | jq -r '.data | 
-                "Event ID: \(.id)\n" +
+            echo "$EVENT" | jq -r '
+                "Event ID: \(.attributes.attributes.evt.id)\n" +
                 "Title: \(.attributes.attributes.title // "N/A")\n" +
                 "Message: \(.attributes.message // "N/A")\n" +
                 "Status: \(.attributes.attributes.status // "N/A")\n" +
@@ -107,7 +120,7 @@ class AlertTools:
             '
             """,
             args=[
-                Arg(name="alert_id", description="ID of the alert event", required=True)
+                Arg(name="alert_id", description="Numerical ID of the alert event", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
@@ -152,12 +165,12 @@ class AlertTools:
         )
 
     def compare_error_rates(self) -> DatadogTool:
-        """Compare error rates between time periods."""
+        """Compare error rates using log-based aggregation from DataDog."""
         return DatadogTool(
             name="compare_error_rates",
-            description="Compare error rates between current and previous periods",
+            description="Compare error rates for the past week vs the previous week using log aggregation",
             content="""
-            apk add --no-cache jq
+            apk add --no-cache jq coreutils
             validate_datadog_connection
 
             if [ -z "$service" ]; then
@@ -165,71 +178,82 @@ class AlertTools:
                 exit 1
             fi
 
+            echo "Comparing error rates for service: $service"
+
+            # Calculate timestamps (in seconds)
             NOW_TS=$(date +%s)
-            PERIOD_SEC=${period_hours:-24}
-            PERIOD_SEC=$((PERIOD_SEC * 3600))
-            PERIOD_AGO_TS=$((NOW_TS - PERIOD_SEC))
-            TWO_PERIODS_AGO_TS=$((NOW_TS - (2 * PERIOD_SEC)))
+            WEEK_SEC=604800  # 7 days in seconds
+            WEEK_AGO_TS=$((NOW_TS - WEEK_SEC))
+            TWO_WEEKS_AGO_TS=$((NOW_TS - (2 * WEEK_SEC)))
 
-            # Query current period
-            CURRENT=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
-                -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                -H "Content-Type: application/json" \
-                -d '{
-                    "filter": {
-                        "from": '"$PERIOD_AGO_TS"',
-                        "to": '"$NOW_TS"',
-                        "query": "service:'"$service"' status:error"
-                    },
-                    "compute": [{"aggregation": "count"}]
-                }')
+            fetch_current_week_logs() {
+                echo "=== Fetching logs for Current Week ==="
 
-            # Query previous period
-            PREVIOUS=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
-                -H "DD-API-KEY: $DD_API_KEY" \
-                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                -H "Content-Type: application/json" \
-                -d '{
-                    "filter": {
-                        "from": '"$TWO_PERIODS_AGO_TS"',
-                        "to": '"$PERIOD_AGO_TS"',
-                        "query": "service:'"$service"' status:error"
-                    },
-                    "compute": [{"aggregation": "count"}]
-                }')
+                RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "filter": {
+                            "from": '"$WEEK_AGO_TS"',
+                            "to": '"$NOW_TS"',
+                            "query": "@service:'"$service"' @status:error"
+                        },
+                        "compute": [{"aggregation": "count"}],
+                        "group_by": [
+                            {"facet": "@service"},
+                            {"facet": "@status"}
+                        ]
+                    }')
 
-            CURRENT_COUNT=$(echo "$CURRENT" | jq -r '.data.buckets[0].computes.c0 // 0')
-            PREVIOUS_COUNT=$(echo "$PREVIOUS" | jq -r '.data.buckets[0].computes.c0 // 0')
-
-            echo "=== Error Rate Comparison ==="
-            echo "Service: $service"
-            echo "Current period ($((PERIOD_SEC/3600))h): $CURRENT_COUNT errors"
-            echo "Previous period ($((PERIOD_SEC/3600))h): $PREVIOUS_COUNT errors"
-            
-            if [ $PREVIOUS_COUNT -eq 0 ]; then
-                if [ $CURRENT_COUNT -eq 0 ]; then
-                    echo "No errors in either period"
-                else
-                    echo "∞% increase (no errors in previous period)"
+                if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                    echo "Error: Invalid JSON response from API"
+                    echo "Raw response: $RESPONSE"
+                    exit 1
                 fi
-            else
-                PERCENT_CHANGE=$(( (CURRENT_COUNT - PREVIOUS_COUNT) * 100 / PREVIOUS_COUNT ))
-                if [ $PERCENT_CHANGE -gt 0 ]; then
-                    echo "⚠️ $PERCENT_CHANGE% increase in errors"
-                elif [ $PERCENT_CHANGE -lt 0 ]; then
-                    echo "✅ $((PERCENT_CHANGE * -1))% decrease in errors"
-                else
-                    echo "No change in error rate"
+
+                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Current Week: $ERROR_COUNT"
+            }
+
+            fetch_previous_week_logs() {
+                echo "=== Fetching logs for Previous Week ==="
+
+                RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/analytics/aggregate" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                        "filter": {
+                            "from": '"$TWO_WEEKS_AGO_TS"',
+                            "to": '"$WEEK_AGO_TS"',
+                            "query": "@service:'"$service"' @status:error"
+                        },
+                        "compute": [{"aggregation": "count"}],
+                        "group_by": [
+                            {"facet": "@service"},
+                            {"facet": "@status"}
+                        ]
+                    }')
+
+                if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
+                    echo "Error: Invalid JSON response from API"
+                    echo "Raw response: $RESPONSE"
+                    exit 1
                 fi
-            fi
+
+                ERROR_COUNT=$(echo "$RESPONSE" | jq -r '.data.buckets[0].computes.c0 // "0"')
+                echo "Total Errors in Previous Week: $ERROR_COUNT"
+            }
+
+            # Execute the log fetching functions
+            fetch_current_week_logs
+            fetch_previous_week_logs
             """,
-            args=[
-                Arg(name="service", description="Service name to analyze", required=True),
-                Arg(name="period_hours", description="Hours to compare (default: 24)", required=False)
-            ],
+            args=[Arg(name="service", description="Service name from alert", required=True)],
             image="curlimages/curl:8.1.2"
         )
+
 
     def query_alert_logs(self) -> DatadogTool:
         """Query logs related to an alert."""
@@ -286,5 +310,58 @@ class AlertTools:
             image="curlimages/curl:8.1.2"
         )
 
+    def get_alert_by_name(self) -> DatadogTool:
+        """Search for recent alerts by monitor name."""
+        return DatadogTool(
+            name="get_alert_by_name",
+            description="Search for recent DataDog alerts by monitor name",
+            content="""
+            apk add --no-cache jq
+            validate_datadog_connection
+
+            if [ -z "$monitor_name" ]; then
+                echo "Error: Monitor name is required"
+                exit 1
+            fi
+
+            # Get current timestamp and 1 hour ago in milliseconds
+            NOW_MS=$(date +%s)000
+            HOUR_AGO_MS=$(($(date +%s) - 3600))000
+
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -G \
+                --data-urlencode "filter[from]=$HOUR_AGO_MS" \
+                --data-urlencode "filter[to]=$NOW_MS" \
+                --data-urlencode "filter[query]=monitor:*\\"$monitor_name\\"*")
+
+            # Check if response contains events
+            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
+                echo "No alerts found matching monitor name: $monitor_name"
+                exit 0
+            fi
+
+            echo "=== Found Alerts ==="
+            echo "$RESPONSE" | jq -r '.data[] | 
+                select(.attributes.attributes.status != "info") |
+                select(.attributes.attributes.monitor.name != null) |
+                select(.attributes.attributes.monitor.name == "'$monitor_name'") |
+                "ID: \(.attributes.attributes.evt.id)",
+                "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")",
+                "Title: \(.attributes.attributes.title // "N/A")",
+                "Status: \(.attributes.attributes.status // "N/A")",
+                "Timestamp: \(.attributes.date_happened // "N/A")",
+                "Service: \(.attributes.attributes.service // "N/A")",
+                "---"
+            '
+            """,
+            args=[
+                Arg(name="monitor_name", description="Name of the monitor to search for", required=True)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+    
 # Initialize tools
 AlertTools() 
