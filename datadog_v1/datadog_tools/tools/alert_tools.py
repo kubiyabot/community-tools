@@ -324,12 +324,20 @@ class AlertTools:
                 exit 1
             fi
 
+            echo "🔍 Searching for alerts with monitor name: $monitor_name"
+
             # Get current timestamp and 1 hour ago in milliseconds
             NOW_MS=$(date +%s)000
             HOUR_AGO_MS=$(($(date +%s) - 3600))000
+            echo "📅 Time range: From $HOUR_AGO_MS to $NOW_MS"
 
             # Escape the monitor name for the query
             ESCAPED_NAME=$(echo "$monitor_name" | sed 's/"/\\"/g')
+            echo "🔒 Escaped monitor name: $ESCAPED_NAME"
+
+            echo "📡 Making API request..."
+            QUERY="*$ESCAPED_NAME*"
+            echo "🔍 Query filter: $QUERY"
 
             RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/events" \
                 -H "DD-API-KEY: $DD_API_KEY" \
@@ -338,26 +346,37 @@ class AlertTools:
                 -G \
                 --data-urlencode "filter[from]=$HOUR_AGO_MS" \
                 --data-urlencode "filter[to]=$NOW_MS" \
-                --data-urlencode "filter[query]=monitor:*\\"$ESCAPED_NAME\\"*")
+                --data-urlencode "filter[query]=$QUERY")
+
+            echo "📥 Raw API Response:"
+            echo "$RESPONSE" | jq '.'
 
             # Check if response is valid JSON
             if ! echo "$RESPONSE" | jq empty 2>/dev/null; then
-                echo "Error: Invalid JSON response from API"
+                echo "❌ Error: Invalid JSON response from API"
                 echo "Raw response: $RESPONSE"
                 exit 1
             fi
 
-            # Check if response contains events
-            if [ "$(echo "$RESPONSE" | jq '.data | length')" = "0" ]; then
-                echo "No alerts found matching monitor name: $monitor_name"
+            echo "🔢 Total events in response:"
+            echo "$RESPONSE" | jq '.data | length'
+
+            echo "🔍 Filtering events for monitor name..."
+            FILTERED_DATA=$(echo "$RESPONSE" | jq -r --arg name "$monitor_name" '.data[] | 
+                select(.attributes.attributes.monitor.name != null) |
+                select(.attributes.attributes.monitor.name | contains($name))')
+
+            echo "📋 Filtered Data (raw):"
+            echo "$FILTERED_DATA"
+
+            if [ -z "$FILTERED_DATA" ]; then
+                echo "❌ No alerts found matching monitor name: $monitor_name"
                 exit 0
             fi
 
+            echo "✅ Found matching alerts. Processing results..."
             echo "=== Found Alerts ==="
-            echo "$RESPONSE" | jq -r --arg name "$monitor_name" '.data[] | 
-                select(.attributes.attributes.status != "info") |
-                select(.attributes.attributes.monitor.name != null) |
-                select(.attributes.attributes.monitor.name | contains($name)) |
+            echo "$FILTERED_DATA" | jq -r '
                 "ID: \(.attributes.attributes.evt.id)\n" +
                 "Monitor Name: \(.attributes.attributes.monitor.name // "N/A")\n" +
                 "Title: \(.attributes.attributes.title // "N/A")\n" +
