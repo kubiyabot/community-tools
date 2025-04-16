@@ -321,6 +321,11 @@ if ! command -v envsubst >/dev/null 2>&1; then
 fi
 echo "🔨 envsubst installed"
 
+# Ensure python3
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --no-cache python3 >/dev/null 2>&1
+fi
+
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
 python_version=$(python3 --version)
