@@ -11,12 +11,8 @@ except ImportError:
 import os
 import sys
 import json
-import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 try:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -41,25 +37,19 @@ class TemplateHandler:
         """Render a template with given variables."""
         try:
             template = self.env.get_template(f"{template_name}.jinja2")
-            logger.info(f"Template '{template_name}' found and loaded")
             try:
                 result = template.render(**variables)
-                logger.info("Template rendered successfully")
                 return result
-            except Exception as e:
-                logger.error(f"Template rendering failed: {str(e)}")
-                logger.error(f"Template variables: {variables}")
+            except Exception:
                 raise
-        except Exception as e:
-            logger.error(f"Failed to load template {template_name}: {str(e)}")
+        except Exception:
             return None
 
     def get_available_templates(self) -> list:
         """Get list of available templates."""
         try:
             return [f.stem for f in self.template_dir.glob('*.jinja2')]
-        except Exception as e:
-            logger.error(f"Failed to list templates: {str(e)}")
+        except Exception:
             return [] 
 
 
@@ -67,10 +57,8 @@ def parse_workflow_steps(steps_json: str) -> list:
     """Parse workflow steps from JSON string."""
     try:
         return json.loads(steps_json)
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid workflow steps JSON: {e}, value: {steps_json}")
+    except json.JSONDecodeError:
         # Return empty list instead of exiting
-        logger.warning("Will skip workflow steps diagram due to parsing error")
         return []
 
 def find_template_file() -> Path:
@@ -84,7 +72,6 @@ def find_template_file() -> Path:
     
     for path in possible_paths:
         if path.exists():
-            logger.info(f"Found template at: {path}")
             return path
             
     raise FileNotFoundError("Could not find workflow_failure.jinja2 template in any expected location")
@@ -107,19 +94,16 @@ def generate_comment(variables: dict) -> str:
         # Initialize template handler
         template_handler = TemplateHandler()
 
-        logger.info(f"Available templates: {template_handler.get_available_templates()}")
-
         # Render the template
         comment = template_handler.render_template('workflow_failure', context)
 
         if not comment:
             raise ValueError("Failed to generate comment from template")
             
-        logger.info("Successfully generated comment")
         return comment
 
     except Exception as e:
-        logger.error(f"Error generating comment: {str(e)}")
+        print(f"Error generating comment: {str(e)}")
         sys.exit(1)
 
 def main():
@@ -138,16 +122,14 @@ def main():
                 raise KeyError(f"Missing required environment variable: {var}")
             variables[var.lower()] = os.environ[var]
         
-        logger.info("Starting comment generation...")
         comment = generate_comment(variables)
         print(comment)
-        logger.info("Comment generation completed successfully")
         
     except KeyError as e:
-        logger.error(f"Missing environment variable: {str(e)}")
+        print(f"Missing environment variable: {str(e)}")
         sys.exit(1)
     except Exception as e:
-        logger.error(f"Error: {str(e)}")
+        print(f"Error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":
