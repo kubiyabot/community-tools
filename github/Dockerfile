@@ -22,7 +22,7 @@ ARG APPNAME=github_tools
 ARG USERNAME=$APPNAME
 
 # System deps
-RUN apk add --no-cache jq ca-certificates curl socat
+RUN apk add --no-cache jq ca-certificates curl socat gettext
 
 # Install GitHub CLI
 RUN apk add --no-cache github-cli
@@ -35,8 +35,12 @@ RUN addgroup -g 6009 $USERNAME && \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-RUN chmod 755 /usr/local/bin/python* /usr/local/bin/pip*
-RUN chmod -R 755 /usr/local/lib/python3.11/site-packages
+# Set proper permissions for Python executables and libraries
+RUN find /usr/local/bin -type f -name "python*" -exec chmod 755 {} \;
+RUN find /usr/local/bin -type f -name "pip*" -exec chmod 755 {} \;
+RUN find /usr/local/lib/python3.11/site-packages -type d -exec chmod 755 {} \;
+RUN find /usr/local/lib/python3.11/site-packages -type f -exec chmod 644 {} \;
+RUN find /usr/local/lib/python3.11/site-packages -type f -name "*.so" -exec chmod 755 {} \;
 
 # Copy source code
 COPY . /app/
