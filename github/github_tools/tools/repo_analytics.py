@@ -70,8 +70,19 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -128,9 +139,26 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="limit", type="str", description="Number of alerts to show (default: 5)", required=False, default="5"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="limit",
+            type="str",
+            description="Number of alerts to show (default: 5)",
+            required=False,
+            default="5",
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -139,61 +167,166 @@ commit_history = GitHubCliTool(
     description="Analyze recent commit history and patterns",
     content="""
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
+
+# Detect if script is being sourced
+sourced=0
+if [ "${BASH_SOURCE[0]}" != "${0}" ]; then
+    sourced=1
+fi
+
+# Use default values if not set
+org=${org:-""}
+repo=${repo:-""}
+limit=${limit:-5}
+format=${format:-"text"}
+
+check_and_set_org() {
+  if [ -n "$org" ]; then
+    echo "Using organization: $org"
+  else
+    orgs=$(gh api user/orgs --jq '.[].login')
+    org_count=$(echo "$orgs" | wc -l)
+    if [ "$org_count" -eq 0 ]; then
+      echo "You are not part of any organization."
+    elif [ "$org_count" -eq 1 ]; then
+      org=$orgs
+      echo "You are part of one organization: $org. Using this organization."
+    else
+      echo "You are part of the following organizations:"
+      echo "$orgs"
+      echo "Please specify the organization in your command if needed."
+    fi
+  fi
+}
+
+get_repo_context() {
+  if [ -z "$repo" ]; then
+    if [ -n "$org" ]; then
+      echo "No repository specified. Here are your 10 most recently updated repositories in the $org organization:"
+      gh repo list $org --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
+    else
+      echo "No repository specified. Here are your 10 most recently updated repositories:"
+      gh repo list --limit 10 --json nameWithOwner --jq '.[].nameWithOwner'
+    fi
+    echo "NOTE: This is not a complete list of your repositories."
+    echo "Please specify a repository name in your command."
+    # Use return instead of exit when sourced
+    if [ $sourced -eq 1 ]; then
+      return 1
+    else
+      exit 1
+    fi
+  else
+    if [[ "$repo" != *"/"* ]]; then
+      if [ -n "$org" ]; then
+        repo="${org}/${repo}"
+      else
+        current_user=$(gh api user --jq '.login')
+        repo="${current_user}/${repo}"
+      fi
+    fi
+    echo "Using repository: $repo"
+  fi
+}
+
+# Run the context checks
+check_and_set_org
+get_repo_context || { 
+  if [ $sourced -eq 1 ]; then
+    return 1
+  else
+    exit 1
+  fi
+}
 
 echo "📜 Analyzing commit history for: $repo"
-LIMIT="${limit:-5}"  # Default to 5 commits if not specified
 
-# Get recent commits (limited)
+# Get recent commits with a single API call
 echo "🔍 Fetching recent commits..."
-COMMITS=$(gh api "repos/$repo/commits?per_page=$LIMIT" --jq '[
-    .[] | {
-        sha: .sha[0:7],  # Short SHA
-        author: .author.login,
-        date: .commit.author.date,
-        message: (.commit.message | split("\\n")[0]),  # Just first line
-        changes: {
-            additions: .stats.additions,
-            deletions: .stats.deletions
-        }
-    }
-]')
+COMMITS=$(gh api "repos/$repo/commits?per_page=$limit" --jq '[ .[] | { 
+  sha: .sha[0:7], 
+  author: .author.login, 
+  author_name: .commit.author.name,
+  date: .commit.author.date,
+  message: (.commit.message | split("\n")[0]),
+  full_message: .commit.message,
+  html_url: .html_url
+} ]')
 
-# Get recent activity (last 4 weeks)
-echo "📊 Analyzing recent activity..."
-ACTIVITY=$(gh api "repos/$repo/stats/commit_activity" --jq '{
-    last_month: ([.[-4:] | .[] | .total] | add),
-    last_week: .[-1].total,
-    by_day: .[-1].days
+# Get current date in ISO 8601 format
+TODAY=$(date +"%Y-%m-%d")
+
+# For macOS date calculations to work properly
+if [[ "$(uname)" == "Darwin" ]]; then
+  # macOS - calculate ISO 8601 dates for 30 days ago and 7 days ago
+  THIRTY_DAYS_AGO=$(date -j -v-30d +"%Y-%m-%d")
+  SEVEN_DAYS_AGO=$(date -j -v-7d +"%Y-%m-%d")
+else
+  # Linux
+  THIRTY_DAYS_AGO=$(date -d "30 days ago" +"%Y-%m-%d")
+  SEVEN_DAYS_AGO=$(date -d "7 days ago" +"%Y-%m-%d")
+fi
+
+echo "📊 Building activity metrics..."
+echo "  Counting commits since $THIRTY_DAYS_AGO..."
+
+# Get commits for last 30 days - use the since parameter with the date
+MONTHLY_COMMITS=$(gh api "repos/$repo/commits?since=${THIRTY_DAYS_AGO}T00:00:00Z&per_page=100" --jq 'length')
+
+# Get commits for last 7 days - use the since parameter with the date 
+echo "  Counting commits since $SEVEN_DAYS_AGO..."
+WEEKLY_COMMITS=$(gh api "repos/$repo/commits?since=${SEVEN_DAYS_AGO}T00:00:00Z&per_page=100" --jq 'length')
+
+# Build activity object - removed daily counts
+ACTIVITY=$(jq -n --argjson monthly "$MONTHLY_COMMITS" --argjson weekly "$WEEKLY_COMMITS" '{
+  last_month: $monthly,
+  last_week: $weekly
 }')
 
 # Format output
 if [ "$format" = "json" ]; then
-    jq -n --argjson commits "$COMMITS" \
-          --argjson activity "$ACTIVITY" \
-        '{
-            recent_commits: $commits,
-            recent_activity: $activity
-        }'
+  jq -n --argjson commits "$COMMITS" --argjson activity "$ACTIVITY" '{
+    recent_commits: $commits,
+    recent_activity: $activity
+  }'
 else
-    echo "=== Recent Commits ==="
-    echo "$COMMITS" | jq -r '.[] |
-        "🔨 \(.date | fromdate | strftime("%Y-%m-%d")):\\n   By: \(.author)\\n   SHA: \(.sha)\\n   Message: \(.message)\\n   Changes: +\(.changes.additions)/-\(.changes.deletions)\\n"
-    '
-    
-    echo "=== Recent Activity ==="
-    echo "$ACTIVITY" | jq -r '
-        "📊 Last Month: \(.last_month) commits\\n" +
-        "📈 Last Week: \(.last_week) commits\\n" +
-        "📅 Last Week by Day (Sun-Sat):\\n   " + 
-        (.by_day | map(tostring) | join(" "))
-    '
+  echo "=== Recent Commits ==="
+  echo "$COMMITS" | jq -r '.[] | "🔨 \(.date | fromdate | strftime("%Y-%m-%d %H:%M:%S UTC")):\n By: \(.author_name) <\(.author)>\n SHA: \(.sha)\n URL: \(.html_url)\n Message: \(.message)\n" '
+  
+  echo "=== Recent Activity ==="
+  echo "$ACTIVITY" | jq -r '
+    "📊 Last Month: \(.last_month) commits\n" +
+    "📈 Last Week: \(.last_week) commits"
+  '
+fi
+
+# If sourced, return 0 for success
+if [ $sourced -eq 1 ]; then
+  return 0
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="limit", type="str", description="Number of commits to show (default: 5)", required=False, default="5"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="limit",
+            type="str",
+            description="Number of commits to show (default: 5)",
+            required=False,
+            default="5",
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -316,10 +449,33 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="days", type="str", description="Days of history to analyze (default: 7)", required=False, default="7"),
-        Arg(name="limit", type="str", description="Maximum number of runs to analyze (default: 50)", required=False, default="50"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="days",
+            type="str",
+            description="Days of history to analyze (default: 7)",
+            required=False,
+            default="7",
+        ),
+        Arg(
+            name="limit",
+            type="str",
+            description="Maximum number of runs to analyze (default: 50)",
+            required=False,
+            default="50",
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -401,10 +557,32 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="workflow", type="str", description="Workflow name or file path", required=True),
-        Arg(name="limit", type="str", description="Number of runs to analyze (default: 10)", required=False, default="10"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="workflow",
+            type="str",
+            description="Workflow name or file path",
+            required=True,
+        ),
+        Arg(
+            name="limit",
+            type="str",
+            description="Number of runs to analyze (default: 10)",
+            required=False,
+            default="10",
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -531,8 +709,19 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -618,8 +807,19 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -696,13 +896,45 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="author", type="str", description="Filter by author (username or email)", required=False),
-        Arg(name="since", type="str", description="Show commits after date (YYYY-MM-DD)", required=False),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="author",
+            type="str",
+            description="Filter by author (username or email)",
+            required=False,
+        ),
+        Arg(
+            name="since",
+            type="str",
+            description="Show commits after date (YYYY-MM-DD)",
+            required=False,
+        ),
         Arg(name="path", type="str", description="Filter by file path", required=False),
-        Arg(name="branch", type="str", description="Filter by branch or commit SHA", required=False),
-        Arg(name="limit", type="str", description="Maximum number of commits to show", required=False, default="10"),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="branch",
+            type="str",
+            description="Filter by branch or commit SHA",
+            required=False,
+        ),
+        Arg(
+            name="limit",
+            type="str",
+            description="Maximum number of commits to show",
+            required=False,
+            default="10",
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -794,9 +1026,25 @@ else
 fi
 """,
     args=[
-        Arg(name="repo", type="str", description="Repository name (owner/repo)", required=True),
-        Arg(name="commit", type="str", description="Commit SHA or reference", required=True),
-        Arg(name="format", type="str", description="Output format (text/json)", required=False, default="text"),
+        Arg(
+            name="repo",
+            type="str",
+            description="Repository name (owner/repo)",
+            required=True,
+        ),
+        Arg(
+            name="commit",
+            type="str",
+            description="Commit SHA or reference",
+            required=True,
+        ),
+        Arg(
+            name="format",
+            type="str",
+            description="Output format (text/json)",
+            required=False,
+            default="text",
+        ),
     ],
 )
 
@@ -816,4 +1064,14 @@ ANALYTICS_TOOLS = [
 for tool in ANALYTICS_TOOLS:
     tool_registry.register("github", tool)
 
-__all__ = ['repo_stats', 'security_analysis', 'commit_history', 'workflow_analytics', 'workflow_job_analytics', 'repo_insights', 'dependency_insights', 'commit_search', 'commit_details'] 
+__all__ = [
+    "repo_stats",
+    "security_analysis",
+    "commit_history",
+    "workflow_analytics",
+    "workflow_job_analytics",
+    "repo_insights",
+    "dependency_insights",
+    "commit_search",
+    "commit_details",
+]
