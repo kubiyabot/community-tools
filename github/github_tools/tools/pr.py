@@ -316,18 +316,16 @@ export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
 
-# Install gettext if needed
+if ! command -v python3 >/dev/null 2>&1; then
+    apk add --quiet python3 py3-pip >/dev/null 2>&1
+fi
+
 if ! command -v envsubst >/dev/null 2>&1; then
     apk add --quiet gettext >/dev/null 2>&1
 fi
 
-# Ensure python3 is available and working
-if ! command -v python3 >/dev/null 2>&1; then
-    apk add --no-cache python3 py3-pip # >/dev/null 2>&1
-fi
-
 if ! python3 -c "import jinja2" >/dev/null 2>&1; then
-    pip3 install --quiet jinja2 # >/dev/null 2>&1
+    python3 -m pip install --quiet jinja2
 fi
 
 # Generate comment using template
