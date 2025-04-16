@@ -316,26 +316,41 @@ export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
 
-
+# Install gettext if needed
 if ! command -v envsubst >/dev/null 2>&1; then
     apk add --quiet gettext >/dev/null 2>&1
 fi
 echo "🔨 envsubst installed"
 
-# Ensure python3
-if ! command -v /usr/local/bin/python3 >/dev/null 2>&1; then
+# Ensure python3 is available and working
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "Installing Python..."
     apk add --no-cache python3 >/dev/null 2>&1
 fi
 
-ls -l $(which /usr/local/bin/python3)
+# Verify python3 works by checking its version
+if ! python3 --version; then
+    echo "❌ Python3 command not working properly"
+    echo "Trying alternative approaches..."
+    
+    # Try using python3.11 directly
+    if command -v python3.11 >/dev/null 2>&1; then
+        echo "Using python3.11 directly"
+        PYTHON_CMD="python3.11"
+    else
+        echo "❌ Could not find working Python interpreter"
+        exit 1
+    fi
+else
+    PYTHON_CMD="python3"
+fi
+
+echo "🔨 Using Python command: $PYTHON_CMD"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
-python_version=$(/usr/local/bin/python3 --version)
-echo "🚀 Python version: $python_version"
-which python3
-GENERATED_COMMENT=$(/usr/local/bin/python3 /opt/scripts/comment_generator.py) || {
-    echo "❌ Failed to generate comment"
+GENERATED_COMMENT=$($PYTHON_CMD /opt/scripts/comment_generator.py 2>&1) || {
+    echo "❌ Failed to generate comment: $GENERATED_COMMENT"
     exit 1
 }
 

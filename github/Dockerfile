@@ -22,14 +22,14 @@ ARG APPNAME=github_tools
 ARG USERNAME=$APPNAME
 
 # System deps
-RUN apk add --no-cache jq ca-certificates curl socat gettext
+RUN apk add --no-cache jq ca-certificates curl socat gettext bash
 
 # Install GitHub CLI
 RUN apk add --no-cache github-cli
 
 # Create app user
 RUN addgroup -g 6009 $USERNAME && \
-    adduser -D -G $USERNAME -u 6009 -h /app -s /sbin/nologin $USERNAME
+    adduser -D -G $USERNAME -u 6009 -h /app -s /bin/bash $USERNAME
 
 # Copy dependencies from builder
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
@@ -52,4 +52,4 @@ RUN chown -R $USERNAME:$USERNAME /app
 
 USER $USERNAME
 
-CMD ["/bin/sh"]
+CMD ["/bin/bash"]
