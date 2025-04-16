@@ -310,21 +310,11 @@ set -euo pipefail
 
 echo "💬 Processing comment for pull request #$number in $repo..."
 
-# # Validate JSON inputs
-# for input in "$workflow_steps" "$failures_and_fixes" "$run_details"; do
-#     if ! printf '%s' "$input" | jq empty; then
-#         echo "❌ Invalid JSON input provided"
-#         exit 1
-#     fi
-# done
-
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
-export ERROR_LOGS="$error_logs"
-export RUN_DETAILS="$run_details"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
@@ -352,12 +342,6 @@ if [ -n "$EXISTING_COMMENT_ID" ]; then
     
     # Get current comment content
     CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
-    
-    # Count existing edits
-    # echo "Calculating edit count... "
-    # EDIT_COUNT=$(printf '%s' "$CURRENT_CONTENT" | grep -c "Edit #" || echo "0")
-    # EDIT_COUNT=$((EDIT_COUNT + 1))
-    # EDIT_COUNT="0"
     
     # Create updated comment with edit history
     echo "🔨 Creating updated comment..."
@@ -424,39 +408,43 @@ fi
         Arg(
             name="failures_and_fixes",
             type="str",
-            description="""JSON array of workflow failures and suggested fixes. Example:
-[
-    {
-        "step": "Run Tests",
-        "error": "Test failed: expected 200 but got 404",
-        "file": "tests/api_test.go",
-        "line": "42",
-        "detailed_suggested_fix": "Update API test expected status code from 200 to 404.",
-        "suggested_fix_code_sample": "assert.Equal(t, http.StatusNotFound, response.StatusCode)"
-    }
-]""",
+            description="""Detailed analysis of workflow failures and suggested fixes in free-form text.
+
+The required format uses Markdown formatting:
+- Headers (### for headings) to identify each issue
+- Bold/italic text for emphasis
+- Lists (bullet points or numbered) for steps
+- Code blocks (``` for code snippets)
+
+Focus on critical issues only with very accurate, focused, and practical fixes.
+Each suggestion must be actionable and directly address the root cause of the failure.
+
+Example format:
+```
+### Build Failure in dependency-installation step
+
+The build is failing because the 'react' package is missing from package.json.
+
+**Recommended fix:**
+Add React as a dependency by running:
+```npm install --save react```
+
+### Type Error in src/components/Counter.tsx
+
+The component is trying to use a string value where a number is expected.
+
+**Recommended fix:**
+Convert the string value to a number:
+```typescript
+// Change this:
+const count: number = value;
+// To this:
+const count: number = parseInt(value, 10);
+```
+```
+""",
             required=True
-        ),
-        Arg(
-            name="error_logs",
-            type="str",
-            description="Raw error logs from the workflow run",
-            required=True
-        ),
-        Arg(
-            name="run_details",
-            type="str",
-            description="""JSON object with workflow run details. Example:
-{
-    "id": "12345678",
-    "name": "CI Pipeline",
-    "status": "completed/failed",
-    "conclusion": "summary of the result of the workflow run",
-    "actor": "pr author",
-    "processed_at": "2024-01-20T10:00:00Z",
-}""",
-            required=True
-        ),
+        )
     ],
     with_files=[
         FileSpec(

@@ -1,23 +1,11 @@
 # Workflow Status
 
-{% set r_details = run_details | from_json %}
-Workflow **{{ workflow_name }}** finished at {{ r_details.processed_at }} (UTC) with status {{ r_details.status | title }}. 
-PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
-Run: [View Run](https://github.com/{{ repo }}/actions/runs/{{ r_details.id }})
+Workflow analysis completed for PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
 
-## 🔬 Detailed Analysis
-{% for item in failures_and_fixes %}
-### Step: {{ item.step }}
-- **Error:** {{ item.error }} in {{ item.file }} at line {{ item.line }}
-- **Suggested Fix:** 
-    - {{ item.detailed_suggested_fix }}
-    - **Code Sample:** 
-```
-{{ item.suggested_fix_code_sample }}
-```
-{% endfor %}
+## 🔬 Critical Issues Analysis
+{{ failures_and_fixes }}
 
-
+{% if workflow_steps and workflow_steps|length > 0 %}
 ### 📊 Workflow Steps:
 ```mermaid
 graph LR;
@@ -33,19 +21,11 @@ graph LR;
     {% endif %}
 {% endfor %}
 ```
-
-## 📝 Error Logs
-<details>
-<summary>Click to expand error logs</summary>
-
-```
-{{ error_logs }}
-```
-</details>
+{% endif %}
 ---
 
 #### Was this comment helpful? 👍 or 👎 Please let us know your feedback!
 
 <sub align="center">
-🤖 This comment was generated automatically by Kubiya AI at {{ r_details.processed_at }} UTC
+🤖 This comment was generated automatically by Kubiya AI at {{ timestamp }}
 </sub>

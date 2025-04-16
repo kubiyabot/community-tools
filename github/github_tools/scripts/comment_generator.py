@@ -36,8 +36,6 @@ class TemplateHandler:
             trim_blocks=True,
             lstrip_blocks=True
         )
-        # Add JSON filter
-        self.env.filters['from_json'] = json.loads
 
     def render_template(self, template_name: str, variables: Dict[str, Any]) -> Optional[str]:
         """Render a template with given variables."""
@@ -71,25 +69,9 @@ def parse_workflow_steps(steps_json: str) -> list:
         return json.loads(steps_json)
     except json.JSONDecodeError as e:
         logger.error(f"Invalid workflow steps JSON: {e}, value: {steps_json}")
-        sys.exit(1)
-
-def parse_failures_and_fixes(failures_and_fixes_json: str) -> list:
-    """Parse workflow failures and fixes from JSON string."""
-    try:
-        return json.loads(failures_and_fixes_json)
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid failures and fixes JSON: {e}, value: {failures_and_fixes_json}")
-        sys.exit(1)
-
-def parse_run_details(details_json: str) -> dict:
-    """Parse workflow run details from JSON string."""
-    try:
-        _detailes_json = json.loads(details_json)
-        _detailes_json['processed_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        return _detailes_json
-    except json.JSONDecodeError as e:
-        logger.error(f"Invalid run details JSON: {e}, value: {details_json}")
-        sys.exit(1)
+        # Return empty list instead of exiting
+        logger.warning("Will skip workflow steps diagram due to parsing error")
+        return []
 
 def find_template_file() -> Path:
     """Find the workflow failure template file."""
@@ -107,46 +89,20 @@ def find_template_file() -> Path:
             
     raise FileNotFoundError("Could not find workflow_failure.jinja2 template in any expected location")
 
-def process_error_logs_in_context(context):
-    """
-    Recursively processes all values in the dictionary context to replace
-    escape sequences (\t and \n) with actual tabs and newlines.
-    """
-    for key, value in context.items():
-        if isinstance(value, str):
-            # Replace the escape sequences with actual tabs and newlines
-            context[key] = value.replace(r'\t', '\t').replace(r'\n', '\n')
-        elif isinstance(value, dict):
-            # Recursively process nested dictionaries
-            process_error_logs_in_context(value)
-        elif isinstance(value, list):
-            # Process lists (apply to each element in the list if it's a string)
-            for i, item in enumerate(value):
-                if isinstance(item, str):
-                    value[i] = item.replace(r'\t', '\t').replace(r'\n', '\n')
-                elif isinstance(item, dict):
-                    process_error_logs_in_context(item)
-    return context
-
 def generate_comment(variables: dict) -> str:
     """Generate a comment using the workflow failure template."""
     try:
-        # Parse JSON inputs
+        # Parse workflow steps
         workflow_steps = parse_workflow_steps(variables['workflow_steps'])
-        run_details = parse_run_details(variables['run_details'])
-        failures_and_fixes = parse_failures_and_fixes(variables['failures_and_fixes'])
         
         # Create template context
         context = {
             'workflow_steps': workflow_steps,
-            'failures_and_fixes': failures_and_fixes,
-            'error_logs': variables['error_logs'],
-            'run_details': json.dumps(run_details),  # Pass as JSON string
+            'failures_and_fixes': variables['failures_and_fixes'],  # Use as is without parsing
             'number': variables['pr_number'],
-            'repo': variables['repo']
+            'repo': variables['repo'],
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
         }
-        # Process the context dictionary to replace escape sequences
-        context = process_error_logs_in_context(context)
 
         # Initialize template handler
         template_handler = TemplateHandler()
@@ -172,7 +128,7 @@ def main():
         # Get variables from environment
         required_vars = [
             'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS', 
-            'FAILURES_AND_FIXES', 'ERROR_LOGS', 'RUN_DETAILS'
+            'FAILURES_AND_FIXES'
         ]
         
         variables = {}
