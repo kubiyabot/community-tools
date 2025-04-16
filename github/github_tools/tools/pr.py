@@ -320,7 +320,6 @@ export FAILURES_AND_FIXES="$failures_and_fixes"
 if ! command -v envsubst >/dev/null 2>&1; then
     apk add --quiet gettext >/dev/null 2>&1
 fi
-echo "🔨 envsubst installed"
 
 # Ensure python3 is available and working
 if ! command -v python3 >/dev/null 2>&1; then
@@ -328,28 +327,13 @@ if ! command -v python3 >/dev/null 2>&1; then
     apk add --no-cache python3 >/dev/null 2>&1
 fi
 
-# Verify python3 works by checking its version
-if ! python3 --version; then
-    echo "❌ Python3 command not working properly"
-    echo "Trying alternative approaches..."
-    
-    # Try using python3.11 directly
-    if command -v python3.11 >/dev/null 2>&1; then
-        echo "Using python3.11 directly"
-        PYTHON_CMD="python3.11"
-    else
-        echo "❌ Could not find working Python interpreter"
-        exit 1
-    fi
-else
-    PYTHON_CMD="python3"
+if ! python3 -c "import jinja2" >/dev/null 2>&1; then
+    pip3 install --quiet jinja2 >/dev/null 2>&1
 fi
-
-echo "🔨 Using Python command: $PYTHON_CMD"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
-GENERATED_COMMENT=$($PYTHON_CMD /opt/scripts/comment_generator.py 2>&1) || {
+GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
     echo "❌ Failed to generate comment: $GENERATED_COMMENT"
     exit 1
 }
