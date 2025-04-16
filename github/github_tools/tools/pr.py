@@ -318,6 +318,8 @@ export FAILURES_AND_FIXES="$failures_and_fixes"
 
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
+python3 --version
+which python3
 GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
     echo "❌ Failed to generate comment"
     exit 1
