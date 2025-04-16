@@ -317,25 +317,24 @@ export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
 
 
-ls -l $(which python3)
-file $(which python3)
-
 if ! command -v envsubst >/dev/null 2>&1; then
     apk add --quiet gettext >/dev/null 2>&1
 fi
 echo "🔨 envsubst installed"
 
 # Ensure python3
-if ! command -v python3 >/dev/null 2>&1; then
+if ! command -v /usr/local/bin/python3 >/dev/null 2>&1; then
     apk add --no-cache python3 >/dev/null 2>&1
 fi
 
+ls -l $(which /usr/local/bin/python3)
+
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
-python_version=$(python3 --version)
+python_version=$(/usr/local/bin/python3 --version)
 echo "🚀 Python version: $python_version"
 which python3
-GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
+GENERATED_COMMENT=$(/usr/local/bin/python3 /opt/scripts/comment_generator.py) || {
     echo "❌ Failed to generate comment"
     exit 1
 }
