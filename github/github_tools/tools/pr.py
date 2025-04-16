@@ -317,10 +317,20 @@ export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
 
 # Generate comment using template
-echo "🔨 Generating analysis comment..."
-python3 --version
-which python3
-GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py) || {
+echo "🔨 Generating analysis comment...."
+# Find a working Python 3 interpreter
+echo "🔎 Finding Python interpreter..."
+if command -v python3 &>/dev/null; then
+  PYTHON_CMD="python3"
+elif command -v python &>/dev/null && python --version 2>&1 | grep -q "Python 3"; then
+  PYTHON_CMD="python"
+else
+  echo "❌ No Python 3 interpreter found in PATH"
+  exit 1
+fi
+
+echo "🚀 Using Python: $($PYTHON_CMD --version)"
+GENERATED_COMMENT=$($PYTHON_CMD /opt/scripts/comment_generator.py) || {
     echo "❌ Failed to generate comment"
     exit 1
 }
