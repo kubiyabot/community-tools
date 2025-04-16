@@ -316,6 +316,10 @@ export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
 export FAILURES_AND_FIXES="$failures_and_fixes"
 
+if ! command -v envsubst >/dev/null 2>&1; then
+    apk add --quiet gettext >/dev/null 2>&1
+fi
+
 # Generate comment using template
 echo "🔨 Generating analysis comment..."
 python_version=$(python3 --version)
