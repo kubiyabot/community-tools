@@ -35,6 +35,9 @@ RUN addgroup -g 6009 $USERNAME && \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
+RUN chmod 755 /usr/local/bin/python* /usr/local/bin/pip*
+RUN chmod -R 755 /usr/local/lib/python3.11/site-packages
+
 # Copy source code
 COPY . /app/
 
