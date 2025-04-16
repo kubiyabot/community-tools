@@ -323,12 +323,7 @@ fi
 
 # Ensure python3 is available and working
 if ! command -v python3 >/dev/null 2>&1; then
-    apk add --no-cache python3 # >/dev/null 2>&1
-fi
-
-# Ensure python3 is available and working
-if ! command -v pip3 >/dev/null 2>&1; then
-    apk add --no-cache python3-pip # >/dev/null 2>&1
+    apk add --no-cache python3 py3-pip # >/dev/null 2>&1
 fi
 
 if ! python3 -c "import jinja2" >/dev/null 2>&1; then
