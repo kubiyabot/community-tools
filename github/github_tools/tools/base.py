@@ -47,6 +47,10 @@ set -e
 # Set operation type for disclaimer
 OPERATION_TYPE="{name}"
 
+if ! command -v jq >/dev/null 2>&1; then
+    apk add --quiet jq >/dev/null 2>&1
+fi
+
 # Function to add disclaimer
 add_disclaimer() {{
     local format="$1"
