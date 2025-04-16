@@ -325,7 +325,7 @@ if ! command -v envsubst >/dev/null 2>&1; then
 fi
 
 if ! python3 -c "import jinja2" >/dev/null 2>&1; then
-    python3 -m pip install --quiet jinja2
+    apk add py3-jinja2
 fi
 
 # Generate comment using template
