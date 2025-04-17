@@ -251,13 +251,13 @@ fi
 
 pr_comment_and_edit_if_exists = GitHubCliTool(
     name="github_pr_comment_and_edit_if_exists",
-    description="Add a formatted comment to a pull request with proper formatting and timestamp. Always creates a new comment.",
+    description="Add a formatted comment to a pull request with proper formatting and timestamp. Updates existing comment if one exists.",
     content="""
 # Format the timestamp in ISO format
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # Create a formatted comment
-echo "📝 Creating new comment..."
+echo "📝 Preparing comment..."
 FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
 
 $body
@@ -265,33 +265,66 @@ $body
 ---
 <sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
 
-# Add the comment to the PR
-COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to add comment"
-    echo "Error: $COMMENT_URL"
+# Get GitHub actor
+GITHUB_ACTOR=$(gh api user --jq '.login') || {
+    echo "❌ Failed to get GitHub user information"
     exit 1
-fi
-COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
+}
 
-# Verify the comment
-echo "🔍 Verifying comment..."
-COMMENT_CHECK=$(gh api repos/$repo/issues/comments/$COMMENT_ID)
-if [ $? -eq 0 ]; then
-    echo "✅ Comment processed successfully for PR #$number"
-    echo "🔗 Comment URL: $COMMENT_URL"
-    echo "⏰ Timestamp: $TIMESTAMP"
+# Get existing comments by the current user
+echo "🔍 Checking for existing comments..."
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
+  | sed -n 1p)
+
+if [ -n "$EXISTING_COMMENT_ID" ]; then
+    # Update existing comment
+    echo "🔄 Updating existing comment..."
     
-    # Verify content matches
-    ACTUAL_BODY=$(echo "$COMMENT_CHECK" | jq -r .body)
-    if [[ "$ACTUAL_BODY" == *"$body"* ]] && [[ "$ACTUAL_BODY" == *"$TIMESTAMP"* ]]; then
-        echo "✅ Comment content verified"
-    else
-        echo "⚠️ Warning: Comment content may not match expected format"
+    # Get current comment content
+    CURRENT_CONTENT=$(gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" --jq '.body')
+    
+    # Create updated comment with edit history
+    echo "🔨 Creating updated comment..."
+    UPDATED_COMMENT="$FORMATTED_COMMENT
+
+<details><summary>Previous Comment</summary>
+
+$CURRENT_CONTENT
+
+</details>"
+
+    # Update the comment
+    echo "🔨 Updating comment in $repo..."
+    if ! gh api "repos/$repo/issues/comments/$EXISTING_COMMENT_ID" \
+        -X PATCH \
+        -f body="$UPDATED_COMMENT"; then
+        echo "❌ Failed to update comment"
+        exit 1
     fi
+    echo "✅ Comment updated successfully!"
 else
-    echo "❌ Failed to verify comment"
-    exit 1
+    # Add new comment
+    echo "➕ Adding new comment..."
+    COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "❌ Failed to add comment"
+        echo "Error: $COMMENT_URL"
+        exit 1
+    fi
+    COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
+
+    # Verify the comment
+    echo "🔍 Verifying comment..."
+    COMMENT_CHECK=$(gh api repos/$repo/issues/comments/$COMMENT_ID)
+    if [ $? -eq 0 ]; then
+        echo "✅ Comment processed successfully for PR #$number"
+        echo "🔗 Comment URL: $COMMENT_URL"
+        echo "⏰ Timestamp: $TIMESTAMP"
+    else
+        echo "❌ Failed to verify comment"
+        exit 1
+    fi
 fi
 """,
     args=[
