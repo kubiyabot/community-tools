@@ -109,6 +109,13 @@ def execute_slack_action(token, action, operation, **kwargs):
     logger.info(f"Action parameters: {{kwargs}}")
 
     try:
+        # Handle channel resolution for supported actions
+        if action in ['conversations_history', 'conversations_replies', 'chat_postMessage'] and 'channel' in kwargs:
+            channel_id = find_channel(client, kwargs['channel'])
+            if not channel_id:
+                return {{"success": False, "error": f"Channel not found: {{kwargs['channel']}}"}}
+            kwargs['channel'] = channel_id
+
         if action == "chat_postMessage":
             if 'text' not in kwargs:
                 logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
