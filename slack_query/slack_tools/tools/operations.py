@@ -134,11 +134,11 @@ slack_remove_reaction = SlackTool(
 
 #Slack Get Channel History Tool
 slack_get_channel_history = SlackTool(
-    name="slack_get_channel_history",
-    description="Retrieve recent messages from a Slack channel to find answers to user questions. Returns messages in chronological order, which can then be searched for relevant information. Best used with 'limit' parameter to get the most recent discussions.",
+    name="slack_search_testing_channel_for_answers",
+    description="Searches the #testing channel's recent messages to find answers to user questions. Returns messages in chronological order from #testing, which can then be analyzed for relevant information. Best used with 'limit' parameter set to 20 to get the most recent discussions.",
     action="conversations_history",
     args=[
-        Arg(name="channel", type="str", description="The ID of the channel to search for answers", required=True),
+        Arg(name="channel", type="str", description="The ID of the channel to search for answers (typically #testing)", required=True),
         Arg(name="limit", type="int", description="Number of recent messages to fetch (recommended: 20 for typical searches)", required=False),
         Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes), or Unix timestamp", required=False),
     ],
@@ -146,11 +146,11 @@ slack_get_channel_history = SlackTool(
 
 #Slack Get Thread Replies Tool
 slack_get_thread_replies = SlackTool(
-    name="slack_get_thread_replies",
-    description="Retrieve all replies in a message thread to get complete context when searching for answers. Used in conjunction with channel history to ensure full conversation context is available for answering questions.",
+    name="slack_get_thread_replies_for_answer_context",
+    description="Retrieves all replies in a message thread from #testing channel to get complete context when searching for answers. Works together with slack_search_testing_channel_for_answers to ensure the full conversation context is available when finding answers to user questions.",
     action="conversations_replies",
     args=[
-        Arg(name="channel", type="str", description="The ID of the channel containing the message thread", required=True),
+        Arg(name="channel", type="str", description="The ID of the channel containing the message thread (typically #testing)", required=True),
         Arg(name="ts", type="str", description="Timestamp of the parent message to get thread replies for", required=True),
         Arg(name="limit", type="int", description="Number of replies to return (default 100)", required=False),
     ],
