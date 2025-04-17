@@ -1,6 +1,6 @@
 import inspect
-from kubiya_sdk.tools import Arg
-from ..base import HoneycombTool
+from kubiya_sdk.tools import Arg, FileSpec
+from .base import HoneycombTool
 from kubiya_sdk.tools.registry import tool_registry
 from . import trace_analysis
 
