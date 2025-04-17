@@ -1,0 +1,31 @@
+# Workflow Status
+
+Workflow analysis completed for PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
+
+## 🔬 Critical Issues Analysis
+{{ failures_and_fixes }}
+
+{% if workflow_steps and workflow_steps|length > 0 %}
+### 📊 Workflow Steps:
+```mermaid
+graph LR;
+{% for step in workflow_steps %}
+    {{ loop.index }}["{{ step.name }}{{ ' ❌' if step.status == 'failure' else ' ✅' }}"];
+    {% if not loop.first %}
+    {{ loop.index - 1 }} --> {{ loop.index }};
+    {% endif %}
+    {% if step.status == 'failure' %}
+    style {{ loop.index }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
+    {% else %}
+    style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
+    {% endif %}
+{% endfor %}
+```
+{% endif %}
+---
+
+#### Was this comment helpful? 👍 or 👎 Please let us know your feedback!
+
+<sub align="center">
+🤖 This comment was generated automatically by Kubiya AI at {{ timestamp }}
+</sub>
