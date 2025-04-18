@@ -103,17 +103,20 @@ def send_slack_message(client, channel, text):
         logger.error(f"Error sending message: {{error_message}}")
         return {{"success": False, "error": error_message}}
 
-def process_slack_messages(messages):
+def process_slack_messages(messages, is_reply=False):
     processed_messages = []
     for msg in messages:
         processed_msg = {{
             "message": msg.get("text", ""),
             "author": msg.get("user", ""),
             "timestamp": msg.get("ts", ""),
-            "thread_id": msg.get("thread_ts", ""),
-            "reply_count": msg.get("reply_count", 0),
-            "latest_reply": msg.get("latest_reply", "")
+            "thread_id": msg.get("thread_ts", "")
         }}
+        
+        # Only include reply_count for main messages, not for replies
+        if not is_reply:
+            processed_msg["reply_count"] = msg.get("reply_count", 0)
+            
         processed_messages.append(processed_msg)
     return processed_messages
 
@@ -155,7 +158,11 @@ def execute_slack_action(token, action, operation, **kwargs):
             method = getattr(client, action)
             response = method(**kwargs)
             if 'messages' in response.data:
-                processed_messages = process_slack_messages(response.data['messages'])
+                # Pass is_reply=True for conversations_replies
+                processed_messages = process_slack_messages(
+                    response.data['messages'], 
+                    is_reply=(action == "conversations_replies")
+                )
                 result = {{"success": True, "result": processed_messages}}
                 logger.info("Messages processed successfully")
             else:
