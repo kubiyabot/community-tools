@@ -2,7 +2,7 @@ import sys
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 def validate_honeycomb_connection():
     if not os.getenv('HONEYCOMB_API_KEY'):
@@ -10,17 +10,15 @@ def validate_honeycomb_connection():
     return None
 
 def calculate_time_range(minutes_ago: int) -> tuple[str, str]:
-    now = datetime.utcnow()
-    start_time = now - timedelta(minutes=minutes_ago)
-    
-    # Add debug logging
-    print(f"Current UTC time: {now}")
-    print(f"Looking back {minutes_ago} minutes")
-    print(f"Start time: {start_time}")
-    
+    now_utc = datetime.now(timezone.utc)
+    start_time = now_utc - timedelta(minutes=minutes_ago)
+
+    print(f"UTC Now: {now_utc}")
+    print(f"Start Time (UTC -{minutes_ago}m): {start_time}")
+
     return (
         start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     )
 
 def make_honeycomb_request(url: str, data: dict) -> dict:
