@@ -8,6 +8,12 @@ analyze_traces = HoneycombTool(
     name="analyze_traces",
     description="Query Honeycomb for trace stats like P99 and error rate for a given service",
     content="""
+# First validate the Honeycomb API token is set
+if [ -z "$HONEYCOMB_API_KEY" ]; then
+    echo "Error: HONEYCOMB_API_KEY environment variable is not set"
+    exit 1
+fi
+
 pip install requests
 python /tmp/trace_analysis.py "{{ .dataset }}" "{{ .service_name }}" "{{ .start_time }}"
 """,

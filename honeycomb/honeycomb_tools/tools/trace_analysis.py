@@ -12,6 +12,12 @@ def validate_honeycomb_connection():
 def calculate_time_range(minutes_ago: int) -> tuple[str, str]:
     now = datetime.utcnow()
     start_time = now - timedelta(minutes=minutes_ago)
+    
+    # Add debug logging
+    print(f"Current UTC time: {now}")
+    print(f"Looking back {minutes_ago} minutes")
+    print(f"Start time: {start_time}")
+    
     return (
         start_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         now.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -22,11 +28,18 @@ def make_honeycomb_request(url: str, data: dict) -> dict:
         'X-Honeycomb-Team': os.getenv('HONEYCOMB_API_KEY'),
         'Content-Type': 'application/json'
     }
-    # Add debug logging
-    print(f"Making request to: {url}")
+    
+    # Add more detailed debug logging
+    print("\nRequest details:")
+    print(f"URL: {url}")
+    print(f"Headers: {json.dumps({k: '***' if k == 'X-Honeycomb-Team' else v for k, v in headers.items()}, indent=2)}")
     print(f"Request data: {json.dumps(data, indent=2)}")
     
     response = requests.post(url, json=data, headers=headers)
+    
+    # Add response debug logging
+    print(f"\nResponse status code: {response.status_code}")
+    print(f"Response headers: {dict(response.headers)}")
     
     # Check if the request was successful
     try:
