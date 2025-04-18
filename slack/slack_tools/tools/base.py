@@ -156,10 +156,10 @@ def execute_slack_action(token, action, operation, **kwargs):
             response = method(**kwargs)
             if 'messages' in response.data:
                 processed_messages = process_slack_messages(response.data['messages'])
-                result = {"success": True, "result": processed_messages}
+                result = {{"success": True, "result": processed_messages}}
                 logger.info("Messages processed successfully")
             else:
-                result = {"success": True, "result": response.data}
+                result = {{"success": True, "result": response.data}}
         else:
             logger.info("Executing action: %s", action)
             method = getattr(client, action)
