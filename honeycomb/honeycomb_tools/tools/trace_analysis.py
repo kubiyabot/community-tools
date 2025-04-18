@@ -102,7 +102,7 @@ def main():
 
     # Send request to Honeycomb
     response = make_honeycomb_request(
-        f"https://api.honeycomb.io/1/query_results/{args.dataset}"
+        f"https://api.honeycomb.io/1/query_results/{args.dataset}",
         query
     )
 
