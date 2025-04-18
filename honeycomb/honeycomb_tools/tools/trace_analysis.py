@@ -23,7 +23,25 @@ def make_honeycomb_request(url: str, data: dict) -> dict:
         'Content-Type': 'application/json'
     }
     response = requests.post(url, json=data, headers=headers)
-    return response.json()
+    
+    # Check if the request was successful
+    try:
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        return {
+            "error": f"Request failed: {str(e)}",
+            "status_code": response.status_code,
+            "response_text": response.text
+        }
+
+    # Try to parse JSON response
+    try:
+        return response.json()
+    except requests.exceptions.JSONDecodeError as e:
+        return {
+            "error": f"Failed to parse JSON response: {str(e)}",
+            "response_text": response.text
+        }
 
 def main():
     import argparse
