@@ -22,6 +22,10 @@ def make_honeycomb_request(url: str, data: dict) -> dict:
         'X-Honeycomb-Team': os.getenv('HONEYCOMB_API_KEY'),
         'Content-Type': 'application/json'
     }
+    # Add debug logging
+    print(f"Making request to: {url}")
+    print(f"Request data: {json.dumps(data, indent=2)}")
+    
     response = requests.post(url, json=data, headers=headers)
     
     # Check if the request was successful
@@ -31,7 +35,9 @@ def make_honeycomb_request(url: str, data: dict) -> dict:
         return {
             "error": f"Request failed: {str(e)}",
             "status_code": response.status_code,
-            "response_text": response.text
+            "response_text": response.text,
+            "url": url,
+            "request_data": data
         }
 
     # Try to parse JSON response
@@ -85,7 +91,7 @@ def main():
 
     # Send request to Honeycomb
     response = make_honeycomb_request(
-        f"https://api.honeycomb.io/v1/queries/{args.dataset}",
+        f"https://api.honeycomb.io/1/query/{args.dataset}",
         query
     )
 
