@@ -106,14 +106,14 @@ def send_slack_message(client, channel, text):
 def process_slack_messages(messages):
     processed_messages = []
     for msg in messages:
-        processed_msg = {
+        processed_msg = {{
             "message": msg.get("text", ""),
             "author": msg.get("user", ""),
             "timestamp": msg.get("ts", ""),
             "thread_id": msg.get("thread_ts", ""),
             "reply_count": msg.get("reply_count", 0),
             "latest_reply": msg.get("latest_reply", "")
-        }
+        }}
         processed_messages.append(processed_msg)
     return processed_messages
 
