@@ -85,7 +85,7 @@ def main():
 
     # Send request to Honeycomb
     response = make_honeycomb_request(
-        f"https://api.honeycomb.io/1/query/{args.dataset}",
+        f"https://api.honeycomb.io/v1/queries/{args.dataset}",
         query
     )
 
