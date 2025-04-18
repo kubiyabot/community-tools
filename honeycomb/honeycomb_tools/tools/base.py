@@ -1,5 +1,5 @@
-from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg, FileSpec
+from typing import List
 
 HONEYCOMB_ICON = "https://www.honeycomb.io/wp-content/themes/honeycomb/assets/images/logo-honeycomb-color.svg"
 
@@ -35,7 +35,7 @@ class HoneycombTool(Tool):
         content: str,
         args: List[Arg] = None,
         with_files: List[FileSpec] = None,
-        image: str = "python:3.9-slim",
+        image: str = "python:3.11-slim",
         mermaid_diagram: str = None
     ):
         super().__init__(
@@ -43,10 +43,6 @@ class HoneycombTool(Tool):
             description=description,
             type="docker",
             image=image,
-            on_build="""
-pip install requests > /dev/null
-pip install kubiya-sdk > /dev/null
-            """,
             content=content,
             args=args or [],
             secrets=["HONEYCOMB_API_KEY"],
