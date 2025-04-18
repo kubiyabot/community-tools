@@ -169,7 +169,7 @@ def execute_slack_action(token, action, operation, **kwargs):
             if 'ts' in response.data:
                 result['thread_ts'] = response.data['ts']
         
-        logger.info("Action completed. Result: %s", result)
+        logger.info("Action completed successfully")
         return result
     except Exception as e:
         logger.error(f"Unexpected error: {{str(e)}}")
