@@ -103,6 +103,20 @@ def send_slack_message(client, channel, text):
         logger.error(f"Error sending message: {{error_message}}")
         return {{"success": False, "error": error_message}}
 
+def process_slack_messages(messages):
+    processed_messages = []
+    for msg in messages:
+        processed_msg = {
+            "message": msg.get("text", ""),
+            "author": msg.get("user", ""),
+            "timestamp": msg.get("ts", ""),
+            "thread_id": msg.get("thread_ts", ""),
+            "reply_count": msg.get("reply_count", 0),
+            "latest_reply": msg.get("latest_reply", "")
+        }
+        processed_messages.append(processed_msg)
+    return processed_messages
+
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
     logger.info(f"Executing Slack action: {{action}}")
@@ -120,11 +134,7 @@ def execute_slack_action(token, action, operation, **kwargs):
                     logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
                     return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
                 result = send_slack_message(client, kwargs['channel'], kwargs['text'])    
-        else:
-            logger.info(f"Executing action: {{action}}")
-            method = getattr(client, action)
-            
-            # Handle time-based filtering for channel history
+        elif action in ["conversations_history", "conversations_replies"]:
             if action == "conversations_history" and 'oldest' in kwargs:
                 oldest_param = kwargs['oldest']
                 if isinstance(oldest_param, str):
@@ -141,6 +151,17 @@ def execute_slack_action(token, action, operation, **kwargs):
                         target_time = current_time - offset
                         kwargs['oldest'] = f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
                         logger.info(f"Time conversion: current={{current_time}}, offset={{offset}}, target={{target_time}}, oldest_param={{kwargs['oldest']}}")
+            
+            method = getattr(client, action)
+            response = method(**kwargs)
+            if 'messages' in response.data:
+                processed_messages = process_slack_messages(response.data['messages'])
+                result = {{"success": True, "result": {"messages": processed_messages}}}
+            else:
+                result = {{"success": True, "result": response.data}}
+        else:
+            logger.info(f"Executing action: {action}")
+            method = getattr(client, action)
             
             response = method(**kwargs)
             result = {{"success": True, "result": response.data}}
@@ -177,7 +198,7 @@ if __name__ == "__main__":
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="pip install slack-sdk fuzzywuzzy python-Levenshtein && python /tmp/script.py",
+            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein > /dev/null 2>&1 && python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
