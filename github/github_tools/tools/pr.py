@@ -14,6 +14,9 @@ KUBIYA_DISCLAIMER = '''
 > 🤖 Automated action via [Kubiya.ai](https://kubiya.ai)
 '''
 
+# Default GitHub actor name to use when API call fails (app token case)
+DEFAULT_GITHUB_ACTOR="kubiya-app"
+
 pr_create = GitHubCliTool(
     name="github_pr_create",
     description="Create a new pull request in a GitHub repository",
@@ -32,7 +35,7 @@ echo "📄 Base branch: $base"
 echo "🔀 Head branch: $head"
 
 # Get current user
-GITHUB_ACTOR=$(gh api user --jq '.login')
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 
 # Get the expanded disclaimer
 DISCLAIMER='{KUBIYA_DISCLAIMER}'
@@ -130,7 +133,7 @@ echo "🔄 Attempting to merge pull request #$number in $repo..."
 echo "📝 Using merge method: $merge_method"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 
-GITHUB_ACTOR=$(gh api user --jq '.login')
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 gh pr merge --repo $repo $number --$merge_method -b "Merged via automated workflow${KUBIYA_DISCLAIMER}"
 
 echo "✅ Pull request merged successfully!"
@@ -148,7 +151,7 @@ pr_close = GitHubCliTool(
     content="""
 echo "🚫 Closing pull request #$number in $repo..."
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-GITHUB_ACTOR=$(gh api user --jq '.login')
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 gh pr close --repo $repo $number -c "Closed via automated workflow${KUBIYA_DISCLAIMER}"
 echo "✅ Pull request closed successfully!"
 """,
@@ -167,7 +170,7 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"@me\") | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select((.user.login == \"@me\" or .user.login == \"${DEFAULT_GITHUB_ACTOR}\") or .body | contains(\"Kubiya\")) | .id" | head -n 1)
 echo "EXISTING_COMMENT_ID: $EXISTING_COMMENT_ID"
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
@@ -266,15 +269,12 @@ $body
 <sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
 
 # Get GitHub actor
-GITHUB_ACTOR=$(gh api user --jq '.login') || {
-    echo "❌ Failed to get GitHub user information"
-    exit 1
-}
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or .body | contains("Kubiya")) | .id' \
   | sed -n 1p)
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
@@ -369,15 +369,12 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
 }
 
 # Get GitHub actor
-GITHUB_ACTOR=$(gh api user --jq '.login') || {
-    echo "❌ Failed to get GitHub user information"
-    exit 1
-}
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'") | .id' \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or .body | contains("Kubiya")) | .id' \
   | sed -n 1p)
 
 
@@ -511,7 +508,7 @@ pr_review = GitHubCliTool(
 echo "👀 Adding review to pull request #$number in $repo..."
 echo "📝 Review type: $review_type"
 echo "🔗 PR Link: https://github.com/$repo/pull/$number"
-GITHUB_ACTOR=$(gh api user --jq '.login')
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
 FULL_BODY="$body${KUBIYA_DISCLAIMER}"
 gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 echo "✅ Review submitted successfully!"
