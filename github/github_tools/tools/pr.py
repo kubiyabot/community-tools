@@ -405,6 +405,7 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
 
 # Try to get GitHub actor, properly handle errors
 GITHUB_ACTOR_RESPONSE=$(gh api user --jq '.login' 2>&1)
+echo "GITHUB_ACTOR_RESPONSE: $GITHUB_ACTOR_RESPONSE"
 if [ $? -ne 0 ] || [[ "$GITHUB_ACTOR_RESPONSE" == *"Resource not accessible"* ]] || [[ "$GITHUB_ACTOR_RESPONSE" == *"message"* ]]; then
     GITHUB_ACTOR="kubiya-production"
 else
