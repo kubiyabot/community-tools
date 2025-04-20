@@ -369,7 +369,7 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
 }
 
 # Get GitHub actor
-GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "${DEFAULT_GITHUB_ACTOR}")
+GITHUB_ACTOR=$(gh api user --jq '.login' 2>/dev/null || echo "kubiya-production")
 
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
