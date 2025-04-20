@@ -204,7 +204,7 @@ fi
 
 # First, check for existing Kubiya comments
 echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq ".[] | select(.user.login == \"${GITHUB_ACTOR}\" or .body | contains(\"Kubiya\")) | .id" | head -n 1)
+EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or (.body | contains("Kubiya"))) | .id' | head -n 1)
 echo "EXISTING_COMMENT_ID: $EXISTING_COMMENT_ID"
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
@@ -314,7 +314,7 @@ fi
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or .body | contains("Kubiya")) | .id' \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or (.body | contains("Kubiya"))) | .id' \
   | sed -n 1p)
 
 if [ -n "$EXISTING_COMMENT_ID" ]; then
@@ -420,7 +420,7 @@ fi
 # Get existing comments by the current user
 echo "🔍 Checking for existing comments..."
 EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" \
-  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or .body | contains("Kubiya")) | .id' \
+  --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or (.body | contains("Kubiya"))) | .id' \
   | sed -n 1p)
 
 
