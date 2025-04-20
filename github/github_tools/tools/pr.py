@@ -15,7 +15,7 @@ KUBIYA_DISCLAIMER = '''
 '''
 
 # Default GitHub actor name to use when API call fails (app token case)
-DEFAULT_GITHUB_ACTOR="kubiya-app"
+DEFAULT_GITHUB_ACTOR="kubiya-production"
 
 pr_create = GitHubCliTool(
     name="github_pr_create",
