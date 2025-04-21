@@ -119,9 +119,7 @@ def process_slack_messages(messages, is_reply=False):
         if not is_reply:
             processed_msg["reply_count"] = msg.get("reply_count", 0)
             
-        json_msg = json.dumps(processed_msg)
-        logger.info(f"Processing message of length: {{len(json_msg)}} characters")
-        print(json_msg)  # Print each message directly
+        print(json.dumps(processed_msg))  # Print each message directly
     
     return "Messages printed individually"  # Return a placeholder
 
@@ -163,7 +161,6 @@ def execute_slack_action(token, action, operation, **kwargs):
             method = getattr(client, action)
             response = method(**kwargs)
             if 'messages' in response.data:
-                logger.info(f"Retrieved {{len(response.data['messages'])}} messages from Slack")
                 result = process_slack_messages(
                     response.data['messages'], 
                     is_reply=(action == "conversations_replies")
