@@ -188,96 +188,31 @@ echo "✅ Pull request closed successfully!"
 
 pr_comment = GitHubCliTool(
     name="github_pr_comment",
-    description="Add a comment to a pull request with proper formatting and timestamp. Updates existing Kubiya comments if found.",
+    description="Add a comment to a pull request with proper formatting and timestamp.",
     content="""
 # Format the timestamp in ISO format
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
-# Try to get GitHub actor, properly handle errors
-API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
-if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
-    echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
-else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
-fi
-
-# First, check for existing Kubiya comments
-echo "🔍 Checking for existing Kubiya comments..."
-EXISTING_COMMENT_ID=$(gh api "repos/$repo/issues/$number/comments" --jq '.[] | select(.user.login == "'"${GITHUB_ACTOR}"'" or (.body | contains("Kubiya"))) | .id' | head -n 1)
-echo "EXISTING_COMMENT_ID: $EXISTING_COMMENT_ID"
-
-if [ -n "$EXISTING_COMMENT_ID" ]; then
-    echo "Found existing Kubiya comment(s)"
-    # Get the most recent comment ID
-    COMMENT_ID=$(echo "$EXISTING_COMMENT_ID")
-    # Get existing content
-    EXISTING_BODY=$(gh api "repos/$repo/issues/$number/comments/$COMMENT_ID" --jq '.body')
-    
-    # Extract the previous content (everything between the header and the disclaimer)
-    PREVIOUS_CONTENT=$(echo "$EXISTING_BODY" | awk '/### 💬 Comment Added via Kubiya AI/{p=1;next} /---/{p=0} p')
-    
-    # Prepare the updated comment with collapsible previous content
-    FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
-
-$body
-
-<details>
-<summary>📜 Previous Comments</summary>
-
-$PREVIOUS_CONTENT
-</details>
-
----
-<sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
-
-    # Create new comment instead of updating
-    echo "📝 Creating new comment with history..."
-    COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to add comment"
-        echo "Error: $COMMENT_URL"
-        exit 1
-    fi
-    COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
-else
-    # Create new comment if no existing Kubiya comment found
-    echo "📝 Creating new comment..."
-    FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
+# Create a formatted comment
+echo "📝 Creating new comment..."
+FORMATTED_COMMENT="### 💬 Comment Added via Kubiya AI
 
 $body
 
 ---
 <sub>🤖 This comment was generated automatically by Kubiya AI at $TIMESTAMP</sub>"
 
-    COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to add comment"
-        echo "Error: $COMMENT_URL"
-        exit 1
-    fi
-    COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
-fi
-
-# Verify the comment
-echo "🔍 Verifying comment..."
-COMMENT_CHECK=$(gh api repos/$repo/issues/comments/$COMMENT_ID)
-if [ $? -eq 0 ]; then
-    echo "✅ Comment processed successfully for PR #$number"
-    echo "🔗 Comment URL: $COMMENT_URL"
-    echo "⏰ Timestamp: $TIMESTAMP"
-    
-    # Verify content matches
-    ACTUAL_BODY=$(echo "$COMMENT_CHECK" | jq -r .body)
-    if [[ "$ACTUAL_BODY" == *"$body"* ]] && [[ "$ACTUAL_BODY" == *"$TIMESTAMP"* ]]; then
-        echo "✅ Comment content verified"
-    else
-        echo "⚠️ Warning: Comment content may not match expected format"
-    fi
-else
-    echo "❌ Failed to verify comment"
+# Add the comment
+COMMENT_URL=$(gh pr comment --repo $repo $number --body "$FORMATTED_COMMENT" 2>&1)
+if [ $? -ne 0 ]; then
+    echo "❌ Failed to add comment"
+    echo "Error: $COMMENT_URL"
     exit 1
 fi
+
+echo "✅ Comment added successfully!"
+echo "🔗 Comment URL: $COMMENT_URL"
+echo "⏰ Timestamp: $TIMESTAMP"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
