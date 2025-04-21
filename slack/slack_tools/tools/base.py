@@ -110,9 +110,7 @@ def process_slack_messages(messages, is_reply=False):
     for msg in messages:
         processed_msg = {{
             "message": msg.get("text", ""),
-            "author": msg.get("user", ""),
-            "timestamp": msg.get("ts", ""),
-            "thread_id": msg.get("thread_ts", "")
+            "timestamp": msg.get("ts", "")
         }}
         
         # Only include reply_count for main messages, not for replies
