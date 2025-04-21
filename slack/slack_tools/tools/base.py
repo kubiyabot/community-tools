@@ -45,6 +45,10 @@ def create_block_kit_message(text, kubiya_user_email):
 def find_channel(client, channel_input):
     logger.info(f"Attempting to find channel: {{channel_input}}")
     
+    if not channel_input:
+        logger.error("Channel input is empty")
+        return None
+    
     # If it's already a valid channel ID (starts with C and is 11 characters long), use it directly
     if channel_input.startswith('C') and len(channel_input) == 11:
         logger.info(f"Using provided channel ID directly: {{channel_input}}")
@@ -57,10 +61,12 @@ def find_channel(client, channel_input):
     try:
         for response in client.conversations_list(types="public_channel,private_channel"):
             for channel in response["channels"]:
-                if channel["name"] == channel_input:
+                # Try exact match first
+                if channel["name"].lower() == channel_input.lower():
                     logger.info(f"Exact match found: {{channel['id']}}")
                     return channel["id"]
-                elif fuzz.ratio(channel["name"], channel_input) > 80:
+                # Fall back to fuzzy match if no exact match found
+                elif fuzz.ratio(channel["name"].lower(), channel_input.lower()) > 80:
                     logger.info(f"Close match found: {{channel['name']}} (ID: {{channel['id']}})")
                     return channel["id"]
     except SlackApiError as e:
@@ -127,6 +133,30 @@ def execute_slack_action(token, action, operation, **kwargs):
     logger.info(f"Action parameters: {{kwargs}}")
 
     try:
+        # Handle channel resolution if channel parameter is provided
+        if 'channel' in kwargs and operation != "slack_send_message_to_predefined_channel":
+            channel_id = find_channel(client, kwargs['channel'])
+            if not channel_id:
+                return {{"success": False, "error": f"Channel not found: {{kwargs['channel']}}"}}
+            kwargs['channel'] = channel_id
+
+        # Handle channel requirement for operations that need it
+        channel_required_actions = [
+            "chat_postMessage", "conversations_invite", "conversations_info",
+            "reactions_add", "chat_delete", "chat_update", "reactions_remove",
+            "conversations_history", "conversations_replies"
+        ]
+        
+        if action in channel_required_actions and operation != "slack_send_message_to_predefined_channel":
+            if 'channel' not in kwargs:
+                logger.error("Channel parameter is required for this operation")
+                return {{"success": False, "error": "Channel parameter is required"}}
+            
+            channel_id = find_channel(client, kwargs['channel'])
+            if not channel_id:
+                return {{"success": False, "error": f"Channel not found: {{kwargs['channel']}}"}}
+            kwargs['channel'] = channel_id
+
         if action == "chat_postMessage":
             if 'text' not in kwargs:
                 logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
@@ -134,9 +164,6 @@ def execute_slack_action(token, action, operation, **kwargs):
             if operation == "slack_send_message_to_predefined_channel":
                 result = send_slack_message(client, os.environ["NOTIFICATION_CHANNEL"], kwargs['text'])
             else:
-                if 'channel' not in kwargs:
-                    logger.error(f"Missing required parameters for chat_postMessage. Received: {{kwargs}}")
-                    return {{"success": False, "error": "Missing required parameters for chat_postMessage"}}
                 result = send_slack_message(client, kwargs['channel'], kwargs['text'])    
         elif action in ["conversations_history", "conversations_replies"]:
             if action == "conversations_history" and 'oldest' in kwargs:
