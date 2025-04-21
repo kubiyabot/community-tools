@@ -104,6 +104,7 @@ def send_slack_message(client, channel, text):
         return {{"success": False, "error": error_message}}
 
 def process_slack_messages(messages, is_reply=False):
+    logger.info(f"Processing {{len(messages)}} messages")
     processed_messages = []
     for msg in messages:
         processed_msg = {{
@@ -117,8 +118,14 @@ def process_slack_messages(messages, is_reply=False):
         if not is_reply:
             processed_msg["reply_count"] = msg.get("reply_count", 0)
             
-        processed_messages.append(json.dumps(processed_msg))
-    return "\\n".join(processed_messages)  # Escape the newline for the f-string
+        json_msg = json.dumps(processed_msg)
+        logger.info(f"Processed message length: {{len(json_msg)}} characters")
+        processed_messages.append(json_msg)
+    
+    result = "\\n".join(processed_messages)
+    logger.info(f"Total result length: {{len(result)}} characters")
+    logger.info(f"First 500 characters of result: {{result[:500]}}...")
+    return result
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
@@ -158,13 +165,14 @@ def execute_slack_action(token, action, operation, **kwargs):
             method = getattr(client, action)
             response = method(**kwargs)
             if 'messages' in response.data:
-                # Pass is_reply=True for conversations_replies
+                logger.info(f"Retrieved {{len(response.data['messages'])}} messages from Slack")
                 processed_messages = process_slack_messages(
                     response.data['messages'], 
                     is_reply=(action == "conversations_replies")
                 )
                 result = {{"success": True, "result": processed_messages}}
                 logger.info("Messages processed successfully")
+                logger.info(f"Final result object size: {{len(str(result))}} characters")
             else:
                 result = {{"success": True, "result": response.data}}
         else:
