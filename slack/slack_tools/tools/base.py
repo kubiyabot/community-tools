@@ -118,7 +118,7 @@ def process_slack_messages(messages, is_reply=False):
             processed_msg["reply_count"] = msg.get("reply_count", 0)
             
         processed_messages.append(json.dumps(processed_msg))
-    return "\n".join(processed_messages)  # Join messages with newlines
+    return "\\n".join(processed_messages)  # Escape the newline for the f-string
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
