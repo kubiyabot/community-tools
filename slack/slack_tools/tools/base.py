@@ -105,7 +105,8 @@ def send_slack_message(client, channel, text):
 
 def process_slack_messages(messages, is_reply=False):
     logger.info(f"Processing {{len(messages)}} messages")
-    processed_messages = []
+    
+    # Print each message individually instead of joining
     for msg in messages:
         processed_msg = {{
             "message": msg.get("text", ""),
@@ -119,13 +120,10 @@ def process_slack_messages(messages, is_reply=False):
             processed_msg["reply_count"] = msg.get("reply_count", 0)
             
         json_msg = json.dumps(processed_msg)
-        logger.info(f"Processed message length: {{len(json_msg)}} characters")
-        processed_messages.append(json_msg)
+        logger.info(f"Processing message of length: {{len(json_msg)}} characters")
+        print(json_msg)  # Print each message directly
     
-    result = "\\n".join(processed_messages)
-    logger.info(f"Total result length: {{len(result)}} characters")
-    logger.info(f"First 500 characters of result: {{result[:500]}}...")
-    return result
+    return "Messages printed individually"  # Return a placeholder
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
@@ -166,13 +164,12 @@ def execute_slack_action(token, action, operation, **kwargs):
             response = method(**kwargs)
             if 'messages' in response.data:
                 logger.info(f"Retrieved {{len(response.data['messages'])}} messages from Slack")
-                processed_messages = process_slack_messages(
+                result = process_slack_messages(
                     response.data['messages'], 
                     is_reply=(action == "conversations_replies")
                 )
-                result = {{"success": True, "result": processed_messages}}
+                result = {{"success": True, "result": result}}
                 logger.info("Messages processed successfully")
-                logger.info(f"Final result object size: {{len(str(result))}} characters")
             else:
                 result = {{"success": True, "result": response.data}}
         else:
