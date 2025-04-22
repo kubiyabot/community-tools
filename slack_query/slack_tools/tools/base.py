@@ -367,47 +367,47 @@ def get_channel_messages(client, channel_id, oldest):
 def analyze_messages_with_llm(messages, query):
     try:
         # Update message formatting for analysis
-        messages_text = "\\n".join([
+        messages_text = "\n".join([
             f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
         
         prompt = (
             f"Based on these Slack messages, answer the following query. "
-            f"If you can't find a clear answer, say so.\\n\\n"
-            f"Query: {{query}}\\n\\n"
-            f"Messages:\\n{{messages_text}}"
+            f"If you can't find a clear answer, say so.\n\n"
+            f"Query: {{query}}\n\n"
+            f"Messages:\n{{messages_text}}"
         )
         
         messages = [
             {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
             {{"role": "user", "content": prompt}}
         ]
+
+        # Fix metadata handling
+        modified_metadata = {{
+            "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
+        }}
         
-        max_retries = 3
-        retry_delay = 1  # Initial delay in seconds
+        response = litellm.completion(
+            messages=messages,
+            model="openai/Llama-4-Scout",
+            api_key=os.environ.get("LITELLM_API_KEY"),
+            base_url=os.environ.get("LITELLM_API_BASE"),
+            stream=False,
+            user=os.environ.get("KUBIYA_USER_EMAIL", "unknown-user"),
+            max_tokens=2048,
+            temperature=0.7,
+            top_p=0.1,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            extra_body={{
+                "metadata": modified_metadata
+            }}
+        )
         
-        for attempt in range(max_retries):
-            try:
-                response = litellm.completion(
-                    messages=messages,
-                    model="openai/Llama-4-Scout",
-                    api_key=os.environ.get("LITELLM_API_KEY"),
-                    base_url=os.environ.get("LITELLM_API_BASE"),
-                    max_tokens=500,
-                    timeout=60  # Set timeout to 60 seconds
-                )
-                return response.choices[0].message.content.strip()
-            except litellm.Timeout:
-                if attempt < max_retries - 1:
-                    logger.warning(f"Attempt {{attempt + 1}} timed out. Retrying in {{retry_delay}} seconds...")
-                    time.sleep(retry_delay)
-                    retry_delay *= 2  # Exponential backoff
-                else:
-                    raise
-    except litellm.Timeout as e:
-        logger.error(f"LLM request timed out after {{max_retries}} attempts: {{e}}")
-        return "Unable to analyze messages due to timeout. Please try again."
+        return response.choices[0].message.content.strip()
+
     except Exception as e:
         logger.error(f"Error analyzing messages: {{e}}")
         return f"Error analyzing messages: {{str(e)}}"
