@@ -366,17 +366,16 @@ def get_channel_messages(client, channel_id, oldest):
 
 def analyze_messages_with_llm(messages, query):
     try:
-        # Update message formatting for analysis
-        messages_text = "\n".join([
-            f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
+        messages_text = "\\n".join([
+            f"Message {{{{i+1}}}} (ts: {{{{msg['timestamp']}}}}, replies: {{{{msg['reply_count']}}}}: {{{{msg['message']}}}}" 
             for i, msg in enumerate(messages)
         ])
         
         prompt = (
             "Based on these Slack messages, answer the following query. "
-            "If you can't find a clear answer, say so.\n\n"
-            f"Query: {{query}}\n\n"
-            f"Messages:\n{{messages_text}}"
+            "If you can't find a clear answer, say so.\\n\\n"
+            f"Query: {{{{query}}}}\\n\\n"
+            f"Messages:\\n{{{{messages_text}}}}"
         )
         
         messages = [
@@ -384,7 +383,6 @@ def analyze_messages_with_llm(messages, query):
             {{"role": "user", "content": prompt}}
         ]
 
-        # Fix metadata handling
         modified_metadata = {{
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
@@ -409,8 +407,8 @@ def analyze_messages_with_llm(messages, query):
         return response.choices[0].message.content.strip()
 
     except Exception as e:
-        logger.error(f"Error analyzing messages: {{e}}")
-        return f"Error analyzing messages: {{str(e)}}"
+        logger.error(f"Error analyzing messages: {{{{e}}}}")
+        return f"Error analyzing messages: {{{{str(e)}}}}"
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
