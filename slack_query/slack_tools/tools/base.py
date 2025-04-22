@@ -1,6 +1,5 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
-import time
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
@@ -385,10 +384,10 @@ def analyze_messages_with_llm(messages, query):
         
         logger.info("Sending request to LLM")
 
-        # Configure litellm
-        litellm.set_verbose = True
-        litellm.request_timeout = 15  # Set shorter timeout
-        litellm.num_retries = 2  # Limit retries
+        # Configure litellm - using environment variable instead of deprecated property
+        os.environ["LITELLM_LOG"] = "INFO"
+        litellm.request_timeout = 30  # Increased timeout
+        litellm.num_retries = 3  # Increased retries
         
         messages = [
             {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
@@ -402,7 +401,7 @@ def analyze_messages_with_llm(messages, query):
         # Fix the base_url by ensuring it ends with a trailing slash
         base_url = os.environ.get("LITELLM_API_BASE", "http://lite-llm.dev.kubiya.ai/")
         if base_url and not base_url.endswith('/'):
-            base_url = f"{{base_url}}/"
+            base_url = f"{{base_url}}"
         
         response = litellm.completion(
             messages=messages,
