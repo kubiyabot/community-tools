@@ -319,7 +319,7 @@ def process_time_filter(oldest_param):
     return None
 
 def process_slack_messages(messages, is_reply=False):
-    logger.info(f"Processing {len(messages)} messages")
+    logger.info(f"Processing {{len(messages)}} messages")
     
     # Print each message individually instead of joining
     for msg in messages:
@@ -357,31 +357,31 @@ def get_channel_messages(client, channel_id, oldest):
             }
             processed_messages.append(processed_msg)
         
-        logger.info(f"Retrieved {len(messages)} messages from channel")
+        logger.info(f"Retrieved {{len(messages)}} messages from channel")
         return processed_messages
         
     except SlackApiError as e:
-        logger.error(f"Error fetching channel history: {e}")
+        logger.error(f"Error fetching channel history: {{e}}")
         return []
 
 def analyze_messages_with_llm(messages, query):
     try:
         # Update message formatting for analysis
         messages_text = "\n".join([
-            f"Message {i+1} (ts: {msg['timestamp']}, replies: {msg['reply_count']}): {msg['message']}" 
+            f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
         
         prompt = f'''Based on these Slack messages, answer the following query. If you can't find a clear answer, say so.
 
-Query: {query}
+Query: {{query}}
 
 Messages:
-{messages_text}'''
+{{messages_text}}'''
         
         messages = [
-            {"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."},
-            {"role": "user", "content": prompt}
+            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+            {{"role": "user", "content": prompt}}
         ]
         
         max_retries = 3
@@ -400,17 +400,17 @@ Messages:
                 return response.choices[0].message.content.strip()
             except litellm.Timeout:
                 if attempt < max_retries - 1:
-                    logger.warning(f"Attempt {attempt + 1} timed out. Retrying in {retry_delay} seconds...")
+                    logger.warning(f"Attempt {{attempt + 1}} timed out. Retrying in {{retry_delay}} seconds...")
                     time.sleep(retry_delay)
                     retry_delay *= 2  # Exponential backoff
                 else:
                     raise
     except litellm.Timeout as e:
-        logger.error(f"LLM request timed out after {max_retries} attempts: {e}")
+        logger.error(f"LLM request timed out after {{max_retries}} attempts: {{e}}")
         return "Unable to analyze messages due to timeout. Please try again."
     except Exception as e:
-        logger.error(f"Error analyzing messages: {e}")
-        return f"Error analyzing messages: {str(e)}"
+        logger.error(f"Error analyzing messages: {{e}}")
+        return f"Error analyzing messages: {{str(e)}}"
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
