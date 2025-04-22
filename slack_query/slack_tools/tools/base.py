@@ -413,9 +413,9 @@ def analyze_messages_with_llm(messages, query):
         presence_penalty=0.0,
         frequency_penalty=0.0,
         timeout=30,  # Increased timeout from 15 to 30 seconds
-        extra_body={
+        extra_body={{
             "metadata": modified_metadata
-        }
+        }}
     )
     
     answer = response.choices[0].message.content.strip()
