@@ -339,10 +339,10 @@ def process_slack_messages(messages, is_reply=False):
 
 def get_channel_messages(client, channel_id, oldest):
     try:
-        params = {
+        params = {{
             "channel": channel_id,
             "oldest": oldest
-        }
+        }}
             
         response = client.conversations_history(**params)
         messages = response["messages"]
@@ -350,11 +350,11 @@ def get_channel_messages(client, channel_id, oldest):
         # Process messages using the same format as SlackTool
         processed_messages = []
         for msg in messages:
-            processed_msg = {
+            processed_msg = {{
                 "message": msg.get("text", ""),
                 "timestamp": msg.get("ts", ""),
                 "reply_count": msg.get("reply_count", 0)
-            }
+            }}
             processed_messages.append(processed_msg)
         
         logger.info(f"Retrieved {{len(messages)}} messages from channel")
@@ -454,13 +454,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logger.info("Starting Slack search execution...")
-    arg_names = {arg_names_json}
+    arg_names = {{arg_names_json}}
     args = {{}}
     for arg in arg_names:
         if arg in os.environ:
             args[arg] = os.environ[arg]
     
-    result = execute_slack_action(token, "{action}", "{name}", **args)
+    result = execute_slack_action(token, "{{action}}", "{{name}}", **args)
     logger.info("Slack search execution completed")
     print(json.dumps(result))
 """
