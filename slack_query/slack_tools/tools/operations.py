@@ -184,7 +184,7 @@ all_tools = [
     slack_get_channel_history,
     slack_send_message_to_predefined_channel,
     slack_get_thread_replies,
-    slack_search_messages,
+    slack_search_messages
 ]
 
 # Register all Slack tools

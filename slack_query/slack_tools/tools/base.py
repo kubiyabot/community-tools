@@ -248,8 +248,15 @@ if __name__ == "__main__":
         )
 
 class SlackSearchTool(SlackTool):
-    def __init__(self, name, description, action, args):
-        script_content = """
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        # Add required env and secrets
+        env = ["KUBIYA_USER_EMAIL", *env]
+        secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY", "LITELLM_API_BASE"]
+        
+        # Add arg names for script
+        arg_names_json = json.dumps([arg.name for arg in args])
+        
+        script_content = f"""
 import os
 import sys
 import json
@@ -259,9 +266,43 @@ from slack_sdk.errors import SlackApiError
 import litellm
 from time import time
 import re
+from fuzzywuzzy import fuzz
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def find_channel(client, channel_input):
+    logger.info(f"Attempting to find channel: {{channel_input}}")
+    
+    if not channel_input:
+        logger.error("Channel input is empty")
+        return None
+    
+    # If it's already a valid channel ID (starts with C and is 11 characters long), use it directly
+    if channel_input.startswith('C') and len(channel_input) == 11:
+        logger.info(f"Using provided channel ID directly: {{channel_input}}")
+        return channel_input
+    
+    # Remove '#' if present
+    channel_input = channel_input.lstrip('#')
+    
+    # Try to find the channel by name
+    try:
+        for response in client.conversations_list(types="public_channel,private_channel"):
+            for channel in response["channels"]:
+                # Try exact match first
+                if channel["name"].lower() == channel_input.lower():
+                    logger.info(f"Exact match found: {{channel['id']}}")
+                    return channel["id"]
+                # Fall back to fuzzy match if no exact match found
+                elif fuzz.ratio(channel["name"].lower(), channel_input.lower()) > 80:
+                    logger.info(f"Close match found: {{channel['name']}} (ID: {{channel['id']}})")
+                    return channel["id"]
+    except SlackApiError as e:
+        logger.error(f"Error listing channels: {{e}}")
+
+    logger.error(f"Channel not found: {{channel_input}}")
+    return None
 
 def process_time_filter(oldest_param):
     if not oldest_param:
@@ -271,28 +312,28 @@ def process_time_filter(oldest_param):
     if time_pattern:
         amount = int(time_pattern.group(1))
         unit = time_pattern.group(2)
-        seconds = {'h': 3600, 'd': 86400, 'm': 60}[unit]
+        seconds = {{'h': 3600, 'd': 86400, 'm': 60}}[unit]
         current_time = time()
         offset = amount * seconds
         target_time = current_time - offset
-        return f"{target_time:.6f}"  # Format with exactly 6 decimal places
+        return f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
     return None
 
 def analyze_messages_with_llm(messages, query):
     try:
         # Prepare messages for analysis
-        messages_text = "\\n".join([f"Message {i+1}: {msg['text']}" for i, msg in enumerate(messages)])
+        messages_text = "\\n".join([f"Message {{i+1}}: {{msg['text']}}" for i, msg in enumerate(messages)])
         
         prompt = f'''Based on these Slack messages, answer the following query. If you can't find a clear answer, say so.
 
-Query: {query}
+Query: {{query}}
 
 Messages:
-{messages_text}'''
+{{messages_text}}'''
         
         messages = [
-            {"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."},
-            {"role": "user", "content": prompt}
+            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+            {{"role": "user", "content": prompt}}
         ]
         
         response = litellm.completion(
@@ -305,59 +346,76 @@ Messages:
         
         return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"Error analyzing messages: {e}")
+        logger.error(f"Error analyzing messages: {{e}}")
         return "Error analyzing messages"
 
 def get_channel_messages(client, channel_id, oldest):
     try:
-        params = {
+        params = {{
             "channel": channel_id,
             "oldest": oldest
-        }
+        }}
             
         response = client.conversations_history(**params)
         messages = response["messages"]
         
-        logger.info(f"Retrieved {len(messages)} messages from channel")
+        logger.info(f"Retrieved {{len(messages)}} messages from channel")
         return messages
         
     except SlackApiError as e:
-        logger.error(f"Error fetching channel history: {e}")
+        logger.error(f"Error fetching channel history: {{e}}")
         return []
 
-def execute_search(token, channel, query, oldest):
+def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
+    logger.info(f"Executing Slack search action")
+    
+    channel = kwargs.get('channel')
+    query = kwargs.get('query')
+    oldest = kwargs.get('oldest', '24h')  # Default to last 24 hours
+    
+    if not channel:
+        return {{"success": False, "error": "Channel parameter is required"}}
+    
+    channel_id = find_channel(client, channel)
+    if not channel_id:
+        return {{"success": False, "error": f"Channel not found: {{channel}}"}}
     
     # Process time filter
     oldest_ts = process_time_filter(oldest)
     if not oldest_ts:
-        return {"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', or '30m'"}
+        return {{"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', or '30m'"}}
     
     # Get messages
-    messages = get_channel_messages(client, channel, oldest_ts)
+    messages = get_channel_messages(client, channel_id, oldest_ts)
     
     if not messages:
-        return {"success": True, "answer": "No messages found in the specified time period"}
+        return {{"success": True, "answer": "No messages found in the specified time period"}}
     
     # Get answer from LLM
     answer = analyze_messages_with_llm(messages, query)
     
-    return {
+    return {{
         "success": True,
         "answer": answer
-    }
+    }}
 
 if __name__ == "__main__":
     token = os.environ.get("SLACK_API_TOKEN")
-    channel = os.environ.get("channel")
-    query = os.environ.get("query")
-    oldest = os.environ.get("oldest")
-    
-    if not all([token, channel, query]):
-        print(json.dumps({"success": False, "error": "Missing required environment variables"}))
+    if not token:
+        logger.error("SLACK_API_TOKEN is not set")
+        print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
         sys.exit(1)
+
+    logger.info("Starting Slack search execution...")
+    arg_names = {arg_names_json}
+    args = {{}}
+    for arg in arg_names:
+        if arg in os.environ:
+            args[arg] = os.environ[arg]
     
-    result = execute_search(token, channel, query, oldest)
+    result = execute_slack_action(token, "{action}", "{name}", **args)
+    logger.info("Slack search execution completed")
     print(json.dumps(result))
 """
         
@@ -366,7 +424,10 @@ if __name__ == "__main__":
             description=description,
             action=action,
             args=args,
-            env=["LITELLM_API_KEY", "LITELLM_API_BASE"],
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid_diagram=mermaid_diagram,
             content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm > /dev/null 2>&1 && python /tmp/script.py",
             with_files=[
                 FileSpec(
