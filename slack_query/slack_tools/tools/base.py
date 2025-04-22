@@ -374,18 +374,18 @@ def analyze_messages_with_llm(messages, query):
         prompt = (
             "Based on these Slack messages, answer the following query. "
             "If you can't find a clear answer, say so.\n\n"
-            f"Query: {query}\n\n"
+            f"Query: {{query}}\n\n"
             f"Messages:\n{{messages_text}}"
         )
         
         messages = [
-            {"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."},
-            {"role": "user", "content": prompt}
+            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+            {{"role": "user", "content": prompt}}
         ]
 
-        modified_metadata = {
+        modified_metadata = {{
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
-        }
+        }}
         
         response = litellm.completion(
             messages=messages,
@@ -399,9 +399,9 @@ def analyze_messages_with_llm(messages, query):
             top_p=0.1,
             presence_penalty=0.0,
             frequency_penalty=0.0,
-            extra_body={
+            extra_body={{
                 "metadata": modified_metadata
-            }
+            }}
         )
         
         return response.choices[0].message.content.strip()
