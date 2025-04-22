@@ -407,7 +407,7 @@ def analyze_messages_with_llm(messages, query):
                 base_url=os.environ.get("LITELLM_API_BASE"),
                 stream=False,
                 user="michael.bauer@kubiya.ai-staging",
-                max_tokens=1024,  # Reduced from 2048
+                max_tokens=2048,  # Reduced from 2048
                 temperature=0.7,
                 top_p=0.1,
                 presence_penalty=0.0,
@@ -503,7 +503,7 @@ if __name__ == "__main__":
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="python:3.11-slim",
-            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm > /dev/null 2>&1 && python /tmp/script.py",
+            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm tenacity > /dev/null 2>&1 && python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
