@@ -366,16 +366,16 @@ def get_channel_messages(client, channel_id, oldest):
 
 def analyze_messages_with_llm(messages, query):
     try:
-        messages_text = "\n".join([
+        messages_text = "\\n".join([
             f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
         
         prompt = (
             "Based on these Slack messages, answer the following query. "
-            "If you can't find a clear answer, say so.\n\n"
-            f"Query: {{query}}\n\n"
-            f"Messages:\n{{messages_text}}"
+            "If you can't find a clear answer, say so.\\n\\n"
+            f"Query: {{query}}\\n\\n"
+            f"Messages:\\n{{messages_text}}"
         )
         
         messages = [
