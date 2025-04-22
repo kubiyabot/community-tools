@@ -454,13 +454,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     logger.info("Starting Slack search execution...")
-    arg_names = {{arg_names_json}}
+    arg_names = {arg_names_json}
     args = {{}}
     for arg in arg_names:
         if arg in os.environ:
             args[arg] = os.environ[arg]
     
-    result = execute_slack_action(token, "{{action}}", "{{name}}", **args)
+    result = execute_slack_action(token, "{action}", "{name}", **args)
     logger.info("Slack search execution completed")
     print(json.dumps(result))
 """
