@@ -323,11 +323,11 @@ def process_slack_messages(messages, is_reply=False):
     
     # Print each message individually instead of joining
     for msg in messages:
-        processed_msg = {
+        processed_msg = {{
             "message": msg.get("text", ""),
             "timestamp": msg.get("ts", ""),
             "reply_count": msg.get("reply_count", 0)
-        }
+        }}
         
         # Only include reply_count for main messages, not for replies
         if not is_reply:
