@@ -401,7 +401,7 @@ def analyze_messages_with_llm(messages, query):
         # Fix the base_url by ensuring it ends with a trailing slash
         base_url = os.environ.get("LITELLM_API_BASE", "http://lite-llm.dev.kubiya.ai/")
         if base_url and not base_url.endswith('/'):
-            base_url = f"{{base_url}}"
+            base_url = f"{{base_url}}/"
         
         response = litellm.completion(
             messages=messages,
