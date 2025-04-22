@@ -247,13 +247,11 @@ if __name__ == "__main__":
             ],
         )
 
-class SlackSearchTool(SlackTool):
+class SlackSearchTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
-        # Add required env and secrets
         env = ["KUBIYA_USER_EMAIL", *env]
         secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY", "LITELLM_API_BASE"]
         
-        # Add arg names for script
         arg_names_json = json.dumps([arg.name for arg in args])
         
         script_content = f"""
@@ -422,13 +420,15 @@ if __name__ == "__main__":
         super().__init__(
             name=name,
             description=description,
-            action=action,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="python:3.11-slim",
+            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm > /dev/null 2>&1 && python /tmp/script.py",
             args=args,
             env=env,
             secrets=secrets,
             long_running=long_running,
-            mermaid_diagram=mermaid_diagram,
-            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm > /dev/null 2>&1 && python /tmp/script.py",
+            mermaid=mermaid_diagram,
             with_files=[
                 FileSpec(
                     destination="/tmp/script.py",
