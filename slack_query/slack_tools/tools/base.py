@@ -373,8 +373,8 @@ def analyze_messages_with_llm(messages, query):
         ])
         
         prompt = (
-            f"Based on these Slack messages, answer the following query. "
-            f"If you can't find a clear answer, say so.\n\n"
+            "Based on these Slack messages, answer the following query. "
+            "If you can't find a clear answer, say so.\n\n"
             f"Query: {{query}}\n\n"
             f"Messages:\n{{messages_text}}"
         )
