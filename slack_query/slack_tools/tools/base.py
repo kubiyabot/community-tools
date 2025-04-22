@@ -403,6 +403,12 @@ def analyze_messages_with_llm(messages, query):
         if base_url and not base_url.endswith('/'):
             base_url = f"{{base_url}}/"
         
+        # Add debug print statements
+        logger.info(f"LITELLM_API_BASE environment variable: {{os.environ.get('LITELLM_API_BASE', 'Not set')}}")
+        logger.info(f"Using base_url for litellm: {{base_url}}")
+        print(f"DEBUG - LITELLM_API_BASE: {{os.environ.get('LITELLM_API_BASE', 'Not set')}}")
+        print(f"DEBUG - Using base_url: {{base_url}}")
+        
         response = litellm.completion(
             messages=messages,
             model="openai/Llama-4-Scout",
