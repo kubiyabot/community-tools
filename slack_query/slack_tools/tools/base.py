@@ -258,15 +258,42 @@ import logging
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import litellm
+from time import time
+import re
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def check_message_relevance(query, message_text):
+def process_time_filter(oldest_param):
+    if not oldest_param:
+        return None
+        
+    time_pattern = re.match(r'(\d+)([hdm])', oldest_param.lower())
+    if time_pattern:
+        amount = int(time_pattern.group(1))
+        unit = time_pattern.group(2)
+        seconds = {'h': 3600, 'd': 86400, 'm': 60}[unit]
+        current_time = time()
+        offset = amount * seconds
+        target_time = current_time - offset
+        return f"{target_time:.6f}"  # Format with exactly 6 decimal places
+    return None
+
+def analyze_messages_with_llm(messages, query):
     try:
+        # Prepare messages for analysis
+        messages_text = "\\n".join([f"Message {i+1}: {msg['text']}" for i, msg in enumerate(messages)])
+        
+        prompt = f'''Based on these Slack messages, answer the following query. If you can't find a clear answer, say so.
+
+Query: {query}
+
+Messages:
+{messages_text}'''
+        
         messages = [
-            {"role": "system", "content": "You are a helpful assistant that determines if a Slack message is relevant to a user's query. Respond with only 'yes' or 'no'."},
-            {"role": "user", "content": f"Query: {query}\\nMessage: {message_text}\\nIs this message relevant to the query? Answer only 'yes' or 'no'."}
+            {"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."},
+            {"role": "user", "content": prompt}
         ]
         
         response = litellm.completion(
@@ -274,124 +301,64 @@ def check_message_relevance(query, message_text):
             model="openai/Llama-4-Scout",
             api_key=os.environ.get("LITELLM_API_KEY"),
             base_url=os.environ.get("LITELLM_API_BASE"),
-            max_tokens=10
+            max_tokens=500
         )
         
-        answer = response.choices[0].message.content.strip().lower()
-        return answer == "yes"
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        logger.error(f"Error checking message relevance: {e}")
-        return False
+        logger.error(f"Error analyzing messages: {e}")
+        return "Error analyzing messages"
 
-def get_thread_replies(client, channel_id, thread_ts, query):
-    try:
-        response = client.conversations_replies(
-            channel=channel_id,
-            ts=thread_ts
-        )
-        
-        relevant_replies = []
-        for reply in response["messages"][1:]:  # Skip the parent message
-            if check_message_relevance(query, reply.get("text", "")):
-                relevant_replies.append({
-                    "text": reply.get("text", ""),
-                    "ts": reply.get("ts", ""),
-                    "is_reply": True
-                })
-        
-        return relevant_replies
-    except SlackApiError as e:
-        logger.error(f"Error fetching thread replies: {e}")
-        return []
-
-def search_channel_history(client, channel_id, query, cursor=None):
-    batch_size = 20
+def get_channel_messages(client, channel_id, oldest):
     try:
         params = {
             "channel": channel_id,
-            "limit": batch_size
+            "oldest": oldest
         }
-        if cursor:
-            params["cursor"] = cursor
             
         response = client.conversations_history(**params)
+        messages = response["messages"]
         
-        relevant_messages = []
-        for msg in response["messages"]:
-            if check_message_relevance(query, msg.get("text", "")):
-                message_data = {
-                    "text": msg.get("text", ""),
-                    "ts": msg.get("ts", ""),
-                    "thread_ts": msg.get("thread_ts", ""),
-                    "replies": []
-                }
-                
-                # If message has replies (thread), check them too
-                if msg.get("reply_count", 0) > 0:
-                    thread_replies = get_thread_replies(client, channel_id, msg["ts"], query)
-                    if thread_replies:
-                        message_data["replies"] = thread_replies
-                
-                relevant_messages.append(message_data)
-                
-        result = {
-            "messages": relevant_messages,
-            "has_more": response["has_more"],
-            "next_cursor": response.get("response_metadata", {}).get("next_cursor")
-        }
-        
-        return result
+        logger.info(f"Retrieved {len(messages)} messages from channel")
+        return messages
         
     except SlackApiError as e:
-        logger.error(f"Error searching channel history: {e}")
-        return None
+        logger.error(f"Error fetching channel history: {e}")
+        return []
 
-def execute_search(token, channel, query):
+def execute_search(token, channel, query, oldest):
     client = WebClient(token=token)
-    cursor = None
-    all_relevant_messages = []
     
-    while True:
-        result = search_channel_history(client, channel, query, cursor)
-        if not result:
-            break
-            
-        all_relevant_messages.extend(result["messages"])
-        
-        # Stop if we have enough messages or there are no more to fetch
-        if not result["has_more"] or len(all_relevant_messages) >= 5:
-            break
-            
-        cursor = result["next_cursor"]
+    # Process time filter
+    oldest_ts = process_time_filter(oldest)
+    if not oldest_ts:
+        return {"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', or '30m'"}
     
-    # Format the final response
-    formatted_messages = []
-    for msg in all_relevant_messages:
-        message_info = {
-            "message": msg["text"],
-            "timestamp": msg["ts"]
-        }
-        
-        if msg["replies"]:
-            message_info["thread_replies"] = [
-                {"message": reply["text"], "timestamp": reply["ts"]}
-                for reply in msg["replies"]
-            ]
-            
-        formatted_messages.append(message_info)
+    # Get messages
+    messages = get_channel_messages(client, channel, oldest_ts)
     
-    return {"success": True, "messages": formatted_messages}
+    if not messages:
+        return {"success": True, "answer": "No messages found in the specified time period"}
+    
+    # Get answer from LLM
+    answer = analyze_messages_with_llm(messages, query)
+    
+    return {
+        "success": True,
+        "answer": answer
+    }
 
 if __name__ == "__main__":
     token = os.environ.get("SLACK_API_TOKEN")
     channel = os.environ.get("channel")
     query = os.environ.get("query")
+    oldest = os.environ.get("oldest")
     
     if not all([token, channel, query]):
         print(json.dumps({"success": False, "error": "Missing required environment variables"}))
         sys.exit(1)
     
-    result = execute_search(token, channel, query)
+    result = execute_search(token, channel, query, oldest)
     print(json.dumps(result))
 """
         

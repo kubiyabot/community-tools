@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool
+from .base import SlackTool, SlackSearchTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Slack Send Message Tool
@@ -156,6 +156,18 @@ slack_get_thread_replies = SlackTool(
     ],
 )
 
+# Add new Slack Search Messages Tool
+slack_search_messages = SlackSearchTool(
+    name="slack_search_messages",
+    description="Search for messages in a Slack channel within a time period using natural language queries",
+    action="conversations_history",
+    args=[
+        Arg(name="channel", type="str", description="The ID of the channel to search in", required=True),
+        Arg(name="query", type="str", description="The search query to find relevant messages", required=True),
+        Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes)", required=True),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -172,6 +184,7 @@ all_tools = [
     slack_get_channel_history,
     slack_send_message_to_predefined_channel,
     slack_get_thread_replies,
+    slack_search_messages,
 ]
 
 # Register all Slack tools
