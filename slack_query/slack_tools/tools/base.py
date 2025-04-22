@@ -399,28 +399,27 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
-   try:
-    response = litellm.completion(
-        messages=messages,
-        model="openai/Llama-4-Scout",
-        api_key=os.environ.get("LITELLM_API_KEY"),
-        base_url=os.environ.get("LITELLM_API_BASE"),
-        stream=False,
-        user="michael.bauer@kubiya.ai-staging",
-        max_tokens=2048,
-        temperature=0.7,
-        top_p=0.1,
-        presence_penalty=0.0,
-        frequency_penalty=0.0,
-        timeout=30,  # Increased timeout from 15 to 30 seconds
-        extra_body={{
-            "metadata": modified_metadata
-        }}
-    )
-    
-    answer = response.choices[0].message.content.strip()
-    logger.info(f"Received response from LLM: {{answer[:100]}}...")
-    return answer
+        response = litellm.completion(
+            messages=messages,
+            model="openai/Llama-4-Scout",
+            api_key=os.environ.get("LITELLM_API_KEY"),
+            base_url=os.environ.get("LITELLM_API_BASE"),
+            stream=False,
+            user="michael.bauer@kubiya.ai-staging",
+            max_tokens=2048,
+            temperature=0.7,
+            top_p=0.1,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            timeout=30,  # Increased timeout from 15 to 30 seconds
+            extra_body={{
+                "metadata": modified_metadata
+            }}
+        )
+        
+        answer = response.choices[0].message.content.strip()
+        logger.info(f"Received response from LLM: {{answer[:100]}}...")
+        return answer
 
     except litellm.Timeout:
         logger.error("LLM request timed out")
