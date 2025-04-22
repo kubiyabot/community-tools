@@ -357,7 +357,8 @@ def get_channel_messages(client, channel_id, oldest):
             }}
             processed_messages.append(processed_msg)
         
-        logger.info(f"Retrieved {{len(messages)}} messages from channel")
+        logger.info(f"Retrieved {{len(processed_messages)}} messages from channel")
+        logger.info(f"Message sample: {{processed_messages[:2]}}")  # Log first two messages for debugging
         return processed_messages
         
     except SlackApiError as e:
@@ -366,10 +367,14 @@ def get_channel_messages(client, channel_id, oldest):
 
 def analyze_messages_with_llm(messages, query):
     try:
+        logger.info(f"Analyzing {{len(messages)}} messages with query: {{query}}")
+        
         messages_text = "\\n".join([
             f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
+        
+        logger.info("Constructed messages text for analysis")
         
         prompt = (
             "Based on these Slack messages, answer the following query. "
@@ -377,6 +382,8 @@ def analyze_messages_with_llm(messages, query):
             f"Query: {{query}}\\n\\n"
             f"Messages:\\n{{messages_text}}"
         )
+        
+        logger.info("Sending request to LLM")
         
         messages = [
             {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
@@ -387,6 +394,7 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
+        # Add timeout parameter
         response = litellm.completion(
             messages=messages,
             model="openai/Llama-4-Scout",
@@ -399,12 +407,15 @@ def analyze_messages_with_llm(messages, query):
             top_p=0.1,
             presence_penalty=0.0,
             frequency_penalty=0.0,
+            timeout=30,  # Add 30 second timeout
             extra_body={{
                 "metadata": modified_metadata
             }}
         )
         
-        return response.choices[0].message.content.strip()
+        answer = response.choices[0].message.content.strip()
+        logger.info(f"Received response from LLM: {{answer[:100]}}...")  # Log first 100 chars
+        return answer
 
     except Exception as e:
         logger.error(f"Error analyzing messages: {{str(e)}}")
@@ -412,7 +423,7 @@ def analyze_messages_with_llm(messages, query):
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
-    logger.info(f"Executing Slack search action")
+    logger.info(f"Executing Slack search action with params: {{kwargs}}")
     
     channel = kwargs.get('channel')
     query = kwargs.get('query')
@@ -430,11 +441,15 @@ def execute_slack_action(token, action, operation, **kwargs):
     if not oldest_ts:
         return {{"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', or '30m'"}}
     
+    logger.info(f"Fetching messages from channel {{channel_id}} since {{oldest_ts}}")
+    
     # Get messages
     messages = get_channel_messages(client, channel_id, oldest_ts)
     
     if not messages:
         return {{"success": True, "answer": "No messages found in the specified time period"}}
+    
+    logger.info(f"Found {{len(messages)}} messages to analyze")
     
     # Get answer from LLM
     answer = analyze_messages_with_llm(messages, query)
