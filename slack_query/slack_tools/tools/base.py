@@ -384,6 +384,11 @@ def analyze_messages_with_llm(messages, query):
         )
         
         logger.info("Sending request to LLM")
+
+        # Configure litellm
+        litellm.set_verbose = True
+        litellm.request_timeout = 15  # Set shorter timeout
+        litellm.num_retries = 2  # Limit retries
         
         messages = [
             {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
@@ -394,28 +399,42 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
-        # Add timeout parameter
-        response = litellm.completion(
-            messages=messages,
-            model="openai/Llama-4-Scout",
-            api_key=os.environ.get("LITELLM_API_KEY"),
-            base_url=os.environ.get("LITELLM_API_BASE"),
-            stream=False,
-            user=os.environ.get("KUBIYA_USER_EMAIL", "unknown-user"),
-            max_tokens=2048,
-            temperature=0.7,
-            top_p=0.1,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-            timeout=30,  # Add 30 second timeout
-            extra_body={{
-                "metadata": modified_metadata
-            }}
-        )
-        
-        answer = response.choices[0].message.content.strip()
-        logger.info(f"Received response from LLM: {{answer[:100]}}...")  # Log first 100 chars
-        return answer
+        try:
+            response = litellm.completion(
+                messages=messages,
+                model="openai/Llama-4-Scout",
+                api_key=os.environ.get("LITELLM_API_KEY"),
+                base_url=os.environ.get("LITELLM_API_BASE"),
+                stream=False,
+                user="michael.bauer@kubiya.ai-staging",
+                max_tokens=1024,  # Reduced from 2048
+                temperature=0.7,
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=15,  # Reduced timeout
+                extra_body={{
+                    "metadata": modified_metadata
+                }}
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            logger.info(f"Received response from LLM: {{answer[:100]}}...")
+            return answer
+
+        except litellm.Timeout:
+            logger.error("LLM request timed out, falling back to simple message search")
+            # Fallback: Simple keyword matching
+            relevant_messages = []
+            query_terms = query.lower().split()
+            for msg in messages:
+                if any(term in msg['message'].lower() for term in query_terms):
+                    relevant_messages.append(msg['message'])
+            
+            if relevant_messages:
+                return "Here are the relevant messages I found:\\n" + "\\n".join(relevant_messages)
+            else:
+                return "No relevant messages found and LLM analysis timed out. Please try again or refine your query."
 
     except Exception as e:
         logger.error(f"Error analyzing messages: {{str(e)}}")
