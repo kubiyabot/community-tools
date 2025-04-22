@@ -399,11 +399,16 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
+        # Fix the base_url by ensuring it ends with a trailing slash
+        base_url = os.environ.get("LITELLM_API_BASE", "http://lite-llm.dev.kubiya.ai/")
+        if base_url and not base_url.endswith('/'):
+            base_url = f"{{base_url}}/"
+        
         response = litellm.completion(
             messages=messages,
             model="openai/Llama-4-Scout",
             api_key=os.environ.get("LITELLM_API_KEY"),
-            base_url=os.environ.get("LITELLM_API_BASE"),
+            base_url=base_url,
             stream=False,
             user="michael.bauer@kubiya.ai-staging",
             max_tokens=2048,
