@@ -1,5 +1,6 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
+import time
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
@@ -317,52 +318,99 @@ def process_time_filter(oldest_param):
         return f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
     return None
 
-def analyze_messages_with_llm(messages, query):
-    try:
-        # Prepare messages for analysis
-        messages_text = "\\n".join([f"Message {{i+1}}: {{msg['text']}}" for i, msg in enumerate(messages)])
+def process_slack_messages(messages, is_reply=False):
+    logger.info(f"Processing {len(messages)} messages")
+    
+    # Print each message individually instead of joining
+    for msg in messages:
+        processed_msg = {
+            "message": msg.get("text", ""),
+            "timestamp": msg.get("ts", ""),
+            "reply_count": msg.get("reply_count", 0)
+        }
         
-        prompt = f'''Based on these Slack messages, answer the following query. If you can't find a clear answer, say so.
-
-Query: {{query}}
-
-Messages:
-{{messages_text}}'''
-        
-        messages = [
-            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
-            {{"role": "user", "content": prompt}}
-        ]
-        
-        response = litellm.completion(
-            messages=messages,
-            model="openai/Llama-4-Scout",
-            api_key=os.environ.get("LITELLM_API_KEY"),
-            base_url=os.environ.get("LITELLM_API_BASE"),
-            max_tokens=500
-        )
-        
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        logger.error(f"Error analyzing messages: {{e}}")
-        return "Error analyzing messages"
+        # Only include reply_count for main messages, not for replies
+        if not is_reply:
+            processed_msg["reply_count"] = msg.get("reply_count", 0)
+            
+        print(json.dumps(processed_msg))  # Print each message directly
+    
+    return "Messages printed individually"  # Return a placeholder
 
 def get_channel_messages(client, channel_id, oldest):
     try:
-        params = {{
+        params = {
             "channel": channel_id,
             "oldest": oldest
-        }}
+        }
             
         response = client.conversations_history(**params)
         messages = response["messages"]
         
-        logger.info(f"Retrieved {{len(messages)}} messages from channel")
-        return messages
+        # Process messages using the same format as SlackTool
+        processed_messages = []
+        for msg in messages:
+            processed_msg = {
+                "message": msg.get("text", ""),
+                "timestamp": msg.get("ts", ""),
+                "reply_count": msg.get("reply_count", 0)
+            }
+            processed_messages.append(processed_msg)
+        
+        logger.info(f"Retrieved {len(messages)} messages from channel")
+        return processed_messages
         
     except SlackApiError as e:
-        logger.error(f"Error fetching channel history: {{e}}")
+        logger.error(f"Error fetching channel history: {e}")
         return []
+
+def analyze_messages_with_llm(messages, query):
+    try:
+        # Update message formatting for analysis
+        messages_text = "\n".join([
+            f"Message {i+1} (ts: {msg['timestamp']}, replies: {msg['reply_count']}): {msg['message']}" 
+            for i, msg in enumerate(messages)
+        ])
+        
+        prompt = f'''Based on these Slack messages, answer the following query. If you can't find a clear answer, say so.
+
+Query: {query}
+
+Messages:
+{messages_text}'''
+        
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        max_retries = 3
+        retry_delay = 1  # Initial delay in seconds
+        
+        for attempt in range(max_retries):
+            try:
+                response = litellm.completion(
+                    messages=messages,
+                    model="openai/Llama-4-Scout",
+                    api_key=os.environ.get("LITELLM_API_KEY"),
+                    base_url=os.environ.get("LITELLM_API_BASE"),
+                    max_tokens=500,
+                    timeout=60  # Set timeout to 60 seconds
+                )
+                return response.choices[0].message.content.strip()
+            except litellm.Timeout:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Attempt {attempt + 1} timed out. Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    raise
+    except litellm.Timeout as e:
+        logger.error(f"LLM request timed out after {max_retries} attempts: {e}")
+        return "Unable to analyze messages due to timeout. Please try again."
+    except Exception as e:
+        logger.error(f"Error analyzing messages: {e}")
+        return f"Error analyzing messages: {str(e)}"
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
