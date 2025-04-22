@@ -1,6 +1,5 @@
 from kubiya_sdk.tools.models import Tool, Arg, FileSpec
 import json
-import litellm
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
@@ -368,6 +367,7 @@ if __name__ == "__main__":
             action=action,
             args=args,
             env=["LITELLM_API_KEY", "LITELLM_API_BASE"],
+            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm > /dev/null 2>&1 && python /tmp/script.py",
             with_files=[
                 FileSpec(
                     destination="/tmp/script.py",
