@@ -250,7 +250,7 @@ if __name__ == "__main__":
 class SlackSearchTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
         env = ["KUBIYA_USER_EMAIL", *env]
-        secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY", "LITELLM_API_BASE"]
+        secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -398,15 +398,11 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
-        # Fix the base_url by ensuring it ends with a trailing slash
-        base_url = os.environ.get("LITELLM_API_BASE", "http://lite-llm.dev.kubiya.ai/")
-        if base_url and not base_url.endswith('/'):
-            base_url = f"{{base_url}}/"
+        # Use hardcoded base URL
+        base_url = "http://lite-llm.dev.kubiya.ai/"
         
         # Add debug print statements
-        logger.info(f"LITELLM_API_BASE environment variable: {{os.environ.get('LITELLM_API_BASE', 'Not set')}}")
         logger.info(f"Using base_url for litellm: {{base_url}}")
-        print(f"DEBUG - LITELLM_API_BASE: {{os.environ.get('LITELLM_API_BASE', 'Not set')}}")
         print(f"DEBUG - Using base_url: {{base_url}}")
         
         response = litellm.completion(
