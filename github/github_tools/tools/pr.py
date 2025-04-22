@@ -187,7 +187,7 @@ echo "✅ Pull request closed successfully!"
 )
 
 pr_comment = GitHubCliTool(
-    name="github_pr_comment",
+    name="github_pr_commentWQ",
     description="Add a comment to a pull request with proper formatting and timestamp.",
     content="""
 # Format the timestamp in ISO format
