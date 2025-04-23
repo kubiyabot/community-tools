@@ -377,6 +377,7 @@ def analyze_messages_with_llm(messages, query):
             f"Message {{i+1}} (ts: {{msg['timestamp']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
+        logger.info(f"Messages: {{messages_text}}")
         
         prompt = (
             "Based on these Slack messages, answer the following query. "
@@ -388,14 +389,6 @@ def analyze_messages_with_llm(messages, query):
         # Log a truncated version of the prompt
         prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
         logger.info(f"Sending prompt to LLM: {{prompt_preview}}")
-        
-        # Try a different approach to disable litellm logging
-        # Set environment variable before importing litellm
-        os.environ["LITELLM_LOG"] = "CRITICAL"
-        
-        # Monkey patch the cost calculator to prevent logging
-        original_get_logging_cost = litellm.utils.cost_calculator.get_logging_cost
-        litellm.utils.cost_calculator.get_logging_cost = lambda *args, **kwargs: None
         
         try:
             litellm.request_timeout = 30
@@ -433,9 +426,6 @@ def analyze_messages_with_llm(messages, query):
             answer = response.choices[0].message.content.strip()
             logger.info("LLM response received successfully")
             return answer
-        finally:
-            # Restore original function
-            litellm.utils.cost_calculator.get_logging_cost = original_get_logging_cost
 
     except litellm.Timeout:
         logger.error("LLM request timed out")
