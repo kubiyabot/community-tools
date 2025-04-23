@@ -384,9 +384,9 @@ def analyze_messages_with_llm(messages, query):
             "If multiple messages contain relevant information, synthesize them into a coherent answer. "
             "If you find a message that seems to be the start of a relevant thread, highlight it and its timestamp. "
             "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
-            "\n\n"
-            f"Query: {{query}}\n\n"
-            f"Messages:\n{{messages_text}}"
+            "\\n\\n"
+            f"Query: {{query}}\\n\\n"
+            f"Messages:\\n{{messages_text}}"
         )
         
         # Log a truncated version of the prompt
