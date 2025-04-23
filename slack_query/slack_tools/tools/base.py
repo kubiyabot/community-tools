@@ -357,7 +357,6 @@ def get_channel_messages(client, channel_id, oldest):
             processed_messages.append(processed_msg)
         
         logger.info(f"Retrieved {{len(processed_messages)}} messages from channel")
-        logger.info(f"Message sample: {{processed_messages[:2]}}")  # Log first two messages for debugging
         return processed_messages
         
     except SlackApiError as e:
@@ -373,8 +372,6 @@ def analyze_messages_with_llm(messages, query):
             for i, msg in enumerate(messages)
         ])
         
-        logger.info("Constructed messages text for analysis")
-        
         prompt = (
             "Based on these Slack messages, answer the following query. "
             "If you can't find a clear answer, say so.\\n\\n"
@@ -384,10 +381,10 @@ def analyze_messages_with_llm(messages, query):
         
         logger.info("Sending request to LLM")
 
-        # Configure litellm - using environment variable instead of deprecated property
-        os.environ["LITELLM_LOG"] = "INFO"
-        litellm.request_timeout = 30  # Increased timeout
-        litellm.num_retries = 3  # Increased retries
+        # Configure litellm - using environment variable for logging
+        os.environ["LITELLM_LOG"] = "ERROR"  # Only log errors from litellm
+        litellm.request_timeout = 30
+        litellm.num_retries = 3
         
         messages = [
             {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
@@ -400,10 +397,6 @@ def analyze_messages_with_llm(messages, query):
         
         # Fix the base URL to include trailing slash and use https instead of http
         base_url = "https://lite-llm.dev.kubiya.ai/"
-        
-        # Add debug print statements
-        logger.info(f"Using base_url for litellm: {{base_url}}")
-        print(f"DEBUG - Using base_url: {{base_url}}")
         
         response = litellm.completion(
             messages=messages,
@@ -424,7 +417,7 @@ def analyze_messages_with_llm(messages, query):
         )
         
         answer = response.choices[0].message.content.strip()
-        logger.info(f"Received response from LLM: {{answer[:100]}}...")
+        logger.info("LLM response received successfully")
         return answer
 
     except litellm.Timeout:
