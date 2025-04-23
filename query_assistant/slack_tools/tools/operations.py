@@ -163,7 +163,7 @@ slack_search_messages = SlackSearchTool(
     action="conversations_history",
     args=[
         Arg(name="channel", type="str", description="The ID of the channel to search in", required=True),
-        Arg(name="query", type="str", description="The exact search query as provided by the user, do not summarize or modify it", required=True),
+        Arg(name="query", type="str", description="The search query exactly as provided by the user. Do not modify, summarize, or interpret the query - pass it through verbatim", required=True),
         Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes)", required=True),
     ],
 )
