@@ -399,7 +399,7 @@ def analyze_messages_with_llm(messages, query):
         }}
         
         # Remove trailing slash to avoid redirect issues
-        base_url = "http://lite-llm.dev.kubiya.ai"
+        base_url = "http://lite-llm.dev.kubiya.ai/"
         
         # Add debug print statements
         logger.info(f"Using base_url for litellm: {{base_url}}")
