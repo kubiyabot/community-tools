@@ -377,13 +377,16 @@ def analyze_messages_with_llm(messages, query):
             f"Message {{i+1}} (ts: {{msg['timestamp']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
-        logger.info(f"Messages: {{messages_text}}")
         
         prompt = (
-            "Based on these Slack messages, answer the following query. "
-            "If you can't find a clear answer, say so.\\n\\n"
-            f"Query: {{query}}\\n\\n"
-            f"Messages:\\n{{messages_text}}"
+            "You are analyzing Slack messages to find information that answers the user's query. "
+            "Focus on finding the most relevant and accurate information from the messages provided. "
+            "If multiple messages contain relevant information, synthesize them into a coherent answer. "
+            "If you find a message that seems to be the start of a relevant thread, highlight it and its timestamp. "
+            "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
+            "\n\n"
+            f"Query: {{query}}\n\n"
+            f"Messages:\n{{messages_text}}"
         )
         
         # Log a truncated version of the prompt
@@ -394,7 +397,7 @@ def analyze_messages_with_llm(messages, query):
         litellm.num_retries = 3
         
         messages = [
-            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+            {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification. If a message appears to be the start of a relevant thread, note its timestamp in your response."}},
             {{"role": "user", "content": prompt}}
         ]
 
