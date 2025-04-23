@@ -390,50 +390,49 @@ def analyze_messages_with_llm(messages, query):
         prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
         logger.info(f"Sending prompt to LLM: {{prompt_preview}}")
         
-        try:
-            litellm.request_timeout = 30
-            litellm.num_retries = 3
-            
-            messages = [
-                {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
-                {{"role": "user", "content": prompt}}
-            ]
+        litellm.request_timeout = 30
+        litellm.num_retries = 3
+        
+        messages = [
+            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+            {{"role": "user", "content": prompt}}
+        ]
 
-            modified_metadata = {{
-                "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
+        modified_metadata = {{
+            "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
+        }}
+        
+        base_url = "https://lite-llm.dev.kubiya.ai/"
+        
+        response = litellm.completion(
+            messages=messages,
+            model="openai/Llama-4-Scout",
+            api_key=os.environ.get("LITELLM_API_KEY"),
+            base_url=base_url,
+            stream=False,
+            user="michael.bauer@kubiya.ai-staging",
+            max_tokens=2048,
+            temperature=0.7,
+            top_p=0.1,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            timeout=30,
+            extra_body={{
+                "metadata": modified_metadata
             }}
-            
-            base_url = "https://lite-llm.dev.kubiya.ai/"
-            
-            response = litellm.completion(
-                messages=messages,
-                model="openai/Llama-4-Scout",
-                api_key=os.environ.get("LITELLM_API_KEY"),
-                base_url=base_url,
-                stream=False,
-                user="michael.bauer@kubiya.ai-staging",
-                max_tokens=2048,
-                temperature=0.7,
-                top_p=0.1,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
-                timeout=30,
-                extra_body={{
-                    "metadata": modified_metadata
-                }}
-            )
-            
-            answer = response.choices[0].message.content.strip()
-            logger.info("LLM response received successfully")
-            return answer
+        )
+        
+        answer = response.choices[0].message.content.strip()
+        logger.info("LLM response received successfully")
+        return answer
 
-        except litellm.Timeout:
-            logger.error("LLM request timed out")
-            return "The LLM analysis timed out. Please try again later."
+    except litellm.Timeout:
+        logger.error("LLM request timed out")
+        return "The LLM analysis timed out. Please try again later."
 
-        except Exception as e:
-            logger.error(f"Error analyzing messages: {{str(e)}}")
-            return f"Error during LLM analysis: {{str(e)}}"
+    except Exception as e:
+        logger.error(f"Error analyzing messages: {{str(e)}}")
+        return f"Error during LLM analysis: {{str(e)}}"
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
