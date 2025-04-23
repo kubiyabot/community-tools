@@ -427,13 +427,13 @@ def analyze_messages_with_llm(messages, query):
             logger.info("LLM response received successfully")
             return answer
 
-    except litellm.Timeout:
-        logger.error("LLM request timed out")
-        return "The LLM analysis timed out. Please try again later."
+        except litellm.Timeout:
+            logger.error("LLM request timed out")
+            return "The LLM analysis timed out. Please try again later."
 
-    except Exception as e:
-        logger.error(f"Error analyzing messages: {{str(e)}}")
-        return f"Error during LLM analysis: {{str(e)}}"
+        except Exception as e:
+            logger.error(f"Error analyzing messages: {{str(e)}}")
+            return f"Error during LLM analysis: {{str(e)}}"
 
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
