@@ -345,17 +345,24 @@ def get_channel_messages(client, channel_id, oldest):
         response = client.conversations_history(**params)
         messages = response["messages"]
         
-        # Process messages using the same format as SlackTool
+        # Process messages for LLM analysis
         processed_messages = []
         for msg in messages:
             processed_msg = {{
                 "message": msg.get("text", ""),
-                "timestamp": msg.get("ts", ""),
-                "reply_count": msg.get("reply_count", 0)
+                "timestamp": msg.get("ts", "")
             }}
             processed_messages.append(processed_msg)
         
-        logger.info(f"Retrieved {{len(processed_messages)}} messages from channel")
+        # Log a sample of messages (first 3)
+        sample_size = min(3, len(processed_messages))
+        if sample_size > 0:
+            logger.info(f"Retrieved {{len(processed_messages)}} messages from channel. Sample:")
+            for i in range(sample_size):
+                logger.info(f"  Message {{i+1}}: {{processed_messages[i]['message'][:100]}}...")
+        else:
+            logger.info("No messages retrieved from channel")
+            
         return processed_messages
         
     except SlackApiError as e:
@@ -378,46 +385,57 @@ def analyze_messages_with_llm(messages, query):
             f"Messages:\\n{{messages_text}}"
         )
         
-        logger.info("Sending request to LLM")
-
-        # Disable litellm logging completely
+        # Log a truncated version of the prompt
+        prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
+        logger.info(f"Sending prompt to LLM: {{prompt_preview}}")
+        
+        # Try a different approach to disable litellm logging
+        # Set environment variable before importing litellm
         os.environ["LITELLM_LOG"] = "CRITICAL"
         
-        litellm.request_timeout = 30
-        litellm.num_retries = 3
+        # Monkey patch the cost calculator to prevent logging
+        original_get_logging_cost = litellm.utils.cost_calculator.get_logging_cost
+        litellm.utils.cost_calculator.get_logging_cost = lambda *args, **kwargs: None
         
-        messages = [
-            {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
-            {{"role": "user", "content": prompt}}
-        ]
+        try:
+            litellm.request_timeout = 30
+            litellm.num_retries = 3
+            
+            messages = [
+                {{"role": "system", "content": "You are a helpful assistant that provides clear, direct answers based on Slack message content."}},
+                {{"role": "user", "content": prompt}}
+            ]
 
-        modified_metadata = {{
-            "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
-        }}
-        
-        base_url = "https://lite-llm.dev.kubiya.ai/"
-        
-        response = litellm.completion(
-            messages=messages,
-            model="openai/Llama-4-Scout",
-            api_key=os.environ.get("LITELLM_API_KEY"),
-            base_url=base_url,
-            stream=False,
-            user="michael.bauer@kubiya.ai-staging",
-            max_tokens=2048,
-            temperature=0.7,
-            top_p=0.1,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-            timeout=30,
-            extra_body={{
-                "metadata": modified_metadata
+            modified_metadata = {{
+                "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
             }}
-        )
-        
-        answer = response.choices[0].message.content.strip()
-        logger.info("LLM response received successfully")
-        return answer
+            
+            base_url = "https://lite-llm.dev.kubiya.ai/"
+            
+            response = litellm.completion(
+                messages=messages,
+                model="openai/Llama-4-Scout",
+                api_key=os.environ.get("LITELLM_API_KEY"),
+                base_url=base_url,
+                stream=False,
+                user="michael.bauer@kubiya.ai-staging",
+                max_tokens=2048,
+                temperature=0.7,
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=30,
+                extra_body={{
+                    "metadata": modified_metadata
+                }}
+            )
+            
+            answer = response.choices[0].message.content.strip()
+            logger.info("LLM response received successfully")
+            return answer
+        finally:
+            # Restore original function
+            litellm.utils.cost_calculator.get_logging_cost = original_get_logging_cost
 
     except litellm.Timeout:
         logger.error("LLM request timed out")
