@@ -324,8 +324,7 @@ def process_slack_messages(messages, is_reply=False):
     for msg in messages:
         processed_msg = {{
             "message": msg.get("text", ""),
-            "timestamp": msg.get("ts", ""),
-            "reply_count": msg.get("reply_count", 0)
+            "timestamp": msg.get("ts", "")
         }}
         
         # Only include reply_count for main messages, not for replies
@@ -368,7 +367,7 @@ def analyze_messages_with_llm(messages, query):
         logger.info(f"Analyzing {{len(messages)}} messages with query: {{query}}")
         
         messages_text = "\\n".join([
-            f"Message {{i+1}} (ts: {{msg['timestamp']}}, replies: {{msg['reply_count']}}): {{msg['message']}}" 
+            f"Message {{i+1}} (ts: {{msg['timestamp']}}): {{msg['message']}}" 
             for i, msg in enumerate(messages)
         ])
         
@@ -381,16 +380,8 @@ def analyze_messages_with_llm(messages, query):
         
         logger.info("Sending request to LLM")
 
-        # Completely disable litellm logging by setting to CRITICAL
+        # Disable litellm logging completely
         os.environ["LITELLM_LOG"] = "CRITICAL"
-        
-        # Disable other litellm logging
-        import logging as python_logging
-        litellm_logger = python_logging.getLogger("litellm")
-        litellm_logger.setLevel(python_logging.CRITICAL)
-        
-        # Disable stdout logging from litellm
-        litellm.utils.logging.disable_logging()
         
         litellm.request_timeout = 30
         litellm.num_retries = 3
@@ -404,7 +395,6 @@ def analyze_messages_with_llm(messages, query):
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
         
-        # Fix the base URL to include trailing slash and use https instead of http
         base_url = "https://lite-llm.dev.kubiya.ai/"
         
         response = litellm.completion(
@@ -419,7 +409,7 @@ def analyze_messages_with_llm(messages, query):
             top_p=0.1,
             presence_penalty=0.0,
             frequency_penalty=0.0,
-            timeout=30,  # Increased timeout from 15 to 30 seconds
+            timeout=30,
             extra_body={{
                 "metadata": modified_metadata
             }}
