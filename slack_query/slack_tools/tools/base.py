@@ -381,8 +381,17 @@ def analyze_messages_with_llm(messages, query):
         
         logger.info("Sending request to LLM")
 
-        # Configure litellm - using environment variable for logging
-        os.environ["LITELLM_LOG"] = "ERROR"  # Only log errors from litellm
+        # Completely disable litellm logging by setting to CRITICAL
+        os.environ["LITELLM_LOG"] = "CRITICAL"
+        
+        # Disable other litellm logging
+        import logging as python_logging
+        litellm_logger = python_logging.getLogger("litellm")
+        litellm_logger.setLevel(python_logging.CRITICAL)
+        
+        # Disable stdout logging from litellm
+        litellm.utils.logging.disable_logging()
+        
         litellm.request_timeout = 30
         litellm.num_retries = 3
         
