@@ -121,7 +121,7 @@ More tools are in development, including:
 ### 1️⃣ Configure Observe Connection
 
 ```bash
-export OBSERVE_API_TOKEN="your-api-token"
+export OBSERVE_API_KEY="your-api-token"
 export OBSERVE_CUSTOMER_ID="your-customer-id"
 ```
 
