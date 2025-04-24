@@ -785,7 +785,7 @@ class MonitoringTools:
             echo "Fetching incidents with parameters: $QUERY_PARAMS"
             
             # Display the full curl command (with API keys masked for security)
-            echo "Executing curl command: curl -X GET \"https://api.\$DD_SITE/api/v2/incidents?$QUERY_PARAMS\" -H \"DD-API-KEY: ****\" -H \"DD-APPLICATION-KEY: ****\" -H \"Content-Type: application/json\" -H \"Accept: application/json\""
+            echo "Executing curl command: curl -X GET \"https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS\" -H \"DD-API-KEY: ****\" -H \"DD-APPLICATION-KEY: ****\" -H \"Content-Type: application/json\" -H \"Accept: application/json\""
             
             # Make the API call to list incidents
             RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS" \
