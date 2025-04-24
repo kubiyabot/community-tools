@@ -64,7 +64,48 @@ class ConfluenceTool(Tool):
                 echo "Using username: $CONFLUENCE_USERNAME"
                 echo "API Token: ${CONFLUENCE_API_TOKEN:0:3}...${CONFLUENCE_API_TOKEN: -3}"
                 
-                # Test connection with verbose output for debugging
+                # For Atlassian Cloud, try different URL formats
+                if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                    echo "Detected Atlassian Cloud instance. Trying different URL formats..."
+                    
+                    # Try base URL without /wiki
+                    if [[ "$CONFLUENCE_URL" == *"/wiki" ]]; then
+                        BASE_URL="${CONFLUENCE_URL%/wiki}"
+                        echo "Trying base URL: $BASE_URL"
+                        
+                        HTTP_RESPONSE=$(curl -s -v -X GET "$BASE_URL/rest/api/content" \
+                            -H "$AUTH_HEADER" \
+                            -H "Content-Type: application/json" 2>&1)
+                        
+                        HTTP_STATUS=$(echo "$HTTP_RESPONSE" | grep -o "< HTTP/[0-9.]* [0-9]*" | grep -o "[0-9][0-9][0-9]" || echo "000")
+                        
+                        if [[ "$HTTP_STATUS" == "200" ]]; then
+                            echo "Successfully connected to Confluence API using: $BASE_URL"
+                            # Update the CONFLUENCE_URL for future requests
+                            CONFLUENCE_URL="$BASE_URL"
+                            return 0
+                        fi
+                    fi
+                    
+                    # Try with /wiki/rest/api
+                    WIKI_API_URL="${CONFLUENCE_URL%/wiki}/wiki/rest/api/content"
+                    echo "Trying wiki API URL: $WIKI_API_URL"
+                    
+                    HTTP_RESPONSE=$(curl -s -v -X GET "$WIKI_API_URL" \
+                        -H "$AUTH_HEADER" \
+                        -H "Content-Type: application/json" 2>&1)
+                    
+                    HTTP_STATUS=$(echo "$HTTP_RESPONSE" | grep -o "< HTTP/[0-9.]* [0-9]*" | grep -o "[0-9][0-9][0-9]" || echo "000")
+                    
+                    if [[ "$HTTP_STATUS" == "200" ]]; then
+                        echo "Successfully connected to Confluence API using: ${CONFLUENCE_URL%/wiki}/wiki"
+                        # Update the CONFLUENCE_URL for future requests
+                        CONFLUENCE_URL="${CONFLUENCE_URL%/wiki}/wiki"
+                        return 0
+                    fi
+                fi
+                
+                # Default connection attempt
                 HTTP_RESPONSE=$(curl -s -v -X GET "$CONFLUENCE_URL/rest/api/content" \
                     -H "$AUTH_HEADER" \
                     -H "Content-Type: application/json" 2>&1)
@@ -81,9 +122,12 @@ class ConfluenceTool(Tool):
                         echo "Warning: CONFLUENCE_URL should start with http:// or https://"
                     fi
                     
-                    # Check if we're using the correct Confluence URL format
-                    if [[ "$CONFLUENCE_URL" == *"atlassian.net/wiki"* ]]; then
-                        echo "Note: For Atlassian Cloud, try using '$CONFLUENCE_URL' or '${CONFLUENCE_URL%/wiki}'"
+                    # Provide guidance for Atlassian Cloud URLs
+                    if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                        echo "For Atlassian Cloud, the correct URL format is typically one of:"
+                        echo "1. https://your-instance.atlassian.net"
+                        echo "2. https://your-instance.atlassian.net/wiki"
+                        echo "Please verify the correct URL in your Atlassian Cloud instance."
                     fi
                     
                     exit 1
