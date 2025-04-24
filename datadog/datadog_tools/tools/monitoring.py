@@ -675,12 +675,20 @@ class MonitoringTools:
             apk add --no-cache jq coreutils
             validate_datadog_connection
 
-            # Set default filter options if not provided
-            PAGE_SIZE="${page_size:-30}"
-            PAGE_NUMBER="${page_number:-0}"
+            # Build the query parameter string with page parameters only if provided
+            QUERY_PARAMS=""
             
-            # Build the query parameter string
-            QUERY_PARAMS="page[size]=$PAGE_SIZE&page[number]=$PAGE_NUMBER"
+            if [ -n "$page_size" ]; then
+                QUERY_PARAMS="page[size]=$page_size"
+            fi
+            
+            if [ -n "$page_number" ]; then
+                if [ -n "$QUERY_PARAMS" ]; then
+                    QUERY_PARAMS="$QUERY_PARAMS&page[number]=$page_number"
+                else
+                    QUERY_PARAMS="page[number]=$page_number"
+                fi
+            fi
             
             # Add optional filter parameters
             if [ -n "$status" ]; then
@@ -775,6 +783,9 @@ class MonitoringTools:
             fi
             
             echo "Fetching incidents with parameters: $QUERY_PARAMS"
+            
+            # Display the full curl command (with API keys masked for security)
+            echo "Executing curl command: curl -X GET \"https://api.\$DD_SITE/api/v2/incidents?$QUERY_PARAMS\" -H \"DD-API-KEY: ****\" -H \"DD-APPLICATION-KEY: ****\" -H \"Content-Type: application/json\" -H \"Accept: application/json\""
             
             # Make the API call to list incidents
             RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS" \
