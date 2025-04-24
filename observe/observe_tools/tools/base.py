@@ -47,8 +47,8 @@ class ObserveTool(Tool):
         helper_functions = """
             # Helper functions for Observe platform tools
             validate_observe_auth() {
-                if [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$OBSERVE_API_KEI" ]; then
-                    echo "Error: OBSERVE_CUSTOMER_ID and OBSERVE_API_KEI environment variables are required"
+                if [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$OBSERVE_API_KEY" ]; then
+                    echo "Error: OBSERVE_CUSTOMER_ID and OBSERVE_API_KEY environment variables are required"
                     exit 1
                 fi
             }
@@ -78,7 +78,7 @@ class ObserveTool(Tool):
                 fi
                 
                 curl -s -X POST "https://api.observeinc.com/v1/customers/$OBSERVE_CUSTOMER_ID/datasets/$dataset_id/query" \
-                    -H "Authorization: Bearer $OBSERVE_API_KEI" \
+                    -H "Authorization: Bearer $OBSERVE_API_KEY" \
                     -H "Content-Type: application/json" \
                     -d "{
                         \"query\": \"$query\",
@@ -113,7 +113,7 @@ class ObserveTool(Tool):
                 fi
                 
                 curl -s -X POST "https://api.observeinc.com/v1/customers/$OBSERVE_CUSTOMER_ID/datasets/$dataset_id/events" \
-                    -H "Authorization: Bearer $OBSERVE_API_KEI" \
+                    -H "Authorization: Bearer $OBSERVE_API_KEY" \
                     -H "Content-Type: application/json" \
                     -d "{
                         \"start\": \"$start_time\",
@@ -127,7 +127,7 @@ class ObserveTool(Tool):
                 local monitor_id="$1"
                 
                 curl -s -X GET "https://api.observeinc.com/v1/customers/$OBSERVE_CUSTOMER_ID/monitors/$monitor_id" \
-                    -H "Authorization: Bearer $OBSERVE_API_KEI" \
+                    -H "Authorization: Bearer $OBSERVE_API_KEY" \
                     -H "Content-Type: application/json"
             }
 
@@ -136,14 +136,14 @@ class ObserveTool(Tool):
                 local alert_id="$1"
                 
                 curl -s -X GET "https://api.observeinc.com/v1/customers/$OBSERVE_CUSTOMER_ID/alerts/$alert_id" \
-                    -H "Authorization: Bearer $OBSERVE_API_KEI" \
+                    -H "Authorization: Bearer $OBSERVE_API_KEY" \
                     -H "Content-Type: application/json"
             }
             
             # Function to list available datasets
             list_datasets() {
                 curl -s -X GET "https://api.observeinc.com/v1/customers/$OBSERVE_CUSTOMER_ID/datasets" \
-                    -H "Authorization: Bearer $OBSERVE_API_KEI" \
+                    -H "Authorization: Bearer $OBSERVE_API_KEY" \
                     -H "Content-Type: application/json"
             }
         """
@@ -158,7 +158,7 @@ class ObserveTool(Tool):
             image=image,
             icon_url=OBSERVE_ICON_URL,
             type="docker",
-            secrets=["OBSERVE_API_KEI", "OBSERVE_CUSTOMER_ID"],
+            secrets=["OBSERVE_API_KEY", "OBSERVE_CUSTOMER_ID"],
             env=[]
         )
 
