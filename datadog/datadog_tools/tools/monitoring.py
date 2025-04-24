@@ -742,7 +742,7 @@ class MonitoringTools:
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json")
-            echo "$RESPONSE"
+            echo "$RESPONSE" | jq
             """,
             args=[
                 Arg(name="status", description="Filter incidents by status (active, stable, resolved, planned)", required=False),
