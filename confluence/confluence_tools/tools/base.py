@@ -74,11 +74,16 @@ class ConfluenceTool(Tool):
                 if [[ "$HTTP_STATUS" != "200" ]]; then
                     echo "Error: Could not connect to Confluence API (HTTP status: $HTTP_STATUS)"
                     echo "Connection details:"
-                    echo "$HTTP_RESPONSE" | grep -E "< HTTP/|* Connected to|* Could not|* Failed|* Trying"
+                    echo "$HTTP_RESPONSE" | grep -E "< HTTP/|\* Connected to|\* Could not|\* Failed|\* Trying"
                     
                     # Check if URL is properly formatted
                     if [[ ! "$CONFLUENCE_URL" =~ ^https?:// ]]; then
                         echo "Warning: CONFLUENCE_URL should start with http:// or https://"
+                    fi
+                    
+                    # Check if we're using the correct Confluence URL format
+                    if [[ "$CONFLUENCE_URL" == *"atlassian.net/wiki"* ]]; then
+                        echo "Note: For Atlassian Cloud, try using '$CONFLUENCE_URL' or '${CONFLUENCE_URL%/wiki}'"
                     fi
                     
                     exit 1
