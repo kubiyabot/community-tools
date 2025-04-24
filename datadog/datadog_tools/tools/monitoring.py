@@ -15,7 +15,9 @@ class MonitoringTools:
                 self.query_logs(),
                 self.search_logs_by_string(),
                 self.search_logs_by_timeframe(),
-                self.get_service_map()
+                self.get_service_map(),
+                self.list_incidents(),
+                self.get_incident_details()
             ]
             
             for tool in tools:
@@ -466,7 +468,7 @@ class MonitoringTools:
             name="get_service_map",
             description="Retrieve Service Map data to visualize service dependencies and repository mappings",
             content="""
-            apk add --no-cache jq coreutils
+            apk add --no-cache -q jq coreutils
             validate_datadog_connection
             
             # Default to last hour if not specified
@@ -660,6 +662,396 @@ class MonitoringTools:
                 Arg(name="service", description="Specific service to focus on in the Service Map", required=False),
                 Arg(name="time_from", description="Start time for Service Map data (e.g., 'now-24h')", required=False),
                 Arg(name="time_to", description="End time for Service Map data (default: 'now')", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def list_incidents(self) -> DatadogTool:
+        """List Datadog incidents with filtering options."""
+        return DatadogTool(
+            name="list_datadog_incidents",
+            description="List Datadog incidents with filtering options such as status, time range, and services",
+            content="""
+            apk add --no-cache jq coreutils
+            validate_datadog_connection
+
+            # Set default filter options if not provided
+            PAGE_SIZE="${page_size:-30}"
+            PAGE_NUMBER="${page_number:-0}"
+            
+            # Build the query parameter string
+            QUERY_PARAMS="page[size]=$PAGE_SIZE&page[number]=$PAGE_NUMBER"
+            
+            # Add optional filter parameters
+            if [ -n "$status" ]; then
+                QUERY_PARAMS="$QUERY_PARAMS&filter[status]=$status"
+            fi
+            
+            if [ -n "$service" ]; then
+                QUERY_PARAMS="$QUERY_PARAMS&filter[service]=$service"
+            fi
+            
+            if [ -n "$query_string" ]; then
+                QUERY_PARAMS="$QUERY_PARAMS&filter[query]=$query_string"
+            fi
+            
+            # Add time range filters if provided
+            if [ -n "$time_from" ]; then
+                # Convert relative time if needed (e.g., now-24h)
+                if [[ "$time_from" == now* ]]; then
+                    NOW_TS=$(date +%s)
+                    if [[ "$time_from" == "now-"* ]]; then
+                        TIME_VAL=$(echo $time_from | sed 's/now-//')
+                        TIME_UNIT=$(echo $TIME_VAL | sed 's/[0-9]//g')
+                        TIME_NUM=$(echo $TIME_VAL | sed 's/[^0-9]//g')
+                        
+                        case "$TIME_UNIT" in
+                            m|min|mins|minute|minutes)
+                                SECONDS=$((TIME_NUM * 60))
+                                ;;
+                            h|hr|hrs|hour|hours)
+                                SECONDS=$((TIME_NUM * 3600))
+                                ;;
+                            d|day|days)
+                                SECONDS=$((TIME_NUM * 86400))
+                                ;;
+                            w|week|weeks)
+                                SECONDS=$((TIME_NUM * 604800))
+                                ;;
+                            *)
+                                echo "Error: Unknown time unit in $time_from"
+                                exit 1
+                                ;;
+                        esac
+                        
+                        FROM_TS=$((NOW_TS - SECONDS))
+                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$FROM_TS"
+                    else
+                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$NOW_TS"
+                    fi
+                else
+                    # Use provided timestamp directly
+                    QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$time_from"
+                fi
+            fi
+            
+            if [ -n "$time_to" ]; then
+                # Similar conversion for end time
+                if [[ "$time_to" == now* ]]; then
+                    NOW_TS=$(date +%s)
+                    if [[ "$time_to" == "now-"* ]]; then
+                        TIME_VAL=$(echo $time_to | sed 's/now-//')
+                        TIME_UNIT=$(echo $TIME_VAL | sed 's/[0-9]//g')
+                        TIME_NUM=$(echo $TIME_VAL | sed 's/[^0-9]//g')
+                        
+                        case "$TIME_UNIT" in
+                            m|min|mins|minute|minutes)
+                                SECONDS=$((TIME_NUM * 60))
+                                ;;
+                            h|hr|hrs|hour|hours)
+                                SECONDS=$((TIME_NUM * 3600))
+                                ;;
+                            d|day|days)
+                                SECONDS=$((TIME_NUM * 86400))
+                                ;;
+                            w|week|weeks)
+                                SECONDS=$((TIME_NUM * 604800))
+                                ;;
+                            *)
+                                echo "Error: Unknown time unit in $time_to"
+                                exit 1
+                                ;;
+                        esac
+                        
+                        TO_TS=$((NOW_TS - SECONDS))
+                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$TO_TS"
+                    else
+                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$NOW_TS"
+                    fi
+                else
+                    # Use provided timestamp directly
+                    QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$time_to"
+                fi
+            fi
+            
+            echo "Fetching incidents with parameters: $QUERY_PARAMS"
+            
+            # Make the API call to list incidents
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
+            
+            # Check for API errors
+            if echo "$RESPONSE" | grep -q "error"; then
+                echo "Error in API response:"
+                echo "$RESPONSE" | jq -r '.errors[] // .errors'
+                exit 1
+            fi
+            
+            # Format and display the incidents
+            INCIDENTS_COUNT=$(echo "$RESPONSE" | jq '.data | length')
+            TOTAL_COUNT=$(echo "$RESPONSE" | jq '.meta.pagination.total // 0')
+            
+            echo "=== Found $INCIDENTS_COUNT incidents (Total: $TOTAL_COUNT) ==="
+            
+            if [ "$INCIDENTS_COUNT" -eq 0 ]; then
+                echo "No incidents found for the specified criteria."
+                exit 0
+            fi
+            
+            # Parse and display incident summaries
+            echo "$RESPONSE" | jq -r '
+                .data | map(
+                    "ID: \(.id)\n" +
+                    "Title: \(.attributes.title)\n" +
+                    "Status: \(.attributes.state)\n" +
+                    "Severity: \(.attributes.severity)\n" +
+                    "Created: \(.attributes.created)\n" +
+                    "Customer Impact: \(.attributes.customer_impact.summary // "None")\n" +
+                    "Services: \(if .attributes.services then (.attributes.services | map(.name) | join(", ")) else "None" end)\n" +
+                    "Commander: \(if .attributes.commander then .attributes.commander.handle else "None" end)\n" +
+                    "URL: https://app.datadoghq.com/incidents/\(.id)\n" +
+                    "---"
+                ) | join("\n")
+            '
+            
+            # Provide summary statistics if more than 5 incidents
+            if [ "$INCIDENTS_COUNT" -gt 5 ]; then
+                echo ""
+                echo "=== Incident Summary Statistics ==="
+                
+                # Status breakdown
+                echo "$RESPONSE" | jq -r '
+                    "Status breakdown: " + 
+                    (.data | group_by(.attributes.state) | map({
+                        status: .[0].attributes.state,
+                        count: length
+                    }) | map("\(.status): \(.count)") | join(", "))
+                '
+                
+                # Severity breakdown
+                echo "$RESPONSE" | jq -r '
+                    "Severity breakdown: " + 
+                    (.data | group_by(.attributes.severity) | map({
+                        severity: .[0].attributes.severity,
+                        count: length
+                    }) | map("\(.severity): \(.count)") | join(", "))
+                '
+                
+                # Service breakdown
+                echo "$RESPONSE" | jq -r '
+                    "Top affected services: " + 
+                    (.data | map(.attributes.services) | flatten | map(select(. != null)) | 
+                     group_by(.name) | map({
+                        service: .[0].name,
+                        count: length
+                    }) | sort_by(-.count)[0:5] | map("\(.service): \(.count)") | join(", "))
+                '
+            fi
+            """,
+            args=[
+                Arg(name="status", description="Filter incidents by status (active, stable, resolved, planned)", required=False),
+                Arg(name="service", description="Filter incidents by service name", required=False),
+                Arg(name="query_string", description="Search query to filter incidents", required=False),
+                Arg(name="time_from", description="Filter incidents created after this time (timestamp or relative time like 'now-24h')", required=False),
+                Arg(name="time_to", description="Filter incidents created before this time (timestamp or relative time like 'now')", required=False),
+                Arg(name="page_size", description="Number of incidents to return per page", required=False),
+                Arg(name="page_number", description="Page number for pagination", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def get_incident_details(self) -> DatadogTool:
+        """Retrieve detailed information about a specific Datadog incident."""
+        return DatadogTool(
+            name="get_datadog_incident_details",
+            description="Get detailed information about a specific incident including timeline, attachments, and related data",
+            content="""
+            apk add --no-cache jq
+            validate_datadog_connection
+
+            if [ -z "$incident_id" ]; then
+                echo "Error: Incident ID is required"
+                exit 1
+            fi
+
+            echo "Fetching details for incident: $incident_id"
+            
+            # Get main incident details
+            INCIDENT_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
+            
+            # Check for API errors
+            if echo "$INCIDENT_DATA" | grep -q "error"; then
+                echo "Error retrieving incident details:"
+                echo "$INCIDENT_DATA" | jq -r '.errors[] // .errors'
+                exit 1
+            fi
+            
+            # Parse and display main incident information
+            echo "=== Incident Overview ==="
+            echo "$INCIDENT_DATA" | jq -r '
+                .data | 
+                "ID: \(.id)",
+                "Title: \(.attributes.title)",
+                "Status: \(.attributes.state)",
+                "Severity: \(.attributes.severity)",
+                "Created: \(.attributes.created)",
+                "Modified: \(.attributes.modified)",
+                "Detected: \(.attributes.detected)",
+                "Created By: \(if .attributes.created_by then .attributes.created_by.handle else "Unknown" end)",
+                
+                "Customer Impact Summary: \(.attributes.customer_impact.summary // "None")",
+                "Customer Impact Scope: \(.attributes.customer_impact.scope // "None")",
+                
+                if .attributes.fields then
+                    "Fields: " + (.attributes.fields | map("\(.name): \(.value)") | join(", "))
+                else
+                    "Fields: None"
+                end,
+                
+                "Commander: \(if .attributes.commander then .attributes.commander.handle else "None" end)",
+                
+                if .attributes.services then
+                    "Affected Services: " + (.attributes.services | map(.name) | join(", "))
+                else
+                    "Affected Services: None"
+                end,
+                
+                "Public ID: \(.attributes.public_id // "None")",
+                "Visibility: \(.attributes.visibility)",
+                "URL: https://app.datadoghq.com/incidents/\(.id)"
+            '
+            
+            # Get incident timeline
+            echo ""
+            echo "=== Incident Timeline ==="
+            
+            TIMELINE_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/attachments" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
+            
+            # Parse and display timeline data
+            TIMELINE_COUNT=$(echo "$TIMELINE_DATA" | jq '.data | length')
+            
+            if [ "$TIMELINE_COUNT" -eq 0 ]; then
+                echo "No timeline entries found for this incident."
+            else
+                echo "$TIMELINE_DATA" | jq -r '
+                    .data | sort_by(.attributes.created) | map(
+                        "Time: \(.attributes.created)",
+                        "Type: \(.attributes.attachment_type)",
+                        if .attributes.attachment_type == "timeline_cell" then
+                            "Content: \(.attributes.attributes.cell_content // "No content")"
+                        elif .attributes.attachment_type == "postmortem" then
+                            "Postmortem: \(.attributes.attributes.document_url // "No URL")"
+                        elif .attributes.attachment_type == "link" then
+                            "Link: \(.attributes.attributes.url // "No URL")\nTitle: \(.attributes.attributes.title // "No title")"
+                        else
+                            "Content: \(.attributes // "No details")"
+                        end,
+                        "---"
+                    ) | join("\n")
+                '
+            fi
+            
+            # Get related incident integrations if requested
+            if [ "$include_integrations" = "true" ]; then
+                echo ""
+                echo "=== Incident Integrations ==="
+                
+                INTEGRATIONS_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/relationships/integrations" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    -H "Accept: application/json")
+                
+                INTEGRATIONS_COUNT=$(echo "$INTEGRATIONS_DATA" | jq '.data | length')
+                
+                if [ "$INTEGRATIONS_COUNT" -eq 0 ]; then
+                    echo "No integrations found for this incident."
+                else
+                    echo "$INTEGRATIONS_DATA" | jq -r '
+                        .data | map(
+                            "Integration ID: \(.id)",
+                            "Type: \(.type)",
+                            if .attributes then
+                                "Details: \(.attributes | to_entries | map("\(.key): \(.value)") | join(", "))"
+                            else
+                                "Details: None available"
+                            end,
+                            "---"
+                        ) | join("\n")
+                    '
+                fi
+            fi
+            
+            # Get related metrics data if requested
+            if [ "$include_metrics" = "true" ]; then
+                echo ""
+                echo "=== Related Metrics ==="
+                
+                METRICS_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/relationships/metrics" \
+                    -H "DD-API-KEY: $DD_API_KEY" \
+                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                    -H "Content-Type: application/json" \
+                    -H "Accept: application/json")
+                
+                METRICS_COUNT=$(echo "$METRICS_DATA" | jq '.data | length')
+                
+                if [ "$METRICS_COUNT" -eq 0 ]; then
+                    echo "No metrics associated with this incident."
+                else
+                    echo "$METRICS_DATA" | jq -r '
+                        .data | map(
+                            "Metric: \(.id)",
+                            if .attributes then
+                                "Details: \(.attributes | to_entries | map("\(.key): \(.value)") | join(", "))"
+                            else
+                                "Details: None available"
+                            end,
+                            "---"
+                        ) | join("\n")
+                    '
+                fi
+            fi
+            
+            # Get incident updates
+            echo ""
+            echo "=== Incident Updates ==="
+            
+            UPDATES_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/relationships/updates" \
+                -H "DD-API-KEY: $DD_API_KEY" \
+                -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/json")
+            
+            UPDATES_COUNT=$(echo "$UPDATES_DATA" | jq '.data | length')
+            
+            if [ "$UPDATES_COUNT" -eq 0 ]; then
+                echo "No updates recorded for this incident."
+            else
+                echo "$UPDATES_DATA" | jq -r '
+                    .data | sort_by(.attributes.created) | map(
+                        "Time: \(.attributes.created)",
+                        "Updated by: \(if .attributes.created_by then .attributes.created_by.handle else "Unknown" end)",
+                        "Content: \(.attributes.content // "No content")",
+                        "---"
+                    ) | join("\n")
+                '
+            fi
+            """,
+            args=[
+                Arg(name="incident_id", description="ID of the incident to retrieve", required=True),
+                Arg(name="include_integrations", description="Whether to include integration details (true/false)", required=False),
+                Arg(name="include_metrics", description="Whether to include metrics details (true/false)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
