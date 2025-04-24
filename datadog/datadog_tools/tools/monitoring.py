@@ -397,13 +397,6 @@ class MonitoringTools:
                     }
                 }")
             
-            # Check for API errors
-            if echo "$RESPONSE" | grep -q "error"; then
-                echo "Error in API response:"
-                echo "$RESPONSE" | jq -r '.errors[] // .errors'
-                exit 1
-            fi
-            
             # Check if response is empty
             if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ] || [ "$(echo "$RESPONSE" | jq '.data | length')" = "0" ]; then
                 echo "No logs found for the specified time range and filters"
