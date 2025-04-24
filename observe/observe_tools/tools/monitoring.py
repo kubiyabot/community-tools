@@ -32,7 +32,7 @@ class ObserveMonitoringTools:
             name="observe_fetch_logs",
             description="Fetch logs from Observe platform with flexible query parameters",
             content="""
-            apk add --no-cache jq curl
+            apk add -q --no-cache jq curl
 
             # Validate required environment variables
             validate_observe_auth
@@ -74,13 +74,6 @@ class ObserveMonitoringTools:
             # Use the helper function to get events
             RESPONSE=$(get_events "$dataset_id" "$start_time" "$end_time" "$filter" "$limit")
 
-            # Check if the response contains an error
-            if echo "$RESPONSE" | jq -e '.error' > /dev/null; then
-                ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message')
-                echo "Error fetching logs: $ERROR_MSG"
-                exit 1
-            fi
-
             # Format and display the results
             EVENTS=$(echo "$RESPONSE" | jq -r '.events')
             EVENT_COUNT=$(echo "$EVENTS" | jq -r 'length')
@@ -114,7 +107,7 @@ class ObserveMonitoringTools:
             name="observe_query_metrics",
             description="Query metrics and insights from Observe platform datasets with OPAL queries",
             content="""
-            apk add --no-cache jq curl
+            apk add -q --no-cache jq curl
             
             # Validate authentication
             validate_observe_auth
@@ -153,13 +146,6 @@ class ObserveMonitoringTools:
             
             # Use helper function to query the dataset
             RESPONSE=$(query_dataset "$dataset_id" "$query" "$start_time" "$end_time")
-            
-            # Check for errors
-            if echo "$RESPONSE" | jq -e '.error' > /dev/null; then
-                ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message')
-                echo "Error executing query: $ERROR_MSG"
-                exit 1
-            fi
             
             # Parse and display results
             echo "Query executed successfully!"
@@ -213,7 +199,7 @@ class ObserveMonitoringTools:
             name="observe_alert_details",
             description="Get detailed information about an alert from the Observe platform",
             content="""
-            apk add --no-cache jq curl
+            apk add -q --no-cache jq curl
             
             # Validate authentication
             validate_observe_auth
@@ -229,14 +215,7 @@ class ObserveMonitoringTools:
             
             # Use helper function to get alert details
             RESPONSE=$(get_alert "$alert_id")
-            
-            # Check for errors
-            if echo "$RESPONSE" | jq -e '.error' > /dev/null; then
-                ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message')
-                echo "Error fetching alert: $ERROR_MSG"
-                exit 1
-            fi
-            
+
             # Print alert details
             echo "============================================="
             echo "ALERT DETAILS"
