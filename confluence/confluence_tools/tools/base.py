@@ -59,15 +59,32 @@ class ConfluenceTool(Tool):
                 # Create auth header with API token
                 AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
 
-                # Test connection
-                HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$CONFLUENCE_URL/rest/api/content" \
+                # Print connection details for debugging (without exposing the full token)
+                echo "Attempting to connect to: $CONFLUENCE_URL"
+                echo "Using username: $CONFLUENCE_USERNAME"
+                echo "API Token: ${CONFLUENCE_API_TOKEN:0:3}...${CONFLUENCE_API_TOKEN: -3}"
+                
+                # Test connection with verbose output for debugging
+                HTTP_RESPONSE=$(curl -s -v -X GET "$CONFLUENCE_URL/rest/api/content" \
                     -H "$AUTH_HEADER" \
-                    -H "Content-Type: application/json")
+                    -H "Content-Type: application/json" 2>&1)
+                
+                HTTP_STATUS=$(echo "$HTTP_RESPONSE" | grep -o "< HTTP/[0-9.]* [0-9]*" | grep -o "[0-9][0-9][0-9]" || echo "000")
                     
                 if [[ "$HTTP_STATUS" != "200" ]]; then
                     echo "Error: Could not connect to Confluence API (HTTP status: $HTTP_STATUS)"
+                    echo "Connection details:"
+                    echo "$HTTP_RESPONSE" | grep -E "< HTTP/|* Connected to|* Could not|* Failed|* Trying"
+                    
+                    # Check if URL is properly formatted
+                    if [[ ! "$CONFLUENCE_URL" =~ ^https?:// ]]; then
+                        echo "Warning: CONFLUENCE_URL should start with http:// or https://"
+                    fi
+                    
                     exit 1
                 fi
+                
+                echo "Successfully connected to Confluence API"
             }
 
             get_page_content() {
