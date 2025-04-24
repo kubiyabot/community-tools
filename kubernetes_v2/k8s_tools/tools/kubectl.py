@@ -5,7 +5,7 @@ import sys
 
 kubectl_tool = KubernetesTool(
     name="kubectl",
-    description="Executes kubectl commands. For namespace-scoped resources, include '-n <namespace>' in the command. Use '--all-namespaces' for cluster-wide queries. Some resources like nodes and persistent volumes are cluster-scoped and don't require a namespace.",
+    description="Executes focused kubectl commands. Keep commands simple and precise. For targeted searches, you can use grep (e.g., 'get pods | grep app-name'). Specify namespace with '-n namespace' for better targeting. Use '--all-namespaces' only when necessary.",
     content="""
     #!/bin/bash
     set -e
@@ -13,9 +13,11 @@ kubectl_tool = KubernetesTool(
     # Show the command being executed
     echo "🔧 Executing: kubectl $command"
 
-    # Run the kubectl command
-    if eval "kubectl $command"; then
-        echo "✅ Command executed successfully"
+    # Run the kubectl command and ensure output is displayed
+    output=$(kubectl $command)
+    if [ $? -eq 0 ]; then
+        echo "$output" | head -n 100
+        echo "-- > For more focused results, consider refining your command or using more specific selectors"
     else
         echo "❌ Command failed: kubectl $command"
         exit 1
@@ -25,12 +27,11 @@ kubectl_tool = KubernetesTool(
         Arg(
             name="command", 
             type="str", 
-            description="The full kubectl command to execute. Examples include (but are not limited to):\n" +
-                       "- 'get pods -n default'\n" +
-                       "- 'create namespace test'\n" +
-                       "- 'get pods --all-namespaces'\n" +
-                       "- 'get nodes'  # cluster-scoped resource, no namespace needed\n" +
-                       "- 'describe node my-node-1'",
+            description="Precise kubectl command to execute. Keep it focused and specific. Examples:\n" +
+                       "- 'get pod my-pod-name -n my-namespace'  # target specific pod\n" +
+                       "- 'get pods -n default | grep my-app'    # filter pods by name\n" +
+                       "- 'get pods -l app=my-app -n prod'       # use labels for precise filtering\n" +
+                       "- 'get nodes --selector=node-role=worker' # target specific node types\n\nTry to use grep to filter the output if possible as well as more specific selectors",
             required=True
         ),
     ],

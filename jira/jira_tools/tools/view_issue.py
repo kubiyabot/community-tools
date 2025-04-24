@@ -8,21 +8,51 @@ import requests
 
 
 def extract_relevant_fields(data):
-    fields = data.get("fields", {})
+    if not data:
+        return {}
+        
+    fields = data.get("fields")
+    if not fields:
+        return {
+            "issuetype_name": "N/A",
+            "description_content": "N/A",
+            "project_self": "N/A",
+            "project_key": "N/A",
+            "project_name": "N/A",
+            "project_type": "N/A",
+            "priority_name": "N/A",
+            "created": "N/A",
+            "assignee_email": "N/A",
+            "assignee_displayName": "N/A",
+            "reporter_email": "N/A",
+            "reporter_displayName": "N/A",
+            "labels": "N/A",
+        }
+
+    def safe_get(obj, *keys):
+        current = obj
+        for key in keys:
+            if not isinstance(current, dict):
+                return "N/A"
+            current = current.get(key)
+            if current is None:
+                return "N/A"
+        return current
 
     filtered_data = {
-        "issuetype_name": fields.get("issuetype", {}).get("name", {}),
-        "description_content": fields.get("description", {}),
-        "project_self": fields.get("project", {}).get("self", {}),
-        "project_key": fields.get("project", {}).get("key", {}),
-        "project_name": fields.get("project", {}).get("name", {}),
-        "project_type": fields.get("project", {}).get("projectTypeKey", {}),
-        "priority_name": fields.get("priority", {}).get("name", {}),
-        "created": fields.get("created", {}),
-        "assignee_email": fields.get("assignee", {}).get("emailAddress", {}),
-        "assignee_displayName": fields.get("assignee", {}).get("displayName", {}),
-        "reporter_email": fields.get("reporter", {}).get("emailAddress", {}),
-        "reporter_displayName": fields.get("reporter", {}).get("displayName", {}),
+        "issuetype_name": safe_get(fields, "issuetype", "name"),
+        "description_content": safe_get(fields, "description"),
+        "project_self": safe_get(fields, "project", "self"),
+        "project_key": safe_get(fields, "project", "key"),
+        "project_name": safe_get(fields, "project", "name"),
+        "project_type": safe_get(fields, "project", "projectTypeKey"),
+        "priority_name": safe_get(fields, "priority", "name"),
+        "created": safe_get(fields, "created"),
+        "assignee_email": safe_get(fields, "assignee", "emailAddress"),
+        "assignee_displayName": safe_get(fields, "assignee", "displayName"),
+        "reporter_email": safe_get(fields, "reporter", "emailAddress"),
+        "reporter_displayName": safe_get(fields, "reporter", "displayName"),
+        "labels": fields.get("labels", []),
     }
 
     return filtered_data
@@ -38,7 +68,13 @@ def main():
 
     try:
         response = requests.get(get_issue_url, headers=get_jira_basic_headers())
-        print(extract_relevant_fields(response.json()))
+        if not response.ok:
+            print(f"Failed to fetch issue: HTTP {response.status_code}")
+            print(f"Response: {response.text}")
+            return
+        
+        data = response.json()
+        print(extract_relevant_fields(data))
     except Exception as e:
         print(f"Failed to view issues: {e}")
         raise RuntimeError(f"Failed to view issues: {e}")

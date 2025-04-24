@@ -27,11 +27,24 @@ def get_jira_cloud_id() -> str:
         response = requests.get(ATLASSIAN_RESOURCES_URL, headers=headers)
         response.raise_for_status()
         resources = response.json()
-        workspaces = [resources["name"] for resources in resources]
-        if len(resources) > 1:
-            print(f"WARNING: You have more than one workspace, available workspaces: {workspaces}. "
-                  f"The first one will be used...")
-        return resources[0]["id"]
+        workspaces = [resource["name"] for resource in resources]
+        
+        # Get workspace name from environment variable
+        workspace_name = os.getenv("JIRA_WORKSPACE_NAME")
+        
+        if workspace_name:
+            # Try to find the workspace by name
+            for resource in resources:
+                if resource["name"] == workspace_name:
+                    return resource["id"]
+            # If workspace not found, raise error
+            raise ValueError(f"Workspace '{workspace_name}' not found. Available workspaces: {workspaces}")
+        else:
+            # Fallback to original behavior if no workspace name specified
+            if len(resources) > 1:
+                print(f"WARNING: JIRA_WORKSPACE_NAME not set and you have more than one workspace. Available workspaces: {workspaces}. "
+                      f"The first one will be used...")
+            return resources[0]["id"]
 
     except HTTPError as e:
         print(f"Failed from Jira api server: {e}")
