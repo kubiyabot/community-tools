@@ -36,7 +36,7 @@ class ConfluenceTool(Tool):
     description: str
     content: str = ""
     args: List[Arg] = []
-    image: str = "atlassian/confluence-server:latest"
+    image: str = "curlimages/curl:8.1.2"
     icon_url: str = CONFLUENCE_ICON_URL
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
@@ -51,26 +51,21 @@ class ConfluenceTool(Tool):
                     exit 1
                 fi
 
-                # Check if we're using API token or username/password
-                if [ -z "$CONFLUENCE_API_TOKEN" ]; then
-                    if [ -z "$CONFLUENCE_USERNAME" ] || [ -z "$CONFLUENCE_PASSWORD" ]; then
-                        echo "Error: Either CONFLUENCE_API_TOKEN or both CONFLUENCE_USERNAME and CONFLUENCE_PASSWORD must be set"
-                        exit 1
-                    fi
-                    AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_PASSWORD" | base64)"
-                else
-                    if [ -z "$CONFLUENCE_USERNAME" ]; then
-                        echo "Error: CONFLUENCE_USERNAME is required even when using API token"
-                        exit 1
-                    fi
-                    AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
+                if [ -z "$CONFLUENCE_API_TOKEN" ] || [ -z "$CONFLUENCE_USERNAME" ]; then
+                    echo "Error: CONFLUENCE_API_TOKEN and CONFLUENCE_USERNAME environment variables are required"
+                    exit 1
                 fi
+                
+                # Create auth header with API token
+                AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
 
                 # Test connection
-                if ! curl -s -o /dev/null -w "%{http_code}" -X GET "$CONFLUENCE_URL/rest/api/content" \
+                HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$CONFLUENCE_URL/rest/api/content" \
                     -H "$AUTH_HEADER" \
-                    -H "Content-Type: application/json" | grep -q "200"; then
-                    echo "Error: Could not connect to Confluence API"
+                    -H "Content-Type: application/json")
+                    
+                if [[ "$HTTP_STATUS" != "200" ]]; then
+                    echo "Error: Could not connect to Confluence API (HTTP status: $HTTP_STATUS)"
                     exit 1
                 fi
             }
@@ -113,7 +108,7 @@ class ConfluenceTool(Tool):
             image=image,
             icon_url=CONFLUENCE_ICON_URL,
             type="docker",
-            secrets=["CONFLUENCE_API_TOKEN", "CONFLUENCE_PASSWORD"],
+            secrets=["CONFLUENCE_API_TOKEN"],
             env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME"]
         )
 
