@@ -396,51 +396,7 @@ class MonitoringTools:
                         \"limit\": $LIMIT
                     }
                 }")
-            
-            # Check if response is empty
-            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ] || [ "$(echo "$RESPONSE" | jq '.data | length')" = "0" ]; then
-                echo "No logs found for the specified time range and filters"
-                exit 0
-            fi
-            
-            # Format and output the logs with detailed attributes
-            echo "$RESPONSE" | jq -r '
-                "=== Found \(.meta.page.total // 0) logs for the specified time range ===\n" +
-                (.data | map(
-                    "Timestamp: \(.attributes.timestamp)\n" +
-                    "Service: \(.attributes.service // "N/A")\n" +
-                    "Status: \(.attributes.status // "N/A")\n" +
-                    "Host: \(.attributes.host // "N/A")\n" +
-                    "Message: \(.attributes.message // "N/A")\n" +
-                    (if .attributes.attributes then
-                        "Tags: " + (.attributes.attributes | to_entries | map("\(.key):\(.value)") | join(", ")) + "\n"
-                    else
-                        ""
-                    end) +
-                    "---"
-                ) | join("\n"))
-            '
-            
-            # Offer summary statistics if more than 5 logs returned
-            LOG_COUNT=$(echo "$RESPONSE" | jq '.meta.page.total')
-            if [ "$LOG_COUNT" -gt 5 ]; then
-                echo ""
-                echo "=== Log Summary Statistics ==="
-                
-                # Count by service
-                echo "$RESPONSE" | jq -r '
-                    "Services breakdown: " + 
-                    (.data | group_by(.attributes.service) | map({service: .[0].attributes.service, count: length}) | 
-                     map("\(.service // "unknown"): \(.count)") | join(", "))
-                '
-                
-                # Count by status
-                echo "$RESPONSE" | jq -r '
-                    "Status breakdown: " + 
-                    (.data | group_by(.attributes.status) | map({status: .[0].attributes.status, count: length}) | 
-                     map("\(.status // "unknown"): \(.count)") | join(", "))
-                '
-            fi
+            echo "$RESPONSE"
             """,
             args=[
                 Arg(name="time_period", description="Time unit to search (minute, hour, day, week, month)", required=False),
