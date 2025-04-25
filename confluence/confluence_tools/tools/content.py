@@ -26,8 +26,11 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates
             
-            # Create auth header with API token
-            AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
+            # Create auth header with API token - properly encode the username with special characters
+            # Use printf to ensure proper URL encoding of special characters
+            USERNAME_ENCODED=$(printf "%s" "$CONFLUENCE_USERNAME" | jq -sRr @uri)
+            AUTH_STRING=$(printf "%s:%s" "$USERNAME_ENCODED" "$CONFLUENCE_API_TOKEN")
+            AUTH_HEADER="Authorization: Basic $(echo -n "$AUTH_STRING" | base64)"
             
             # Check if we have page_id or (title and space_key)
             if [ -z "$page_id" ] && ([ -z "$title" ] || [ -z "$space_key" ]); then
@@ -44,16 +47,12 @@ class ContentTools:
                 
                 # For Atlassian Cloud
                 if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                    # Construct the API URL for v2 API
-                    if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                        SEARCH_URL="${CONFLUENCE_URL}/api/v2/pages?title=$title&space-key=$space_key&limit=1"
-                    else
-                        SEARCH_URL="$CONFLUENCE_URL/wiki/api/v2/pages?title=$title&space-key=$space_key&limit=1"
-                    fi
+                    # Try the v1 API first as it seems to be working better
+                    SEARCH_URL="$CONFLUENCE_URL/rest/api/content?type=page&spaceKey=$space_key&title=$title"
                     
                     SEARCH_RESULT=$(curl -s -X GET "$SEARCH_URL" \
-                        -H "$AUTH_HEADER" \
-                        -H "Content-Type: application/json")
+                        -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                        -H "Accept: application/json")
                     
                     # Check if we found any results
                     RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
@@ -73,8 +72,8 @@ class ContentTools:
                     
                     SEARCH_URL="$CONFLUENCE_URL/rest/api/content/search?cql=$SEARCH_QUERY&limit=1"
                     SEARCH_RESULT=$(curl -s -X GET "$SEARCH_URL" \
-                        -H "$AUTH_HEADER" \
-                        -H "Content-Type: application/json")
+                        -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                        -H "Accept: application/json")
                     
                     # Check if we found any results
                     RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
@@ -96,24 +95,25 @@ class ContentTools:
             
             # For Atlassian Cloud
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # Construct the API URL for v2 API
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    API_URL="${CONFLUENCE_URL}/api/v2/pages/$page_id?body-format=storage"
-                else
-                    API_URL="$CONFLUENCE_URL/wiki/api/v2/pages/$page_id?body-format=storage"
-                fi
+                # Try the v1 API first as it seems to be working better
+                API_URL="$CONFLUENCE_URL/rest/api/content/$page_id?expand=body.storage,space,history,metadata.labels"
             else
                 # For self-hosted Confluence
                 API_URL="$CONFLUENCE_URL/rest/api/content/$page_id?expand=body.storage,space,history,metadata.labels"
             fi
             
+            echo "API URL: $API_URL"
             PAGE_DATA=$(curl -s -X GET "$API_URL" \
-                -H "$AUTH_HEADER" \
-                -H "Content-Type: application/json")
-
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
+            
+            # Debug: Print the raw API response
+            echo "DEBUG: Raw API response:"
+            echo "$PAGE_DATA" | jq '.'
+            
             # Check if we got a valid response
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # For Atlassian Cloud v2 API
+                # For Atlassian Cloud v1 API
                 if [ "$(echo "$PAGE_DATA" | jq -r '.statusCode // ""')" = "404" ]; then
                     echo "Error: Page not found with ID: $page_id"
                     exit 1
@@ -121,32 +121,37 @@ class ContentTools:
                 
                 # Extract and display the page information
                 TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
-                SPACE_KEY=$(echo "$PAGE_DATA" | jq -r '.spaceId // ""')
-                CREATED_DATE=$(echo "$PAGE_DATA" | jq -r '.createdAt // ""' | cut -d'T' -f1)
-                CREATED_BY=$(echo "$PAGE_DATA" | jq -r '.authorId // ""')
-                UPDATED_DATE=$(echo "$PAGE_DATA" | jq -r '.version.createdAt // ""' | cut -d'T' -f1)
-                UPDATED_BY=$(echo "$PAGE_DATA" | jq -r '.version.authorId // ""')
+                SPACE_KEY=$(echo "$PAGE_DATA" | jq -r '.space.key // ""')
+                SPACE_NAME=$(echo "$PAGE_DATA" | jq -r '.space.name // ""')
+                CREATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.createdDate // ""' | cut -d'T' -f1)
+                CREATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.createdBy.displayName // ""')
+                UPDATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.when // ""' | cut -d'T' -f1)
+                UPDATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.by.displayName // ""')
                 
                 # Get labels if available
-                LABELS=$(echo "$PAGE_DATA" | jq -r '.labels.results[] | .name' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
+                LABELS=$(echo "$PAGE_DATA" | jq -r '.metadata.labels.results[] | .name' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
                 if [ -z "$LABELS" ]; then
                     LABELS="None"
                 fi
                 
-                # Extract the content
-                CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // ""')
+                # Extract the content - try different paths
+                CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // .body.view.value // ""')
                 
                 # Display page metadata
                 echo "=== Page Information ==="
                 echo "Title: $TITLE"
-                echo "Space: $SPACE_KEY"
+                echo "Space: $SPACE_NAME ($SPACE_KEY)"
                 echo "Created: $CREATED_DATE by $CREATED_BY"
                 echo "Updated: $UPDATED_DATE by $UPDATED_BY"
                 echo "Labels: $LABELS"
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    echo "URL: $CONFLUENCE_URL/pages/$page_id"
+                echo "URL: $CONFLUENCE_URL/spaces/$SPACE_KEY/pages/$page_id"
+                
+                echo ""
+                echo "=== Page Content ==="
+                if [ -n "$CONTENT" ]; then
+                    echo "$CONTENT"
                 else
-                    echo "URL: $CONFLUENCE_URL/wiki/pages/$page_id"
+                    echo "No content found or content is empty."
                 fi
             else
                 # For self-hosted Confluence
@@ -157,8 +162,8 @@ class ContentTools:
                 
                 # Extract and display the page information
                 TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
-                SPACE_NAME=$(echo "$PAGE_DATA" | jq -r '.space.name // ""')
                 SPACE_KEY=$(echo "$PAGE_DATA" | jq -r '.space.key // ""')
+                SPACE_NAME=$(echo "$PAGE_DATA" | jq -r '.space.name // ""')
                 CREATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.createdDate // ""' | cut -d'T' -f1)
                 CREATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.createdBy.displayName // ""')
                 UPDATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.when // ""' | cut -d'T' -f1)
@@ -181,17 +186,19 @@ class ContentTools:
                 echo "Updated: $UPDATED_DATE by $UPDATED_BY"
                 echo "Labels: $LABELS"
                 echo "URL: $CONFLUENCE_URL/display/$SPACE_KEY/$page_id"
+                
+                echo ""
+                echo "=== Page Content ==="
+                if [ -n "$CONTENT" ]; then
+                    echo "$CONTENT"
+                else
+                    echo "No content found or content is empty."
+                fi
             fi
-            
-            # Display the content
-            echo ""
-            echo "=== Page Content ==="
-            echo ""
-            echo "$CONTENT"
             """,
             args=[
-                Arg(name="page_id", description="ID of the Confluence page", required=False),
-                Arg(name="title", description="Title of the Confluence page", required=False),
+                Arg(name="page_id", description="ID of the page to retrieve", required=False),
+                Arg(name="title", description="Title of the page to retrieve", required=False),
                 Arg(name="space_key", description="Space key where the page is located", required=False)
             ],
             image="curlimages/curl:8.1.2"
@@ -206,8 +213,8 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates
             
-            # Create auth header with API token
-            AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
+            # Basic validation
+            validate_confluence_connection
             
             if [ -z "$query" ]; then
                 echo "Error: Search query is required"
@@ -222,22 +229,19 @@ class ContentTools:
             
             # For Atlassian Cloud
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # Construct the API URL for v2 API
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    SEARCH_URL="${CONFLUENCE_URL}/api/v2/pages?title=$query&limit=$LIMIT"
-                    
-                    # Add space key filter if provided
-                    if [ -n "$space_key" ]; then
-                        SEARCH_URL="$SEARCH_URL&space-key=$space_key"
-                    fi
-                else
-                    SEARCH_URL="$CONFLUENCE_URL/wiki/api/v2/pages?title=$query&limit=$LIMIT"
-                    
-                    # Add space key filter if provided
-                    if [ -n "$space_key" ]; then
-                        SEARCH_URL="$SEARCH_URL&space-key=$space_key"
-                    fi
+                # Use v1 API for Atlassian Cloud
+                SEARCH_URL="$CONFLUENCE_URL/rest/api/content/search"
+                
+                # URL encode the query for the CQL query
+                ENCODED_QUERY=$(echo "$query" | sed 's/ /%20/g')
+                SEARCH_QUERY="text%20~%20%22$ENCODED_QUERY%22"
+                
+                # Add space key filter if provided
+                if [ -n "$space_key" ]; then
+                    SEARCH_QUERY="$SEARCH_QUERY%20AND%20space%20=%20$space_key"
                 fi
+                
+                SEARCH_URL="$SEARCH_URL?cql=$SEARCH_QUERY&limit=$LIMIT"
             else
                 # For self-hosted Confluence
                 # URL encode the query for the CQL query
@@ -254,17 +258,11 @@ class ContentTools:
             
             echo "Searching for: $query"
             SEARCH_RESULT=$(curl -s -X GET "$SEARCH_URL" \
-                -H "$AUTH_HEADER" \
-                -H "Content-Type: application/json")
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
             
             # Check if we got a valid response
-            if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # For Atlassian Cloud v2 API
-                RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
-            else
-                # For self-hosted Confluence
-                RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
-            fi
+            RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
             
             if [ "$RESULT_COUNT" -eq 0 ]; then
                 echo "No results found for query: $query"
@@ -275,19 +273,7 @@ class ContentTools:
             echo ""
             
             # Display the results
-            if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # For Atlassian Cloud v2 API
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    BASE_URL="$CONFLUENCE_URL/pages"
-                else
-                    BASE_URL="$CONFLUENCE_URL/wiki/pages"
-                fi
-                
-                echo "$SEARCH_RESULT" | jq -r --arg base_url "$BASE_URL" '.results[] | "ID: \(.id)\nTitle: \(.title)\nSpace: \(.spaceId)\nURL: \($base_url)/\(.id)\n"'
-            else
-                # For self-hosted Confluence
-                echo "$SEARCH_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nSpace: \(.space.name) (\(.space.key))\nURL: \($base_url)/display/\(.space.key)/\(.id)\n"'
-            fi
+            echo "$SEARCH_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nSpace: \(.space.name) (\(.space.key))\nURL: \($base_url)/display/\(.space.key)/\(.id)\n"'
             """,
             args=[
                 Arg(name="query", description="Search query", required=True),
@@ -306,8 +292,8 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates
             
-            # Create auth header with API token
-            AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
+            # Basic validation
+            validate_confluence_connection
             
             # Set limit with default
             LIMIT=${limit:-25}
@@ -317,12 +303,8 @@ class ContentTools:
             
             # For Atlassian Cloud
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # Construct the API URL for v2 API
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    SPACES_URL="${CONFLUENCE_URL}/api/v2/spaces?limit=$LIMIT"
-                else
-                    SPACES_URL="$CONFLUENCE_URL/wiki/api/v2/spaces?limit=$LIMIT"
-                fi
+                # Use v1 API for Atlassian Cloud
+                SPACES_URL="$CONFLUENCE_URL/rest/api/space?limit=$LIMIT"
             else
                 # For self-hosted Confluence
                 SPACES_URL="$CONFLUENCE_URL/rest/api/space?limit=$LIMIT"
@@ -330,8 +312,8 @@ class ContentTools:
             
             echo "Retrieving list of Confluence spaces..."
             SPACES_RESULT=$(curl -s -X GET "$SPACES_URL" \
-                -H "$AUTH_HEADER" \
-                -H "Content-Type: application/json")
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
             
             # Check if we got any results
             RESULT_COUNT=$(echo "$SPACES_RESULT" | jq '.size // 0')
@@ -345,13 +327,7 @@ class ContentTools:
             echo ""
             
             # Display the results
-            if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # For Atlassian Cloud v2 API
-                echo "$SPACES_RESULT" | jq -r '.results[] | "Key: \(.key)\nName: \(.name)\nType: \(.type)\nDescription: \(.description.plain.value // "No description")\n"'
-            else
-                # For self-hosted Confluence
-                echo "$SPACES_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.results[] | "Key: \(.key)\nName: \(.name)\nType: \(.type)\nDescription: \(.description.plain.value // "No description")\nURL: \($base_url)/display/\(.key)\n"'
-            fi
+            echo "$SPACES_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.results[] | "Key: \(.key)\nName: \(.name)\nType: \(.type)\nDescription: \(.description.plain.value // "No description")\nURL: \($base_url)/display/\(.key)\n"'
             """,
             args=[
                 Arg(name="limit", description="Maximum number of spaces to return", required=False)
@@ -368,8 +344,8 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates
             
-            # Create auth header with API token
-            AUTH_HEADER="Authorization: Basic $(echo -n "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" | base64)"
+            # Basic validation
+            validate_confluence_connection
             
             if [ -z "$space_key" ]; then
                 echo "Error: Space key is required"
@@ -384,12 +360,8 @@ class ContentTools:
             
             # For Atlassian Cloud
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # Construct the API URL for v2 API
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    CONTENT_URL="${CONFLUENCE_URL}/api/v2/spaces/$space_key/pages?limit=$LIMIT"
-                else
-                    CONTENT_URL="$CONFLUENCE_URL/wiki/api/v2/spaces/$space_key/pages?limit=$LIMIT"
-                fi
+                # Use v1 API for Atlassian Cloud
+                CONTENT_URL="$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$LIMIT"
             else
                 # For self-hosted Confluence
                 CONTENT_URL="$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$LIMIT"
@@ -397,8 +369,8 @@ class ContentTools:
             
             echo "Retrieving content from space: $space_key"
             CONTENT_RESULT=$(curl -s -X GET "$CONTENT_URL" \
-                -H "$AUTH_HEADER" \
-                -H "Content-Type: application/json")
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
             
             # Check if we got a valid response
             if [ "$(echo "$CONTENT_RESULT" | jq -r '.statusCode // ""')" != "" ]; then
@@ -407,45 +379,24 @@ class ContentTools:
             fi
             
             # Check if we got any results
-            if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
-                # For Atlassian Cloud v2 API
-                RESULT_COUNT=$(echo "$CONTENT_RESULT" | jq '.size // 0')
-                
-                if [ "$RESULT_COUNT" -eq 0 ]; then
-                    echo "No content found in space: $space_key"
-                    exit 0
-                fi
-                
-                # Display pages
+            PAGE_COUNT=$(echo "$CONTENT_RESULT" | jq '.page.size // 0')
+            BLOG_COUNT=$(echo "$CONTENT_RESULT" | jq '.blogpost.size // 0')
+            
+            if [ "$PAGE_COUNT" -eq 0 ] && [ "$BLOG_COUNT" -eq 0 ]; then
+                echo "No content found in space: $space_key"
+                exit 0
+            fi
+            
+            # Display pages
+            if [ "$PAGE_COUNT" -gt 0 ]; then
                 echo "=== Pages in $space_key ==="
-                if [[ "$CONFLUENCE_URL" == */wiki ]]; then
-                    BASE_URL="$CONFLUENCE_URL/pages"
-                else
-                    BASE_URL="$CONFLUENCE_URL/wiki/pages"
-                fi
-                
-                echo "$CONTENT_RESULT" | jq -r --arg base_url "$BASE_URL" '.results[] | "ID: \(.id)\nTitle: \(.title)\nURL: \($base_url)/\(.id)\n"'
-            else
-                # For self-hosted Confluence
-                PAGE_COUNT=$(echo "$CONTENT_RESULT" | jq '.page.size // 0')
-                BLOG_COUNT=$(echo "$CONTENT_RESULT" | jq '.blogpost.size // 0')
-                
-                if [ "$PAGE_COUNT" -eq 0 ] && [ "$BLOG_COUNT" -eq 0 ]; then
-                    echo "No content found in space: $space_key"
-                    exit 0
-                fi
-                
-                # Display pages
-                if [ "$PAGE_COUNT" -gt 0 ]; then
-                    echo "=== Pages in $space_key ==="
-                    echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.page.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
-                fi
-                
-                # Display blog posts
-                if [ "$BLOG_COUNT" -gt 0 ]; then
-                    echo "=== Blog Posts in $space_key ==="
-                    echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.blogpost.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
-                fi
+                echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.page.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
+            fi
+            
+            # Display blog posts
+            if [ "$BLOG_COUNT" -gt 0 ]; then
+                echo "=== Blog Posts in $space_key ==="
+                echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.blogpost.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
             fi
             """,
             args=[
