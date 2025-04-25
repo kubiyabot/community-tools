@@ -163,3 +163,21 @@ for tool in [argocd_login, argocd_list_applications, argocd_get_application, arg
              argocd_set_app_parameters, argocd_get_project, argocd_create_project, argocd_delete_project,
              argocd_list_repositories, argocd_add_repository]:
     tool_registry.register("argocd", tool)
+
+
+
+__all__ = [
+    'argocd_login',
+    'argocd_list_applications',
+    'argocd_get_application',
+    'argocd_sync_application',
+    'argocd_create_application',
+    'argocd_delete_application',
+    'argocd_rollback_application',
+    'argocd_set_app_parameters',
+    'argocd_get_project',
+    'argocd_create_project',
+    'argocd_delete_project',
+    'argocd_list_repositories',
+    'argocd_add_repository',
+]
