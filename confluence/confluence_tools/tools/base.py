@@ -96,7 +96,7 @@ class ConfluenceTool(Tool):
                         -H "$AUTH_HEADER" \
                         -H "Content-Type: application/json" 2>&1
                     echo ""
-                }
+                fi
                 
                 echo "Connection tests completed. If all tests failed, please check:"
                 echo "1. Your network connectivity to Atlassian services"
