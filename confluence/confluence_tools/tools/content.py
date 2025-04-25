@@ -26,11 +26,8 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates
             
-            # Create auth header with API token - properly encode the username with special characters
-            # Use printf to ensure proper URL encoding of special characters
-            USERNAME_ENCODED=$(printf "%s" "$CONFLUENCE_USERNAME" | jq -sRr @uri)
-            AUTH_STRING=$(printf "%s:%s" "$USERNAME_ENCODED" "$CONFLUENCE_API_TOKEN")
-            AUTH_HEADER="Authorization: Basic $(echo -n "$AUTH_STRING" | base64)"
+            # Basic validation
+            validate_confluence_connection
             
             # Check if we have page_id or (title and space_key)
             if [ -z "$page_id" ] && ([ -z "$title" ] || [ -z "$space_key" ]); then
@@ -43,8 +40,6 @@ class ContentTools:
             
             # If we have title and space_key but no page_id, search for the page
             if [ -z "$page_id" ] && [ -n "$title" ] && [ -n "$space_key" ]; then
-                echo "Searching for page with title '$title' in space '$space_key'..."
-                
                 # For Atlassian Cloud
                 if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
                     # Try the v1 API first as it seems to be working better
@@ -86,13 +81,9 @@ class ContentTools:
                     # Extract the page ID from the search result
                     page_id=$(echo "$SEARCH_RESULT" | jq -r '.results[0].id')
                 fi
-                
-                echo "Found page with ID: $page_id"
             fi
 
             # Now get the page content
-            echo "Retrieving content for page ID: $page_id"
-            
             # For Atlassian Cloud
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
                 # Try the v1 API first as it seems to be working better
@@ -102,14 +93,9 @@ class ContentTools:
                 API_URL="$CONFLUENCE_URL/rest/api/content/$page_id?expand=body.storage,space,history,metadata.labels"
             fi
             
-            echo "API URL: $API_URL"
             PAGE_DATA=$(curl -s -X GET "$API_URL" \
                 -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
                 -H "Accept: application/json")
-            
-            # Debug: Print the raw API response
-            echo "DEBUG: Raw API response:"
-            echo "$PAGE_DATA" | jq '.'
             
             # Check if we got a valid response
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
@@ -119,35 +105,10 @@ class ContentTools:
                     exit 1
                 fi
                 
-                # Extract and display the page information
-                TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
-                SPACE_KEY=$(echo "$PAGE_DATA" | jq -r '.space.key // ""')
-                SPACE_NAME=$(echo "$PAGE_DATA" | jq -r '.space.name // ""')
-                CREATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.createdDate // ""' | cut -d'T' -f1)
-                CREATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.createdBy.displayName // ""')
-                UPDATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.when // ""' | cut -d'T' -f1)
-                UPDATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.by.displayName // ""')
-                
-                # Get labels if available
-                LABELS=$(echo "$PAGE_DATA" | jq -r '.metadata.labels.results[] | .name' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
-                if [ -z "$LABELS" ]; then
-                    LABELS="None"
-                fi
-                
                 # Extract the content - try different paths
                 CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // .body.view.value // ""')
                 
-                # Display page metadata
-                echo "=== Page Information ==="
-                echo "Title: $TITLE"
-                echo "Space: $SPACE_NAME ($SPACE_KEY)"
-                echo "Created: $CREATED_DATE by $CREATED_BY"
-                echo "Updated: $UPDATED_DATE by $UPDATED_BY"
-                echo "Labels: $LABELS"
-                echo "URL: $CONFLUENCE_URL/spaces/$SPACE_KEY/pages/$page_id"
-                
-                echo ""
-                echo "=== Page Content ==="
+                # Output only the content
                 if [ -n "$CONTENT" ]; then
                     echo "$CONTENT"
                 else
@@ -160,35 +121,10 @@ class ContentTools:
                     exit 1
                 fi
                 
-                # Extract and display the page information
-                TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
-                SPACE_KEY=$(echo "$PAGE_DATA" | jq -r '.space.key // ""')
-                SPACE_NAME=$(echo "$PAGE_DATA" | jq -r '.space.name // ""')
-                CREATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.createdDate // ""' | cut -d'T' -f1)
-                CREATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.createdBy.displayName // ""')
-                UPDATED_DATE=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.when // ""' | cut -d'T' -f1)
-                UPDATED_BY=$(echo "$PAGE_DATA" | jq -r '.history.lastUpdated.by.displayName // ""')
-                
-                # Get labels if available
-                LABELS=$(echo "$PAGE_DATA" | jq -r '.metadata.labels.results[] | .name' 2>/dev/null | tr '\n' ', ' | sed 's/,$//')
-                if [ -z "$LABELS" ]; then
-                    LABELS="None"
-                fi
-                
                 # Extract the content
                 CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // ""')
                 
-                # Display page metadata
-                echo "=== Page Information ==="
-                echo "Title: $TITLE"
-                echo "Space: $SPACE_NAME ($SPACE_KEY)"
-                echo "Created: $CREATED_DATE by $CREATED_BY"
-                echo "Updated: $UPDATED_DATE by $UPDATED_BY"
-                echo "Labels: $LABELS"
-                echo "URL: $CONFLUENCE_URL/display/$SPACE_KEY/$page_id"
-                
-                echo ""
-                echo "=== Page Content ==="
+                # Output only the content
                 if [ -n "$CONTENT" ]; then
                     echo "$CONTENT"
                 else
