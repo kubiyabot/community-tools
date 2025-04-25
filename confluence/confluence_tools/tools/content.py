@@ -24,10 +24,7 @@ class ContentTools:
             description="Retrieve content from a Confluence page by ID or title and space",
             content="""
             # Install required packages silently
-            apk add --no-cache --quiet jq curl bash ca-certificates
-            
-            # Basic validation
-            validate_confluence_connection
+            apk add --no-cache --quiet jq curl bash ca-certificates >/dev/null 2>&1
             
             # Check if we have page_id or (title and space_key)
             if [ -z "$page_id" ] && ([ -z "$title" ] || [ -z "$space_key" ]); then
@@ -105,10 +102,18 @@ class ContentTools:
                     exit 1
                 fi
                 
+                # Extract the title
+                TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
+                
                 # Extract the content - try different paths
                 CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // .body.view.value // ""')
                 
-                # Output only the content
+                # Output the title and content
+                if [ -n "$TITLE" ]; then
+                    echo "# $TITLE"
+                    echo ""
+                fi
+                
                 if [ -n "$CONTENT" ]; then
                     echo "$CONTENT"
                 else
@@ -121,10 +126,18 @@ class ContentTools:
                     exit 1
                 fi
                 
+                # Extract the title
+                TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
+                
                 # Extract the content
                 CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // ""')
                 
-                # Output only the content
+                # Output the title and content
+                if [ -n "$TITLE" ]; then
+                    echo "# $TITLE"
+                    echo ""
+                fi
+                
                 if [ -n "$CONTENT" ]; then
                     echo "$CONTENT"
                 else
