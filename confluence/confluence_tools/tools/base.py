@@ -64,58 +64,76 @@ class ConfluenceTool(Tool):
                 echo "Using username: $CONFLUENCE_USERNAME"
                 echo "API Token: ${CONFLUENCE_API_TOKEN:0:3}...${CONFLUENCE_API_TOKEN: -3}"
                 
-                # Try a simple curl request with full debugging
-                echo "Testing connection with curl..."
-                curl -v --connect-timeout 10 "$CONFLUENCE_URL" 2>&1
-                echo ""
-                
-                # For Atlassian Cloud, the API endpoint might be different
+                # For Atlassian Cloud, determine the correct API endpoint
                 if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
                     echo "Detected Atlassian Cloud instance."
                     
-                    # Try the Atlassian Cloud API endpoint
-                    API_URL="https://api.atlassian.com/ex/confluence"
-                    echo "Trying Atlassian Cloud API endpoint: $API_URL"
+                    # Remove trailing slashes
+                    CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
                     
-                    curl -v --connect-timeout 10 -X GET "$API_URL" \
-                        -H "$AUTH_HEADER" \
-                        -H "Content-Type: application/json" 2>&1
-                    echo ""
-                    
-                    # Try the standard Confluence Cloud API endpoint
-                    if [[ "$CONFLUENCE_URL" == *"/wiki" ]]; then
-                        BASE_URL="${CONFLUENCE_URL%/wiki}"
+                    # Use v2 API for Atlassian Cloud
+                    if [[ "$CONFLUENCE_URL" == */wiki ]]; then
+                        API_URL="${CONFLUENCE_URL}/api/v2/pages"
                     else
-                        BASE_URL="$CONFLUENCE_URL"
+                        API_URL="$CONFLUENCE_URL/wiki/api/v2/pages"
                     fi
                     
-                    CLOUD_API_URL="$BASE_URL/rest/api/latest/content"
-                    echo "Trying Confluence Cloud API endpoint: $CLOUD_API_URL"
-                    
-                    curl -v --connect-timeout 10 -X GET "$CLOUD_API_URL" \
+                    echo "Using Confluence Cloud v2 API: $API_URL"
+                    HTTP_RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null -X GET "$API_URL" \
                         -H "$AUTH_HEADER" \
-                        -H "Content-Type: application/json" 2>&1
-                    echo ""
+                        -H "Content-Type: application/json")
+                    
+                    if [[ "$HTTP_RESPONSE" == "200" ]]; then
+                        echo "Successfully connected to Confluence API v2"
+                        return 0
+                    elif [[ "$HTTP_RESPONSE" == "401" ]]; then
+                        echo "Error: Authentication failed. Please check your API token and username."
+                        echo "For Atlassian Cloud, create a new API token at: https://id.atlassian.com/manage-profile/security/api-tokens"
+                        exit 1
+                    else
+                        echo "Warning: Received HTTP status $HTTP_RESPONSE from Confluence API"
+                        echo "Will continue but operations may fail"
+                    fi
+                else
+                    # For self-hosted Confluence
+                    HTTP_RESPONSE=$(curl -s -w "%{http_code}" -o /dev/null -X GET "$CONFLUENCE_URL/rest/api/content" \
+                        -H "$AUTH_HEADER" \
+                        -H "Content-Type: application/json")
+                    
+                    if [[ "$HTTP_RESPONSE" == "200" ]]; then
+                        echo "Successfully connected to Confluence API"
+                        return 0
+                    elif [[ "$HTTP_RESPONSE" == "401" ]]; then
+                        echo "Error: Authentication failed. Please check your API token and username."
+                        exit 1
+                    else
+                        echo "Warning: Received HTTP status $HTTP_RESPONSE from Confluence API"
+                        echo "Will continue but operations may fail"
+                    fi
                 fi
-                
-                echo "Connection tests completed. If all tests failed, please check:"
-                echo "1. Your network connectivity to Atlassian services"
-                echo "2. The correct URL format for your Confluence instance"
-                echo "3. Your API token permissions"
-                echo "4. For Atlassian Cloud, ensure you're using a valid API token from https://id.atlassian.com/manage-profile/security/api-tokens"
-                
-                # For now, we'll continue with the script but mark this as a warning
-                echo "WARNING: Could not verify Confluence API connection. Continuing anyway..."
-                
-                # Don't exit with error for now, to allow the script to continue
-                # exit 1
             }
 
             get_page_content() {
                 local page_id="$1"
                 local expand="${2:-body.storage}"
                 
-                curl -s -X GET "$CONFLUENCE_URL/rest/api/content/$page_id?expand=$expand" \
+                # For Atlassian Cloud, determine the correct API endpoint
+                if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                    # Remove trailing slashes
+                    CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
+                    
+                    # Use v2 API for Atlassian Cloud
+                    if [[ "$CONFLUENCE_URL" == */wiki ]]; then
+                        API_URL="${CONFLUENCE_URL}/api/v2/pages/$page_id?body-format=storage"
+                    else
+                        API_URL="$CONFLUENCE_URL/wiki/api/v2/pages/$page_id?body-format=storage"
+                    fi
+                else
+                    # For self-hosted Confluence
+                    API_URL="$CONFLUENCE_URL/rest/api/content/$page_id?expand=$expand"
+                fi
+                
+                curl -s -X GET "$API_URL" \
                     -H "$AUTH_HEADER" \
                     -H "Content-Type: application/json"
             }
@@ -124,7 +142,23 @@ class ConfluenceTool(Tool):
                 local cql="$1"
                 local limit="${2:-10}"
                 
-                curl -s -X GET "$CONFLUENCE_URL/rest/api/content/search?cql=$cql&limit=$limit" \
+                # For Atlassian Cloud, determine the correct API endpoint
+                if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                    # Remove trailing slashes
+                    CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
+                    
+                    # Use v2 API for Atlassian Cloud
+                    if [[ "$CONFLUENCE_URL" == */wiki ]]; then
+                        API_URL="${CONFLUENCE_URL}/api/v2/pages?limit=$limit&title=$cql"
+                    else
+                        API_URL="$CONFLUENCE_URL/wiki/api/v2/pages?limit=$limit&title=$cql"
+                    fi
+                else
+                    # For self-hosted Confluence
+                    API_URL="$CONFLUENCE_URL/rest/api/content/search?cql=$cql&limit=$limit"
+                fi
+                
+                curl -s -X GET "$API_URL" \
                     -H "$AUTH_HEADER" \
                     -H "Content-Type: application/json"
             }
@@ -133,7 +167,23 @@ class ConfluenceTool(Tool):
                 local space_key="$1"
                 local limit="${2:-10}"
                 
-                curl -s -X GET "$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$limit" \
+                # For Atlassian Cloud, determine the correct API endpoint
+                if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                    # Remove trailing slashes
+                    CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
+                    
+                    # Use v2 API for Atlassian Cloud
+                    if [[ "$CONFLUENCE_URL" == */wiki ]]; then
+                        API_URL="${CONFLUENCE_URL}/api/v2/spaces/$space_key/pages?limit=$limit"
+                    else
+                        API_URL="$CONFLUENCE_URL/wiki/api/v2/spaces/$space_key/pages?limit=$limit"
+                    fi
+                else
+                    # For self-hosted Confluence
+                    API_URL="$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$limit"
+                fi
+                
+                curl -s -X GET "$API_URL" \
                     -H "$AUTH_HEADER" \
                     -H "Content-Type: application/json"
             }
