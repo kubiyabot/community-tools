@@ -2,6 +2,7 @@ from kubiya_sdk.tools import Arg
 from .base import ArgoCDTool
 from kubiya_sdk.tools.registry import tool_registry
 
+# Define ArgoCD tools
 argocd_login = ArgoCDTool(
     name="argocd_login",
     description="Login to ArgoCD server",
@@ -158,14 +159,26 @@ argocd_add_repository = ArgoCDTool(
 )
 
 # Register all ArgoCD tools
-for tool in [argocd_login, argocd_list_applications, argocd_get_application, argocd_sync_application,
-             argocd_create_application, argocd_delete_application, argocd_rollback_application,
-             argocd_set_app_parameters, argocd_get_project, argocd_create_project, argocd_delete_project,
-             argocd_list_repositories, argocd_add_repository]:
+tools = [
+    argocd_login, 
+    argocd_list_applications, 
+    argocd_get_application, 
+    argocd_sync_application,
+    argocd_create_application, 
+    argocd_delete_application, 
+    argocd_rollback_application,
+    argocd_set_app_parameters, 
+    argocd_get_project, 
+    argocd_create_project, 
+    argocd_delete_project,
+    argocd_list_repositories, 
+    argocd_add_repository
+]
+
+for tool in tools:
     tool_registry.register("argocd", tool)
 
-
-
+# Explicitly define __all__ to properly export the tools
 __all__ = [
     'argocd_login',
     'argocd_list_applications',

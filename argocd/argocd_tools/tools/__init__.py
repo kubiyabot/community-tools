@@ -14,6 +14,7 @@ from .operations import (
     argocd_add_repository,
 )
 
+# Re-export all tools
 __all__ = [
     'argocd_login',
     'argocd_list_applications',
