@@ -145,7 +145,7 @@ class ApplicationTools:
             
             # Trigger sync
             RESPONSE=$(curl -s -k -X POST \
-                -H "Authorization: Bearer $ARGOCD_AUTH_TOKEN" \
+                -H "Authorization: Bearer $ARGO_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{
                     "prune": '"$PRUNE"',
@@ -153,7 +153,7 @@ class ApplicationTools:
                     "replace": '"$REPLACE"',
                     "force": '"$FORCE"'
                 }' \
-                "$ARGOCD_SERVER/api/v1/applications/$app_name/sync")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/sync")
             
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to sync application"
@@ -282,7 +282,7 @@ class ApplicationTools:
             
             # Create application
             RESPONSE=$(curl -s -k -X POST \
-                -H "Authorization: Bearer $ARGOCD_AUTH_TOKEN" \
+                -H "Authorization: Bearer $ARGO_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{
                     "metadata": {
@@ -302,7 +302,7 @@ class ApplicationTools:
                         "syncPolicy": '"$SYNC_POLICY"'
                     }
                 }' \
-                "$ARGOCD_SERVER/api/v1/applications")
+                "$ARGOCD_DOMAIN/api/v1/applications")
             
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to create application"
@@ -366,8 +366,8 @@ class ApplicationTools:
             
             # Delete application
             RESPONSE=$(curl -s -k -X DELETE \
-                -H "Authorization: Bearer $ARGOCD_AUTH_TOKEN" \
-                "$ARGOCD_SERVER/api/v1/applications/$app_name?cascade=$CASCADE&propagationPolicy=$PROPAGATION_POLICY")
+                -H "Authorization: Bearer $ARGO_TOKEN" \
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name?cascade=$CASCADE&propagationPolicy=$PROPAGATION_POLICY")
             
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to delete application"
