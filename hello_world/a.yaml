@@ -1,17 +1,8 @@
 name: tool_chaining_example
-description: Example DAG demonstrating data flow between tool steps using Go templates
-type: workflow
-
-inputs:
-  - name: slack_channel
-    type: string
-    description: The Slack channel to send the notification to (e.g., #tf-test)
-    required: true
-    default: "#tf-test" # Optional default value
-
+description: Example DAG demonstrating data flow between tool steps
 steps:
-  - name: generate_data
-    description: First tool generates data for the second step
+  - name: generate-data
+    description: First tool generates data for the second step 1
     executor:
       type: tool
       config:
@@ -26,7 +17,6 @@ steps:
                 #!/usr/bin/env python3
                 import json
                 import random
-                import sys
 
                 # Generate some random data
                 data = {
@@ -36,18 +26,17 @@ steps:
                 }
 
                 # Output the data as JSON
-                json_data = json.dumps(data)
-                print(f"DEBUG - Generating data: {json_data}", file=sys.stderr)
-                print(json_data)
-          content: |
+                print(json.dumps(data))
+          content: | 
             set -e
-            python /tmp/ascript.py
-    output: generated_data
+            python  /tmp/ascript.py
+    output: GENERATED_DATA
 
-  - name: process_data
+
+  - name: process-data
     description: Second tool processes data from first tool
     depends:
-      - generate_data
+      - generate-data
     executor:
       type: tool
       config:
@@ -62,35 +51,19 @@ steps:
                 #!/usr/bin/env python3
                 import os
                 import json
-                import sys
 
-                # Get the data from the previous step via environment variable 'data'
+                # Get the data from the previous step
                 input_data = os.environ.get('data')
                 
-                # Debug: print what we received
-                print(f"DEBUG - Received input: '{input_data}'", file=sys.stderr)
-                
-                # List all environment variables to see what's available
-                print("DEBUG - All environment variables:", file=sys.stderr)
-                for key, value in os.environ.items():
-                    print(f"  {key}={value}", file=sys.stderr)
-
                 try:
-                    # Handle empty input case
-                    if not input_data:
-                        print("ERROR: Input data is empty!", file=sys.stderr)
-                        result = {"error": "No input data received"}
-                        print(json.dumps(result))
-                        sys.exit(1)
-                        
                     # Parse the JSON data
                     data = json.loads(input_data)
 
                     # Process the data
                     total = sum(data.get('values', [0]))
-                    avg = total / len(data.get('values', [1])) # Avoid division by zero if values is empty
+                    avg = total / len(data.get('values', [1]))
 
-                    # Output the results as a single compact line
+                    # Output the results as a single compact line to avoid truncation issues
                     result = {
                         "source_id": data.get('id'),
                         "source_name": data.get('name'),
@@ -100,38 +73,34 @@ steps:
                             "count": len(data.get('values', []))
                         }
                     }
-                    print(json.dumps(result))
+
+                    # Output as a single line with no formatting to avoid truncation
+                    print(f"RESULT:{json.dumps(result)}")
 
                 except json.JSONDecodeError as e:
-                    print(f"Error parsing data: '{input_data}'", file=sys.stderr)
-                    print(f"Error details: {str(e)}", file=sys.stderr)
-                    result = {"error": f"JSON decode error: {str(e)}"}
-                    print(json.dumps(result))
-                    sys.exit(1)
-                except Exception as e:
-                    print(f"An unexpected error occurred: {str(e)}", file=sys.stderr)
-                    result = {"error": f"Unexpected error: {str(e)}"}
-                    print(json.dumps(result))
-                    sys.exit(1)
+                    print(f"Error parsing data: {input_data}")
+                    print(f"Error details: {str(e)}")
+                    raise
           content: |
             set -e
-            python /tmp/ascript.py
-          args: # Arguments defined for the tool *itself*
+            python  /tmp/ascript.py
+
+          args:
             - name: data
               type: string
               description: JSON data from previous step
               required: true
-        args: # Arguments *passed* to the tool executor
-          data: "${generated_data}" # Try standard single-brace syntax
-    output: processed_data
+        args:
+          data: "${GENERATED_DATA}"
+    output: PROCESSED_DATA
 
   - name: send-to-slack
-    description: Sends processed data to Slack using a workflow input for the channel
     executor:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: "Send a Slack msg to channel ${slack_channel} saying Processed Data: ${processed_data}. ask no questions"
-    output: slack_response
+        message: "Send a Slack msg to channel #tf-test saying ${PROCESSED_DATA}. and run it don't ask for questions"
+    output: SLACK_RESPONSE
     depends:
-      - process_data
+      - process-data
+      - generate-data
