@@ -251,3 +251,5 @@ class ProjectTools:
             ],
             image="curlimages/curl:8.1.2"
         ) 
+
+ProjectTools()
