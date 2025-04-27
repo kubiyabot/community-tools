@@ -395,3 +395,5 @@ class ApplicationTools:
             ],
             image="curlimages/curl:8.1.2"
         ) 
+
+ApplicationTools()
