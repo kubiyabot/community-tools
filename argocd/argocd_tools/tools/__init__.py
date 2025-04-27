@@ -5,14 +5,16 @@ from .operations import (
     argocd_sync_application,
     argocd_create_application,
     argocd_delete_application,
+    argocd_rollback_application,
+    argocd_set_app_parameters,
     argocd_get_project,
-    argocd_list_projects,
     argocd_create_project,
     argocd_delete_project,
     argocd_list_repositories,
     argocd_add_repository,
 )
 
+# Re-export all tools
 __all__ = [
     'argocd_login',
     'argocd_list_applications',
@@ -20,8 +22,9 @@ __all__ = [
     'argocd_sync_application',
     'argocd_create_application',
     'argocd_delete_application',
+    'argocd_rollback_application',
+    'argocd_set_app_parameters',
     'argocd_get_project',
-    'argocd_list_projects',
     'argocd_create_project',
     'argocd_delete_project',
     'argocd_list_repositories',
