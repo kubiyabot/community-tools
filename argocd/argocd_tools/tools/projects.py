@@ -39,7 +39,7 @@ class ProjectTools:
             echo "=== ArgoCD Projects ==="
             
             # Fetch projects
-            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
             
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to retrieve projects"
@@ -75,7 +75,7 @@ class ProjectTools:
             echo "=== Project Details: $project_name ==="
             
             # Fetch project details
-            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects/$project_name")
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects/$project_name")
             
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to retrieve project details"
@@ -102,7 +102,7 @@ class ProjectTools:
             
             # Get applications in project
             echo "=== Applications in Project ==="
-            APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
+            APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
             
             if [ -z "$APPS_RESPONSE" ]; then
                 echo "Error: Failed to retrieve applications in project"
@@ -144,7 +144,7 @@ class ProjectTools:
             
             # Create project
             RESPONSE=$(curl -s -k -X POST \
-                -H "Authorization: Bearer $ARGO_TOKEN" \
+                -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{
                     "metadata": {
@@ -210,7 +210,7 @@ class ProjectTools:
             
             # Check if project has applications
             echo "=== Checking Project Applications ==="
-            APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
+            APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
             APPS_COUNT=$(echo "$APPS_RESPONSE" | jq '.items | length')
             
             if [ "$APPS_COUNT" -gt 0 ]; then
@@ -228,7 +228,7 @@ class ProjectTools:
             
             # Delete project
             RESPONSE=$(curl -s -k -X DELETE \
-                -H "Authorization: Bearer $ARGO_TOKEN" \
+                -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/projects/$project_name")
             
             if [ -z "$RESPONSE" ]; then

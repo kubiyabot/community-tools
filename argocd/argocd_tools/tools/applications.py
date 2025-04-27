@@ -145,7 +145,7 @@ class ApplicationTools:
             
             # Trigger sync
             RESPONSE=$(curl -s -k -X POST \
-                -H "Authorization: Bearer $ARGO_TOKEN" \
+                -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{
                     "prune": '"$PRUNE"',
@@ -282,7 +282,7 @@ class ApplicationTools:
             
             # Create application
             RESPONSE=$(curl -s -k -X POST \
-                -H "Authorization: Bearer $ARGO_TOKEN" \
+                -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 -H "Content-Type: application/json" \
                 -d '{
                     "metadata": {
@@ -366,7 +366,7 @@ class ApplicationTools:
             
             # Delete application
             RESPONSE=$(curl -s -k -X DELETE \
-                -H "Authorization: Bearer $ARGO_TOKEN" \
+                -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name?cascade=$CASCADE&propagationPolicy=$PROPAGATION_POLICY")
             
             if [ -z "$RESPONSE" ]; then

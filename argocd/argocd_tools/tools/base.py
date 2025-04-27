@@ -46,13 +46,13 @@ class ArgoCDTool(Tool):
         helper_functions = """
             # Helper functions for ArgoCD tools
             validate_argocd_connection() {
-                if [ -z "$ARGOCD_DOMAIN" ] || [ -z "$ARGO_TOKEN" ]; then
-                    echo "Error: ARGOCD_DOMAIN and ARGO_TOKEN environment variables are required"
+                if [ -z "$ARGOCD_DOMAIN" ] || [ -z "$ARGOCD_TOKEN" ]; then
+                    echo "Error: ARGOCD_DOMAIN and ARGOCD_TOKEN environment variables are required"
                     exit 1
                 fi
 
                 # Test connection
-                if ! curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications" > /dev/null; then
+                if ! curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications" > /dev/null; then
                     echo "Error: Could not connect to ArgoCD API"
                     exit 1
                 fi
@@ -60,7 +60,7 @@ class ArgoCDTool(Tool):
 
             login_argocd_cli() {
                 # Login to ArgoCD CLI
-                argocd login "$ARGOCD_DOMAIN" --auth-token "$ARGO_TOKEN" --insecure
+                argocd login "$ARGOCD_DOMAIN" --auth-token "$ARGOCD_TOKEN" --insecure
                 if [ $? -ne 0 ]; then
                     echo "Error: Failed to login to ArgoCD CLI"
                     exit 1
@@ -69,16 +69,16 @@ class ArgoCDTool(Tool):
 
             get_application_details() {
                 local app_name="$1"
-                curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name"
+                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name"
             }
 
             get_applications() {
-                curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications"
+                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications"
             }
 
             get_application_sync_status() {
                 local app_name="$1"
-                curl -s -k -H "Authorization: Bearer $ARGO_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree"
+                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree"
             }
         """
         
@@ -92,7 +92,7 @@ class ArgoCDTool(Tool):
             image=image,
             icon_url=ARGOCD_ICON_URL,
             type="docker",
-            secrets=["ARGO_TOKEN"],
+            secrets=["ARGOCD_TOKEN"],
             env=["ARGOCD_DOMAIN"]
         )
 
