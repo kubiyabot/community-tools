@@ -1,7 +1,7 @@
 # k8s_tools/tools/base.py
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 
-KUBERNETES_ICON_URL = "https://argo-cd.readthedocs.io/en/stable/assets/logo.png"
+KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 
 class KubernetesTool(Tool):
     def __init__(self, name, description, content, args, image="kubiya/kubectl-light:latest"):
