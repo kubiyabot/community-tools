@@ -5,17 +5,18 @@ terraform_deploy_bucket = GCPTool(
     name="terraform_deploy_bucket",
     description="Deploy a GCP Storage bucket using Terraform",
     content="""
-# Install Terraform
+# Install Terraform quietly
 echo "Installing Terraform..."
-apt-get update && apt-get install -y wget unzip
-wget https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-unzip terraform_1.5.7_linux_amd64.zip
+apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null 2>&1
+wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
-terraform --version
+echo "Terraform $(terraform --version | head -n 1) installed successfully"
 
 # Create a directory for Terraform files
 TERRAFORM_DIR=$(mktemp -d)
 cd "$TERRAFORM_DIR"
+echo "Working in temporary directory: $TERRAFORM_DIR"
 
 # Create provider configuration for GCP
 cat > provider.tf << EOF
@@ -28,18 +29,36 @@ EOF
 
 # Create the main.tf file with the provided Terraform content
 echo "$terraform_content" > main.tf
+echo "Created Terraform configuration files"
 
-# Initialize Terraform
-terraform init
+# Initialize Terraform with reduced output
+echo "Initializing Terraform..."
+terraform init -no-color -input=false > terraform_init.log 2>&1
+INIT_STATUS=$?
+if [ $INIT_STATUS -ne 0 ]; then
+    echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
+    cat terraform_init.log
+    exit $INIT_STATUS
+fi
+echo "Terraform initialized successfully"
 
 # Apply the Terraform configuration
-terraform apply -auto-approve
+echo "Applying Terraform configuration to create bucket '$bucket_name'..."
+terraform apply -auto-approve -no-color -input=false > terraform_apply.log 2>&1
+APPLY_STATUS=$?
+if [ $APPLY_STATUS -ne 0 ]; then
+    echo "ERROR: Terraform apply failed with status $APPLY_STATUS"
+    cat terraform_apply.log
+    exit $APPLY_STATUS
+fi
+echo "Terraform apply completed successfully"
 
 # Show the created resources
-terraform show
-
-# Output the state
+echo "Resources created:"
 terraform state list
+
+# Output success message
+echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully in region '$region'"
 """,
     args=[
         Arg(name="bucket_name", type="str", description="Name of the bucket to create", required=True),
@@ -55,7 +74,7 @@ graph TD
     E --> F[Initialize Terraform]
     F --> G[Apply Terraform Configuration]
     G --> H[Show Created Resources]
-    H --> I[List Terraform State]
+    H --> I[Output Success Message]
     I --> J[End]
 """
 )
@@ -65,17 +84,18 @@ terraform_deploy_resource = GCPTool(
     name="terraform_deploy_resource",
     description="Deploy any GCP resource using Terraform",
     content="""
-# Install Terraform
+# Install Terraform quietly
 echo "Installing Terraform..."
-apt-get update && apt-get install -y wget unzip
-wget https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-unzip terraform_1.5.7_linux_amd64.zip
+apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null 2>&1
+wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
+unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
-terraform --version
+echo "Terraform $(terraform --version | head -n 1) installed successfully"
 
 # Create a directory for Terraform files
 TERRAFORM_DIR=$(mktemp -d)
 cd "$TERRAFORM_DIR"
+echo "Working in temporary directory: $TERRAFORM_DIR"
 
 # Create provider configuration for GCP
 cat > provider.tf << EOF
@@ -88,18 +108,36 @@ EOF
 
 # Create the main.tf file with the provided Terraform content
 echo "$terraform_content" > main.tf
+echo "Created Terraform configuration files"
 
-# Initialize Terraform
-terraform init
+# Initialize Terraform with reduced output
+echo "Initializing Terraform..."
+terraform init -no-color -input=false > terraform_init.log 2>&1
+INIT_STATUS=$?
+if [ $INIT_STATUS -ne 0 ]; then
+    echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
+    cat terraform_init.log
+    exit $INIT_STATUS
+fi
+echo "Terraform initialized successfully"
 
 # Apply the Terraform configuration
-terraform apply -auto-approve
+echo "Applying Terraform configuration to create $resource_type '$resource_name'..."
+terraform apply -auto-approve -no-color -input=false > terraform_apply.log 2>&1
+APPLY_STATUS=$?
+if [ $APPLY_STATUS -ne 0 ]; then
+    echo "ERROR: Terraform apply failed with status $APPLY_STATUS"
+    cat terraform_apply.log
+    exit $APPLY_STATUS
+fi
+echo "Terraform apply completed successfully"
 
 # Show the created resources
-terraform show
-
-# Output the state
+echo "Resources created:"
 terraform state list
+
+# Output success message
+echo "SUCCESS: GCP $resource_type '$resource_name' has been deployed successfully in region '$region'"
 """,
     args=[
         Arg(name="resource_type", type="str", description="Type of GCP resource to create", required=True),
@@ -116,7 +154,7 @@ graph TD
     E --> F[Initialize Terraform]
     F --> G[Apply Terraform Configuration]
     G --> H[Show Created Resources]
-    H --> I[List Terraform State]
+    H --> I[Output Success Message]
     I --> J[End]
 """
 )
