@@ -6,7 +6,9 @@ class GCPTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
         # Wrap the command to ensure errors are captured and output is verbose
         # This redirects stderr to stdout and sets debug flags
-        enhanced_content = f"""
+        
+        # Use a raw string (r prefix) to avoid Python's string escaping issues
+        bash_script = r"""
 #!/bin/bash
 set -e
 
@@ -18,8 +20,20 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     
     echo "Processing credentials..."
     
+    # Debug: Show credential length and format
+    CRED_LENGTH=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | wc -c)
+    echo "Credential string length: $CRED_LENGTH bytes"
+    
+    # Check if it starts with a curly brace (likely JSON)
+    if echo "$GOOGLE_APPLICATION_CREDENTIALS" | grep -q "^{"; then
+        echo "Credentials appear to be in JSON format"
+    else
+        echo "Warning: Credentials don't appear to be in JSON format"
+        echo "First 10 characters: $(echo "$GOOGLE_APPLICATION_CREDENTIALS" | head -c 10)..."
+    fi
+    
     # Clean up any potential special characters or line breaks
-    CLEANED_CREDS=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | tr -d '\\r' | tr -d '\\n')
+    CLEANED_CREDS=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | tr -d '\r' | tr -d '\n')
     
     # Use credentials directly as JSON
     echo "$CLEANED_CREDS" > "$CREDS_FILE"
@@ -31,21 +45,27 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
         # Activate the service account
         echo "Activating service account..."
-        gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>/dev/null
+        gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>&1
         if [ $? -eq 0 ]; then
             echo "Service account activated successfully"
+            # Extract and display non-sensitive information
+            PROJECT_ID=$(jq -r '.project_id' "$CREDS_FILE" 2>/dev/null || echo "unknown")
+            CLIENT_EMAIL=$(jq -r '.client_email' "$CREDS_FILE" 2>/dev/null || echo "unknown")
+            echo "Using service account: $CLIENT_EMAIL for project: $PROJECT_ID"
         else
             echo "Error activating service account"
-            # Print first few lines of the file for debugging (without sensitive data)
-            echo "Credential file structure (first few lines):"
-            grep -v "private_key" "$CREDS_FILE" | head -5
+            # Show available fields in the credentials file
+            echo "Available credential fields:"
+            jq 'keys' "$CREDS_FILE" 2>/dev/null || echo "Could not parse credentials"
             exit 1
         fi
     else
         echo "Error: Invalid JSON credentials format"
-        # Print the first few characters for debugging
-        echo "First 100 characters of credentials (for debugging):"
-        head -c 100 "$CREDS_FILE" | sed 's/\\n/\\\\n/g' | sed 's/\\r/\\\\r/g'
+        # Show the full credential string for debugging
+        echo "Full credential string for debugging:"
+        echo "$GOOGLE_APPLICATION_CREDENTIALS"
+        echo "---"
+        echo "Hint: Credentials should be a complete, valid JSON object."
         exit 1
     fi
 else
@@ -54,8 +74,10 @@ fi
 
 # Execute the actual command
 echo "Executing command..."
-{content}
 """
+        
+        # Add the content to the bash script
+        enhanced_content = bash_script + content
         
         super().__init__(
             name=name,
