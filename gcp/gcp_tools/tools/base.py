@@ -10,6 +10,12 @@ class GCPTool(Tool):
 #!/bin/bash
 set -e
 export CLOUDSDK_CORE_VERBOSITY=debug
+
+# Explicitly activate service account from credentials file
+if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+fi
+
 {content} 2>&1
 """
         
