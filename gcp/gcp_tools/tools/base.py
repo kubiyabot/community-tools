@@ -11,14 +11,21 @@ class GCPTool(Tool):
 set -e
 export CLOUDSDK_CORE_VERBOSITY=debug
 
-# Always write credentials to a temporary file
+# Handle credentials properly
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-    # Create a temporary file with the JSON content
-    echo "$GOOGLE_APPLICATION_CREDENTIALS" > /tmp/gcp_credentials.json
-    # Set the environment variable to point to this file
-    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_credentials.json
-    # Activate the service account
-    gcloud auth activate-service-account --key-file=/tmp/gcp_credentials.json
+    # Use base64 encoding/decoding to preserve the exact content
+    echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > /tmp/gcp_credentials.json 2>/dev/null || echo "$GOOGLE_APPLICATION_CREDENTIALS" > /tmp/gcp_credentials.json
+    
+    # Check if the file is valid JSON
+    if jq . /tmp/gcp_credentials.json >/dev/null 2>&1; then
+        # Set the environment variable to point to this file
+        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_credentials.json
+        # Activate the service account
+        gcloud auth activate-service-account --key-file=/tmp/gcp_credentials.json
+    else
+        echo "Error: Invalid JSON credentials format"
+        cat /tmp/gcp_credentials.json | head -10
+    fi
 fi
 
 {content} 2>&1
