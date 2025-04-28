@@ -9,14 +9,6 @@ gcs_list_buckets = GCPTool(
     mermaid_diagram="..."  # Add mermaid diagram here
 )
 
-gcs_list_buckets_detailed = GCPTool(
-    name="gcs_list_buckets_detailed",
-    description="List Cloud Storage buckets with detailed information",
-    content="echo 'Listing Cloud Storage buckets with details...' && gsutil ls -L",
-    args=[],
-    mermaid_diagram="..."  # Add mermaid diagram here
-)
-
 gcs_create_bucket = GCPTool(
     name="gcs_create_bucket",
     description="Create a new Cloud Storage bucket",
