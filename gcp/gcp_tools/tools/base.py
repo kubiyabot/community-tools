@@ -39,7 +39,7 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     echo "$CLEANED_CREDS" > "$CREDS_FILE"
     
     # Check if the file is valid JSON
-    if jq . "$CREDS_FILE" >/dev/null 2>&1; then
+    if jq -e . "$CREDS_FILE" >/dev/null 2>&1; then
         echo "Valid JSON credentials detected"
         # Set the environment variable to point to this file
         export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
@@ -63,7 +63,7 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         echo "Error: Invalid JSON credentials format"
         # Show the full credential string for debugging
         echo "Full credential string for debugging:"
-        echo "$GOOGLE_APPLICATION_CREDENTIALS"
+        cat "$CREDS_FILE"
         echo "---"
         echo "Hint: Credentials should be a complete, valid JSON object."
         exit 1
