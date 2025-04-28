@@ -4,7 +4,23 @@ from .base import GCPTool, register_gcp_tool
 gcs_list_buckets = GCPTool(
     name="gcs_list_buckets",
     description="List Cloud Storage buckets",
-    content="echo 'Listing Cloud Storage buckets...' && gsutil ls",
+    content="""
+echo 'Listing Cloud Storage buckets...'
+# Get the project ID from the credentials
+PROJECT_ID=$(gcloud config get-value project)
+echo "Project: $PROJECT_ID"
+
+# List buckets with more detailed output
+if ! BUCKET_LIST=$(gsutil ls -L 2>&1); then
+    echo "Error listing buckets: $BUCKET_LIST"
+    exit 1
+fi
+
+# Format the output for better readability
+echo "$BUCKET_LIST" | grep -E 'gs://|Storage class:|Location constraint:|Versioning:|Created:'
+
+echo "Bucket listing completed successfully"
+""",
     args=[],
     mermaid_diagram="..."  # Add mermaid diagram here
 )
