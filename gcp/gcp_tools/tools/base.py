@@ -8,8 +8,6 @@ class GCPTool(Tool):
         # This redirects stderr to stdout and sets debug flags
         enhanced_content = f"""
 #!/bin/bash
-set -e
-export CLOUDSDK_CORE_VERBOSITY=debug
 
 # Handle credentials properly
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
