@@ -21,13 +21,8 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Clean up any potential special characters or line breaks
     CLEANED_CREDS=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | tr -d '\\r' | tr -d '\\n')
     
-    # Try to decode if base64 encoded, otherwise use as-is
-    if echo "$CLEANED_CREDS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
-        echo "Credentials appear to be base64 encoded, decoded successfully"
-    else
-        echo "Credentials don't appear to be base64 encoded, using as raw JSON"
-        echo "$CLEANED_CREDS" > "$CREDS_FILE"
-    fi
+    # Use credentials directly as JSON
+    echo "$CLEANED_CREDS" > "$CREDS_FILE"
     
     # Check if the file is valid JSON
     if jq . "$CREDS_FILE" >/dev/null 2>&1; then
