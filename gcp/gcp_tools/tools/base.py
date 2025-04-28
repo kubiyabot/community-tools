@@ -5,29 +5,26 @@ GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google
 
 class GCPTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
-        # Enhanced bash script with better credential handling
+        # Enhanced bash script with base64-encoded credential handling
         bash_script = r"""
 #!/bin/bash
 set -e
 
-# Handle credentials - expecting JSON content in GOOGLE_APPLICATION_CREDENTIALS
+# Handle credentials - expecting base64-encoded JSON in GOOGLE_APPLICATION_CREDENTIALS
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
     
-    # Write credentials to file, ensuring proper JSON format
-    printf "%s" "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
+    # Decode base64 credentials and write to file
+    echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 --decode > "$CREDS_FILE"
     
     # Validate JSON format without printing contents
     if ! jq empty "$CREDS_FILE" 2>/dev/null; then
-        echo "Error: Invalid JSON format in credentials"
-        echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid JSON"
+        echo "Error: Invalid JSON format in credentials after base64 decoding"
+        echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded JSON"
         rm -f "$CREDS_FILE"  # Clean up the file
         exit 1
     fi
-    
-    # Set the environment variable to point to this file
-    export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
     
     # Activate the service account with error handling
     if ! gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>/dev/null; then
