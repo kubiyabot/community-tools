@@ -17,13 +17,8 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     CREDS_DIR=$(mktemp -d)
     CREDS_FILE="$CREDS_DIR/credentials.json"
     
-    # Try to decode if base64 encoded, otherwise use as-is
-    if echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
-        echo "Credentials appear to be base64 encoded, decoded successfully"
-    else
-        echo "Credentials don't appear to be base64 encoded, using as raw JSON"
-        echo "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
-    fi
+    # Write credentials directly to file first
+    echo "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
     
     # Check if the file is valid JSON
     if jq . "$CREDS_FILE" >/dev/null 2>&1; then
@@ -52,7 +47,7 @@ echo "Executing command..."
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="gcr.io/google.com/cloudsdktool/cloud-sdk:alpine",
+            image="google/cloud-sdk:slim",
             content=enhanced_content,
             args=args,
             env=["GOOGLE_APPLICATION_CREDENTIALS"],
