@@ -46,11 +46,18 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         # Show file size for debugging
         echo "Decoded file size: $(wc -c < "$CREDS_FILE") bytes"
         
-        # Show beginning and end of file for debugging
-        echo "First 50 characters:"
-        head -c 50 "$CREDS_FILE" | hexdump -C
-        echo "Last 50 characters:"
-        tail -c 50 "$CREDS_FILE" | hexdump -C
+        # Show beginning and end of file for debugging using od (octal dump) which is more commonly available
+        echo "First 50 characters (octal dump):"
+        head -c 50 "$CREDS_FILE" | od -c
+        echo "Last 50 characters (octal dump):"
+        tail -c 50 "$CREDS_FILE" | od -c
+        
+        # Also try to show as plain text with cat -A for non-printable character visibility
+        echo "First 50 characters (text):"
+        head -c 50 "$CREDS_FILE" | cat -A 2>/dev/null || head -c 50 "$CREDS_FILE"
+        echo ""
+        echo "Last 50 characters (text):"
+        tail -c 50 "$CREDS_FILE" | cat -A 2>/dev/null || tail -c 50 "$CREDS_FILE"
         
         rm -f "$CREDS_FILE"
         exit 1
