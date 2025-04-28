@@ -11,7 +11,8 @@ class ContentTools:
             self.get_page_content(),
             self.search_content(),
             self.list_spaces(),
-            self.get_space_content()
+            self.get_space_content(),
+            self.get_pages_by_label()
         ]
         
         for tool in tools:
@@ -351,6 +352,94 @@ class ContentTools:
             args=[
                 Arg(name="space_key", description="Space key to get content from", required=True),
                 Arg(name="limit", description="Maximum number of results to return", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def get_pages_by_label(self) -> ConfluenceTool:
+        """Get all pages that have a specific label."""
+        return ConfluenceTool(
+            name="confluence_pages_by_label",
+            description="Retrieve all pages that have a specific label with their content",
+            content="""
+            # Install required packages silently
+            apk add --no-cache --quiet jq curl bash ca-certificates >/dev/null 2>&1
+            
+            # Basic validation
+            if [ -z "$label" ]; then
+                echo "Error: Label is required"
+                exit 1
+            fi
+            
+            # Fixed limit of 50
+            LIMIT=50
+            
+            # Remove trailing slashes from URL
+            CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
+            
+            # URL encode the label
+            ENCODED_LABEL=$(echo "$label" | sed 's/ /%20/g')
+            
+            # Simple query for label
+            SEARCH_QUERY="label%20=%20$ENCODED_LABEL"
+            
+            SEARCH_URL="$CONFLUENCE_URL/rest/api/content/search?cql=$SEARCH_QUERY&limit=$LIMIT&expand=metadata.labels,space"
+            
+            echo "Searching for pages with label: $label (limit: 50)"
+            SEARCH_RESULT=$(curl -s -X GET "$SEARCH_URL" \
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
+            
+            # Check if we got a valid response
+            RESULT_COUNT=$(echo "$SEARCH_RESULT" | jq '.size // 0')
+            
+            if [ "$RESULT_COUNT" -eq 0 ]; then
+                echo "No pages found with label: $label"
+                exit 0
+            fi
+            
+            echo "Found $RESULT_COUNT pages with label '$label':"
+            echo ""
+            
+            # Display the results in a simple format
+            echo "$SEARCH_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.results[] | "Title: \(.title)\nID: \(.id)\nSpace: \(.space.name)\nURL: \($base_url)/pages/viewpage.action?pageId=\(.id)\n"'
+            
+            echo "Retrieving content for each page..."
+            echo ""
+            
+            # Loop through each page and get its content
+            for page_id in $(echo "$SEARCH_RESULT" | jq -r '.results[].id'); do
+                # Get the page content
+                API_URL="$CONFLUENCE_URL/rest/api/content/$page_id?expand=body.storage"
+                
+                PAGE_DATA=$(curl -s -X GET "$API_URL" \
+                    -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                    -H "Accept: application/json")
+                
+                # Extract the title
+                TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
+                
+                # Extract the content
+                CONTENT=$(echo "$PAGE_DATA" | jq -r '.body.storage.value // ""')
+                
+                # Output the title and content
+                echo "==============================================="
+                echo "# $TITLE"
+                echo "==============================================="
+                echo ""
+                
+                if [ -n "$CONTENT" ]; then
+                    echo "$CONTENT"
+                else
+                    echo "No content found or content is empty."
+                fi
+                
+                echo ""
+                echo ""
+            done
+            """,
+            args=[
+                Arg(name="label", description="Label to search for", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
