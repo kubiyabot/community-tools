@@ -3,7 +3,12 @@ from kubiya_sdk.tools import Tool
 GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google-cloud-1200-630.png"
 
 class GCPTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
+    def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None, verbose=True):
+        self.verbose = verbose
+        
+        if verbose and not content.startswith("set -x && "):
+            content = f"set -x && {content}"
+            
         super().__init__(
             name=name,
             description=description,
