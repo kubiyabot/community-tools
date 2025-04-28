@@ -3,19 +3,23 @@ from kubiya_sdk.tools import Tool
 GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google-cloud-1200-630.png"
 
 class GCPTool(Tool):
-    def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None, verbose=True):
-        self.verbose = verbose
+    def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
+        # Wrap the command to ensure errors are captured and output is verbose
+        # This redirects stderr to stdout and sets debug flags
+        enhanced_content = f"""
+#!/bin/bash
+set -e
+export CLOUDSDK_CORE_VERBOSITY=debug
+{content} 2>&1
+"""
         
-        if verbose and not content.startswith("set -x && "):
-            content = f"set -x && {content}"
-            
         super().__init__(
             name=name,
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
             image="google/cloud-sdk:latest",
-            content=content,
+            content=enhanced_content,
             args=args,
             env=["GOOGLE_APPLICATION_CREDENTIALS"],
             long_running=long_running,
