@@ -32,5 +32,5 @@ gcs_upload_file = GCPTool(
     mermaid_diagram="..."  # Add mermaid diagram here
 )
 
-for tool in [gcs_list_buckets, gcs_list_buckets_detailed, gcs_create_bucket, gcs_upload_file]:
+for tool in [gcs_list_buckets, gcs_create_bucket, gcs_upload_file]:
     register_gcp_tool(tool)
