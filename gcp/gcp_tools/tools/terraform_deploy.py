@@ -3,11 +3,11 @@ from .base import GCPTool, register_gcp_tool
 
 terraform_deploy_bucket = GCPTool(
     name="terraform_deploy_bucket",
-    description="Deploy a GCP Storage bucket using Terraform",
+    description="Deploy a GCP Storage bucket using Terraform and save the configuration to GitLab",
     content="""
 # Install Terraform quietly
 echo "Installing Terraform..."
-apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null 2>&1
+apt-get update -qq && apt-get install -y -qq wget unzip git > /dev/null 2>&1
 wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
 unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
@@ -70,6 +70,58 @@ echo "Terraform apply completed successfully"
 echo "Resources created:"
 terraform state list
 
+# Save Terraform configuration to GitLab
+if [ -n "$gitlab_repo_url" ]; then
+    echo "Saving Terraform configuration to GitLab repository: $gitlab_repo_url"
+    
+    # Configure Git
+    git config --global user.email "terraform-bot@example.com"
+    git config --global user.name "Terraform Bot"
+    
+    # Clone the repository
+    REPO_DIR=$(mktemp -d)
+    if [ -n "$gitlab_token" ]; then
+        # Use token for authentication
+        GITLAB_URL=$(echo "$gitlab_repo_url" | sed 's/https:\\/\\///')
+        git clone "https://oauth2:$gitlab_token@$GITLAB_URL" "$REPO_DIR"
+    else
+        # Use SSH or other configured authentication
+        git clone "$gitlab_repo_url" "$REPO_DIR"
+    fi
+    
+    # Create directory for this bucket if it doesn't exist
+    BUCKET_DIR="$REPO_DIR/terraform/buckets/$bucket_name"
+    mkdir -p "$BUCKET_DIR"
+    
+    # Copy Terraform files to the repository
+    cp provider.tf main.tf "$BUCKET_DIR/"
+    
+    # Add README with deployment information
+    cat > "$BUCKET_DIR/README.md" << EOF
+# GCP Storage Bucket: $bucket_name
+
+Deployed on: $(date)
+Region: $region
+
+## Configuration
+The Terraform configuration in this directory deploys a Google Cloud Storage bucket.
+
+## Files
+- provider.tf: GCP provider configuration
+- main.tf: Bucket resource definition
+EOF
+    
+    # Commit and push changes
+    cd "$REPO_DIR"
+    git add .
+    git commit -m "Add Terraform configuration for bucket $bucket_name"
+    git push
+    
+    echo "Successfully saved Terraform configuration to GitLab"
+else
+    echo "GitLab repository URL not provided, skipping GitLab integration"
+fi
+
 # Output success message
 echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully in region '$region'"
 """,
@@ -79,6 +131,12 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
         Arg(name="terraform_content", type="str", 
             description="Terraform configuration for main.tf file. Should contain a google_storage_bucket resource definition. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
             required=True),
+        Arg(name="gitlab_repo_url", type="str", 
+            description="GitLab repository URL where Terraform configuration should be saved (e.g., https://gitlab.com/username/repo.git)", 
+            required=False),
+        Arg(name="gitlab_token", type="str", 
+            description="GitLab personal access token for authentication (optional if using SSH authentication)", 
+            required=False),
     ],
     mermaid_diagram="""
 graph TD
@@ -89,8 +147,9 @@ graph TD
     E --> F[Initialize Terraform]
     F --> G[Apply Terraform Configuration]
     G --> H[Show Created Resources]
-    H --> I[Output Success Message]
-    I --> J[End]
+    H --> I[Save to GitLab]
+    I --> J[Output Success Message]
+    J --> K[End]
 """
 )
 
