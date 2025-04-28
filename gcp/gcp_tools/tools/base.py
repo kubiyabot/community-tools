@@ -47,24 +47,12 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     if ! jq empty "$CREDS_FILE" 2>/dev/null; then
         echo "Error: Invalid JSON format in credentials after base64 decoding and fixing attempts"
         echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded JSON"
-        
-        # Create a minimal valid credentials file for testing
-        echo "Creating a minimal credentials file for testing..."
-        echo '{
-  "type": "service_account",
-  "project_id": "kubiya-staging",
-  "client_email": "bucket-admin-sa@kubiya-staging.iam.gserviceaccount.com"
-}' > "$CREDS_FILE"
-        
-        # Check if we can at least get the project info
-        if ! gcloud config set project kubiya-staging 2>/dev/null; then
-            echo "Failed to set project. Authentication may not work properly."
-            rm -f "$CREDS_FILE"
-            exit 1
-        fi
-        
-        echo "Proceeding with minimal credentials. Some operations may fail."
+        rm -f "$CREDS_FILE"
+        exit 1
     fi
+    
+    # Extract project ID for potential fallback
+    PROJECT_ID=$(jq -r '.project_id // ""' "$CREDS_FILE" 2>/dev/null)
     
     # Activate the service account with error handling
     if ! gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>/dev/null; then
@@ -74,11 +62,19 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         echo "Project ID: $(jq -r '.project_id // "Not found"' "$CREDS_FILE" 2>/dev/null)"
         echo "Client email: $(jq -r '.client_email // "Not found"' "$CREDS_FILE" 2>/dev/null)"
         
-        # Try a fallback authentication method
-        echo "Attempting fallback authentication..."
-        if gcloud config set project kubiya-staging 2>/dev/null; then
-            echo "Project set successfully. Proceeding without service account authentication."
+        # Try a fallback authentication method if we have a project ID
+        if [ -n "$PROJECT_ID" ]; then
+            echo "Attempting fallback authentication using project ID: $PROJECT_ID"
+            if gcloud config set project "$PROJECT_ID" 2>/dev/null; then
+                echo "Project set successfully. Proceeding without service account authentication."
+                # Some operations may still work with just the project set
+            else
+                echo "Failed to set project. Authentication failed completely."
+                rm -f "$CREDS_FILE"
+                exit 1
+            fi
         else
+            echo "No project ID found in credentials. Authentication failed completely."
             rm -f "$CREDS_FILE"
             exit 1
         fi
