@@ -18,12 +18,15 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     
     echo "Processing credentials..."
     
+    # Clean up any potential special characters or line breaks
+    CLEANED_CREDS=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | tr -d '\\r' | tr -d '\\n')
+    
     # Try to decode if base64 encoded, otherwise use as-is
-    if echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
+    if echo "$CLEANED_CREDS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
         echo "Credentials appear to be base64 encoded, decoded successfully"
     else
         echo "Credentials don't appear to be base64 encoded, using as raw JSON"
-        echo "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
+        echo "$CLEANED_CREDS" > "$CREDS_FILE"
     fi
     
     # Check if the file is valid JSON
@@ -38,10 +41,16 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
             echo "Service account activated successfully"
         else
             echo "Error activating service account"
+            # Print first few lines of the file for debugging (without sensitive data)
+            echo "Credential file structure (first few lines):"
+            grep -v "private_key" "$CREDS_FILE" | head -5
             exit 1
         fi
     else
         echo "Error: Invalid JSON credentials format"
+        # Print the first few characters for debugging
+        echo "First 100 characters of credentials (for debugging):"
+        head -c 100 "$CREDS_FILE" | sed 's/\\n/\\\\n/g' | sed 's/\\r/\\\\r/g'
         exit 1
     fi
 else
