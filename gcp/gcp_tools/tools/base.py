@@ -5,7 +5,7 @@ GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google
 
 class GCPTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
-        # Enhanced bash script with base64-encoded credential handling
+        # Enhanced bash script with direct credential handling
         bash_script = r"""
 #!/bin/bash
 set -e
@@ -15,20 +15,8 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
     
-    # Write the base64 string to a file first to avoid any shell interpretation issues
-    B64_FILE=$(mktemp)
-    echo "$GOOGLE_APPLICATION_CREDENTIALS" > "$B64_FILE"
-    
-    # Decode base64 credentials using the file as input
-    if ! base64 -d "$B64_FILE" > "$CREDS_FILE" 2>/dev/null; then
-        echo "Error: Failed to decode base64 credentials"
-        echo "Please ensure GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded data"
-        rm -f "$B64_FILE" "$CREDS_FILE"
-        exit 1
-    fi
-    
-    # Clean up the base64 file as we don't need it anymore
-    rm -f "$B64_FILE"
+    # Try a different approach - write to file directly without echo
+    printf "%s" "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null
     
     # Check if the file is empty
     if [ ! -s "$CREDS_FILE" ]; then
@@ -46,21 +34,19 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         # Show file size for debugging
         echo "Decoded file size: $(wc -c < "$CREDS_FILE") bytes"
         
-        # Show beginning and end of file for debugging using od (octal dump) which is more commonly available
-        echo "First 50 characters (octal dump):"
-        head -c 50 "$CREDS_FILE" | od -c
-        echo "Last 50 characters (octal dump):"
-        tail -c 50 "$CREDS_FILE" | od -c
+        # Try to fix common JSON issues and validate again
+        echo "Attempting to fix JSON format issues..."
+        # Remove any trailing garbage and ensure it ends with a single }
+        sed -i -e 's/}[^}]*$/}/' "$CREDS_FILE" 2>/dev/null || true
         
-        # Also try to show as plain text with cat -A for non-printable character visibility
-        echo "First 50 characters (text):"
-        head -c 50 "$CREDS_FILE" | cat -A 2>/dev/null || head -c 50 "$CREDS_FILE"
-        echo ""
-        echo "Last 50 characters (text):"
-        tail -c 50 "$CREDS_FILE" | cat -A 2>/dev/null || tail -c 50 "$CREDS_FILE"
-        
-        rm -f "$CREDS_FILE"
-        exit 1
+        # Check if the fix worked
+        if ! jq empty "$CREDS_FILE" 2>/dev/null; then
+            echo "JSON format is still invalid after attempted fixes."
+            rm -f "$CREDS_FILE"
+            exit 1
+        else
+            echo "JSON format fixed successfully."
+        fi
     fi
     
     # Activate the service account with error handling
