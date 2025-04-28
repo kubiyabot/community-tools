@@ -14,30 +14,38 @@ set -e
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
+    TEMP_FILE=$(mktemp)
     
     # Decode base64 credentials and write to file with better error handling
-    if ! echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
+    if ! echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$TEMP_FILE" 2>/dev/null; then
         echo "Error: Failed to decode base64 credentials"
         echo "Please ensure GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded data"
-        rm -f "$CREDS_FILE"  # Clean up the file
+        rm -f "$TEMP_FILE" "$CREDS_FILE"  # Clean up the files
         exit 1
     fi
     
     # Check if the file is empty
-    if [ ! -s "$CREDS_FILE" ]; then
+    if [ ! -s "$TEMP_FILE" ]; then
         echo "Error: Decoded credentials file is empty"
         echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains non-empty base64-encoded JSON"
-        rm -f "$CREDS_FILE"
+        rm -f "$TEMP_FILE" "$CREDS_FILE"
         exit 1
     fi
+    
+    # Trim leading/trailing whitespace and save to the credentials file
+    cat "$TEMP_FILE" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' > "$CREDS_FILE"
+    rm -f "$TEMP_FILE"  # Remove the temporary file
     
     # Validate JSON format without printing contents
     if ! jq empty "$CREDS_FILE" 2>/dev/null; then
         echo "Error: Invalid JSON format in credentials after base64 decoding"
         echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded JSON"
         # Show first few characters to help debug (without revealing sensitive info)
-        echo "First 20 characters of decoded content (for debugging):"
-        head -c 20 "$CREDS_FILE" | cat -A
+        echo "First 30 characters of decoded content (for debugging):"
+        head -c 30 "$CREDS_FILE" | cat -A
+        echo ""
+        echo "Last 30 characters of decoded content (for debugging):"
+        tail -c 30 "$CREDS_FILE" | cat -A
         rm -f "$CREDS_FILE"  # Clean up the file
         exit 1
     fi
