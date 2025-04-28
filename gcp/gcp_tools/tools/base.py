@@ -8,12 +8,15 @@ class GCPTool(Tool):
         # This redirects stderr to stdout and sets debug flags
         enhanced_content = f"""
 #!/bin/bash
+set -e
 
 # Handle credentials properly
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary directory for credentials
     CREDS_DIR=$(mktemp -d)
     CREDS_FILE="$CREDS_DIR/credentials.json"
+    
+    echo "Processing credentials..."
     
     # Try to decode if base64 encoded, otherwise use as-is
     if echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
@@ -30,19 +33,24 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
         # Activate the service account
         echo "Activating service account..."
-        gcloud auth activate-service-account --key-file="$CREDS_FILE"
-        echo "Service account activated"
+        gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            echo "Service account activated successfully"
+        else
+            echo "Error activating service account"
+            exit 1
+        fi
     else
         echo "Error: Invalid JSON credentials format"
-        echo "First 10 lines of credentials file:"
-        head -10 "$CREDS_FILE"
         exit 1
     fi
+else
+    echo "Warning: No credentials provided via GOOGLE_APPLICATION_CREDENTIALS"
 fi
 
 # Execute the actual command
 echo "Executing command..."
-{content} 2>&1
+{content}
 """
         
         super().__init__(

@@ -4,7 +4,15 @@ from .base import GCPTool, register_gcp_tool
 gcs_list_buckets = GCPTool(
     name="gcs_list_buckets",
     description="List Cloud Storage buckets",
-    content="gsutil ls -L",
+    content="echo 'Listing Cloud Storage buckets...' && gsutil ls",
+    args=[],
+    mermaid_diagram="..."  # Add mermaid diagram here
+)
+
+gcs_list_buckets_detailed = GCPTool(
+    name="gcs_list_buckets_detailed",
+    description="List Cloud Storage buckets with detailed information",
+    content="echo 'Listing Cloud Storage buckets with details...' && gsutil ls -L",
     args=[],
     mermaid_diagram="..."  # Add mermaid diagram here
 )
@@ -32,5 +40,5 @@ gcs_upload_file = GCPTool(
     mermaid_diagram="..."  # Add mermaid diagram here
 )
 
-for tool in [gcs_list_buckets, gcs_create_bucket, gcs_upload_file]:
+for tool in [gcs_list_buckets, gcs_list_buckets_detailed, gcs_create_bucket, gcs_upload_file]:
     register_gcp_tool(tool)
