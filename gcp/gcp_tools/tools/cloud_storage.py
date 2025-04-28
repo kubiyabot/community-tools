@@ -10,14 +10,26 @@ echo 'Listing Cloud Storage buckets...'
 PROJECT_ID=$(gcloud config get-value project)
 echo "Project: $PROJECT_ID"
 
-# List buckets with more detailed output
-if ! BUCKET_LIST=$(gsutil ls -L 2>&1); then
+# List buckets with proper error handling
+if ! BUCKET_LIST=$(gsutil ls 2>&1); then
     echo "Error listing buckets: $BUCKET_LIST"
     exit 1
 fi
 
-# Format the output for better readability
-echo "$BUCKET_LIST" | grep -E 'gs://|Storage class:|Location constraint:|Versioning:|Created:'
+# Check if any buckets were found
+if [ -z "$BUCKET_LIST" ]; then
+    echo "No buckets found in project $PROJECT_ID"
+else
+    echo "Buckets in project $PROJECT_ID:"
+    echo "$BUCKET_LIST"
+    
+    # Get details for each bucket
+    echo -e "\nBucket details:"
+    for BUCKET in $BUCKET_LIST; do
+        echo -e "\nDetails for $BUCKET:"
+        gsutil ls -L "$BUCKET" | grep -E 'Storage class:|Location constraint:|Versioning:|Created:' || echo "Could not retrieve details"
+    done
+fi
 
 echo "Bucket listing completed successfully"
 """,
