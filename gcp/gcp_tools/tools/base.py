@@ -10,7 +10,7 @@ class GCPTool(Tool):
 #!/bin/bash
 set -e
 
-# Handle credentials
+# Handle credentials - expecting JSON content in GOOGLE_APPLICATION_CREDENTIALS
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
@@ -18,10 +18,11 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Write credentials to file, ensuring proper JSON format
     printf "%s" "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
     
-    # Validate JSON format
+    # Validate JSON format without printing contents
     if ! jq empty "$CREDS_FILE" 2>/dev/null; then
         echo "Error: Invalid JSON format in credentials"
-        cat "$CREDS_FILE" | head -n 5
+        echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid JSON"
+        rm -f "$CREDS_FILE"  # Clean up the file
         exit 1
     fi
     
@@ -29,25 +30,33 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
     
     # Activate the service account with error handling
-    if ! gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>&1; then
-        echo "Authentication failed. Checking credential file format..."
-        # Print first few lines of file for debugging (without sensitive data)
-        echo "Credential file structure:"
-        jq 'keys' "$CREDS_FILE" 2>/dev/null || echo "Not valid JSON"
+    if ! gcloud auth activate-service-account --key-file="$CREDS_FILE" 2>/dev/null; then
+        echo "Authentication failed."
+        echo "Please check that the service account has the necessary permissions."
+        # Only show non-sensitive information
+        echo "Project ID: $(jq -r '.project_id // "Not found"' "$CREDS_FILE" 2>/dev/null)"
+        echo "Client email: $(jq -r '.client_email // "Not found"' "$CREDS_FILE" 2>/dev/null)"
+        rm -f "$CREDS_FILE"  # Clean up the file
         exit 1
     fi
     
     echo "Authentication completed successfully"
+    
+    # Execute the command (we'll clean up the file afterward)
+    {
+"""
+        
+        # Add the content to the bash script
+        enhanced_content = bash_script + content + r"""
+    } 
+    
+    # Clean up after command execution
+    rm -f "$CREDS_FILE"
 else
     echo "No credentials provided via GOOGLE_APPLICATION_CREDENTIALS"
     exit 1
 fi
-
-# Execute the command
 """
-        
-        # Add the content to the bash script
-        enhanced_content = bash_script + content
         
         super().__init__(
             name=name,
