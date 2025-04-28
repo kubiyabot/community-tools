@@ -33,10 +33,9 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     fi
     
     # Clean up any potential special characters or line breaks
-    CLEANED_CREDS=$(echo "$GOOGLE_APPLICATION_CREDENTIALS" | tr -d '\r' | tr -d '\n')
-    
-    # Use credentials directly as JSON
-    echo "$CLEANED_CREDS" > "$CREDS_FILE"
+    echo "Cleaning credentials format..."
+    # Write credentials to file without using echo (to avoid shell interpretation issues)
+    printf "%s" "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
     
     # Check if the file is valid JSON
     if jq -e . "$CREDS_FILE" >/dev/null 2>&1; then
@@ -61,9 +60,19 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
         fi
     else
         echo "Error: Invalid JSON credentials format"
-        # Show the full credential string for debugging
-        echo "Full credential string for debugging:"
-        cat "$CREDS_FILE"
+        # Check file size
+        FILE_SIZE=$(wc -c < "$CREDS_FILE")
+        echo "Credential file size: $FILE_SIZE bytes"
+        
+        # Check if file starts with JSON opening brace
+        if [[ $(head -c 1 "$CREDS_FILE") == "{" ]]; then
+            echo "File starts with JSON opening brace"
+        else
+            echo "File does not start with JSON opening brace"
+            echo "First 20 bytes (hex):"
+            hexdump -C -n 20 "$CREDS_FILE"
+        fi
+        
         echo "---"
         echo "Hint: Credentials should be a complete, valid JSON object."
         exit 1
