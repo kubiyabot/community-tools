@@ -71,8 +71,8 @@ echo "Resources created:"
 terraform state list
 
 # Save Terraform configuration to GitLab
-if [ -n "$gitlab_repo_url" ]; then
-    echo "Saving Terraform configuration to GitLab repository: $gitlab_repo_url"
+if [ -n "$GITLAB_REPO_URL" ]; then
+    echo "Saving Terraform configuration to GitLab repository: $GITLAB_REPO_URL"
     
     # Configure Git
     git config --global user.email "terraform-bot@example.com"
@@ -80,13 +80,13 @@ if [ -n "$gitlab_repo_url" ]; then
     
     # Clone the repository
     REPO_DIR=$(mktemp -d)
-    if [ -n "$gitlab_token" ]; then
+    if [ -n "$GITLAB_TOKEN" ]; then
         # Use token for authentication
-        GITLAB_URL=$(echo "$gitlab_repo_url" | sed 's/https:\\/\\///')
-        git clone "https://oauth2:$gitlab_token@$GITLAB_URL" "$REPO_DIR"
+        GITLAB_URL=$(echo "$GITLAB_REPO_URL" | sed 's/https:\\/\\///')
+        git clone "https://oauth2:$GITLAB_TOKEN@$GITLAB_URL" "$REPO_DIR"
     else
         # Use SSH or other configured authentication
-        git clone "$gitlab_repo_url" "$REPO_DIR"
+        git clone "$GITLAB_REPO_URL" "$REPO_DIR"
     fi
     
     # Create directory for this bucket if it doesn't exist
@@ -119,7 +119,7 @@ EOF
     
     echo "Successfully saved Terraform configuration to GitLab"
 else
-    echo "GitLab repository URL not provided, skipping GitLab integration"
+    echo "GitLab repository URL not provided in environment, skipping GitLab integration"
 fi
 
 # Output success message
@@ -131,12 +131,6 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
         Arg(name="terraform_content", type="str", 
             description="Terraform configuration for main.tf file. Should contain a google_storage_bucket resource definition. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
             required=True),
-        Arg(name="gitlab_repo_url", type="str", 
-            description="GitLab repository URL where Terraform configuration should be saved (e.g., https://gitlab.com/username/repo.git)", 
-            required=False),
-        Arg(name="gitlab_token", type="str", 
-            description="GitLab personal access token for authentication (optional if using SSH authentication)", 
-            required=False),
     ],
     mermaid_diagram="""
 graph TD
@@ -153,100 +147,5 @@ graph TD
 """
 )
 
-# Example of a more general Terraform deployment tool
-terraform_deploy_resource = GCPTool(
-    name="terraform_deploy_resource",
-    description="Deploy any GCP resource using Terraform",
-    content="""
-# Install Terraform quietly
-echo "Installing Terraform..."
-apt-get update -qq && apt-get install -y -qq wget unzip > /dev/null 2>&1
-wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
-unzip -q terraform_1.5.7_linux_amd64.zip
-mv terraform /usr/local/bin/
-echo "Terraform $(terraform --version | head -n 1) installed successfully"
-
-# Create a directory for Terraform files
-TERRAFORM_DIR=$(mktemp -d)
-cd "$TERRAFORM_DIR"
-echo "Working in temporary directory: $TERRAFORM_DIR"
-
-# Create provider configuration for GCP
-cat > provider.tf << EOF
-provider "google" {
-  credentials = file("$CREDS_FILE")
-  project     = "$(gcloud config get-value project)"
-  region      = "$region"
-}
-
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 4.0"
-    }
-  }
-}
-EOF
-
-# Create the main.tf file with the provided Terraform content
-echo "$terraform_content" > main.tf
-echo "Created Terraform configuration files"
-
-# Display the content of the files for debugging
-echo "Contents of provider.tf:"
-cat provider.tf
-echo "Contents of main.tf:"
-cat main.tf
-
-# Initialize Terraform with more verbose output
-echo "Initializing Terraform..."
-terraform init -input=false
-INIT_STATUS=$?
-if [ $INIT_STATUS -ne 0 ]; then
-    echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
-    exit $INIT_STATUS
-fi
-echo "Terraform initialized successfully"
-
-# Apply the Terraform configuration
-echo "Applying Terraform configuration to create $resource_type '$resource_name'..."
-terraform apply -auto-approve -input=false
-APPLY_STATUS=$?
-if [ $APPLY_STATUS -ne 0 ]; then
-    echo "ERROR: Terraform apply failed with status $APPLY_STATUS"
-    exit $APPLY_STATUS
-fi
-echo "Terraform apply completed successfully"
-
-# Show the created resources
-echo "Resources created:"
-terraform state list
-
-# Output success message
-echo "SUCCESS: GCP $resource_type '$resource_name' has been deployed successfully in region '$region'"
-""",
-    args=[
-        Arg(name="resource_type", type="str", description="Type of GCP resource to create (e.g., 'storage bucket', 'compute instance')", required=True),
-        Arg(name="resource_name", type="str", description="Name of the resource to create", required=True),
-        Arg(name="terraform_content", type="str", 
-            description="Terraform configuration for main.tf file. Should contain the resource definition for the specified resource type. Example: 'resource \"google_compute_instance\" \"vm\" { name = \"my-vm\", machine_type = \"e2-medium\", zone = \"us-central1-a\" }'", 
-            required=True),
-        Arg(name="region", type="str", description="GCP region for deployment", required=True),
-    ],
-    mermaid_diagram="""
-graph TD
-    A[Start] --> B[Install Terraform]
-    B --> C[Create Terraform Directory]
-    C --> D[Configure GCP Provider]
-    D --> E[Write Terraform Configuration]
-    E --> F[Initialize Terraform]
-    F --> G[Apply Terraform Configuration]
-    G --> H[Show Created Resources]
-    H --> I[Output Success Message]
-    I --> J[End]
-"""
-)
-
-for tool in [terraform_deploy_bucket, terraform_deploy_resource]:
-    register_gcp_tool(tool) 
+for tool in [terraform_deploy_bucket]:
+    register_gcp_tool(tool)

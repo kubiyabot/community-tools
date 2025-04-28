@@ -42,7 +42,8 @@ fi
             image="google/cloud-sdk:latest",
             content=enhanced_content,
             args=args,
-            env=["GOOGLE_APPLICATION_CREDENTIALS"],
+            env=["GOOGLE_APPLICATION_CREDENTIALS", "GITLAB_REPO_URL"],
+            secrets=["GITLAB_TOKEN"],
             long_running=long_running,
             mermaid=mermaid_diagram
         )
