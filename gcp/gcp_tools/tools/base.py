@@ -11,9 +11,14 @@ class GCPTool(Tool):
 set -e
 export CLOUDSDK_CORE_VERBOSITY=debug
 
-# Explicitly activate service account from credentials file
+# Always write credentials to a temporary file
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-    gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+    # Create a temporary file with the JSON content
+    echo "$GOOGLE_APPLICATION_CREDENTIALS" > /tmp/gcp_credentials.json
+    # Set the environment variable to point to this file
+    export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_credentials.json
+    # Activate the service account
+    gcloud auth activate-service-account --key-file=/tmp/gcp_credentials.json
 fi
 
 {content} 2>&1
