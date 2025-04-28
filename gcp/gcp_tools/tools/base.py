@@ -13,21 +13,37 @@ export CLOUDSDK_CORE_VERBOSITY=debug
 
 # Handle credentials properly
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-    # Use base64 encoding/decoding to preserve the exact content
-    echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > /tmp/gcp_credentials.json 2>/dev/null || echo "$GOOGLE_APPLICATION_CREDENTIALS" > /tmp/gcp_credentials.json
+    # Create a temporary directory for credentials
+    CREDS_DIR=$(mktemp -d)
+    CREDS_FILE="$CREDS_DIR/credentials.json"
+    
+    # Try to decode if base64 encoded, otherwise use as-is
+    if echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
+        echo "Credentials appear to be base64 encoded, decoded successfully"
+    else
+        echo "Credentials don't appear to be base64 encoded, using as raw JSON"
+        echo "$GOOGLE_APPLICATION_CREDENTIALS" > "$CREDS_FILE"
+    fi
     
     # Check if the file is valid JSON
-    if jq . /tmp/gcp_credentials.json >/dev/null 2>&1; then
+    if jq . "$CREDS_FILE" >/dev/null 2>&1; then
+        echo "Valid JSON credentials detected"
         # Set the environment variable to point to this file
-        export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp_credentials.json
+        export GOOGLE_APPLICATION_CREDENTIALS="$CREDS_FILE"
         # Activate the service account
-        gcloud auth activate-service-account --key-file=/tmp/gcp_credentials.json
+        echo "Activating service account..."
+        gcloud auth activate-service-account --key-file="$CREDS_FILE"
+        echo "Service account activated"
     else
         echo "Error: Invalid JSON credentials format"
-        cat /tmp/gcp_credentials.json | head -10
+        echo "First 10 lines of credentials file:"
+        head -10 "$CREDS_FILE"
+        exit 1
     fi
 fi
 
+# Execute the actual command
+echo "Executing command..."
 {content} 2>&1
 """
         
