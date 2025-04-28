@@ -52,7 +52,7 @@ echo "Executing command..."
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="google/cloud-sdk:latest",
+            image="gcr.io/google.com/cloudsdktool/cloud-sdk:alpine",
             content=enhanced_content,
             args=args,
             env=["GOOGLE_APPLICATION_CREDENTIALS"],
