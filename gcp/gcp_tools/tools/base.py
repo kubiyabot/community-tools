@@ -15,13 +15,29 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
     
-    # Decode base64 credentials and write to file
-    echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 --decode > "$CREDS_FILE"
+    # Decode base64 credentials and write to file with better error handling
+    if ! echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE" 2>/dev/null; then
+        echo "Error: Failed to decode base64 credentials"
+        echo "Please ensure GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded data"
+        rm -f "$CREDS_FILE"  # Clean up the file
+        exit 1
+    fi
+    
+    # Check if the file is empty
+    if [ ! -s "$CREDS_FILE" ]; then
+        echo "Error: Decoded credentials file is empty"
+        echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains non-empty base64-encoded JSON"
+        rm -f "$CREDS_FILE"
+        exit 1
+    fi
     
     # Validate JSON format without printing contents
     if ! jq empty "$CREDS_FILE" 2>/dev/null; then
         echo "Error: Invalid JSON format in credentials after base64 decoding"
         echo "Please check that GOOGLE_APPLICATION_CREDENTIALS contains valid base64-encoded JSON"
+        # Show first few characters to help debug (without revealing sensitive info)
+        echo "First 20 characters of decoded content (for debugging):"
+        head -c 20 "$CREDS_FILE" | cat -A
         rm -f "$CREDS_FILE"  # Clean up the file
         exit 1
     fi
