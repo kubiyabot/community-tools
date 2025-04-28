@@ -25,30 +25,43 @@ provider "google" {
   project     = "$(gcloud config get-value project)"
   region      = "$region"
 }
+
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 4.0"
+    }
+  }
+}
 EOF
 
 # Create the main.tf file with the provided Terraform content
 echo "$terraform_content" > main.tf
 echo "Created Terraform configuration files"
 
-# Initialize Terraform with reduced output
+# Display the content of the files for debugging
+echo "Contents of provider.tf:"
+cat provider.tf
+echo "Contents of main.tf:"
+cat main.tf
+
+# Initialize Terraform with more verbose output
 echo "Initializing Terraform..."
-terraform init -no-color -input=false > terraform_init.log 2>&1
+terraform init -input=false
 INIT_STATUS=$?
 if [ $INIT_STATUS -ne 0 ]; then
     echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
-    cat terraform_init.log
     exit $INIT_STATUS
 fi
 echo "Terraform initialized successfully"
 
 # Apply the Terraform configuration
 echo "Applying Terraform configuration to create bucket '$bucket_name'..."
-terraform apply -auto-approve -no-color -input=false > terraform_apply.log 2>&1
+terraform apply -auto-approve -input=false
 APPLY_STATUS=$?
 if [ $APPLY_STATUS -ne 0 ]; then
     echo "ERROR: Terraform apply failed with status $APPLY_STATUS"
-    cat terraform_apply.log
     exit $APPLY_STATUS
 fi
 echo "Terraform apply completed successfully"
@@ -63,7 +76,9 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
     args=[
         Arg(name="bucket_name", type="str", description="Name of the bucket to create", required=True),
         Arg(name="region", type="str", description="Region for the bucket (e.g., us-central1)", required=True),
-        Arg(name="terraform_content", type="str", description="Terraform configuration content", required=True),
+        Arg(name="terraform_content", type="str", 
+            description="Terraform configuration for main.tf file. Should contain a google_storage_bucket resource definition. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
+            required=True),
     ],
     mermaid_diagram="""
 graph TD
@@ -104,30 +119,43 @@ provider "google" {
   project     = "$(gcloud config get-value project)"
   region      = "$region"
 }
+
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 4.0"
+    }
+  }
+}
 EOF
 
 # Create the main.tf file with the provided Terraform content
 echo "$terraform_content" > main.tf
 echo "Created Terraform configuration files"
 
-# Initialize Terraform with reduced output
+# Display the content of the files for debugging
+echo "Contents of provider.tf:"
+cat provider.tf
+echo "Contents of main.tf:"
+cat main.tf
+
+# Initialize Terraform with more verbose output
 echo "Initializing Terraform..."
-terraform init -no-color -input=false > terraform_init.log 2>&1
+terraform init -input=false
 INIT_STATUS=$?
 if [ $INIT_STATUS -ne 0 ]; then
     echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
-    cat terraform_init.log
     exit $INIT_STATUS
 fi
 echo "Terraform initialized successfully"
 
 # Apply the Terraform configuration
 echo "Applying Terraform configuration to create $resource_type '$resource_name'..."
-terraform apply -auto-approve -no-color -input=false > terraform_apply.log 2>&1
+terraform apply -auto-approve -input=false
 APPLY_STATUS=$?
 if [ $APPLY_STATUS -ne 0 ]; then
     echo "ERROR: Terraform apply failed with status $APPLY_STATUS"
-    cat terraform_apply.log
     exit $APPLY_STATUS
 fi
 echo "Terraform apply completed successfully"
@@ -140,9 +168,11 @@ terraform state list
 echo "SUCCESS: GCP $resource_type '$resource_name' has been deployed successfully in region '$region'"
 """,
     args=[
-        Arg(name="resource_type", type="str", description="Type of GCP resource to create", required=True),
+        Arg(name="resource_type", type="str", description="Type of GCP resource to create (e.g., 'storage bucket', 'compute instance')", required=True),
         Arg(name="resource_name", type="str", description="Name of the resource to create", required=True),
-        Arg(name="terraform_content", type="str", description="Terraform configuration content", required=True),
+        Arg(name="terraform_content", type="str", 
+            description="Terraform configuration for main.tf file. Should contain the resource definition for the specified resource type. Example: 'resource \"google_compute_instance\" \"vm\" { name = \"my-vm\", machine_type = \"e2-medium\", zone = \"us-central1-a\" }'", 
+            required=True),
         Arg(name="region", type="str", description="GCP region for deployment", required=True),
     ],
     mermaid_diagram="""
