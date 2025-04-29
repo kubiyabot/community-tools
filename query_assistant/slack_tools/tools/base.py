@@ -337,13 +337,36 @@ def process_slack_messages(messages, is_reply=False):
 
 def get_channel_messages(client, channel_id, oldest):
     try:
-        params = {{
-            "channel": channel_id,
-            "oldest": oldest
-        }}
+        messages = []
+        cursor = None
+        
+        # Use pagination to get all messages
+        while True:
+            params = {
+                "channel": channel_id,
+                "oldest": oldest,
+                "limit": 1000  # Maximum allowed by Slack API
+            }
             
-        response = client.conversations_history(**params)
-        messages = response["messages"]
+            # Add cursor for pagination if we have one
+            if cursor:
+                params["cursor"] = cursor
+                
+            response = client.conversations_history(**params)
+            batch = response["messages"]
+            messages.extend(batch)
+            
+            # Check if there are more messages to fetch
+            if response["has_more"]:
+                cursor = response["response_metadata"]["next_cursor"]
+                logger.info(f"Retrieved {{len(batch)}} messages, fetching more with cursor")
+            else:
+                break
+                
+            # Safety limit to prevent excessive API calls
+            if len(messages) >= 5000:
+                logger.info(f"Reached maximum message limit (5000), stopping pagination")
+                break
         
         # Process messages for LLM analysis
         processed_messages = []
