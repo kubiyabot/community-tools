@@ -10,43 +10,33 @@ class GCPTool(Tool):
 #!/bin/sh
 set -e
 
-# Enable verbose output
-set -x
-
 # Handle credentials
 if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
-    echo "Setting up GCP credentials..."
     # Create a temporary file for credentials
     CREDS_FILE=$(mktemp)
     
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
-    # Install required packages
-    echo "Installing required packages..."
-    apk update && apk add --no-cache curl python3 bash gnupg
+    # Install minimal gcloud CLI components
+    echo "Installing minimal gcloud CLI components..."
+    apk update && apk add --no-cache python3 curl
     
-    # Install gcloud CLI
-    echo "Installing gcloud CLI..."
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-latest-linux-x86_64.tar.gz
-    mkdir -p /usr/local/gcloud
-    tar -xzf google-cloud-cli-latest-linux-x86_64.tar.gz -C /usr/local/gcloud
-    /usr/local/gcloud/google-cloud-sdk/install.sh --quiet
-    export PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
+    # Install a minimal version of the gcloud CLI
+    curl -sSL https://sdk.cloud.google.com > /tmp/gcli && 
+    bash /tmp/gcli --disable-prompts --install-dir=/usr/local --only-core
+    export PATH=$PATH:/usr/local/google-cloud-sdk/bin
     
     # Activate the service account
-    echo "Activating service account..."
     gcloud auth activate-service-account --key-file="$CREDS_FILE"
     
     # Execute the command
-    echo "Executing main script..."
     {
 """
         
         # Add the content to the bash script
         enhanced_content = bash_script + content + r"""
     } 
-    echo "Script execution completed."
 else
     echo "No credentials provided via GOOGLE_APPLICATION_CREDENTIALS"
     exit 1
@@ -58,7 +48,7 @@ fi
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="alpine:latest",
+            image="alpine:3.18",  # Using a specific Alpine version for stability
             content=enhanced_content,
             args=args,
             env=["GITLAB_REPO_URL"],
