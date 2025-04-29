@@ -356,17 +356,27 @@ def get_channel_messages(client, channel_id, oldest):
             batch = response["messages"]
             messages.extend(batch)
             
+            # Log detailed information about the response
+            logger.info(f"API response - has_more: {{response.get('has_more', False)}}, messages in batch: {{len(batch)}}")
+            
             # Check if there are more messages to fetch
-            if response["has_more"]:
-                cursor = response["response_metadata"]["next_cursor"]
-                logger.info(f"Retrieved {{len(batch)}} messages, fetching more with cursor")
+            if response.get("has_more", False):
+                cursor = response.get("response_metadata", {{}}).get("next_cursor")
+                if cursor:
+                    logger.info(f"Retrieved {{len(batch)}} messages, continuing with cursor: {{cursor[:10]}}...")
+                else:
+                    logger.info("Response indicates more messages but no cursor found, stopping pagination")
+                    break
             else:
+                logger.info("No more messages to retrieve, pagination complete")
                 break
                 
             # Safety limit to prevent excessive API calls
-            if len(messages) >= 5000:
-                logger.info(f"Reached maximum message limit (5000), stopping pagination")
+            if len(messages) >= 10000:
+                logger.info(f"Reached maximum message limit (10000), stopping pagination")
                 break
+        
+        logger.info(f"Total messages retrieved after pagination: {{len(messages)}}")
         
         # Process messages for LLM analysis
         processed_messages = []
