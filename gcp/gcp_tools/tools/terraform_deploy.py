@@ -1,13 +1,13 @@
 from kubiya_sdk.tools import Arg
-from .base import GCPTool, register_gcp_tool
+from .base import TerraformTool, register_gcp_tool
 
-terraform_deploy_bucket = GCPTool(
+terraform_deploy_bucket = TerraformTool(
     name="terraform_deploy_bucket",
     description="Deploy a GCP Storage bucket using Terraform and append to existing configuration in GitLab",
     content="""
 # Make sure we have essential tools
 echo "Installing essential tools..."
-apk update && apk add --no-cache wget unzip git bash
+apk update && apk add --no-cache wget unzip git
 
 # Install Terraform
 echo "Installing Terraform..."
