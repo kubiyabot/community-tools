@@ -23,8 +23,9 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     apk update && apk add --no-cache python3 curl bash
     
     # Install a minimal version of the gcloud CLI
-    curl -sSL https://sdk.cloud.google.com > /tmp/gcli && 
-    bash /tmp/gcli --disable-prompts --install-dir=/usr/local --only-core
+    echo "Downloading and installing minimal gcloud CLI..."
+    curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/install_google_cloud_sdk.bash > /tmp/gcli
+    bash /tmp/gcli --disable-prompts --install-dir=/usr/local
     export PATH=$PATH:/usr/local/google-cloud-sdk/bin
     
     # Activate the service account
