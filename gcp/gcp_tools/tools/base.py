@@ -7,10 +7,10 @@ class GCPTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
         # Minimal bash script for credential handling
         bash_script = r"""
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
-# Enable more verbose output for debugging
+# Enable verbose output
 set -x
 
 # Handle credentials
@@ -22,12 +22,17 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
+    # Install required packages
+    echo "Installing required packages..."
+    apk update && apk add --no-cache curl python3 bash gnupg
+    
     # Install gcloud CLI
-    echo "Installing minimal gcloud CLI..."
-    apt-get update -qq && apt-get install -y -qq curl python3 apt-transport-https ca-certificates gnupg lsb-release
-    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
-    curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
-    apt-get update && apt-get install -y google-cloud-cli
+    echo "Installing gcloud CLI..."
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-latest-linux-x86_64.tar.gz
+    mkdir -p /usr/local/gcloud
+    tar -xzf google-cloud-cli-latest-linux-x86_64.tar.gz -C /usr/local/gcloud
+    /usr/local/gcloud/google-cloud-sdk/install.sh --quiet
+    export PATH=$PATH:/usr/local/gcloud/google-cloud-sdk/bin
     
     # Activate the service account
     echo "Activating service account..."
@@ -53,7 +58,7 @@ fi
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="debian:bullseye-slim",
+            image="alpine:latest",
             content=enhanced_content,
             args=args,
             env=["GITLAB_REPO_URL"],

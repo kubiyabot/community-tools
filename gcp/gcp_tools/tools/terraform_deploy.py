@@ -7,7 +7,7 @@ terraform_deploy_bucket = GCPTool(
     content="""
 # Make sure we have essential tools
 echo "Installing essential tools..."
-apt-get update && apt-get install -y wget unzip git
+apk update && apk add --no-cache wget unzip git
 
 # Install Terraform
 echo "Installing Terraform..."
