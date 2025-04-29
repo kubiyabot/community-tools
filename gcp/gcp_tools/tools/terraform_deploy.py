@@ -3,7 +3,7 @@ from .base import GCPTool, register_gcp_tool
 
 terraform_deploy_bucket = GCPTool(
     name="terraform_deploy_bucket",
-    description="Deploy a GCP Storage bucket using Terraform and save the configuration to GitLab",
+    description="Deploy a GCP Storage bucket using Terraform and append to existing configuration in GitLab",
     content="""
 # Install Terraform quietly
 echo "Installing Terraform..."
@@ -36,7 +36,7 @@ terraform {
 }
 EOF
 
-# Create the main.tf file with the provided Terraform content
+# Create a temporary main.tf file with the provided Terraform content
 echo "$terraform_content" > main.tf
 echo "Created Terraform configuration files"
 
@@ -89,35 +89,71 @@ if [ -n "$GITLAB_REPO_URL" ]; then
         git clone "$GITLAB_REPO_URL" "$REPO_DIR"
     fi
     
-    # Create directory for this bucket if it doesn't exist
-    BUCKET_DIR="$REPO_DIR/terraform/buckets/$bucket_name"
-    mkdir -p "$BUCKET_DIR"
+    # Create buckets directory if it doesn't exist
+    BUCKETS_DIR="$REPO_DIR/terraform/buckets"
+    mkdir -p "$BUCKETS_DIR"
     
-    # Copy Terraform files to the repository
-    cp provider.tf main.tf "$BUCKET_DIR/"
+    # Check if main.tf already exists, if not create it
+    if [ ! -f "$BUCKETS_DIR/main.tf" ]; then
+        echo "# GCP Storage Buckets Terraform Configuration" > "$BUCKETS_DIR/main.tf"
+        echo "# This file is automatically managed - do not edit directly" >> "$BUCKETS_DIR/main.tf"
+        echo "" >> "$BUCKETS_DIR/main.tf"
+    fi
     
-    # Add README with deployment information
-    cat > "$BUCKET_DIR/README.md" << EOF
-# GCP Storage Bucket: $bucket_name
+    # Check if provider.tf already exists, if not create it
+    if [ ! -f "$BUCKETS_DIR/provider.tf" ]; then
+        cp provider.tf "$BUCKETS_DIR/provider.tf"
+    fi
+    
+    # Check if bucket already exists in the configuration
+    if grep -q "resource \"google_storage_bucket\" \"$bucket_name\"" "$BUCKETS_DIR/main.tf"; then
+        echo "Bucket '$bucket_name' already exists in Terraform configuration, updating..."
+        # Create a backup of the current main.tf
+        cp "$BUCKETS_DIR/main.tf" "$BUCKETS_DIR/main.tf.bak.$(date +%Y%m%d%H%M%S)"
+        
+        # Remove the existing bucket configuration
+        sed -i "/resource \"google_storage_bucket\" \"$bucket_name\"/,/}/d" "$BUCKETS_DIR/main.tf"
+    fi
+    
+    # Append the new bucket configuration to main.tf
+    # First, modify the resource name in the terraform_content to match bucket_name
+    MODIFIED_CONTENT=$(echo "$terraform_content" | sed "s/resource \"google_storage_bucket\" \"bucket\"/resource \"google_storage_bucket\" \"$bucket_name\"/")
+    
+    # Append to main.tf with a comment indicating when it was added/updated
+    echo "" >> "$BUCKETS_DIR/main.tf"
+    echo "# Bucket: $bucket_name - Added/Updated on $(date)" >> "$BUCKETS_DIR/main.tf"
+    echo "$MODIFIED_CONTENT" >> "$BUCKETS_DIR/main.tf"
+    
+    # Update or create README with deployment information
+    if [ ! -f "$BUCKETS_DIR/README.md" ]; then
+        cat > "$BUCKETS_DIR/README.md" << EOF
+# GCP Storage Buckets
 
-Deployed on: $(date)
-Region: $region
+This directory contains Terraform configuration for all GCP Storage buckets.
 
-## Configuration
-The Terraform configuration in this directory deploys a Google Cloud Storage bucket.
-
-## Files
+## Structure
+- main.tf: Contains all bucket definitions
 - provider.tf: GCP provider configuration
-- main.tf: Bucket resource definition
+
+## Managed Buckets
 EOF
+    fi
+    
+    # Check if bucket is already in the README
+    if ! grep -q "^- $bucket_name:" "$BUCKETS_DIR/README.md"; then
+        echo "- $bucket_name: Created on $(date), Region: $region" >> "$BUCKETS_DIR/README.md"
+    else
+        # Update the existing entry
+        sed -i "s/^- $bucket_name:.*$/- $bucket_name: Updated on $(date), Region: $region/" "$BUCKETS_DIR/README.md"
+    fi
     
     # Commit and push changes
     cd "$REPO_DIR"
     git add .
-    git commit -m "Add Terraform configuration for bucket $bucket_name"
+    git commit -m "Update Terraform configuration for bucket $bucket_name"
     git push
     
-    echo "Successfully saved Terraform configuration to GitLab"
+    echo "Successfully saved Terraform configuration to GitLab at $BUCKETS_DIR"
 else
     echo "GitLab repository URL not provided in environment, skipping GitLab integration"
 fi
@@ -129,7 +165,7 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
         Arg(name="bucket_name", type="str", description="Name of the bucket to create", required=True),
         Arg(name="region", type="str", description="Region for the bucket (e.g., us-central1)", required=True),
         Arg(name="terraform_content", type="str", 
-            description="Terraform configuration for main.tf file. Should contain a google_storage_bucket resource definition. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
+            description="Terraform configuration for the bucket resource. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
             required=True),
     ],
     mermaid_diagram="""
