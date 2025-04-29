@@ -339,35 +339,49 @@ def get_channel_messages(client, channel_id, oldest):
     try:
         messages = []
         cursor = None
+        latest = None  # For time-based pagination
         
         # Use pagination to get all messages
         while True:
             params = {{
                 "channel": channel_id,
                 "oldest": oldest,
-                "limit": 1000  # Maximum allowed by Slack API
+                "limit": 200  # Recommended by Slack API
             }}
             
             # Add cursor for pagination if we have one
             if cursor:
                 params["cursor"] = cursor
+            
+            # Add latest timestamp for time-based pagination if we have one
+            if latest:
+                params["latest"] = latest
                 
             response = client.conversations_history(**params)
             batch = response["messages"]
+            
+            if not batch:
+                logger.info("No messages returned in this batch")
+                break
+                
             messages.extend(batch)
             
             # Log detailed information about the response
             logger.info(f"API response - has_more: {{response.get('has_more', False)}}, messages in batch: {{len(batch)}}")
             
-            # Check if there are more messages to fetch
+            # Check if there are more messages to fetch via cursor
             if response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
                 cursor = response.get("response_metadata", {{}}).get("next_cursor")
-                logger.info(f"Retrieved {{len(batch)}} messages, continuing with cursor: {{cursor[:10]}}...")
+                latest = None  # Reset latest when using cursor
+                logger.info(f"Retrieved {{len(batch)}} messages, continuing with cursor: {{cursor[:10] if cursor else 'None'}}...")
+            # If has_more is true but no cursor, use time-based pagination
+            elif response.get("has_more", False) and batch:
+                # Get the timestamp of the oldest message in this batch
+                latest = batch[-1].get("ts")
+                cursor = None  # Reset cursor when using time-based pagination
+                logger.info(f"No cursor but has_more is true. Using time-based pagination with latest={{latest}}")
             else:
-                if response.get("has_more", False):
-                    logger.info("Response indicates more messages but no cursor found, stopping pagination")
-                else:
-                    logger.info("No more messages to retrieve, pagination complete")
+                logger.info("No more messages to retrieve, pagination complete")
                 break
                 
             # Safety limit to prevent excessive API calls
