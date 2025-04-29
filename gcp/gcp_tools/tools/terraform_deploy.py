@@ -5,9 +5,12 @@ terraform_deploy_bucket = GCPTool(
     name="terraform_deploy_bucket",
     description="Deploy a GCP Storage bucket using Terraform and append to existing configuration in GitLab",
     content="""
-# Install Terraform quietly
+# Make sure we have essential tools
+echo "Installing essential tools..."
+apt-get update && apt-get install -y wget unzip git
+
+# Install Terraform
 echo "Installing Terraform..."
-apt-get update -qq && apt-get install -y -qq wget unzip git > /dev/null 2>&1
 wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
 unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
@@ -168,6 +171,7 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
             description="Terraform configuration for the bucket resource. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
             required=True),
     ],
+    long_running=True,
     mermaid_diagram="""
 graph TD
     A[Start] --> B[Install Terraform]
