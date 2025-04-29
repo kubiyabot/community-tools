@@ -4,7 +4,7 @@ from .base import TerraformTool, register_gcp_tool
 terraform_deploy_bucket = TerraformTool(
     name="terraform_deploy_bucket",
     description="Deploy a GCP Storage bucket using Terraform and append to existing configuration in GitLab",
-    content="""
+    content=f"""
 # Make sure we have essential tools
 echo "Installing essential tools..."
 apk update && apk add --no-cache wget unzip git
@@ -23,19 +23,19 @@ echo "Working in temporary directory: $TERRAFORM_DIR"
 
 # Create provider configuration for GCP
 cat > provider.tf << EOF
-provider "google" {
+provider "google" {{
   project     = "$GOOGLE_PROJECT"
   region      = "$region"
-}
+}}
 
-terraform {
-  required_providers {
-    google = {
+terraform {{
+  required_providers {{
+    google = {{
       source  = "hashicorp/google"
       version = "~> 4.0"
-    }
-  }
-}
+    }}
+  }}
+}}
 EOF
 
 # Create a temporary main.tf file with the provided Terraform content
@@ -89,31 +89,60 @@ if [ -n "$GITLAB_REPO_URL" ]; then
     BUCKETS_DIR="$REPO_DIR/terraform/buckets"
     mkdir -p "$BUCKETS_DIR"
     
-    # Check if main.tf already exists, if not create it
+    # Check if main.tf already exists, if not create it with proper header
     if [ ! -f "$BUCKETS_DIR/main.tf" ]; then
-        echo "# GCP Storage Buckets Terraform Configuration" > "$BUCKETS_DIR/main.tf"
-        echo "# This file is automatically managed - do not edit directly" >> "$BUCKETS_DIR/main.tf"
-        echo "" >> "$BUCKETS_DIR/main.tf"
+        cat > "$BUCKETS_DIR/main.tf" << EOF
+# GCP Storage Buckets Terraform Configuration
+# Last updated: $(date +%Y-%m-%d)
+# Managed by: Cloud Infrastructure Team
+
+locals {{
+  default_labels = {{
+    environment = "staging"
+    managed_by  = "terraform"
+    team        = "platform-engineering"
+  }}
+  
+  default_lifecycle_rules = {{
+    standard = {{
+      age          = 90
+      storage_class = "NEARLINE"
+    }}
+    archive = {{
+      age          = 365
+      storage_class = "COLDLINE"
+    }}
+  }}
+}}
+EOF
     fi
     
-    # Check if provider.tf already exists, if not create it
+    # Check if provider.tf already exists, if not copy from existing
     if [ ! -f "$BUCKETS_DIR/provider.tf" ]; then
         cp provider.tf "$BUCKETS_DIR/provider.tf"
     fi
     
+    # Generate a resource name that's valid for Terraform
+    RESOURCE_NAME=$(echo "$bucket_name" | tr '-' '_')
+    
     # Check if bucket already exists in the configuration
-    if grep -q "resource \"google_storage_bucket\" \"$bucket_name\"" "$BUCKETS_DIR/main.tf"; then
+    if grep -q "resource \\"google_storage_bucket\\" \\"$RESOURCE_NAME\\"" "$BUCKETS_DIR/main.tf"; then
         echo "Bucket '$bucket_name' already exists in Terraform configuration, updating..."
         # Create a backup of the current main.tf
         cp "$BUCKETS_DIR/main.tf" "$BUCKETS_DIR/main.tf.bak.$(date +%Y%m%d%H%M%S)"
         
-        # Remove the existing bucket configuration
-        sed -i "/resource \"google_storage_bucket\" \"$bucket_name\"/,/}/d" "$BUCKETS_DIR/main.tf"
+        # Remove the existing bucket configuration (from resource line to closing brace)
+        sed -i "/# Bucket: $bucket_name/,/^}}/d" "$BUCKETS_DIR/main.tf"
     fi
     
-    # Append the new bucket configuration to main.tf
-    # First, modify the resource name in the terraform_content to match bucket_name
-    MODIFIED_CONTENT=$(echo "$terraform_content" | sed "s/resource \"google_storage_bucket\" \"bucket\"/resource \"google_storage_bucket\" \"$bucket_name\"/")
+    # Modify the terraform_content to use the proper resource name and include labels
+    MODIFIED_CONTENT=$(echo "$terraform_content" | sed "s/resource \\"google_storage_bucket\\" \\"bucket\\"/resource \\"google_storage_bucket\\" \\"$RESOURCE_NAME\\"/")
+    
+    # Check if labels are already in the content, if not add them
+    if ! echo "$MODIFIED_CONTENT" | grep -q "labels"; then
+        # Add labels before the closing brace
+        MODIFIED_CONTENT=$(echo "$MODIFIED_CONTENT" | sed "s/}}/\\n  labels = merge(local.default_labels, {{\\n    purpose = \\"application-data\\"\\n    owner   = \\"$(whoami)\\"\\n  }})\\n}}/")
+    fi
     
     # Append to main.tf with a comment indicating when it was added/updated
     echo "" >> "$BUCKETS_DIR/main.tf"
@@ -143,6 +172,64 @@ EOF
         sed -i "s/^- $bucket_name:.*$/- $bucket_name: Updated on $(date), Region: $region/" "$BUCKETS_DIR/README.md"
     fi
     
+    # Update outputs.tf file to include the new bucket
+    if [ -f "$BUCKETS_DIR/outputs.tf" ]; then
+        # Check if the bucket is already in outputs
+        if ! grep -q "$RESOURCE_NAME" "$BUCKETS_DIR/outputs.tf"; then
+            # Create a temporary file for the updated outputs
+            TEMP_OUTPUTS=$(mktemp)
+            
+            # Update bucket_names output
+            sed -n '/output "bucket_names"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
+            sed "/}}/i\\    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" > "$TEMP_OUTPUTS"
+            
+            # Replace the original output block
+            sed -i "/output \\"bucket_names\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
+            
+            # Update bucket_urls output
+            TEMP_OUTPUTS=$(mktemp)
+            sed -n '/output "bucket_urls"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
+            sed "/}}/i\\    $RESOURCE_NAME = \\"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\\"" > "$TEMP_OUTPUTS"
+            
+            # Replace the original output block
+            sed -i "/output \\"bucket_urls\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
+            
+            # Update bucket_self_links output
+            TEMP_OUTPUTS=$(mktemp)
+            sed -n '/output "bucket_self_links"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
+            sed "/}}/i\\    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" > "$TEMP_OUTPUTS"
+            
+            # Replace the original output block
+            sed -i "/output \\"bucket_self_links\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
+        fi
+    else
+        # Create a new outputs.tf file
+        cat > "$BUCKETS_DIR/outputs.tf" << EOF
+# Output the bucket names and URLs for use in other modules
+
+output "bucket_names" {{
+  description = "Map of bucket names"
+  value = {{
+    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name
+  }}
+}}
+
+output "bucket_urls" {{
+  description = "Map of bucket URLs"
+  value = {{
+    $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
+  }}
+}}
+
+output "bucket_self_links" {{
+  description = "Map of bucket self links"
+  value = {{
+    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link
+  }}
+}} 
+EOF
+    fi
+    
     # Commit and push changes
     cd "$REPO_DIR"
     git add .
@@ -150,6 +237,23 @@ EOF
     git push
     
     echo "Successfully saved Terraform configuration to GitLab at $BUCKETS_DIR"
+    
+    # Update Terraform state in GCP
+    echo "Using Terraform state in GCS bucket defined in provider.tf"
+    
+    # Initialize with existing backend config
+    cd "$BUCKETS_DIR"
+    terraform init -reconfigure
+    
+    # Import the resource into the state if it's not already there
+    if ! terraform state list | grep -q "google_storage_bucket.$RESOURCE_NAME"; then
+        terraform import google_storage_bucket.$RESOURCE_NAME $bucket_name
+        echo "Imported $bucket_name into Terraform state"
+    else
+        echo "Bucket $bucket_name already exists in Terraform state"
+    fi
+    
+    echo "Terraform state updated successfully"
 else
     echo "GitLab repository URL not provided in environment, skipping GitLab integration"
 fi
@@ -174,8 +278,9 @@ graph TD
     F --> G[Apply Terraform Configuration]
     G --> H[Show Created Resources]
     H --> I[Save to GitLab]
-    I --> J[Output Success Message]
-    J --> K[End]
+    I --> J[Update Terraform State in GCS]
+    J --> K[Output Success Message]
+    K --> L[End]
 """
 )
 
