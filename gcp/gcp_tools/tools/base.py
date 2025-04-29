@@ -18,18 +18,12 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
-    # Install minimal gcloud CLI components
-    echo "Installing minimal gcloud CLI components..."
-    apk update && apk add --no-cache python3 curl bash
+    # Install minimal dependencies
+    apk update && apk add --no-cache python3 py3-pip curl jq
     
-    # Install a minimal version of the gcloud CLI
-    echo "Downloading and installing minimal gcloud CLI..."
-    curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/install_google_cloud_sdk.bash > /tmp/gcli
-    bash /tmp/gcli --disable-prompts --install-dir=/usr/local
-    export PATH=$PATH:/usr/local/google-cloud-sdk/bin
-    
-    # Activate the service account
-    gcloud auth activate-service-account --key-file="$CREDS_FILE"
+    # Use the credentials directly with Terraform
+    export GOOGLE_CREDENTIALS=$(cat "$CREDS_FILE")
+    export GOOGLE_PROJECT=$(cat "$CREDS_FILE" | jq -r '.project_id')
     
     # Execute the command
     {

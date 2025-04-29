@@ -24,8 +24,7 @@ echo "Working in temporary directory: $TERRAFORM_DIR"
 # Create provider configuration for GCP
 cat > provider.tf << EOF
 provider "google" {
-  credentials = file("$CREDS_FILE")
-  project     = "$(gcloud config get-value project)"
+  project     = "$GOOGLE_PROJECT"
   region      = "$region"
 }
 
@@ -43,13 +42,7 @@ EOF
 echo "$terraform_content" > main.tf
 echo "Created Terraform configuration files"
 
-# Display the content of the files for debugging
-echo "Contents of provider.tf:"
-cat provider.tf
-echo "Contents of main.tf:"
-cat main.tf
-
-# Initialize Terraform with more verbose output
+# Initialize Terraform
 echo "Initializing Terraform..."
 terraform init -input=false
 INIT_STATUS=$?
