@@ -5,7 +5,7 @@ GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google
 
 class GCPTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, mermaid_diagram=None):
-        # Minimal bash script for credential handling
+        # Minimal ash script for credential handling
         bash_script = r"""
 #!/bin/sh
 set -e
@@ -20,7 +20,7 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     
     # Install minimal gcloud CLI components
     echo "Installing minimal gcloud CLI components..."
-    apk update && apk add --no-cache python3 curl
+    apk update && apk add --no-cache python3 curl bash
     
     # Install a minimal version of the gcloud CLI
     curl -sSL https://sdk.cloud.google.com > /tmp/gcli && 
