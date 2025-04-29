@@ -18,8 +18,17 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
-    # Activate the service account
-    gcloud auth activate-service-account --key-file="$CREDS_FILE"
+    # Activate the service account without unnecessary components
+    # Skip component update check to speed up startup
+    export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+    # Skip diagnostics to speed up commands
+    export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+    export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true
+    # Skip Python warnings
+    export PYTHONWARNINGS=ignore
+    
+    # Faster authentication
+    gcloud auth activate-service-account --key-file="$CREDS_FILE" --quiet
     
     # Execute the command
     {
@@ -39,7 +48,7 @@ fi
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="google/cloud-sdk:slim",  # Using the slim version of the SDK
+            image="google/cloud-sdk:alpine",  # Using the Alpine version for faster startup
             content=enhanced_content,
             args=args,
             env=["GITLAB_REPO_URL"],
