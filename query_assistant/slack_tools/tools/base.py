@@ -360,15 +360,14 @@ def get_channel_messages(client, channel_id, oldest):
             logger.info(f"API response - has_more: {{response.get('has_more', False)}}, messages in batch: {{len(batch)}}")
             
             # Check if there are more messages to fetch
-            if response.get("has_more", False):
-                cursor = response.get("response_metadata", {{}}).get("next_cursor")
-                if cursor:
-                    logger.info(f"Retrieved {{len(batch)}} messages, continuing with cursor: {{cursor[:10]}}...")
-                else:
-                    logger.info("Response indicates more messages but no cursor found, stopping pagination")
-                    break
+            if response.get("has_more", False) and response.get("response_metadata", {}).get("next_cursor"):
+                cursor = response.get("response_metadata", {}).get("next_cursor")
+                logger.info(f"Retrieved {{len(batch)} messages, continuing with cursor: {cursor[:10]}}...")
             else:
-                logger.info("No more messages to retrieve, pagination complete")
+                if response.get("has_more", False):
+                    logger.info("Response indicates more messages but no cursor found, stopping pagination")
+                else:
+                    logger.info("No more messages to retrieve, pagination complete")
                 break
                 
             # Safety limit to prevent excessive API calls
