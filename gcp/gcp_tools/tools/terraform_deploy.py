@@ -171,7 +171,6 @@ echo "SUCCESS: GCP Storage bucket '$bucket_name' has been deployed successfully 
             description="Terraform configuration for the bucket resource. Example: 'resource \"google_storage_bucket\" \"bucket\" { name = \"my-bucket\", location = \"us-central1\" }'", 
             required=True),
     ],
-    long_running=True,
     mermaid_diagram="""
 graph TD
     A[Start] --> B[Install Terraform]
