@@ -7,7 +7,7 @@ terraform_deploy_bucket = TerraformTool(
     content=f"""
 # Make sure we have essential tools
 echo "Installing essential tools..."
-apk update && apk add --no-cache wget unzip git
+apk update --quiet && apk add --quiet --no-cache wget unzip git
 
 # Install Terraform
 echo "Installing Terraform..."
@@ -38,8 +38,12 @@ terraform {{
 }}
 EOF
 
+# Format the terraform_content to ensure proper syntax
+# Replace single-line format with multi-line format for multiple arguments
+FORMATTED_CONTENT=$(echo "$terraform_content" | sed 's/{{ *name *= *"\\([^"]*\\)" *, *location *= *"\\([^"]*\\)" *}}/{{\\n  name     = "\\1"\\n  location = "\\2"\\n}}/')
+
 # Create a temporary main.tf file with the provided Terraform content
-echo "$terraform_content" > main.tf
+echo "$FORMATTED_CONTENT" > main.tf
 echo "Created Terraform configuration files"
 
 # Initialize Terraform
