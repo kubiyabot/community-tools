@@ -18,6 +18,13 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
+    # Install gcloud CLI
+    echo "Installing minimal gcloud CLI..."
+    apt-get update -qq && apt-get install -y -qq curl python3 apt-transport-https ca-certificates gnupg > /dev/null 2>&1
+    echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list
+    curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add -
+    apt-get update -qq && apt-get install -y -qq google-cloud-cli > /dev/null 2>&1
+    
     # Activate the service account
     gcloud auth activate-service-account --key-file="$CREDS_FILE"
     
@@ -39,7 +46,7 @@ fi
             description=description,
             icon_url=GCP_ICON_URL,
             type="docker",
-            image="google/cloud-sdk:latest",
+            image="debian:bullseye-slim",  # Much smaller base image
             content=enhanced_content,
             args=args,
             env=["GITLAB_REPO_URL"],
