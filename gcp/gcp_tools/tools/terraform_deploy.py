@@ -7,14 +7,14 @@ terraform_deploy_bucket = TerraformTool(
     content=f"""
 # Make sure we have essential tools
 echo "Installing essential tools..."
-apk update --quiet && apk add --quiet --no-cache wget unzip git
+apk update --quiet && apk add --quiet --no-cache wget unzip git > /dev/null 2>&1
 
 # Install Terraform
 echo "Installing Terraform..."
 wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
 unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
-echo "Terraform $(terraform --version | head -n 1) installed successfully"
+echo "Terraform $(terraform --version | head -n 1 | awk '{{print $2}}') installed successfully"
 
 # Create a directory for Terraform files
 TERRAFORM_DIR=$(mktemp -d)
@@ -48,7 +48,7 @@ echo "Created Terraform configuration files"
 
 # Initialize Terraform
 echo "Initializing Terraform..."
-terraform init -input=false
+terraform init -input=false -no-color > /dev/null
 INIT_STATUS=$?
 if [ $INIT_STATUS -ne 0 ]; then
     echo "ERROR: Terraform initialization failed with status $INIT_STATUS"
@@ -58,7 +58,7 @@ echo "Terraform initialized successfully"
 
 # Apply the Terraform configuration
 echo "Applying Terraform configuration to create bucket '$bucket_name'..."
-terraform apply -auto-approve -input=false
+terraform apply -auto-approve -input=false -no-color > /dev/null
 APPLY_STATUS=$?
 if [ $APPLY_STATUS -ne 0 ]; then
     echo "ERROR: Terraform apply failed with status $APPLY_STATUS"

@@ -72,8 +72,9 @@ if [ -n "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
     # Decode base64 credentials
     echo "$GOOGLE_APPLICATION_CREDENTIALS" | base64 -d > "$CREDS_FILE"
     
-    # Install minimal dependencies
-    apk update && apk add --no-cache python3 py3-pip curl jq bash
+    # Install minimal dependencies silently
+    echo "Installing dependencies..."
+    apk update --quiet > /dev/null 2>&1 && apk add --quiet --no-cache python3 py3-pip curl jq bash > /dev/null 2>&1
     
     # Use the credentials directly with Terraform
     export GOOGLE_CREDENTIALS=$(cat "$CREDS_FILE")
