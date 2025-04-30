@@ -210,6 +210,9 @@ EOF
 output "bucket_urls" {{
   description = "Map of bucket URLs"
   value = {{
+    $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
+  }}
+}}
 EOF
         
         # Add existing bucket URLs from the current outputs.tf
@@ -221,11 +224,10 @@ EOF
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
-        # Add the new bucket URL with properly escaped interpolation syntax
+        # Add the new bucket URL with properly escaped interpolation syntax for shell script
         echo "    $RESOURCE_NAME = \"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\"" >> "$TEMP_OUTPUTS_FILE"
         echo "  }}" >> "$TEMP_OUTPUTS_FILE"
         echo "}}" >> "$TEMP_OUTPUTS_FILE"
-        echo "" >> "$TEMP_OUTPUTS_FILE"
         
         # Add bucket self links output
         cat >> "$TEMP_OUTPUTS_FILE" << EOF
