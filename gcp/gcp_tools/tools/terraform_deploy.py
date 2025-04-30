@@ -178,34 +178,79 @@ EOF
     
     # Update outputs.tf file to include the new bucket
     if [ -f "$BUCKETS_DIR/outputs.tf" ]; then
-        # Check if the bucket is already in outputs
-        if ! grep -q "$RESOURCE_NAME" "$BUCKETS_DIR/outputs.tf"; then
-            # Create a temporary file for the updated outputs
-            TEMP_OUTPUTS=$(mktemp)
-            
-            # Update bucket_names output
-            sed -n '/output "bucket_names"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
-            sed "/}}/i\\    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" > "$TEMP_OUTPUTS"
-            
-            # Replace the original output block
-            sed -i "/output \\"bucket_names\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
-            
-            # Update bucket_urls output
-            TEMP_OUTPUTS=$(mktemp)
-            sed -n '/output "bucket_urls"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
-            sed "/}}/i\\    $RESOURCE_NAME = \\"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\\"" > "$TEMP_OUTPUTS"
-            
-            # Replace the original output block
-            sed -i "/output \\"bucket_urls\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
-            
-            # Update bucket_self_links output
-            TEMP_OUTPUTS=$(mktemp)
-            sed -n '/output "bucket_self_links"/,/}}/p' "$BUCKETS_DIR/outputs.tf" | 
-            sed "/}}/i\\    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" > "$TEMP_OUTPUTS"
-            
-            # Replace the original output block
-            sed -i "/output \\"bucket_self_links\\"/,/}}/c\\$(cat $TEMP_OUTPUTS)" "$BUCKETS_DIR/outputs.tf"
-        fi
+        # Create a new temporary file for the updated outputs
+        TEMP_OUTPUTS_FILE=$(mktemp)
+        
+        # Write the updated outputs.tf content to the temporary file
+        cat > "$TEMP_OUTPUTS_FILE" << EOF
+# Output the bucket names and URLs for use in other modules
+
+output "bucket_names" {{
+  description = "Map of bucket names"
+  value = {{
+EOF
+        
+        # Add existing bucket names from the current outputs.tf
+        grep -A 20 "output \"bucket_names\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \"bucket_names\"" | 
+        grep -v "description" | 
+        grep -v "value = {{" | 
+        grep -v "}}" | 
+        grep -v "^$" | 
+        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
+        
+        # Add the new bucket name
+        echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
+        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "" >> "$TEMP_OUTPUTS_FILE"
+        
+        # Add bucket URLs output
+        cat >> "$TEMP_OUTPUTS_FILE" << EOF
+output "bucket_urls" {{
+  description = "Map of bucket URLs"
+  value = {{
+EOF
+        
+        # Add existing bucket URLs from the current outputs.tf
+        grep -A 20 "output \"bucket_urls\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \"bucket_urls\"" | 
+        grep -v "description" | 
+        grep -v "value = {{" | 
+        grep -v "}}" | 
+        grep -v "^$" | 
+        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
+        
+        # Add the new bucket URL
+        echo "    $RESOURCE_NAME = \"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\"" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
+        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "" >> "$TEMP_OUTPUTS_FILE"
+        
+        # Add bucket self links output
+        cat >> "$TEMP_OUTPUTS_FILE" << EOF
+output "bucket_self_links" {{
+  description = "Map of bucket self links"
+  value = {{
+EOF
+        
+        # Add existing bucket self links from the current outputs.tf
+        grep -A 20 "output \"bucket_self_links\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \"bucket_self_links\"" | 
+        grep -v "description" | 
+        grep -v "value = {{" | 
+        grep -v "}}" | 
+        grep -v "^$" | 
+        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
+        
+        # Add the new bucket self link
+        echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
+        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        
+        # Replace the original outputs.tf with our new file
+        mv "$TEMP_OUTPUTS_FILE" "$BUCKETS_DIR/outputs.tf"
+        
     else
         # Create a new outputs.tf file
         cat > "$BUCKETS_DIR/outputs.tf" << EOF
@@ -215,21 +260,21 @@ output "bucket_names" {{
   description = "Map of bucket names"
   value = {{
     $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name
-  }}
-}}
+  }}}
+}
 
 output "bucket_urls" {{
   description = "Map of bucket URLs"
   value = {{
     $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
-  }}
-}}
+  }}}
+}
 
 output "bucket_self_links" {{
   description = "Map of bucket self links"
   value = {{
     $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link
-  }}
+  }}}
 }} 
 EOF
     fi
