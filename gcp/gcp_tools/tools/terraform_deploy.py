@@ -199,8 +199,8 @@ EOF
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
-        # Add the new bucket name
-        echo "    $RESOURCE_NAME = \"gs://\$${{{{google_storage_bucket.$RESOURCE_NAME.name}}}}\"" >> "$TEMP_OUTPUTS_FILE"
+        # Add the new bucket name with proper syntax for Terraform
+        echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" >> "$TEMP_OUTPUTS_FILE"
         echo "  }}" >> "$TEMP_OUTPUTS_FILE"
         echo "}}" >> "$TEMP_OUTPUTS_FILE"
         echo "" >> "$TEMP_OUTPUTS_FILE"
@@ -221,7 +221,7 @@ EOF
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
-        # Add the new bucket URL
+        # Add the new bucket URL with properly escaped interpolation syntax
         echo "    $RESOURCE_NAME = \"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\"" >> "$TEMP_OUTPUTS_FILE"
         echo "  }}" >> "$TEMP_OUTPUTS_FILE"
         echo "}}" >> "$TEMP_OUTPUTS_FILE"
@@ -252,7 +252,7 @@ EOF
         mv "$TEMP_OUTPUTS_FILE" "$BUCKETS_DIR/outputs.tf"
         
     else
-        # Create a new outputs.tf file
+        # Create a new outputs.tf file with properly escaped Terraform interpolation
         cat > "$BUCKETS_DIR/outputs.tf" << EOF
 # Output the bucket names and URLs for use in other modules
 
