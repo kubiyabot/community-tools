@@ -200,7 +200,7 @@ EOF
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket name
-        echo "    $RESOURCE_NAME = \\\"gs:\\/\\/\\\${{google_storage_bucket.$RESOURCE_NAME.name}}\\\"" >> "$TEMP_OUTPUTS_FILE"
+        f'echo "    $RESOURCE_NAME = \\"gs://\\${{google_storage_bucket.{RESOURCE_NAME}.name}}\"" >> "$TEMP_OUTPUTS_FILE"'
         echo "  }}" >> "$TEMP_OUTPUTS_FILE"
         echo "}}" >> "$TEMP_OUTPUTS_FILE"
         echo "" >> "$TEMP_OUTPUTS_FILE"
