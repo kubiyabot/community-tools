@@ -183,118 +183,79 @@ EOF
         sed -i "s/^- $bucket_name:.*$/- $bucket_name: Updated on $(date), Region: $region/" "$BUCKETS_DIR/README.md"
     fi
     
-    # Update outputs.tf file to include the new bucket
-    if [ -f "$BUCKETS_DIR/outputs.tf" ]; then
-        # Create a new temporary file for the updated outputs
-        TEMP_OUTPUTS_FILE=$(mktemp)
-        
-        # Write the updated outputs.tf content to the temporary file
-        cat > "$TEMP_OUTPUTS_FILE" << EOF
+    # Create a completely new outputs.tf file instead of trying to modify the existing one
+    cat > "$BUCKETS_DIR/outputs.tf" << EOF
 # Output the bucket names and URLs for use in other modules
 
 output "bucket_names" {
   description = "Map of bucket names"
   value = {
 EOF
-        
-        # Add existing bucket names from the current outputs.tf
-        grep -A 20 "output \\"bucket_names\\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \\"bucket_names\\"" | 
-        grep -v "description" | 
+
+    # Add existing bucket names from the current outputs.tf if it exists
+    if [ -f "$BUCKETS_DIR/outputs.tf.bak" ]; then
+        grep -A 20 "value = {" "$BUCKETS_DIR/outputs.tf.bak" | 
         grep -v "value = {" | 
         grep -v "}" | 
         grep -v "^$" | 
-        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
-        
-        # Add the new bucket name with proper syntax for Terraform
-        echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" >> "$TEMP_OUTPUTS_FILE"
-        echo "  }" >> "$TEMP_OUTPUTS_FILE"
-        echo "}" >> "$TEMP_OUTPUTS_FILE"
-        echo "" >> "$TEMP_OUTPUTS_FILE"
-        
-        # Add bucket URLs output
-        cat >> "$TEMP_OUTPUTS_FILE" << EOF
-output "bucket_urls" {
-  description = "Map of bucket URLs"
-  value = {
-EOF
-        
-        # Add existing bucket URLs from the current outputs.tf
-        grep -A 20 "output \\"bucket_urls\\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \\"bucket_urls\\"" | 
-        grep -v "description" | 
-        grep -v "value = {" | 
-        grep -v "}" | 
-        grep -v "^$" | 
-        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
-        
-        # Add the new bucket URL with properly escaped interpolation syntax for shell script
-        # Use heredoc to avoid interpolation issues
-        cat >> "$TEMP_OUTPUTS_FILE" << 'EOFINNER'
-    RESOURCE_NAME = "gs://${google_storage_bucket.RESOURCE_NAME.name}"
-EOFINNER
-
-        # Replace RESOURCE_NAME placeholder with actual resource name
-        sed -i "s/RESOURCE_NAME/$RESOURCE_NAME/g" "$TEMP_OUTPUTS_FILE"
-        
-        echo "  }" >> "$TEMP_OUTPUTS_FILE"
-        echo "}" >> "$TEMP_OUTPUTS_FILE"
-        echo "" >> "$TEMP_OUTPUTS_FILE"
-        
-        # Add bucket self links output
-        cat >> "$TEMP_OUTPUTS_FILE" << EOF
-output "bucket_self_links" {
-  description = "Map of bucket self links"
-  value = {
-EOF
-        
-        # Add existing bucket self links from the current outputs.tf
-        grep -A 20 "output \\"bucket_self_links\\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \\"bucket_self_links\\"" | 
-        grep -v "description" | 
-        grep -v "value = {" | 
-        grep -v "}" | 
-        grep -v "^$" | 
-        grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
-        
-        # Add the new bucket self link
-        echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" >> "$TEMP_OUTPUTS_FILE"
-        echo "  }" >> "$TEMP_OUTPUTS_FILE"
-        echo "}" >> "$TEMP_OUTPUTS_FILE"
-        
-        # Replace the original outputs.tf with our new file
-        mv "$TEMP_OUTPUTS_FILE" "$BUCKETS_DIR/outputs.tf"
-        
-    else
-        # Create a new outputs.tf file with properly escaped Terraform interpolation
-        cat > "$BUCKETS_DIR/outputs.tf" << 'EOF'
-# Output the bucket names and URLs for use in other modules
-
-output "bucket_names" {
-  description = "Map of bucket names"
-  value = {
-    RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.name
-  }
-}
-
-output "bucket_urls" {
-  description = "Map of bucket URLs"
-  value = {
-    RESOURCE_NAME = "gs://${google_storage_bucket.RESOURCE_NAME.name}"
-  }
-}
-
-output "bucket_self_links" {
-  description = "Map of bucket self links"
-  value = {
-    RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.self_link
-  }
-}
-EOF
-
-        # Replace RESOURCE_NAME placeholder with actual resource name
-        sed -i "s/RESOURCE_NAME/$RESOURCE_NAME/g" "$BUCKETS_DIR/outputs.tf"
+        grep -v "^#" | 
+        grep -v "output" >> "$BUCKETS_DIR/outputs.tf" || true
     fi
+    
+    # Add the new bucket name
+    echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" >> "$BUCKETS_DIR/outputs.tf"
+    echo "  }" >> "$BUCKETS_DIR/outputs.tf"
+    echo "}" >> "$BUCKETS_DIR/outputs.tf"
+    echo "" >> "$BUCKETS_DIR/outputs.tf"
+    
+    # Add bucket URLs output
+    cat >> "$BUCKETS_DIR/outputs.tf" << EOF
+output "bucket_urls" {
+  description = "Map of bucket URLs"
+  value = {
+EOF
+
+    # Add existing bucket URLs if backup exists
+    if [ -f "$BUCKETS_DIR/outputs.tf.bak" ]; then
+        grep -A 20 "output \"bucket_urls\"" "$BUCKETS_DIR/outputs.tf.bak" | 
+        grep -v "output \"bucket_urls\"" | 
+        grep -v "description" | 
+        grep -v "value = {" | 
+        grep -v "}" | 
+        grep -v "^$" | 
+        grep -v "^#" >> "$BUCKETS_DIR/outputs.tf" || true
+    fi
+    
+    # Add the new bucket URL
+    cat >> "$BUCKETS_DIR/outputs.tf" << EOF
+    $RESOURCE_NAME = "gs://\${google_storage_bucket.$RESOURCE_NAME.name}"
+  }
+}
+
+EOF
+    
+    # Add bucket self links output
+    cat >> "$BUCKETS_DIR/outputs.tf" << EOF
+output "bucket_self_links" {
+  description = "Map of bucket self links"
+  value = {
+EOF
+
+    # Add existing bucket self links if backup exists
+    if [ -f "$BUCKETS_DIR/outputs.tf.bak" ]; then
+        grep -A 20 "output \"bucket_self_links\"" "$BUCKETS_DIR/outputs.tf.bak" | 
+        grep -v "output \"bucket_self_links\"" | 
+        grep -v "description" | 
+        grep -v "value = {" | 
+        grep -v "}" | 
+        grep -v "^$" | 
+        grep -v "^#" >> "$BUCKETS_DIR/outputs.tf" || true
+    fi
+    
+    # Add the new bucket self link
+    echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" >> "$BUCKETS_DIR/outputs.tf"
+    echo "  }" >> "$BUCKETS_DIR/outputs.tf"
+    echo "}" >> "$BUCKETS_DIR/outputs.tf"
     
     # Commit and push changes
     cd "$REPO_DIR"
@@ -309,6 +270,10 @@ EOF
     
     # Initialize with existing backend config
     cd "$BUCKETS_DIR"
+    
+    # Make a backup of the outputs.tf file before initializing
+    cp outputs.tf outputs.tf.bak
+    
     terraform init -reconfigure
     
     # Import the resource into the state if it's not already there
