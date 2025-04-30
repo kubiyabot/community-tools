@@ -260,22 +260,22 @@ output "bucket_names" {{
   description = "Map of bucket names"
   value = {{
     $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name
-  }}}
-}
+  }}
+}}
 
 output "bucket_urls" {{
   description = "Map of bucket URLs"
   value = {{
     $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
-  }}}
-}
+  }}
+}}
 
 output "bucket_self_links" {{
   description = "Map of bucket self links"
   value = {{
     $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link
-  }}}
-}} 
+  }}
+}}
 EOF
     fi
     
