@@ -210,9 +210,6 @@ EOF
 output "bucket_urls" {{
   description = "Map of bucket URLs"
   value = {{
-    $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
-  }}
-}}
 EOF
         
         # Add existing bucket URLs from the current outputs.tf
@@ -225,9 +222,17 @@ EOF
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket URL with properly escaped interpolation syntax for shell script
-        echo "    $RESOURCE_NAME = \"gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}\"" >> "$TEMP_OUTPUTS_FILE"
+        # Use triple quotes to avoid interpolation issues
+        cat >> "$TEMP_OUTPUTS_FILE" << 'EOFINNER'
+    RESOURCE_NAME = "gs://${{google_storage_bucket.RESOURCE_NAME.name}}"
+EOFINNER
+
+        # Replace RESOURCE_NAME placeholder with actual resource name
+        sed -i "s/RESOURCE_NAME/$RESOURCE_NAME/g" "$TEMP_OUTPUTS_FILE"
+        
         echo "  }}" >> "$TEMP_OUTPUTS_FILE"
         echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "" >> "$TEMP_OUTPUTS_FILE"
         
         # Add bucket self links output
         cat >> "$TEMP_OUTPUTS_FILE" << EOF
@@ -255,30 +260,33 @@ EOF
         
     else
         # Create a new outputs.tf file with properly escaped Terraform interpolation
-        cat > "$BUCKETS_DIR/outputs.tf" << EOF
+        cat > "$BUCKETS_DIR/outputs.tf" << 'EOF'
 # Output the bucket names and URLs for use in other modules
 
 output "bucket_names" {{
   description = "Map of bucket names"
   value = {{
-    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name
+    RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.name
   }}
 }}
 
 output "bucket_urls" {{
   description = "Map of bucket URLs"
   value = {{
-    $RESOURCE_NAME = "gs://\${{google_storage_bucket.$RESOURCE_NAME.name}}"
+    RESOURCE_NAME = "gs://${{google_storage_bucket.RESOURCE_NAME.name}}"
   }}
 }}
 
 output "bucket_self_links" {{
   description = "Map of bucket self links"
   value = {{
-    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link
+    RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.self_link
   }}
 }}
 EOF
+
+        # Replace RESOURCE_NAME placeholder with actual resource name
+        sed -i "s/RESOURCE_NAME/$RESOURCE_NAME/g" "$BUCKETS_DIR/outputs.tf"
     fi
     
     # Commit and push changes
