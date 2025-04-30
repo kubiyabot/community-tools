@@ -4,7 +4,7 @@ from .base import TerraformTool, register_gcp_tool
 terraform_deploy_bucket = TerraformTool(
     name="terraform_deploy_bucket",
     description="Deploy a GCP Storage bucket using Terraform and append to existing configuration in GitLab",
-    content=f"""
+    content="""
 # Make sure we have essential tools
 echo "Installing essential tools..."
 apk update --quiet && apk add --quiet --no-cache wget unzip git > /dev/null 2>&1
@@ -14,7 +14,7 @@ echo "Installing Terraform..."
 wget -q https://releases.hashicorp.com/terraform/1.5.7/terraform_1.5.7_linux_amd64.zip
 unzip -q terraform_1.5.7_linux_amd64.zip
 mv terraform /usr/local/bin/
-echo "Terraform $(terraform --version | head -n 1 | awk '{{print $2}}') installed successfully"
+echo "Terraform $(terraform --version | head -n 1 | awk '{print $2}') installed successfully"
 
 # Create a directory for Terraform files
 TERRAFORM_DIR=$(mktemp -d)
@@ -23,24 +23,24 @@ echo "Working in temporary directory: $TERRAFORM_DIR"
 
 # Create provider configuration for GCP
 cat > provider.tf << EOF
-provider "google" {{
+provider "google" {
   project     = "$GOOGLE_PROJECT"
   region      = "$region"
-}}
+}
 
-terraform {{
-  required_providers {{
-    google = {{
+terraform {
+  required_providers {
+    google = {
       source  = "hashicorp/google"
       version = "~> 4.0"
-    }}
-  }}
-}}
+    }
+  }
+}
 EOF
 
 # Format the terraform_content to ensure proper syntax
-# Replace single-line format with multi-line format for multiple arguments
-FORMATTED_CONTENT=$(echo "$terraform_content" | sed 's/{{ *name *= *"\\([^"]*\\)" *, *location *= *"\\([^"]*\\)" *}}/{{\\n  name     = "\\1"\\n  location = "\\2"\\n}}/')
+# Improved regex to handle multiple arguments in a single line
+FORMATTED_CONTENT=$(echo "$terraform_content" | sed -E 's/\\{\\s*name\\s*=\\s*"([^"]*)"\\s*,\\s*location\\s*=\\s*"([^"]*)"\\s*\\}/{\\\n  name     = "\\1"\\\n  location = "\\2"\\\n}/')
 
 # Create a temporary main.tf file with the provided Terraform content
 echo "$FORMATTED_CONTENT" > main.tf
@@ -100,24 +100,24 @@ if [ -n "$GITLAB_REPO_URL" ]; then
 # Last updated: $(date +%Y-%m-%d)
 # Managed by: Cloud Infrastructure Team
 
-locals {{
-  default_labels = {{
+locals {
+  default_labels = {
     environment = "staging"
     managed_by  = "terraform"
     team        = "platform-engineering"
-  }}
+  }
   
-  default_lifecycle_rules = {{
-    standard = {{
+  default_lifecycle_rules = {
+    standard = {
       age          = 90
       storage_class = "NEARLINE"
-    }}
-    archive = {{
+    }
+    archive = {
       age          = 365
       storage_class = "COLDLINE"
-    }}
-  }}
-}}
+    }
+  }
+}
 EOF
     fi
     
@@ -145,7 +145,7 @@ EOF
     # Check if labels are already in the content, if not add them
     if ! echo "$MODIFIED_CONTENT" | grep -q "labels"; then
         # Add labels before the closing brace
-        MODIFIED_CONTENT=$(echo "$MODIFIED_CONTENT" | sed "s/}}/\\n  labels = merge(local.default_labels, {{\\n    purpose = \\"application-data\\"\\n    owner   = \\"$(whoami)\\"\\n  }})\\n}}/")
+        MODIFIED_CONTENT=$(echo "$MODIFIED_CONTENT" | sed "s/}}/\\\n  labels = merge(local.default_labels, {\\\n    purpose = \\"application-data\\"\\\n    owner   = \\"$(whoami)\\"\\\n  })\\\n}}/")
     fi
     
     # Append to main.tf with a comment indicating when it was added/updated
@@ -185,75 +185,75 @@ EOF
         cat > "$TEMP_OUTPUTS_FILE" << EOF
 # Output the bucket names and URLs for use in other modules
 
-output "bucket_names" {{
+output "bucket_names" {
   description = "Map of bucket names"
-  value = {{
+  value = {
 EOF
         
         # Add existing bucket names from the current outputs.tf
-        grep -A 20 "output \"bucket_names\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \"bucket_names\"" | 
+        grep -A 20 "output \\"bucket_names\\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \\"bucket_names\\"" | 
         grep -v "description" | 
-        grep -v "value = {{" | 
-        grep -v "}}" | 
+        grep -v "value = {" | 
+        grep -v "}" | 
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket name with proper syntax for Terraform
         echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.name" >> "$TEMP_OUTPUTS_FILE"
-        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
-        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }" >> "$TEMP_OUTPUTS_FILE"
+        echo "}" >> "$TEMP_OUTPUTS_FILE"
         echo "" >> "$TEMP_OUTPUTS_FILE"
         
         # Add bucket URLs output
         cat >> "$TEMP_OUTPUTS_FILE" << EOF
-output "bucket_urls" {{
+output "bucket_urls" {
   description = "Map of bucket URLs"
-  value = {{
+  value = {
 EOF
         
         # Add existing bucket URLs from the current outputs.tf
-        grep -A 20 "output \"bucket_urls\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \"bucket_urls\"" | 
+        grep -A 20 "output \\"bucket_urls\\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \\"bucket_urls\\"" | 
         grep -v "description" | 
-        grep -v "value = {{" | 
-        grep -v "}}" | 
+        grep -v "value = {" | 
+        grep -v "}" | 
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket URL with properly escaped interpolation syntax for shell script
         # Use triple quotes to avoid interpolation issues
         cat >> "$TEMP_OUTPUTS_FILE" << 'EOFINNER'
-    RESOURCE_NAME = "gs://${{google_storage_bucket.RESOURCE_NAME.name}}"
+    RESOURCE_NAME = "gs://${google_storage_bucket.RESOURCE_NAME.name}"
 EOFINNER
 
         # Replace RESOURCE_NAME placeholder with actual resource name
         sed -i "s/RESOURCE_NAME/$RESOURCE_NAME/g" "$TEMP_OUTPUTS_FILE"
         
-        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
-        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }" >> "$TEMP_OUTPUTS_FILE"
+        echo "}" >> "$TEMP_OUTPUTS_FILE"
         echo "" >> "$TEMP_OUTPUTS_FILE"
         
         # Add bucket self links output
         cat >> "$TEMP_OUTPUTS_FILE" << EOF
-output "bucket_self_links" {{
+output "bucket_self_links" {
   description = "Map of bucket self links"
-  value = {{
+  value = {
 EOF
         
         # Add existing bucket self links from the current outputs.tf
-        grep -A 20 "output \"bucket_self_links\"" "$BUCKETS_DIR/outputs.tf" | 
-        grep -v "output \"bucket_self_links\"" | 
+        grep -A 20 "output \\"bucket_self_links\\"" "$BUCKETS_DIR/outputs.tf" | 
+        grep -v "output \\"bucket_self_links\\"" | 
         grep -v "description" | 
-        grep -v "value = {{" | 
-        grep -v "}}" | 
+        grep -v "value = {" | 
+        grep -v "}" | 
         grep -v "^$" | 
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket self link
         echo "    $RESOURCE_NAME = google_storage_bucket.$RESOURCE_NAME.self_link" >> "$TEMP_OUTPUTS_FILE"
-        echo "  }}" >> "$TEMP_OUTPUTS_FILE"
-        echo "}}" >> "$TEMP_OUTPUTS_FILE"
+        echo "  }" >> "$TEMP_OUTPUTS_FILE"
+        echo "}" >> "$TEMP_OUTPUTS_FILE"
         
         # Replace the original outputs.tf with our new file
         mv "$TEMP_OUTPUTS_FILE" "$BUCKETS_DIR/outputs.tf"
@@ -263,26 +263,26 @@ EOF
         cat > "$BUCKETS_DIR/outputs.tf" << 'EOF'
 # Output the bucket names and URLs for use in other modules
 
-output "bucket_names" {{
+output "bucket_names" {
   description = "Map of bucket names"
-  value = {{
+  value = {
     RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.name
-  }}
-}}
+  }
+}
 
-output "bucket_urls" {{
+output "bucket_urls" {
   description = "Map of bucket URLs"
-  value = {{
-    RESOURCE_NAME = "gs://${{google_storage_bucket.RESOURCE_NAME.name}}"
-  }}
-}}
+  value = {
+    RESOURCE_NAME = "gs://${google_storage_bucket.RESOURCE_NAME.name}"
+  }
+}
 
-output "bucket_self_links" {{
+output "bucket_self_links" {
   description = "Map of bucket self links"
-  value = {{
+  value = {
     RESOURCE_NAME = google_storage_bucket.RESOURCE_NAME.self_link
-  }}
-}}
+  }
+}
 EOF
 
         # Replace RESOURCE_NAME placeholder with actual resource name
