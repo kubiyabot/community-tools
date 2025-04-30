@@ -38,12 +38,13 @@ terraform {
 }
 EOF
 
-# Format the terraform_content to ensure proper syntax
-# Improved regex to handle multiple arguments in a single line
-FORMATTED_CONTENT=$(echo "$terraform_content" | sed -E 's/\\{\\s*name\\s*=\\s*"([^"]*)"\\s*,\\s*location\\s*=\\s*"([^"]*)"\\s*\\}/{\\\n  name     = "\\1"\\\n  location = "\\2"\\\n}/')
-
-# Create a temporary main.tf file with the provided Terraform content
-echo "$FORMATTED_CONTENT" > main.tf
+# Instead of using sed for formatting, create a properly formatted Terraform file directly
+cat > main.tf << EOF
+resource "google_storage_bucket" "bucket" {
+  name     = "$bucket_name"
+  location = "$region"
+}
+EOF
 echo "Created Terraform configuration files"
 
 # Initialize Terraform
@@ -139,14 +140,20 @@ EOF
         sed -i "/# Bucket: $bucket_name/,/^}}/d" "$BUCKETS_DIR/main.tf"
     fi
     
-    # Modify the terraform_content to use the proper resource name and include labels
-    MODIFIED_CONTENT=$(echo "$terraform_content" | sed "s/resource \\"google_storage_bucket\\" \\"bucket\\"/resource \\"google_storage_bucket\\" \\"$RESOURCE_NAME\\"/")
+    # Create a properly formatted Terraform resource block
+    cat > temp_resource.tf << EOF
+resource "google_storage_bucket" "$RESOURCE_NAME" {
+  name     = "$bucket_name"
+  location = "$region"
+  labels = merge(local.default_labels, {
+    purpose = "application-data"
+    owner   = "$(whoami)"
+  })
+}
+EOF
     
-    # Check if labels are already in the content, if not add them
-    if ! echo "$MODIFIED_CONTENT" | grep -q "labels"; then
-        # Add labels before the closing brace
-        MODIFIED_CONTENT=$(echo "$MODIFIED_CONTENT" | sed "s/}}/\\\n  labels = merge(local.default_labels, {\\\n    purpose = \\"application-data\\"\\\n    owner   = \\"$(whoami)\\"\\\n  })\\\n}}/")
-    fi
+    # Read the formatted content
+    MODIFIED_CONTENT=$(cat temp_resource.tf)
     
     # Append to main.tf with a comment indicating when it was added/updated
     echo "" >> "$BUCKETS_DIR/main.tf"
@@ -222,7 +229,7 @@ EOF
         grep -v "^#" >> "$TEMP_OUTPUTS_FILE" || true
         
         # Add the new bucket URL with properly escaped interpolation syntax for shell script
-        # Use triple quotes to avoid interpolation issues
+        # Use heredoc to avoid interpolation issues
         cat >> "$TEMP_OUTPUTS_FILE" << 'EOFINNER'
     RESOURCE_NAME = "gs://${google_storage_bucket.RESOURCE_NAME.name}"
 EOFINNER
