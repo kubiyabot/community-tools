@@ -6,7 +6,7 @@ pipeline_list = BitbucketCliTool(
     name="bitbucket_pipeline_list",
     description="List pipeline results for a repository",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/" | \
         jq '.values[] | {uuid, state, created_on, target: .target.ref_name}'
     """,
@@ -20,7 +20,7 @@ pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
     description="Get logs for a specific pipeline",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/$step_uuid/log" | \
         jq -r '.content'
     """,
@@ -36,7 +36,7 @@ pipeline_get = BitbucketCliTool(
     name="bitbucket_pipeline_get",
     description="Get details for a specific pipeline",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid" | \
         jq '{
             uuid: .uuid,
@@ -58,7 +58,7 @@ pipeline_steps = BitbucketCliTool(
     name="bitbucket_pipeline_steps",
     description="Get steps for a specific pipeline",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/" | \
         jq '.values[] | {
             uuid: .uuid,

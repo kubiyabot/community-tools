@@ -7,6 +7,5 @@ COMMON_FILES = [
 ]
 
 COMMON_SECRETS = [
-    "BITBUCKET_USERNAME",  # Your Bitbucket username
-    "BITBUCKET_APP_PASSWORD",  # App password with minimal required permissions
+    "BITBUCKET_PASSWORD",  # Your Bitbucket access token/app password
 ] 

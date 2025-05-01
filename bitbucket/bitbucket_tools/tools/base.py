@@ -17,11 +17,10 @@ fi
 
 # Setup Bitbucket authentication
 setup_auth() {{
-    if [ -z "$BITBUCKET_USERNAME" ] || [ -z "$BITBUCKET_APP_PASSWORD" ]; then
-        echo "Error: Bitbucket credentials not set"
+    if [ -z "$BITBUCKET_PASSWORD" ]; then
+        echo "Error: Bitbucket access token not set"
         exit 1
     fi
-    export BITBUCKET_AUTH="$BITBUCKET_USERNAME:$BITBUCKET_APP_PASSWORD"
 }}
 
 setup_auth
