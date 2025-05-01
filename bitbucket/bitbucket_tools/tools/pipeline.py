@@ -6,7 +6,7 @@ pipeline_list = BitbucketCliTool(
     name="bitbucket_pipeline_list",
     description="List pipeline results for a repository",
     content="""
-    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/" | \
         jq '.values[] | {uuid, state, created_on, target: .target.ref_name}'
     """,
@@ -20,9 +20,9 @@ pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
     description="Get logs for a specific pipeline",
     content="""
-    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/$step_uuid/log" | \
-        jq -r '.content'
+        jq -r '.content // "No logs available"'
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
@@ -36,7 +36,7 @@ pipeline_get = BitbucketCliTool(
     name="bitbucket_pipeline_get",
     description="Get details for a specific pipeline",
     content="""
-    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid" | \
         jq '{
             uuid: .uuid,
@@ -58,9 +58,14 @@ pipeline_steps = BitbucketCliTool(
     name="bitbucket_pipeline_steps",
     description="Get steps for a specific pipeline",
     content="""
-    curl -s -H "Authorization: Bearer $BITBUCKET_PASSWORD" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/" | \
-        jq '.values[] | {
+    # Fetch the pipeline steps
+    RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/")
+    
+    # Check if the response contains values
+    if echo "$RESPONSE" | jq -e '.values' > /dev/null 2>&1; then
+        # Process the values if they exist
+        echo "$RESPONSE" | jq '.values[] | {
             uuid: .uuid,
             name: .name,
             state: .state,
@@ -68,6 +73,12 @@ pipeline_steps = BitbucketCliTool(
             completed_on: .completed_on,
             duration_in_seconds: .duration_in_seconds
         }'
+    else
+        # Print the raw response for debugging
+        echo "API Response:"
+        echo "$RESPONSE" | jq '.'
+        echo "No pipeline steps found or invalid response format."
+    fi
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
