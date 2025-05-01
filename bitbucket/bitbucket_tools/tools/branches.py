@@ -6,7 +6,7 @@ branch_list = BitbucketCliTool(
     name="bitbucket_branch_list",
     description="List branches in a Bitbucket repository",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/refs/branches" | \
         jq '.values[] | {name, target: {hash: .target.hash, date: .target.date}}'
     """,
@@ -20,7 +20,7 @@ branch_create = BitbucketCliTool(
     name="bitbucket_branch_create",
     description="Create a new branch in a Bitbucket repository",
     content="""
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "name": "'$branch_name'",
@@ -42,7 +42,7 @@ branch_delete = BitbucketCliTool(
     name="bitbucket_branch_delete",
     description="Delete a branch from a Bitbucket repository",
     content="""
-    curl -X DELETE -u $BITBUCKET_AUTH \
+    curl -X DELETE -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/refs/branches/$branch_name"
     """,
     args=[

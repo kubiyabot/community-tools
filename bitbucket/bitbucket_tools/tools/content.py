@@ -13,7 +13,7 @@ content_create = BitbucketCliTool(
     # Encode content in base64
     CONTENT_B64=$(base64 "$TEMP_FILE")
 
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "message": "'$commit_message'",
@@ -42,7 +42,7 @@ content_get = BitbucketCliTool(
     name="bitbucket_content_get",
     description="Get the contents of a file from a Bitbucket repository",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/src/$ref/$path" | \
         jq -r '.content'
     """,
@@ -58,7 +58,7 @@ content_delete = BitbucketCliTool(
     name="bitbucket_content_delete",
     description="Delete a file from a Bitbucket repository",
     content="""
-    curl -X DELETE -u $BITBUCKET_AUTH \
+    curl -X DELETE -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "message": "'$commit_message'",

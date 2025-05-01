@@ -6,7 +6,7 @@ repo_list = BitbucketCliTool(
     name="bitbucket_repo_list",
     description="List repositories in a Bitbucket workspace",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace" | \
         jq '.values[] | {name, full_name, description, updated_on}'
     """,
@@ -19,7 +19,7 @@ repo_create = BitbucketCliTool(
     name="bitbucket_repo_create",
     description="Create a new Bitbucket repository",
     content="""
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "scm": "git",

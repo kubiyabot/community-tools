@@ -21,6 +21,9 @@ setup_auth() {{
         echo "Error: Bitbucket access token not set"
         exit 1
     fi
+    
+    # Set auth header for Bearer token authentication
+    BITBUCKET_AUTH_HEADER="Authorization: Bearer $BITBUCKET_PASSWORD"
 }}
 
 setup_auth

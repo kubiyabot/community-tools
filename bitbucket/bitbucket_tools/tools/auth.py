@@ -8,7 +8,7 @@ auth_test = BitbucketCliTool(
     content="""
     # Test authentication and get user info
     echo "Testing authentication..."
-    USER_INFO=$(curl -s -u $BITBUCKET_AUTH \
+    USER_INFO=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/user" \
         -w "\\nStatus: %{http_code}")
     
@@ -22,7 +22,7 @@ auth_test = BitbucketCliTool(
         }'
         
         echo "\\nAccessible workspaces:"
-        curl -s -u $BITBUCKET_AUTH \
+        curl -s -H "$BITBUCKET_AUTH_HEADER" \
             "https://api.bitbucket.org/2.0/workspaces" | \
             jq '.values[] | {
                 name: .name,

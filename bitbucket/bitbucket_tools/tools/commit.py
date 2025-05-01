@@ -21,7 +21,7 @@ commit_create = BitbucketCliTool(
 
     # Create the commit
     cd "$TEMP_DIR"
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: multipart/form-data" \
         -F "message=$commit_message" \
         -F "branch=$branch" \
@@ -46,7 +46,7 @@ commit_get = BitbucketCliTool(
     name="bitbucket_commit_get",
     description="Get details of a specific commit",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit" | \
         jq '{
             hash: .hash,
@@ -67,7 +67,7 @@ commit_list = BitbucketCliTool(
     name="bitbucket_commit_list",
     description="List commits in a repository",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commits/$branch" | \
         jq '.values[] | {
             hash: .hash,
@@ -87,7 +87,7 @@ commit_comment = BitbucketCliTool(
     name="bitbucket_commit_comment",
     description="Add a comment to a commit",
     content="""
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "content": {

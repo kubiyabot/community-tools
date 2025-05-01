@@ -6,7 +6,7 @@ pr_list = BitbucketCliTool(
     name="bitbucket_pr_list",
     description="List pull requests in a Bitbucket repository",
     content="""
-    curl -s -u $BITBUCKET_AUTH \
+    curl -s -H "$BITBUCKET_AUTH_HEADER" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pullrequests" | \
         jq '.values[] | {id, title, state, author: .author.display_name, created_on}'
     """,
@@ -20,7 +20,7 @@ pr_create = BitbucketCliTool(
     name="bitbucket_pr_create",
     description="Create a new pull request",
     content="""
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "title": "'$title'",
@@ -44,7 +44,7 @@ pr_comment = BitbucketCliTool(
     name="bitbucket_pr_comment",
     description="Add a comment to a pull request",
     content="""
-    curl -X POST -u $BITBUCKET_AUTH \
+    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "content": {
