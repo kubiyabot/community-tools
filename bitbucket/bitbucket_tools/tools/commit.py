@@ -46,15 +46,26 @@ commit_get = BitbucketCliTool(
     name="bitbucket_commit_get",
     description="Get details of a specific commit",
     content="""
-    curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit" | \
-        jq '{
+    # Fetch the commit details
+    RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit")
+    
+    # Check if the response is valid JSON and has the expected fields
+    if echo "$RESPONSE" | jq -e '.hash' > /dev/null 2>&1; then
+        # Process the response if it has the expected structure
+        echo "$RESPONSE" | jq '{
             hash: .hash,
             message: .message,
             date: .date,
             author: .author.raw,
-            parents: [.parents[].hash]
+            parents: [.parents[].hash // ""]
         }'
+    else
+        # Print the raw response for debugging
+        echo "API Response:"
+        echo "$RESPONSE"
+        echo "Invalid response format or commit not found."
+    fi
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
@@ -67,14 +78,25 @@ commit_list = BitbucketCliTool(
     name="bitbucket_commit_list",
     description="List commits in a repository",
     content="""
-    curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commits/$branch" | \
-        jq '.values[] | {
+    # Fetch the commits
+    RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commits/$branch")
+    
+    # Check if the response contains values
+    if echo "$RESPONSE" | jq -e '.values' > /dev/null 2>&1; then
+        # Process the values if they exist
+        echo "$RESPONSE" | jq '.values[] | {
             hash: .hash,
             message: .message,
             date: .date,
             author: .author.raw
         }'
+    else
+        # Print the raw response for debugging
+        echo "API Response:"
+        echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+        echo "No commits found or invalid response format."
+    fi
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
@@ -87,14 +109,23 @@ commit_comment = BitbucketCliTool(
     name="bitbucket_commit_comment",
     description="Add a comment to a commit",
     content="""
-    curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
+    RESPONSE=$(curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
         -d '{
             "content": {
                 "raw": "'$comment'"
             }
         }' \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments"
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments")
+    
+    # Check if the response is valid
+    if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
+        echo "Comment added successfully!"
+        echo "$RESPONSE" | jq '{id: .id, content: .content.raw, created_on: .created_on}'
+    else
+        echo "Failed to add comment:"
+        echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+    fi
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
