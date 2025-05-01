@@ -3,7 +3,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from .common import COMMON_ENV, COMMON_FILES, COMMON_SECRETS
 
 BITBUCKET_ICON_URL = "https://cdn-icons-png.flaticon.com/512/6125/6125001.png"
-BITBUCKET_CLI_DOCKER_IMAGE = "atlassian/bitbucket-pipelines-runner:latest"
+BITBUCKET_CLI_DOCKER_IMAGE = "alpine:latest"
 
 class BitbucketCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False):
@@ -11,9 +11,8 @@ class BitbucketCliTool(Tool):
 #!/bin/sh
 set -e
 
-if ! command -v jq >/dev/null 2>&1; then
-    apk add --quiet jq curl >/dev/null 2>&1
-fi
+# Install required tools
+apk add --no-cache curl jq bash
 
 # Setup Bitbucket authentication
 setup_auth() {{
