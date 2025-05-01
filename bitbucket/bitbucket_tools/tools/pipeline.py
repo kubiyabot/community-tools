@@ -32,8 +32,52 @@ pipeline_logs = BitbucketCliTool(
     ],
 )
 
+pipeline_get = BitbucketCliTool(
+    name="bitbucket_pipeline_get",
+    description="Get details for a specific pipeline",
+    content="""
+    curl -s -u $BITBUCKET_AUTH \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid" | \
+        jq '{
+            uuid: .uuid,
+            state: .state,
+            created_on: .created_on,
+            completed_on: .completed_on,
+            target: .target.ref_name,
+            build_number: .build_number
+        }'
+    """,
+    args=[
+        Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
+        Arg(name="repo", type="str", description="Repository name", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID", required=True),
+    ],
+)
+
+pipeline_steps = BitbucketCliTool(
+    name="bitbucket_pipeline_steps",
+    description="Get steps for a specific pipeline",
+    content="""
+    curl -s -u $BITBUCKET_AUTH \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/" | \
+        jq '.values[] | {
+            uuid: .uuid,
+            name: .name,
+            state: .state,
+            started_on: .started_on,
+            completed_on: .completed_on,
+            duration_in_seconds: .duration_in_seconds
+        }'
+    """,
+    args=[
+        Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
+        Arg(name="repo", type="str", description="Repository name", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID", required=True),
+    ],
+)
+
 # Register tools
-for tool in [pipeline_list, pipeline_logs]:
+for tool in [pipeline_list, pipeline_logs, pipeline_get, pipeline_steps]:
     tool_registry.register("bitbucket", tool)
 
-__all__ = ['pipeline_list', 'pipeline_logs'] 
+__all__ = ['pipeline_list', 'pipeline_logs', 'pipeline_get', 'pipeline_steps'] 

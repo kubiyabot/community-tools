@@ -40,8 +40,29 @@ pr_create = BitbucketCliTool(
     ],
 )
 
+pr_comment = BitbucketCliTool(
+    name="bitbucket_pr_comment",
+    description="Add a comment to a pull request",
+    content="""
+    curl -X POST -u $BITBUCKET_AUTH \
+        -H "Content-Type: application/json" \
+        -d '{
+            "content": {
+                "raw": "'$comment'"
+            }
+        }' \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pullrequests/$pr_id/comments"
+    """,
+    args=[
+        Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
+        Arg(name="repo", type="str", description="Repository name", required=True),
+        Arg(name="pr_id", type="str", description="Pull request ID", required=True),
+        Arg(name="comment", type="str", description="Comment content (markdown supported)", required=True),
+    ],
+)
+
 # Register tools
-for tool in [pr_list, pr_create]:
+for tool in [pr_list, pr_create, pr_comment]:
     tool_registry.register("bitbucket", tool)
 
-__all__ = ['pr_list', 'pr_create'] 
+__all__ = ['pr_list', 'pr_create', 'pr_comment'] 

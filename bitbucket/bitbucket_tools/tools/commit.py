@@ -83,8 +83,29 @@ commit_list = BitbucketCliTool(
     ],
 )
 
+commit_comment = BitbucketCliTool(
+    name="bitbucket_commit_comment",
+    description="Add a comment to a commit",
+    content="""
+    curl -X POST -u $BITBUCKET_AUTH \
+        -H "Content-Type: application/json" \
+        -d '{
+            "content": {
+                "raw": "'$comment'"
+            }
+        }' \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments"
+    """,
+    args=[
+        Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
+        Arg(name="repo", type="str", description="Repository name", required=True),
+        Arg(name="commit_hash", type="str", description="Commit hash", required=True),
+        Arg(name="comment", type="str", description="Comment content (markdown supported)", required=True),
+    ],
+)
+
 # Register tools
-for tool in [commit_create, commit_get, commit_list]:
+for tool in [commit_create, commit_get, commit_list, commit_comment]:
     tool_registry.register("bitbucket", tool)
 
-__all__ = ['commit_create', 'commit_get', 'commit_list'] 
+__all__ = ['commit_create', 'commit_get', 'commit_list', 'commit_comment']
