@@ -629,3 +629,197 @@ if __name__ == "__main__":
                 )
             ],
         )
+
+class SlackSummaryTool(Tool):
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        # Make sure we include the required environment variables
+        env = ["KUBIYA_USER_EMAIL", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS", *env]
+        secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY"]
+        
+        arg_names_json = json.dumps([arg.name for arg in args])
+        
+        script_content = f"""
+import os
+import sys
+import json
+import logging
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import litellm
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def summarize_thread_with_llm(thread_messages, summary_length="medium", channel_id=None, thread_ts=None):
+    try:
+        logger.info(f"Summarizing thread with {{len(thread_messages)}} messages")
+
+        def format_thread_messages(messages):
+            lines = []
+            for i, msg in enumerate(messages):
+                # Create a message link using timestamp and channel ID if available
+                message_link = ""
+                if channel_id and msg.get('ts'):
+                    message_link = f"https://slack.com/archives/{{channel_id}}/p{{msg['ts'].replace('.', '')}}"
+                    if thread_ts:
+                        message_link += f"?thread_ts={{thread_ts}}&cid={{channel_id}}"
+                
+                # Format the message with its ID
+                lines.append(f"[MSG_ID:{{i+1}}] {{msg.get('text', '')}}\\nTIMESTAMP: {{msg.get('ts', '')}}\\n")
+            
+            return "\\n".join(lines)
+
+        messages_text = format_thread_messages(thread_messages)
+        
+        # Determine the summary length instructions
+        length_instructions = {{
+            "short": "Provide a very concise summary in 2-3 sentences.",
+            "medium": "Provide a balanced summary covering the main points in about 5-7 sentences.",
+            "long": "Provide a comprehensive summary that captures all important details and nuances."
+        }}.get(summary_length.lower(), "Provide a balanced summary covering the main points in about 5-7 sentences.")
+
+        prompt = (
+            "You are analyzing a Slack thread to create a summary. "
+            f"{{length_instructions}} "
+            "Focus on the key points, decisions, action items, and conclusions from the conversation. "
+            "If there are questions that were asked and answered, include both the questions and their answers. "
+            "If there are unresolved questions or action items, highlight those. "
+            "\\n\\n"
+            f"Thread Messages:\\n{{messages_text}}"
+        )
+
+        litellm.request_timeout = 30
+        litellm.num_retries = 3
+
+        llm_messages = [
+            {{"role": "system", "content": "You are a specialized assistant for Slack thread summarization. Your task is to carefully examine Slack thread messages and provide a clear, concise, and accurate summary of the conversation."}},
+            {{"role": "user", "content": prompt}}
+        ]
+
+        modified_metadata = {{
+            "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
+        }}
+
+        base_url = "https://lite-llm.dev.kubiya.ai/"
+
+        response = litellm.completion(
+            messages=llm_messages,
+            model="openai/Llama-4-Scout",
+            api_key=os.environ.get("LITELLM_API_KEY"),
+            base_url=base_url,
+            stream=False,
+            user="michael.bauer@kubiya.ai-staging",
+            max_tokens=2048,
+            temperature=0.7,
+            top_p=0.1,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            timeout=30,
+            extra_body={{
+                "metadata": modified_metadata
+            }}
+        )
+
+        summary = response.choices[0].message.content.strip()
+        logger.info("Thread summary generated successfully")
+        return summary
+
+    except litellm.Timeout:
+        logger.error("LLM request timed out")
+        return "The thread summarization timed out. Please try again later."
+
+    except Exception as e:
+        logger.error(f"Error summarizing thread: {{str(e)}}")
+        return f"Error during thread summarization: {{str(e)}}"
+
+def execute_slack_action(token, action, operation, **kwargs):
+    client = WebClient(token=token)
+    logger.info(f"Executing Slack action: {{action}} for operation: {{operation}}")
+    logger.info(f"Action parameters: {{kwargs}}")
+    
+    # Get required environment variables
+    channel_id = os.environ.get("SLACK_CHANNEL_ID")
+    thread_ts = os.environ.get("SLACK_THREAD_TS")
+    summary_length = kwargs.get("summary_length", "medium")
+    
+    logger.info(f"Using channel_id: {{channel_id}}, thread_ts: {{thread_ts}}")
+    
+    if not channel_id or not thread_ts:
+        return {{"success": False, "error": "Missing required environment variables: SLACK_CHANNEL_ID and/or SLACK_THREAD_TS"}}
+    
+    try:
+        # Get thread messages
+        response = client.conversations_replies(
+            channel=channel_id,
+            ts=thread_ts,
+            limit=1000  # Get as many messages as possible
+        )
+        
+        thread_messages = response["messages"]
+        logger.info(f"Retrieved {{len(thread_messages)}} messages from thread")
+        
+        # Use pagination if needed
+        while response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
+            cursor = response.get("response_metadata", {{}}).get("next_cursor")
+            response = client.conversations_replies(
+                channel=channel_id,
+                ts=thread_ts,
+                cursor=cursor,
+                limit=1000
+            )
+            thread_messages.extend(response["messages"])
+            logger.info(f"Retrieved additional {{len(response['messages'])}} messages from thread")
+        
+        if not thread_messages:
+            return {{"success": True, "summary": "No messages found in this thread."}}
+        
+        # Generate summary
+        summary = summarize_thread_with_llm(thread_messages, summary_length, channel_id, thread_ts)
+        
+        return {{
+            "success": True,
+            "summary": summary
+        }}
+        
+    except SlackApiError as e:
+        error_message = str(e)
+        logger.error(f"Error retrieving thread messages: {{error_message}}")
+        return {{"success": False, "error": error_message}}
+
+if __name__ == "__main__":
+    token = os.environ.get("SLACK_API_TOKEN")
+    if not token:
+        logger.error("SLACK_API_TOKEN is not set")
+        print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
+        sys.exit(1)
+
+    logger.info("Starting Slack summary execution...")
+    arg_names = {arg_names_json}
+    args = {{}}
+    for arg in arg_names:
+        if arg in os.environ:
+            args[arg] = os.environ[arg]
+    
+    result = execute_slack_action(token, "{action}", "{name}", **args)
+    logger.info("Slack summary execution completed")
+    print(json.dumps(result))
+"""
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="python:3.11-slim",
+            content="pip install -q slack-sdk litellm tenacity > /dev/null 2>&1 && python /tmp/script.py",
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+            with_files=[
+                FileSpec(
+                    destination="/tmp/script.py",
+                    content=script_content,
+                )
+            ],
+        )

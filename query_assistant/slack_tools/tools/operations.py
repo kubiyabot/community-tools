@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool, SlackSearchTool
+from .base import SlackTool, SlackSearchTool, SlackSummaryTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Slack Send Message Tool
@@ -168,6 +168,16 @@ slack_search_messages = SlackSearchTool(
     ],
 )
 
+# Slack Summarize Thread Tool
+slack_summarize_thread = SlackSummaryTool(
+    name="slack_summarize_thread",
+    description="Summarize a Slack thread using the thread timestamp and channel ID from the environment",
+    action="conversations_replies",
+    args=[
+        Arg(name="summary_length", type="str", description="Length of the summary: 'short', 'medium', or 'long'", required=False),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -184,7 +194,8 @@ all_tools = [
     slack_get_channel_history,
     slack_send_message_to_predefined_channel,
     slack_get_thread_replies,
-    slack_search_messages
+    slack_search_messages,
+    slack_summarize_thread
 ]
 
 # Register all Slack tools
