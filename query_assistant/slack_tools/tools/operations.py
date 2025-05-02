@@ -171,7 +171,7 @@ slack_search_messages = SlackSearchTool(
 # Slack Summarize Thread Tool
 slack_summarize_thread = SlackSummaryTool(
     name="slack_summarize_thread",
-    description="Summarize a Slack thread using the thread timestamp and channel ID from the environment",
+    description="Retrieve all messages from a Slack thread using the thread timestamp and channel ID from the environment",
     action="conversations_replies",
     args=[],  # No arguments needed
 )
