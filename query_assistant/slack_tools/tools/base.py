@@ -306,15 +306,34 @@ def process_time_filter(oldest_param):
     if not oldest_param:
         return None
         
-    time_pattern = re.match(r'(\d+)([hdm])', oldest_param.lower())
+    # Handle direct Unix timestamp
+    if oldest_param.replace('.', '').isdigit():
+        return oldest_param
+        
+    time_pattern = re.match(r'(\d+)([hdmw])', oldest_param.lower())
     if time_pattern:
         amount = int(time_pattern.group(1))
         unit = time_pattern.group(2)
-        seconds = {{'h': 3600, 'd': 86400, 'm': 60}}[unit]
+        
+        # Calculate seconds based on unit
+        if unit == 'h':
+            seconds = 3600 * amount
+        elif unit == 'd':
+            seconds = 86400 * amount
+        elif unit == 'w':
+            seconds = 604800 * amount
+        elif unit == 'm':
+            seconds = 60 * amount
+        else:
+            return None
+            
+        # Get current time
         current_time = time()
-        offset = amount * seconds
-        target_time = current_time - offset
-        return f"{{target_time:.6f}}"  # Format with exactly 6 decimal places
+        target_time = current_time - seconds
+        
+        # Format with 6 decimal places
+        return f"{{target_time:.6f}}"
+    
     return None
 
 def process_slack_messages(messages, is_reply=False):
@@ -346,7 +365,7 @@ def get_channel_messages(client, channel_id, oldest):
             params = {{
                 "channel": channel_id,
                 "oldest": oldest,
-                "limit": 200  # Recommended by Slack API
+                "limit": 1000  # Recommended by Slack API
             }}
             
             # Add cursor for pagination if we have one
@@ -366,48 +385,54 @@ def get_channel_messages(client, channel_id, oldest):
                 
             messages.extend(batch)
             
-            # Log detailed information about the response
-            logger.info(f"API response - has_more: {{response.get('has_more', False)}}, messages in batch: {{len(batch)}}")
-            
             # Check if there are more messages to fetch via cursor
             if response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
                 cursor = response.get("response_metadata", {{}}).get("next_cursor")
                 latest = None  # Reset latest when using cursor
-                logger.info(f"Retrieved {{len(batch)}} messages, continuing with cursor: {{cursor[:10] if cursor else 'None'}}...")
             # If has_more is true but no cursor, use time-based pagination
-            elif response.get("has_more", False) and batch:
+            elif response.get("has_more", False):
                 # Get the timestamp of the oldest message in this batch
-                latest = batch[-1].get("ts")
-                cursor = None  # Reset cursor when using time-based pagination
-                logger.info(f"No cursor but has_more is true. Using time-based pagination with latest={{latest}}")
+                if batch:
+                    latest = batch[-1].get("ts")
+                    cursor = None  # Reset cursor when using time-based pagination
+                else:
+                    break
             else:
-                logger.info("No more messages to retrieve, pagination complete")
                 break
                 
             # Safety limit to prevent excessive API calls
-            if len(messages) >= 10000:
-                logger.info(f"Reached maximum message limit (10000), stopping pagination")
+            if len(messages) >= 50000:
+                logger.info(f"Reached maximum message limit (50000), stopping pagination")
                 break
         
-        logger.info(f"Total messages retrieved after pagination: {{len(messages)}}")
+        logger.info(f"Total messages retrieved: {{len(messages)}}")
         
         # Process messages for LLM analysis
         processed_messages = []
+        
         for msg in messages:
             processed_msg = {{
                 "message": msg.get("text", ""),
                 "timestamp": msg.get("ts", "")
             }}
+
+            # Check if message has a thread
+            thread_ts = msg.get("thread_ts")
+            if thread_ts and thread_ts == msg.get("ts"):
+                replies = get_thread_replies(client, channel_id, thread_ts)
+                
+                # Attach replies under parent message
+                processed_msg["replies"] = [
+                    {{
+                        "message": reply.get("text", ""),
+                        "timestamp": reply.get("ts", "")
+                    }}
+                    for reply in replies
+                ]
+            else:
+                processed_msg["replies"] = []  # no replies
+
             processed_messages.append(processed_msg)
-        
-        # Log a sample of messages (first 3)
-        sample_size = min(3, len(processed_messages))
-        if sample_size > 0:
-            logger.info(f"Retrieved {{len(processed_messages)}} messages from channel. Sample:")
-            for i in range(sample_size):
-                logger.info(f"  Message {{i+1}}: {{processed_messages[i]['message'][:100]}}...")
-        else:
-            logger.info("No messages retrieved from channel")
             
         return processed_messages
         
@@ -415,46 +440,91 @@ def get_channel_messages(client, channel_id, oldest):
         logger.error(f"Error fetching channel history: {{e}}")
         return []
 
-def analyze_messages_with_llm(messages, query):
+def get_thread_replies(client, channel_id, thread_ts):
+    try:
+        replies = []
+        cursor = None
+        while True:
+            params = {{
+                "channel": channel_id,
+                "ts": thread_ts,
+                "limit": 200
+            }}
+            if cursor:
+                params["cursor"] = cursor
+            
+            response = client.conversations_replies(**params)
+            thread_messages = response["messages"]
+            
+            # Skip the first message (it's the parent)
+            replies_batch = thread_messages[1:] if len(thread_messages) > 1 else []
+            replies.extend(replies_batch)
+            
+            if response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
+                cursor = response.get("response_metadata", {{}}).get("next_cursor")
+            else:
+                break
+        
+        return replies
+
+    except SlackApiError as e:
+        logger.error(f"Error fetching replies for thread {{thread_ts}}: {{e}}")
+        return []
+        
+def analyze_messages_with_llm(messages, query, channel_id):
     try:
         logger.info(f"Analyzing {{len(messages)}} messages with query: {{query}}")
-        
-        messages_text = "\\n".join([
-            f"Message {{i+1}} (ts: {{msg['timestamp']}}): {{msg['message']}}" 
-            for i, msg in enumerate(messages)
-        ])
-        
+
+        def format_messages(messages):
+            lines = []
+            for i, msg in enumerate(messages):
+                # Create a message link using timestamp and channel ID
+                message_link = f"https://slack.com/archives/{{channel_id}}/p{{msg['timestamp'].replace('.', '')}}"
+                # Include a unique message ID and make the link more prominent
+                lines.append(f"[MSG_ID:{{i+1}}] {{msg['message']}}\\nLINK: {{message_link}}\\nTIMESTAMP: {{msg['timestamp']}}\\n")
+                
+                for j, reply in enumerate(msg.get("replies", [])):
+                    # Create a reply link using thread timestamp and reply timestamp
+                    reply_link = f"https://slack.com/archives/{{channel_id}}/p{{msg['timestamp'].replace('.', '')}}?thread_ts={{msg['timestamp']}}&cid={{channel_id}}"
+                    # Include a unique reply ID and make the link more prominent
+                    lines.append(f"  [REPLY_ID:{{i+1}}.{{j+1}}] {{reply['message']}}\\n  LINK: {{reply_link}}\\n  TIMESTAMP: {{reply['timestamp']}}\\n")
+            return "\\n".join(lines)
+
+        messages_text = format_messages(messages)
+
         prompt = (
             "You are analyzing Slack messages to find information that answers the user's query. "
             "Focus on finding the most relevant and accurate information from the messages provided. "
             "If multiple messages contain relevant information, synthesize them into a coherent answer. "
-            "If you find a message that seems to be the start of a relevant thread, highlight it and its timestamp. "
+            "\\n\\n"
+            "IMPORTANT: At the end of your answer, you MUST include the EXACT link of the SPECIFIC message "
+            "that contains the most relevant information. Use the format: 'MESSAGE_LINK: <exact link>'. "
+            "Do not modify or reconstruct the link - copy it exactly as provided in the message data. "
+            "Each message has a unique MSG_ID or REPLY_ID - reference this ID when citing information. "
+            "\\n\\n"
+            "Answers may appear in a reply to an earlier message, or as a separate message posted later in the channel. "
             "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
             "\\n\\n"
             f"Query: {{query}}\\n\\n"
             f"Messages:\\n{{messages_text}}"
         )
-        
-        # Log a truncated version of the prompt
-        prompt_preview = prompt[:500] + "..." if len(prompt) > 500 else prompt
-        logger.info(f"Sending prompt to LLM: {{prompt_preview}}")
-        
+
         litellm.request_timeout = 30
         litellm.num_retries = 3
-        
-        messages = [
-            {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification. If a message appears to be the start of a relevant thread, note its timestamp in your response."}},
+
+        llm_messages = [
+            {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification."}},
             {{"role": "user", "content": prompt}}
         ]
 
         modified_metadata = {{
             "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
         }}
-        
+
         base_url = "https://lite-llm.dev.kubiya.ai/"
-        
+
         response = litellm.completion(
-            messages=messages,
+            messages=llm_messages,
             model="openai/Llama-4-Scout",
             api_key=os.environ.get("LITELLM_API_KEY"),
             base_url=base_url,
@@ -470,7 +540,7 @@ def analyze_messages_with_llm(messages, query):
                 "metadata": modified_metadata
             }}
         )
-        
+
         answer = response.choices[0].message.content.strip()
         logger.info("LLM response received successfully")
         return answer
@@ -501,7 +571,7 @@ def execute_slack_action(token, action, operation, **kwargs):
     # Process time filter
     oldest_ts = process_time_filter(oldest)
     if not oldest_ts:
-        return {{"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', or '30m'"}}
+        return {{"success": False, "answer": "Invalid time filter format. Use format like '1h', '2d', '1w', or '30m'"}}
     
     logger.info(f"Fetching messages from channel {{channel_id}} since {{oldest_ts}}")
     
@@ -514,7 +584,7 @@ def execute_slack_action(token, action, operation, **kwargs):
     logger.info(f"Found {{len(messages)}} messages to analyze")
     
     # Get answer from LLM
-    answer = analyze_messages_with_llm(messages, query)
+    answer = analyze_messages_with_llm(messages, query, channel_id)
     
     return {{
         "success": True,
