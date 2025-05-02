@@ -650,9 +650,13 @@ import litellm
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def summarize_thread_with_llm(thread_messages, summary_length="medium", channel_id=None, thread_ts=None):
+def summarize_thread_with_llm(thread_messages):
     try:
         logger.info(f"Summarizing thread with {{len(thread_messages)}} messages")
+        
+        # Get channel_id and thread_ts from environment
+        channel_id = os.environ.get("SLACK_CHANNEL_ID")
+        thread_ts = os.environ.get("SLACK_THREAD_TS")
 
         def format_thread_messages(messages):
             lines = []
@@ -671,19 +675,12 @@ def summarize_thread_with_llm(thread_messages, summary_length="medium", channel_
 
         messages_text = format_thread_messages(thread_messages)
         
-        # Determine the summary length instructions
-        length_instructions = {{
-            "short": "Provide a very concise summary in 2-3 sentences.",
-            "medium": "Provide a balanced summary covering the main points in about 5-7 sentences.",
-            "long": "Provide a comprehensive summary that captures all important details and nuances."
-        }}.get(summary_length.lower(), "Provide a balanced summary covering the main points in about 5-7 sentences.")
-
         prompt = (
             "You are analyzing a Slack thread to create a summary. "
-            f"{{length_instructions}} "
-            "Focus on the key points, decisions, action items, and conclusions from the conversation. "
+            "Provide a clear and concise summary that captures the key points, decisions, action items, and conclusions from the conversation. "
             "If there are questions that were asked and answered, include both the questions and their answers. "
             "If there are unresolved questions or action items, highlight those. "
+            "Use your judgment to determine the appropriate length based on the complexity and content of the thread. "
             "\\n\\n"
             f"Thread Messages:\\n{{messages_text}}"
         )
@@ -740,7 +737,6 @@ def execute_slack_action(token, action, operation, **kwargs):
     # Get required environment variables
     channel_id = os.environ.get("SLACK_CHANNEL_ID")
     thread_ts = os.environ.get("SLACK_THREAD_TS")
-    summary_length = kwargs.get("summary_length", "medium")
     
     logger.info(f"Using channel_id: {{channel_id}}, thread_ts: {{thread_ts}}")
     
@@ -774,7 +770,7 @@ def execute_slack_action(token, action, operation, **kwargs):
             return {{"success": True, "summary": "No messages found in this thread."}}
         
         # Generate summary
-        summary = summarize_thread_with_llm(thread_messages, summary_length, channel_id, thread_ts)
+        summary = summarize_thread_with_llm(thread_messages)
         
         return {{
             "success": True,

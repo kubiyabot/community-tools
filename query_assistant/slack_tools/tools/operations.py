@@ -173,9 +173,7 @@ slack_summarize_thread = SlackSummaryTool(
     name="slack_summarize_thread",
     description="Summarize a Slack thread using the thread timestamp and channel ID from the environment",
     action="conversations_replies",
-    args=[
-        Arg(name="summary_length", type="str", description="Length of the summary: 'short', 'medium', or 'long'", required=False),
-    ],
+    args=[],  # No arguments needed
 )
 
 # Update the all_tools list
