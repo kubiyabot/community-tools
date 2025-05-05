@@ -395,7 +395,7 @@ def get_channel_messages(client, channel_id, oldest):
             params = {{
                 "channel": channel_id,
                 "oldest": oldest,
-                "limit": 1000  # Recommended by Slack API
+                "limit": 250  # Recommended by Slack API
             }}
             
             # Add cursor for pagination if we have one
