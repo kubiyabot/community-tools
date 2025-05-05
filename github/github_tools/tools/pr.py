@@ -431,7 +431,7 @@ fi
         Arg(
             name="failures_and_fixes",
             type="str",
-            description="""Detailed analysis of workflow failures and suggested fixes in plain GitHub Markdown format.
+            description="""Detailed analysis of workflow failures and suggested fixes in GitHub Markdown format.
 
 The required format uses standard GitHub Markdown formatting:
 - Headers (### for headings) to identify each issue
@@ -439,9 +439,8 @@ The required format uses standard GitHub Markdown formatting:
 - Lists (bullet points or numbered) for steps
 - Code blocks (``` for code snippets)
 
-Focus on critical issues only with very accurate, focused, and practical fixes.
-Each suggestion must be actionable and directly address the root cause of the failure.
-DO NOT use URL encoding (like %0A for newlines) - use regular Markdown syntax.
+Focus on critical issues with accurate, focused, and practical fixes.
+Each suggestion must directly address the root cause of the failure.
 
 Example format:
 ```
