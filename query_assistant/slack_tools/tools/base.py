@@ -262,9 +262,10 @@ import logging
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import litellm
-from time import time
+from time import time, sleep
 import re
 from fuzzywuzzy import fuzz
+import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -354,6 +355,35 @@ def process_slack_messages(messages, is_reply=False):
     
     return "Messages printed individually"  # Return a placeholder
 
+def retry_with_backoff(func, max_retries=5, initial_delay=1, max_delay=60):
+    retries = 0
+    delay = initial_delay
+    
+    while retries < max_retries:
+        try:
+            return func()
+        except SlackApiError as e:
+            error_message = str(e)
+            
+            # Check if rate limited
+            if "ratelimited" in error_message:
+                # Add jitter to avoid thundering herd problem
+                jitter = random.uniform(0, 0.1 * delay)
+                sleep_time = delay + jitter
+                
+                logger.warning(f"Rate limited. Retrying in {{sleep_time:.2f}} seconds (attempt {{retries+1}}/{{max_retries}})")
+                sleep(sleep_time)
+                
+                # Exponential backoff
+                delay = min(delay * 2, max_delay)
+                retries += 1
+            else:
+                # If not rate limited, re-raise the exception
+                raise
+    
+    # If we've exhausted retries, raise the last exception
+    raise Exception(f"Failed after {{max_retries}} retries due to rate limiting")
+
 def get_channel_messages(client, channel_id, oldest):
     try:
         messages = []
@@ -375,8 +405,12 @@ def get_channel_messages(client, channel_id, oldest):
             # Add latest timestamp for time-based pagination if we have one
             if latest:
                 params["latest"] = latest
+            
+            # Use retry with backoff for API call
+            def api_call():
+                return client.conversations_history(**params)
                 
-            response = client.conversations_history(**params)
+            response = retry_with_backoff(api_call)
             batch = response["messages"]
             
             if not batch:
@@ -453,7 +487,11 @@ def get_thread_replies(client, channel_id, thread_ts):
             if cursor:
                 params["cursor"] = cursor
             
-            response = client.conversations_replies(**params)
+            # Use retry with backoff for API call
+            def api_call():
+                return client.conversations_replies(**params)
+                
+            response = retry_with_backoff(api_call)
             thread_messages = response["messages"]
             
             # Skip the first message (it's the parent)
@@ -467,7 +505,7 @@ def get_thread_replies(client, channel_id, thread_ts):
         
         return replies
 
-    except SlackApiError as e:
+    except Exception as e:
         logger.error(f"Error fetching replies for thread {{thread_ts}}: {{e}}")
         return []
         
