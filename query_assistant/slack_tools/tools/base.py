@@ -621,7 +621,7 @@ def analyze_messages_with_llm(messages, query, channel_id):
                 all_results.append(chunk_result)
             
             # Combine results
-            combined_result = "I've analyzed all messages in chunks due to the large volume. Here's what I found:\n\n"
+            combined_result = "I've analyzed all messages in chunks due to the large volume. Here's what I found:\\n\\n"
             for i, result in enumerate(all_results):
                 combined_result += f"--- Chunk {{i+1}} Results ---\\n{{result}}\\n\\n"
                 
