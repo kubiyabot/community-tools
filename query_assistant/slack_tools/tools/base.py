@@ -528,60 +528,158 @@ def analyze_messages_with_llm(messages, query, channel_id):
                     lines.append(f"  [REPLY_ID:{{i+1}}.{{j+1}}] {{reply['message']}}\\n  LINK: {{reply_link}}\\n  TIMESTAMP: {{reply['timestamp']}}\\n")
             return "\\n".join(lines)
 
+        # Format all messages first
         messages_text = format_messages(messages)
+        
+        # Check if we need to chunk the messages
+        MAX_CHUNK_SIZE = 50000  # Conservative limit for API request
+        
+        if len(messages_text) > MAX_CHUNK_SIZE:
+            logger.info(f"Messages text too large ({{len(messages_text)}} chars), processing in chunks")
+            
+            # Split by message boundaries (each message starts with [MSG_ID:)
+            message_blocks = messages_text.split("[MSG_ID:")
+            
+            # First element is empty, skip it
+            if message_blocks and not message_blocks[0].strip():
+                message_blocks = message_blocks[1:]
+                
+            # Add the prefix back to each message
+            message_blocks = ["[MSG_ID:" + block if i > 0 else block for i, block in enumerate(message_blocks)]
+            
+            # Create chunks of messages
+            chunks = []
+            current_chunk = ""
+            
+            for block in message_blocks:
+                if len(current_chunk) + len(block) < MAX_CHUNK_SIZE:
+                    current_chunk += block
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = block
+                    
+            # Add the last chunk if it's not empty
+            if current_chunk:
+                chunks.append(current_chunk)
+                
+            logger.info(f"Split messages into {{len(chunks)}} chunks")
+            
+            # Process each chunk separately
+            all_results = []
+            for i, chunk in enumerate(chunks):
+                logger.info(f"Processing chunk {{i+1}}/{{len(chunks)}}")
+                
+                # Create prompt for this chunk
+                chunk_prompt = (
+                    "You are analyzing Slack messages to find information that answers the user's query. "
+                    "Focus on finding the most relevant and accurate information from the messages provided. "
+                    "If multiple messages contain relevant information, synthesize them into a coherent answer. "
+                    "\\n\\n"
+                    "IMPORTANT: At the end of your answer, you MUST include the EXACT link of the SPECIFIC message "
+                    "that contains the most relevant information. Use the format: 'MESSAGE_LINK: <exact link>'. "
+                    "Do not modify or reconstruct the link - copy it exactly as provided in the message data. "
+                    "Each message has a unique MSG_ID or REPLY_ID - reference this ID when citing information. "
+                    "\\n\\n"
+                    "Answers may appear in a reply to an earlier message, or as a separate message posted later in the channel. "
+                    "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
+                    "\\n\\n"
+                    f"Query: {{query}}\\n\\n"
+                    f"Messages (Chunk {{i+1}} of {{len(chunks)}}):\\n{{chunk}}"
+                )
+                
+                chunk_messages = [
+                    {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification."}},
+                    {{"role": "user", "content": chunk_prompt}}
+                ]
+                
+                modified_metadata = {{
+                    "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
+                }}
+                
+                base_url = "https://lite-llm.dev.kubiya.ai/"
+                
+                response = litellm.completion(
+                    messages=chunk_messages,
+                    model="openai/Llama-4-Scout",
+                    api_key=os.environ.get("LITELLM_API_KEY"),
+                    base_url=base_url,
+                    stream=False,
+                    user="michael.bauer@kubiya.ai-staging",
+                    max_tokens=2048,
+                    temperature=0.7,
+                    top_p=0.1,
+                    presence_penalty=0.0,
+                    frequency_penalty=0.0,
+                    timeout=30,
+                    extra_body={{
+                        "metadata": modified_metadata
+                    }}
+                )
+                
+                chunk_result = response.choices[0].message.content.strip()
+                all_results.append(chunk_result)
+            
+            # Combine results
+            combined_result = "I've analyzed all messages in chunks due to the large volume. Here's what I found:\n\n"
+            for i, result in enumerate(all_results):
+                combined_result += f"--- Chunk {{i+1}} Results ---\\n{{result}}\\n\\n"
+                
+            return combined_result
+        else:
+            # Process normally if size is manageable
+            prompt = (
+                "You are analyzing Slack messages to find information that answers the user's query. "
+                "Focus on finding the most relevant and accurate information from the messages provided. "
+                "If multiple messages contain relevant information, synthesize them into a coherent answer. "
+                "\\n\\n"
+                "IMPORTANT: At the end of your answer, you MUST include the EXACT link of the SPECIFIC message "
+                "that contains the most relevant information. Use the format: 'MESSAGE_LINK: <exact link>'. "
+                "Do not modify or reconstruct the link - copy it exactly as provided in the message data. "
+                "Each message has a unique MSG_ID or REPLY_ID - reference this ID when citing information. "
+                "\\n\\n"
+                "Answers may appear in a reply to an earlier message, or as a separate message posted later in the channel. "
+                "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
+                "\\n\\n"
+                f"Query: {{query}}\\n\\n"
+                f"Messages:\\n{{messages_text}}"
+            )
 
-        prompt = (
-            "You are analyzing Slack messages to find information that answers the user's query. "
-            "Focus on finding the most relevant and accurate information from the messages provided. "
-            "If multiple messages contain relevant information, synthesize them into a coherent answer. "
-            "\\n\\n"
-            "IMPORTANT: At the end of your answer, you MUST include the EXACT link of the SPECIFIC message "
-            "that contains the most relevant information. Use the format: 'MESSAGE_LINK: <exact link>'. "
-            "Do not modify or reconstruct the link - copy it exactly as provided in the message data. "
-            "Each message has a unique MSG_ID or REPLY_ID - reference this ID when citing information. "
-            "\\n\\n"
-            "Answers may appear in a reply to an earlier message, or as a separate message posted later in the channel. "
-            "If you cannot find a clear answer in the provided messages, state that clearly and suggest what kind of information might help. "
-            "\\n\\n"
-            f"Query: {{query}}\\n\\n"
-            f"Messages:\\n{{messages_text}}"
-        )
+            litellm.request_timeout = 30
+            litellm.num_retries = 3
 
-        litellm.request_timeout = 30
-        litellm.num_retries = 3
+            llm_messages = [
+                {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification."}},
+                {{"role": "user", "content": prompt}}
+            ]
 
-        llm_messages = [
-            {{"role": "system", "content": "You are a specialized assistant for Slack message analysis. Your task is to carefully examine Slack messages, identify relevant information that answers the user's query, and provide clear, concise responses. Pay special attention to message timestamps as they may be needed for thread identification."}},
-            {{"role": "user", "content": prompt}}
-        ]
-
-        modified_metadata = {{
-            "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
-        }}
-
-        base_url = "https://lite-llm.dev.kubiya.ai/"
-
-        response = litellm.completion(
-            messages=llm_messages,
-            model="openai/Llama-4-Scout",
-            api_key=os.environ.get("LITELLM_API_KEY"),
-            base_url=base_url,
-            stream=False,
-            user="michael.bauer@kubiya.ai-staging",
-            max_tokens=2048,
-            temperature=0.7,
-            top_p=0.1,
-            presence_penalty=0.0,
-            frequency_penalty=0.0,
-            timeout=30,
-            extra_body={{
-                "metadata": modified_metadata
+            modified_metadata = {{
+                "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
             }}
-        )
 
-        answer = response.choices[0].message.content.strip()
-        logger.info("LLM response received successfully")
-        return answer
+            base_url = "https://lite-llm.dev.kubiya.ai/"
+
+            response = litellm.completion(
+                messages=llm_messages,
+                model="openai/Llama-4-Scout",
+                api_key=os.environ.get("LITELLM_API_KEY"),
+                base_url=base_url,
+                stream=False,
+                user="michael.bauer@kubiya.ai-staging",
+                max_tokens=2048,
+                temperature=0.7,
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=30,
+                extra_body={{
+                    "metadata": modified_metadata
+                }}
+            )
+
+            answer = response.choices[0].message.content.strip()
+            logger.info("LLM response received successfully")
+            return answer
 
     except litellm.Timeout:
         logger.error("LLM request timed out")
