@@ -531,6 +531,163 @@ ec2_describe_network_interfaces = AWSCliTool(
     """
 )
 
+ec2_create_instance_from_config = AWSSdkTool(
+    name="ec2_create_instance_from_config",
+    description="Create EC2 instances based on a JSON configuration file",
+    content="""
+import boto3
+import json
+
+def create_instances_from_config(config_json):
+    ec2 = boto3.resource('ec2')
+    config = json.loads(config_json)
+    
+    instances = []
+    for instance_config in config.get('instances', []):
+        response = ec2.create_instances(
+            ImageId=instance_config.get('ImageId'),
+            InstanceType=instance_config.get('InstanceType'),
+            KeyName=instance_config.get('KeyName'),
+            MinCount=instance_config.get('MinCount', 1),
+            MaxCount=instance_config.get('MaxCount', 1),
+            SecurityGroupIds=instance_config.get('SecurityGroupIds', []),
+            SubnetId=instance_config.get('SubnetId'),
+            UserData=instance_config.get('UserData'),
+            BlockDeviceMappings=instance_config.get('BlockDeviceMappings', []),
+            TagSpecifications=instance_config.get('TagSpecifications', [])
+        )
+        instances.extend(response)
+    
+    instance_ids = [instance.id for instance in instances]
+    print(f"Created instances: {instance_ids}")
+    return instance_ids
+
+result = create_instances_from_config(config_json)
+print(result)
+    """,
+    args=[
+        Arg(name="config_json", type="str", description="JSON configuration for EC2 instances", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Create EC2 from config| B[🤖 TeamMate]
+        B --> C{{"Configuration JSON?" 📝}}
+        C --> D[User provides config ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS creates instances 🚀]
+        F --> G[User receives instance IDs 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_create_launch_template = AWSCliTool(
+    name="ec2_create_launch_template",
+    description="Create an EC2 launch template",
+    content="aws ec2 create-launch-template --launch-template-name $template_name --version-description $version_description --launch-template-data '$template_data'",
+    args=[
+        Arg(name="template_name", type="str", description="Name for the launch template", required=True),
+        Arg(name="version_description", type="str", description="Description for this version", required=True),
+        Arg(name="template_data", type="str", description="JSON template data with instance configuration", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Create launch template| B[🤖 TeamMate]
+        B --> C{{"Template details?" 📝}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS creates template 📋]
+        F --> G[User receives confirmation 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_list_launch_templates = AWSCliTool(
+    name="ec2_list_launch_templates",
+    description="List EC2 launch templates",
+    content="aws ec2 describe-launch-templates",
+    args=[],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List launch templates| B[🤖 TeamMate]
+        B --> C[API request to AWS ☁️]
+        C --> D[AWS retrieves templates 📋]
+        D --> E[User receives template list 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style D fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style E fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_get_launch_template = AWSCliTool(
+    name="ec2_get_launch_template",
+    description="Get details of an EC2 launch template",
+    content="aws ec2 describe-launch-template-versions --launch-template-name $template_name $([[ -n \"$version\" ]] && echo \"--versions $version\")",
+    args=[
+        Arg(name="template_name", type="str", description="Name of the launch template", required=True),
+        Arg(name="version", type="str", description="Version number (optional, defaults to all versions)", required=False),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Get template details| B[🤖 TeamMate]
+        B --> C{{"Template name?" 📝}}
+        C --> D[User provides name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves template details 📋]
+        F --> G[User receives template information 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_delete_launch_template = AWSCliTool(
+    name="ec2_delete_launch_template",
+    description="Delete an EC2 launch template",
+    content="aws ec2 delete-launch-template --launch-template-name $template_name",
+    args=[
+        Arg(name="template_name", type="str", description="Name of the launch template to delete", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Delete template| B[🤖 TeamMate]
+        B --> C{{"Template name?" 📝}}
+        C --> D[User provides name ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS deletes template 🗑️]
+        F --> G[User receives confirmation 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -551,3 +708,8 @@ tool_registry.register("aws", ec2_describe_availability_zones)
 tool_registry.register("aws", ec2_describe_images)
 tool_registry.register("aws", ec2_get_instance_cpu_info)
 tool_registry.register("aws", ec2_describe_network_interfaces)
+tool_registry.register("aws", ec2_create_instance_from_config)
+tool_registry.register("aws", ec2_create_launch_template)
+tool_registry.register("aws", ec2_list_launch_templates)
+tool_registry.register("aws", ec2_get_launch_template)
+tool_registry.register("aws", ec2_delete_launch_template)
