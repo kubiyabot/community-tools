@@ -688,6 +688,144 @@ ec2_delete_launch_template = AWSCliTool(
     """
 )
 
+ec2_list_security_groups = AWSCliTool(
+    name="ec2_list_security_groups",
+    description="List security groups in the current region",
+    content="aws ec2 describe-security-groups $([[ -n \"$vpc_id\" ]] && echo \"--filters Name=vpc-id,Values=$vpc_id\")",
+    args=[
+        Arg(name="vpc_id", type="str", description="Filter security groups by VPC ID (optional)", required=False),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: List security groups| B[🤖 TeamMate]
+        B --> C{{"VPC ID (optional)?" 🔢}}
+        C --> D[User provides VPC ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS retrieves security groups 🔄]
+        F --> G[User receives security group details 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_create_security_group = AWSCliTool(
+    name="ec2_create_security_group",
+    description="Create a new security group",
+    content="aws ec2 create-security-group --group-name $group_name --description \"$description\" $([[ -n \"$vpc_id\" ]] && echo \"--vpc-id $vpc_id\")",
+    args=[
+        Arg(name="group_name", type="str", description="Name for the security group", required=True),
+        Arg(name="description", type="str", description="Description for the security group", required=True),
+        Arg(name="vpc_id", type="str", description="ID of the VPC (optional for EC2-Classic)", required=False),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Create security group| B[🤖 TeamMate]
+        B --> C{{"Security group details?" 🔢}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS creates security group 🚀]
+        F --> G[User receives security group ID 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_delete_security_group = AWSCliTool(
+    name="ec2_delete_security_group",
+    description="Delete a security group",
+    content="aws ec2 delete-security-group --group-id $group_id",
+    args=[
+        Arg(name="group_id", type="str", description="ID of the security group to delete", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Delete security group| B[🤖 TeamMate]
+        B --> C{{"Security group ID?" 🔢}}
+        C --> D[User provides group ID ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS deletes security group 🗑️]
+        F --> G[User receives confirmation 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_authorize_security_group_ingress = AWSCliTool(
+    name="ec2_authorize_security_group_ingress",
+    description="Add an inbound rule to a security group",
+    content="aws ec2 authorize-security-group-ingress --group-id $group_id --protocol $protocol --port $port --cidr $cidr",
+    args=[
+        Arg(name="group_id", type="str", description="ID of the security group", required=True),
+        Arg(name="protocol", type="str", description="Protocol (tcp, udp, icmp, or a protocol number)", required=True),
+        Arg(name="port", type="str", description="Port number or range (e.g., '22' or '0-65535')", required=True),
+        Arg(name="cidr", type="str", description="CIDR IP range (e.g., '0.0.0.0/0' for anywhere)", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Add inbound rule| B[🤖 TeamMate]
+        B --> C{{"Rule details?" 🔢}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS adds rule to security group 🔒]
+        F --> G[User receives confirmation 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
+ec2_authorize_security_group_egress = AWSCliTool(
+    name="ec2_authorize_security_group_egress",
+    description="Add an outbound rule to a security group",
+    content="aws ec2 authorize-security-group-egress --group-id $group_id --protocol $protocol --port $port --cidr $cidr",
+    args=[
+        Arg(name="group_id", type="str", description="ID of the security group", required=True),
+        Arg(name="protocol", type="str", description="Protocol (tcp, udp, icmp, or a protocol number)", required=True),
+        Arg(name="port", type="str", description="Port number or range (e.g., '22' or '0-65535')", required=True),
+        Arg(name="cidr", type="str", description="CIDR IP range (e.g., '0.0.0.0/0' for anywhere)", required=True),
+    ],
+    mermaid_diagram="""
+    graph TD
+        A[👤 User] -->|Request: Add outbound rule| B[🤖 TeamMate]
+        B --> C{{"Rule details?" 🔢}}
+        C --> D[User provides details ✍️]
+        D --> E[API request to AWS ☁️]
+        E --> F[AWS adds rule to security group 🔒]
+        F --> G[User receives confirmation 📄]
+
+        style A fill:#f0f9ff,stroke:#0369a1,stroke-width:2px;
+        style B fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+        style C fill:#d1fae5,stroke:#059669,stroke-width:2px;
+        style D fill:#bbf7d0,stroke:#16a34a,stroke-width:2px;
+        style E fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
+        style F fill:#ffedd5,stroke:#ea580c,stroke-width:2px;
+        style G fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    """
+)
+
 tool_registry.register("aws", ec2_describe_instances)
 tool_registry.register("aws", ec2_start_instance)
 tool_registry.register("aws", ec2_stop_instance)
@@ -713,3 +851,8 @@ tool_registry.register("aws", ec2_create_launch_template)
 tool_registry.register("aws", ec2_list_launch_templates)
 tool_registry.register("aws", ec2_get_launch_template)
 tool_registry.register("aws", ec2_delete_launch_template)
+tool_registry.register("aws", ec2_list_security_groups)
+tool_registry.register("aws", ec2_create_security_group)
+tool_registry.register("aws", ec2_delete_security_group)
+tool_registry.register("aws", ec2_authorize_security_group_ingress)
+tool_registry.register("aws", ec2_authorize_security_group_egress)
