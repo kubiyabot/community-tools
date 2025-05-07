@@ -463,40 +463,57 @@ class ApplicationManager:
                 exit 1
             fi
 
+            # Verify environment variables
+            if [ -z "$ARGOCD_SERVER" ]; then
+                echo "Error: ARGOCD_SERVER environment variable is not set"
+                exit 1
+            fi
+
+            if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+                echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
+                exit 1
+            fi
+
             # Get current application status
             echo "🔍 Checking current application status..."
-            app_status=$(argocd app get "$app_name" --insecure -o json)
-            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+            app_status=$(argocd app get "$app_name" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure -o json)
+            if [ $? -ne 0 ]; then
+                echo "❌ Failed to get application status"
+                exit 1
+            fi
             
+            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
             echo "Current sync status: $sync_status"
             
             if [ "$sync_status" = "Synced" ]; then
                 echo "⚠️ Application is already synced. Forcing refresh to detect changes..."
-                argocd app refresh "$app_name" --insecure || {
+                argocd app refresh "$app_name" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure
+                if [ $? -ne 0 ]; then
                     echo "❌ Failed to refresh application"
                     exit 1
-                }
+                fi
                 
                 # Check again after refresh
-                app_status=$(argocd app get "$app_name" --insecure -o json)
+                app_status=$(argocd app get "$app_name" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure -o json)
                 sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
                 echo "Sync status after refresh: $sync_status"
             fi
             
             # Show resources that will be pruned
             echo "📋 Resources that will be pruned:"
-            argocd app diff "$app_name" --insecure | grep "^-" || echo "No resources to prune detected in diff"
+            argocd app diff "$app_name" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure | grep "^-" || echo "No resources to prune detected in diff"
             
             # Perform sync with prune option
             echo "🔄 Syncing application with prune option..."
-            argocd app sync "$app_name" --prune --insecure || {
+            argocd app sync "$app_name" --prune --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure
+            if [ $? -ne 0 ]; then
                 echo "❌ Failed to sync application with prune option"
                 exit 1
-            }
+            fi
             
             # Verify sync completed successfully
             echo "✅ Sync with prune completed. Verifying application status..."
-            app_status=$(argocd app get "$app_name" --insecure -o json)
+            app_status=$(argocd app get "$app_name" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure -o json)
             sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
             health_status=$(echo "$app_status" | jq -r '.status.health.status')
             
