@@ -183,10 +183,16 @@ class JobManager:
             # Get build information
             BUILD_INFO=$(curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL")
             
+            # Extract build result and check if it's null (in progress)
+            BUILD_RESULT=$(echo "$BUILD_INFO" | jq -r '.result')
+            if [ "$BUILD_RESULT" = "null" ]; then
+                BUILD_RESULT="IN PROGRESS"
+            fi
+            
             echo "=== Build Status ==="
             echo "Job: $job_name"
             echo "Build: #$(echo "$BUILD_INFO" | jq -r '.number')"
-            echo "Result: $(echo "$BUILD_INFO" | jq -r '.result // "IN PROGRESS"')"
+            echo "Result: $BUILD_RESULT"
             echo "Status: $(echo "$BUILD_INFO" | jq -r '.building' | sed 's/true/BUILDING/;s/false/COMPLETED/')"
             echo "Duration: $(echo "$BUILD_INFO" | jq -r '.duration') ms"
             echo "URL: $(echo "$BUILD_INFO" | jq -r '.url')"
