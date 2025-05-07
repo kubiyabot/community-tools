@@ -176,23 +176,23 @@ class ArgoCDGitTool(Tool):
         # Enhanced setup script with Git and ArgoCD support
         setup_script = """
 # Install required packages
-echo "Installing required packages..." && \
-apk update && \
+echo "Installing required packages..." && \\
+apk update && \\
 apk add --no-cache curl jq git bash
 
 # Install ArgoCD CLI with error handling
-echo "Installing ArgoCD CLI..." && \
-VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \
+echo "Installing ArgoCD CLI..." && \\
+VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \\
 if [ -z "$VERSION" ]; then
     echo "Error: Failed to get ArgoCD version"
     exit 1
-fi && \
-DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \
-echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \
+fi && \\
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \\
+echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \\
 curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
     echo "Error: Failed to download ArgoCD CLI"
     exit 1
-} && \
+} && \\
 chmod +x /usr/local/bin/argocd || {
     echo "Error: Failed to make ArgoCD CLI executable"
     exit 1
@@ -209,27 +209,27 @@ if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
     exit 1
 fi
 
-if [ -z "$GH_TOKEN" ]; then
-    echo "Error: GH_TOKEN environment variable is not set"
-    exit 1
+# Configure GitHub credentials
+if [ ! -z "$GH_TOKEN" ]; then
+    echo "Configuring GitHub credentials..." && \\
+    git config --global credential.helper store
+    echo "https://oauth2:${GH_TOKEN}@github.com" > ~/.git-credentials
+else
+    echo "Warning: GitHub token not found. Set GH_TOKEN for GitHub operations."
 fi
 
-# Configure Git
-echo "Configuring Git credentials..." && \
-git config --global credential.helper store
-echo "https://oauth2:${GH_TOKEN}@github.com" > ~/.git-credentials
 git config --global user.name "Kubiya Bot"
 git config --global user.email "bot@kubiya.ai"
 
 # Test ArgoCD connection
-echo "Testing ArgoCD connection..." && \
+echo "Testing ArgoCD connection..." && \\
 if ! argocd version --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
     echo "Error: Failed to verify ArgoCD CLI installation and authentication"
     exit 1
 fi
 
 # Create workspace for Git operations
-echo "Creating Git workspace..." && \
+echo "Creating Git workspace..." && \\
 WORKSPACE="/tmp/argocd_workspace"
 mkdir -p "$WORKSPACE"
 cd "$WORKSPACE"
@@ -385,3 +385,88 @@ fi
         if missing_args:
             return f"Missing required arguments: {', '.join(missing_args)}"
         return None
+
+class ArgoCDBitbucketTool(Tool):
+    """Base class for ArgoCD tools that interact with Bitbucket repositories."""
+    
+    def __init__(self, name, description, content, args=None, image="alpine:3.18"):
+        # Enhanced setup script with Git and ArgoCD support
+        setup_script = """
+# Install required packages
+echo "Installing required packages..." && \\
+apk update && \\
+apk add --no-cache curl jq git bash
+
+# Install ArgoCD CLI with error handling
+echo "Installing ArgoCD CLI..." && \\
+VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | jq -r .tag_name) && \\
+if [ -z "$VERSION" ]; then
+    echo "Error: Failed to get ArgoCD version"
+    exit 1
+fi && \\
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${VERSION}/argocd-linux-amd64" && \\
+echo "Downloading ArgoCD CLI from: $DOWNLOAD_URL" && \\
+curl -sSL -o /usr/local/bin/argocd "$DOWNLOAD_URL" || {
+    echo "Error: Failed to download ArgoCD CLI"
+    exit 1
+} && \\
+chmod +x /usr/local/bin/argocd || {
+    echo "Error: Failed to make ArgoCD CLI executable"
+    exit 1
+}
+
+# Verify environment variables
+if [ -z "$ARGOCD_SERVER" ]; then
+    echo "Error: ARGOCD_SERVER environment variable is not set"
+    exit 1
+fi
+
+if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+    echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
+    exit 1
+fi
+
+# Configure Bitbucket credentials
+if [ ! -z "$BITBUCKET_PASSWORD" ]; then
+    echo "Configuring Bitbucket credentials with token..." && \\
+    # For Bitbucket, we'll use the token directly
+    git config --global credential.helper store
+    echo "https://x-token-auth:${BITBUCKET_PASSWORD}@bitbucket.org" > ~/.git-credentials
+else
+    echo "Warning: Bitbucket token not found. Set BITBUCKET_PASSWORD for Bitbucket operations."
+fi
+
+git config --global user.name "Kubiya Bot"
+git config --global user.email "bot@kubiya.ai"
+
+# Test ArgoCD connection
+echo "Testing ArgoCD connection..." && \\
+if ! argocd version --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure; then
+    echo "Error: Failed to verify ArgoCD CLI installation and authentication"
+    exit 1
+fi
+
+# Create workspace for Git operations
+echo "Creating Git workspace..." && \\
+WORKSPACE="/tmp/argocd_workspace"
+mkdir -p "$WORKSPACE"
+cd "$WORKSPACE"
+
+"""
+        enhanced_content = setup_script + "\n" + content + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
+        
+        # Add auth flags to all argocd commands in the content, but not in the setup script
+        content_with_auth = content.replace("argocd ", 'argocd --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure ')
+        enhanced_content = setup_script + "\n" + content_with_auth + "\n\n# Cleanup\ncd /\nrm -rf \"$WORKSPACE\""
+        
+        super().__init__(
+            name=name,
+            description=description,
+            content=enhanced_content,
+            args=args or [],
+            image=image,
+            icon_url=ARGOCD_ICON_URL,
+            type="docker",
+            secrets=["ARGOCD_AUTH_TOKEN", "BITBUCKET_PASSWORD"],
+            env=["ARGOCD_SERVER"]
+        )

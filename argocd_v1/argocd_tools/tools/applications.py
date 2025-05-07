@@ -21,7 +21,11 @@ class ApplicationManager:
                 self.get_application_history(),
                 self.get_health_status(),
                 self.setup_helm_environment(),
-                self.deploy_application()
+                self.deploy_application(),
+                self.prune_resources(),
+                self.rollback_application(),
+                self.diff_application(),
+                self.setup_bitbucket_repository()
             ]
             
             for tool in tools:
@@ -444,6 +448,233 @@ class ApplicationManager:
                     required=True),
                 Arg(name="namespace",
                     description="Kubernetes namespace where the application will be deployed",
+                    required=True)
+            ]
+        )
+
+    def prune_resources(self) -> ArgoCDTool:
+        """Prune resources that have been removed from the source repository."""
+        return ArgoCDTool(
+            name="prune_resources",
+            description="Prune resources that have been removed from the source repository (like deleted CronJobs)",
+            content="""
+            if [ -z "$app_name" ]; then
+                echo "Error: Application name not specified"
+                exit 1
+            fi
+
+            # Get current application status
+            echo "🔍 Checking current application status..."
+            app_status=$(argocd app get "$app_name" --insecure -o json)
+            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+            
+            echo "Current sync status: $sync_status"
+            
+            if [ "$sync_status" = "Synced" ]; then
+                echo "⚠️ Application is already synced. Forcing refresh to detect changes..."
+                argocd app refresh "$app_name" --insecure || {
+                    echo "❌ Failed to refresh application"
+                    exit 1
+                }
+                
+                # Check again after refresh
+                app_status=$(argocd app get "$app_name" --insecure -o json)
+                sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+                echo "Sync status after refresh: $sync_status"
+            fi
+            
+            # Show resources that will be pruned
+            echo "📋 Resources that will be pruned:"
+            argocd app diff "$app_name" --insecure | grep "^-" || echo "No resources to prune detected in diff"
+            
+            # Perform sync with prune option
+            echo "🔄 Syncing application with prune option..."
+            argocd app sync "$app_name" --prune --insecure || {
+                echo "❌ Failed to sync application with prune option"
+                exit 1
+            }
+            
+            # Verify sync completed successfully
+            echo "✅ Sync with prune completed. Verifying application status..."
+            app_status=$(argocd app get "$app_name" --insecure -o json)
+            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+            health_status=$(echo "$app_status" | jq -r '.status.health.status')
+            
+            echo "Final status: Sync=$sync_status, Health=$health_status"
+            
+            if [ "$sync_status" = "Synced" ]; then
+                echo "✅ Resources successfully pruned!"
+            else
+                echo "⚠️ Application is not fully synced after prune operation."
+                echo "Please check application details for more information."
+            fi
+            """,
+            args=[
+                Arg(name="app_name",
+                    description="Name of the application to prune resources from",
+                    required=True)
+            ]
+        )
+
+    def rollback_application(self) -> ArgoCDTool:
+        """Rollback an application to a previous revision."""
+        return ArgoCDTool(
+            name="rollback_application",
+            description="Rollback an ArgoCD application to a previous revision",
+            content="""
+            if [ -z "$app_name" ]; then
+                echo "Error: Application name not specified"
+                exit 1
+            fi
+
+            # Get application history
+            echo "📋 Application revision history:"
+            argocd app history "$app_name" --insecure
+            
+            # If revision is not specified, list history and exit
+            if [ -z "$revision" ]; then
+                echo "⚠️ No revision specified. Please specify a revision ID from the history above."
+                exit 1
+            fi
+            
+            # Perform rollback
+            echo "🔄 Rolling back application to revision $revision..."
+            argocd app rollback "$app_name" "$revision" --insecure || {
+                echo "❌ Failed to rollback application"
+                exit 1
+            }
+            
+            # Verify rollback completed successfully
+            echo "✅ Rollback initiated. Verifying application status..."
+            app_status=$(argocd app get "$app_name" --insecure -o json)
+            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+            health_status=$(echo "$app_status" | jq -r '.status.health.status')
+            
+            echo "Status after rollback: Sync=$sync_status, Health=$health_status"
+            
+            if [ "$sync_status" = "Synced" ] && [ "$health_status" = "Healthy" ]; then
+                echo "✅ Application successfully rolled back to revision $revision!"
+            else
+                echo "⚠️ Application is not fully synced or healthy after rollback."
+                echo "Please check application details for more information."
+            fi
+            """,
+            args=[
+                Arg(name="app_name",
+                    description="Name of the application to rollback",
+                    required=True),
+                Arg(name="revision",
+                    description="Revision ID to rollback to",
+                    required=True)
+            ]
+        )
+
+    def diff_application(self) -> ArgoCDTool:
+        """Show differences between the current state and the desired state."""
+        return ArgoCDTool(
+            name="diff_application",
+            description="Show differences between the current state and the desired state of an ArgoCD application",
+            content="""
+            if [ -z "$app_name" ]; then
+                echo "Error: Application name not specified"
+                exit 1
+            fi
+
+            # Refresh application to ensure we have the latest state
+            echo "🔄 Refreshing application to get latest state..."
+            argocd app refresh "$app_name" --insecure || {
+                echo "❌ Failed to refresh application"
+                exit 1
+            }
+            
+            # Show diff
+            echo "📋 Differences between current state and desired state:"
+            argocd app diff "$app_name" --insecure
+            
+            # Get summary of changes
+            echo "\n📊 Summary of changes:"
+            diff_output=$(argocd app diff "$app_name" --insecure)
+            
+            # Count additions, modifications, and deletions
+            additions=$(echo "$diff_output" | grep -c "^+")
+            deletions=$(echo "$diff_output" | grep -c "^-")
+            
+            echo "Additions: $additions"
+            echo "Deletions: $deletions"
+            
+            # Show sync status
+            app_status=$(argocd app get "$app_name" --insecure -o json)
+            sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
+            echo "\nCurrent sync status: $sync_status"
+            
+            if [ "$sync_status" = "Synced" ] && [ "$additions" -eq 0 ] && [ "$deletions" -eq 0 ]; then
+                echo "✅ Application is in sync with the desired state."
+            else
+                echo "⚠️ Application is not in sync with the desired state."
+                echo "Run 'sync_application' to apply these changes."
+            fi
+            """,
+            args=[
+                Arg(name="app_name",
+                    description="Name of the application to show differences for",
+                    required=True)
+            ]
+        )
+
+    def setup_bitbucket_repository(self) -> ArgoCDTool:
+        """Set up a Bitbucket repository in ArgoCD."""
+        return ArgoCDTool(
+            name="setup_bitbucket_repository",
+            description="Add a Bitbucket repository to ArgoCD",
+            content="""
+            if [ -z "$repo_url" ]; then
+                echo "Error: Repository URL not specified"
+                exit 1
+            fi
+
+            # Check if we have Bitbucket credentials
+            if [ ! -z "$BITBUCKET_PASSWORD" ]; then
+                echo "Using Bitbucket Bearer token for authentication"
+                
+                # Create a temporary access token file for ArgoCD
+                echo "🔄 Adding Bitbucket repository to ArgoCD..."
+                
+                # ArgoCD doesn't directly support Bearer token auth for Git repos
+                # We'll use a username/password approach with the token as password
+                argocd repo add "$repo_url" \
+                    --username x-token-auth \
+                    --password "$BITBUCKET_PASSWORD" \
+                    --insecure || {
+                    echo "❌ Failed to add repository with token"
+                    exit 1
+                }
+            elif [ ! -z "$BITBUCKET_USERNAME" ] && [ ! -z "$BITBUCKET_APP_PASSWORD" ]; then
+                echo "Using Bitbucket username and app password for authentication"
+                
+                # Add repository to ArgoCD
+                echo "🔄 Adding Bitbucket repository to ArgoCD..."
+                argocd repo add "$repo_url" \
+                    --username "$BITBUCKET_USERNAME" \
+                    --password "$BITBUCKET_APP_PASSWORD" \
+                    --insecure || {
+                    echo "❌ Failed to add repository"
+                    exit 1
+                }
+            else
+                echo "❌ No Bitbucket credentials provided"
+                echo "Please set either BITBUCKET_PASSWORD or both BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD"
+                exit 1
+            fi
+            
+            echo "✅ Repository added successfully!"
+            
+            # List repositories to confirm
+            echo "\n📋 Current repositories:"
+            argocd repo list --insecure
+            """,
+            args=[
+                Arg(name="repo_url",
+                    description="Bitbucket repository URL (https://bitbucket.org/username/repo.git)",
                     required=True)
             ]
         )
