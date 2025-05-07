@@ -621,52 +621,6 @@ class ApplicationManager:
             ]
         )
 
-    def setup_bitbucket_repository(self) -> ArgoCDBitbucketTool:
-        """Set up a Bitbucket repository in ArgoCD."""
-        return ArgoCDBitbucketTool(
-            name="setup_bitbucket_repository",
-            description="Add a Bitbucket repository to ArgoCD",
-            content="""
-            if [ -z "$repo_url" ]; then
-                echo "Error: Repository URL not specified"
-                exit 1
-            fi
-
-            # Check if we have Bitbucket credentials
-            if [ ! -z "$BITBUCKET_PASSWORD" ]; then
-                echo "Using Bitbucket Bearer token for authentication"
-                
-                # Create a temporary access token file for ArgoCD
-                echo "🔄 Adding Bitbucket repository to ArgoCD..."
-                
-                # ArgoCD doesn't directly support Bearer token auth for Git repos
-                # We'll use a username/password approach with the token as password
-                argocd repo add "$repo_url" \
-                    --username x-token-auth \
-                    --password "$BITBUCKET_PASSWORD" \
-                    --insecure || {
-                    echo "❌ Failed to add repository with token"
-                    exit 1
-                }
-            else
-                echo "❌ No Bitbucket credentials provided"
-                echo "Please set BITBUCKET_PASSWORD"
-                exit 1
-            fi
-            
-            echo "✅ Repository added successfully!"
-            
-            # List repositories to confirm
-            echo "\n📋 Current repositories:"
-            argocd repo list --insecure
-            """,
-            args=[
-                Arg(name="repo_url",
-                    description="Bitbucket repository URL (https://bitbucket.org/username/repo.git)",
-                    required=True)
-            ]
-        )
-
 
 
 # Initialize when module is imported
