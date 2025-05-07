@@ -178,9 +178,7 @@ class JobManager:
             BUILD_NUM=${build_number:-"lastBuild"}
             BUILD_URL="$JENKINS_URL/job/$job_name/$BUILD_NUM/api/json"
 
-            echo "Fetching build status for $job_name #$BUILD_NUM..."
-            
-            # Get build information
+            # Get build information - put this first to ensure it's captured
             BUILD_INFO=$(curl -sSf -u "$JENKINS_USER:$JENKINS_TOKEN" "$BUILD_URL")
             
             # Extract build result and check if it's null (in progress)
@@ -189,6 +187,17 @@ class JobManager:
                 BUILD_RESULT="IN PROGRESS"
             fi
             
+            # Put the most important information at the beginning of the output
+            echo "CRITICAL_INFO_BEGIN"
+            echo "JOB_NAME: $job_name"
+            echo "BUILD_NUMBER: $(echo "$BUILD_INFO" | jq -r '.number')"
+            echo "BUILD_RESULT: $BUILD_RESULT"
+            echo "BUILD_URL: $(echo "$BUILD_INFO" | jq -r '.url')"
+            echo "CRITICAL_INFO_END"
+            
+            # Now add the formatted output
+            echo ""
+            echo "Fetching build status for $job_name #$BUILD_NUM..."
             echo "=== Build Status ==="
             echo "Job: $job_name"
             echo "Build: #$(echo "$BUILD_INFO" | jq -r '.number')"
