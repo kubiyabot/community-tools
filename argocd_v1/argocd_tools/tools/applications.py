@@ -1,5 +1,5 @@
 from typing import List
-from .base import ArgoCDTool, ArgoCDGitTool, ArgoCDKubeTool, Arg
+from .base import ArgoCDTool, ArgoCDGitTool, ArgoCDKubeTool, ArgoCDBitbucketTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 import sys
 
@@ -452,9 +452,9 @@ class ApplicationManager:
             ]
         )
 
-    def prune_resources(self) -> ArgoCDTool:
+    def prune_resources(self) -> ArgoCDBitbucketTool:
         """Prune resources that have been removed from the source repository."""
-        return ArgoCDTool(
+        return ArgoCDBitbucketTool(
             name="prune_resources",
             description="Prune resources that have been removed from the source repository (like deleted CronJobs)",
             content="""
@@ -621,9 +621,9 @@ class ApplicationManager:
             ]
         )
 
-    def setup_bitbucket_repository(self) -> ArgoCDTool:
+    def setup_bitbucket_repository(self) -> ArgoCDBitbucketTool:
         """Set up a Bitbucket repository in ArgoCD."""
-        return ArgoCDTool(
+        return ArgoCDBitbucketTool(
             name="setup_bitbucket_repository",
             description="Add a Bitbucket repository to ArgoCD",
             content="""
@@ -648,21 +648,9 @@ class ApplicationManager:
                     echo "❌ Failed to add repository with token"
                     exit 1
                 }
-            elif [ ! -z "$BITBUCKET_USERNAME" ] && [ ! -z "$BITBUCKET_APP_PASSWORD" ]; then
-                echo "Using Bitbucket username and app password for authentication"
-                
-                # Add repository to ArgoCD
-                echo "🔄 Adding Bitbucket repository to ArgoCD..."
-                argocd repo add "$repo_url" \
-                    --username "$BITBUCKET_USERNAME" \
-                    --password "$BITBUCKET_APP_PASSWORD" \
-                    --insecure || {
-                    echo "❌ Failed to add repository"
-                    exit 1
-                }
             else
                 echo "❌ No Bitbucket credentials provided"
-                echo "Please set either BITBUCKET_PASSWORD or both BITBUCKET_USERNAME and BITBUCKET_APP_PASSWORD"
+                echo "Please set BITBUCKET_PASSWORD"
                 exit 1
             fi
             
