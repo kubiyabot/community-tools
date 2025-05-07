@@ -24,8 +24,7 @@ class ApplicationManager:
                 self.deploy_application(),
                 self.prune_resources(),
                 self.rollback_application(),
-                self.diff_application(),
-                self.setup_bitbucket_repository()
+                self.diff_application()
             ]
             
             for tool in tools:
