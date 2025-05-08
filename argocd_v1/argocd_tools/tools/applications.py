@@ -468,7 +468,7 @@ class ApplicationManager:
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to get application status"
                 exit 1
-            }
+            fi
             
             sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
             echo "Current sync status: $sync_status"
@@ -479,7 +479,7 @@ class ApplicationManager:
                 if [ $? -ne 0 ]; then
                     echo "❌ Failed to refresh application"
                     exit 1
-                }
+                fi
                 
                 # Check again after refresh
                 app_status=$(argocd app get "$app_name" -o json)
@@ -497,7 +497,7 @@ class ApplicationManager:
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to sync application with prune option"
                 exit 1
-            }
+            fi
             
             # Verify sync completed successfully
             echo "✅ Sync with prune completed. Verifying application status..."
