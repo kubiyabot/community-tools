@@ -36,21 +36,37 @@ pipeline_get = BitbucketCliTool(
     name="bitbucket_pipeline_get",
     description="Get details for a specific pipeline",
     content="""
-    curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid" | \
-        jq '{
-            uuid: .uuid,
-            state: .state,
-            created_on: .created_on,
-            completed_on: .completed_on,
-            target: .target.ref_name,
-            build_number: .build_number
-        }'
+    # Ensure pipeline_uuid is properly formatted
+    # Bitbucket API expects UUIDs in the format {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx}
+    # If a numeric ID is provided, we need to query differently
+    
+    if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
+        # If pipeline_uuid is numeric, use the build_number endpoint
+        RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid")
+        
+        # Extract the first pipeline from the results
+        PIPELINE_DATA=$(echo "$RESPONSE" | jq '.values[0] // {}')
+    else
+        # If pipeline_uuid is already in UUID format, use it directly
+        PIPELINE_DATA=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid")
+    fi
+    
+    # Format and output the pipeline data
+    echo "$PIPELINE_DATA" | jq '{
+        uuid: .uuid,
+        state: .state,
+        created_on: .created_on,
+        completed_on: .completed_on,
+        target: .target.ref_name,
+        build_number: .build_number
+    }'
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
         Arg(name="repo", type="str", description="Repository name", required=True),
-        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID or build number", required=True),
     ],
 )
 
