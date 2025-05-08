@@ -154,6 +154,57 @@ steps:
           data: "${PROCESSED_DATA}"
     output: FORMATTED_REPORT
 
+  - name: generate-sparkline
+    description: Create an ASCII sparkline of the values array
+    depends:
+      - process-data
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: sparkline-generator
+          description: Produces a Unicode sparkline string
+          type: docker
+          image: python:3.12-slim-bullseye
+          with_files:
+            - destination: /tmp/ascript.py
+              content: |
+                #!/usr/bin/env python3
+                import os, json
+                values = json.loads(os.environ.get('data', '[]'))
+                if isinstance(values, dict) and 'values' in values:
+                    values = values['values']
+                if not values:
+                    print("SPARKLINE:N/A")
+                    exit(0)
+
+                blocks = '▁▂▃▄▅▆▇█'
+                mn, mx = min(values), max(values)
+                rng = mx - mn or 1
+                spark = ''.join(blocks[int((v - mn) / rng * (len(blocks) - 1))] for v in values)
+                print(f"SPARKLINE:{spark}")
+          content: |
+            set -e
+            python /tmp/ascript.py
+    args:
+      data: "${GENERATED_DATA}"
+    output: SPARKLINE
+
+  - name: insight-summary
+    description: AI generates human‑readable insight from the stats
+    depends:
+      - process-data
+    executor:
+      type: agent
+      config:
+        teammate_name: "demo_teammate"
+        message: |
+          Using the JSON below, write 2‑3 concise sentences explaining the most interesting insights about the data (mention any outliers or notable stats). Respond in plain text without code blocks.
+
+          JSON:
+          ${PROCESSED_DATA}
+    output: INSIGHT_TEXT
+
   - name: asciiify-json
     description: AI agent converts processed JSON to an ASCII table for Slack
     depends:
@@ -169,6 +220,50 @@ steps:
           ${PROCESSED_DATA}
     output: ASCII_DATA
 
+  - name: generate-schema
+    description: Produce a JSON Schema for the sample data structure (id, values, name, timestamp, tags)
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: schema-generator
+          description: Generates a JSON Schema definition for demo
+          type: docker
+          image: python:3.12-slim-bullseye
+          with_files:
+            - destination: /tmp/ascript.py
+              content: |
+                #!/usr/bin/env python3
+                import json, textwrap
+
+                schema = {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "title": "SampleData",
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "values": {
+                            "type": "array",
+                            "items": {"type": "integer"},
+                            "minItems": 1
+                        },
+                        "name": {"type": "string"},
+                        "timestamp": {"type": "string", "format": "date-time"},
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["id", "values", "name", "timestamp"]
+                }
+
+                # Pretty‑print the schema so Slack renders it nicely
+                print(json.dumps(schema, indent=2))
+          content: |
+            set -e
+            python /tmp/ascript.py
+    output: JSON_SCHEMA
+
   - name: send-to-slack
     executor:
       type: agent
@@ -180,8 +275,22 @@ steps:
 
           ${FORMATTED_REPORT}
 
+          :crystal_ball: *Insight* :
+          ${INSIGHT_TEXT}
+
+          :sparkles: *Sparkline* :
+          ${SPARKLINE}
+
+          :scroll: *Schema* :
+          ```json
+          ${JSON_SCHEMA}
+          ```
+
           _(automated message – no reply needed)_
     output: SLACK_RESPONSE
     depends:
       - format-report
       - asciiify-json
+      - generate-schema
+      - generate-sparkline
+      - insight-summary
