@@ -30,7 +30,8 @@ pipeline_logs = BitbucketCliTool(
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
         # If pipeline_uuid is numeric, first get the actual UUID
         PIPELINE_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid"
-        echo "Fetching pipeline UUID from build number using: $PIPELINE_API_URL"
+        echo "Fetching pipeline UUID from build number using:"
+        echo "$PIPELINE_API_URL"
         
         PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_API_URL")
         
@@ -53,7 +54,8 @@ pipeline_logs = BitbucketCliTool(
     
     # Construct and display the logs API URL
     LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log"
-    echo "Fetching logs using API endpoint: $LOGS_API_URL"
+    echo "Fetching logs using API endpoint:"
+    echo "$LOGS_API_URL"
     
     # Get logs using the actual UUID
     LOG_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL")
