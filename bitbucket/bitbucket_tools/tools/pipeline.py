@@ -103,23 +103,37 @@ pipeline_steps = BitbucketCliTool(
         ACTUAL_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
         
         if [ -z "$ACTUAL_UUID" ] || [ "$ACTUAL_UUID" == "null" ]; then
-            echo "API Response:"
-            echo "$PIPELINE_RESPONSE" | jq '.'
             echo "No pipeline found with build number $pipeline_uuid."
             exit 1
         fi
         
-        # Use the actual UUID to fetch steps
-        RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
-            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_UUID/steps/")
-    else
-        # If pipeline_uuid is already in UUID format, use it directly
-        RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
-            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/")
+        pipeline_uuid="$ACTUAL_UUID"
+    fi
+    
+    # First, get the pipeline details to verify it exists
+    PIPELINE_DETAILS=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid")
+    
+    # Check if pipeline exists
+    if echo "$PIPELINE_DETAILS" | jq -e '.error' > /dev/null 2>&1; then
+        echo "Error retrieving pipeline details:"
+        echo "$PIPELINE_DETAILS" | jq '.'
+        exit 1
+    fi
+    
+    # Now get the steps with proper error handling
+    RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/")
+    
+    # Check for API errors
+    if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+        echo "API Error:"
+        echo "$RESPONSE" | jq '.'
+        exit 1
     fi
     
     # Check if the response contains values
-    if echo "$RESPONSE" | jq -e '.values' > /dev/null 2>&1; then
+    if echo "$RESPONSE" | jq -e '.values' > /dev/null 2>&1 && [ "$(echo "$RESPONSE" | jq '.values | length')" -gt 0 ]; then
         # Process the values if they exist
         echo "$RESPONSE" | jq '.values[] | {
             uuid: .uuid,
@@ -130,10 +144,9 @@ pipeline_steps = BitbucketCliTool(
             duration_in_seconds: .duration_in_seconds
         }'
     else
-        # Print the raw response for debugging
-        echo "API Response:"
-        echo "$RESPONSE" | jq '.'
-        echo "No pipeline steps found or invalid response format."
+        echo "No pipeline steps found for pipeline $pipeline_uuid."
+        echo "Pipeline details:"
+        echo "$PIPELINE_DETAILS" | jq '.'
     fi
     """,
     args=[
