@@ -20,14 +20,33 @@ pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
     description="Get logs for a specific pipeline",
     content="""
+    # Handle both UUID and build number formats for pipeline_uuid
+    if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
+        # If pipeline_uuid is numeric, first get the actual UUID
+        PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid")
+        
+        # Extract the UUID from the response
+        ACTUAL_PIPELINE_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
+        
+        if [ -z "$ACTUAL_PIPELINE_UUID" ] || [ "$ACTUAL_PIPELINE_UUID" == "null" ]; then
+            echo "No pipeline found with build number $pipeline_uuid."
+            exit 1
+        fi
+    else
+        # If pipeline_uuid is already in UUID format, use it directly
+        ACTUAL_PIPELINE_UUID="$pipeline_uuid"
+    fi
+    
+    # Get logs using the actual UUID
     curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/$step_uuid/log" | \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log" | \
         jq -r '.content // "No logs available"'
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
         Arg(name="repo", type="str", description="Repository name", required=True),
-        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID or build number", required=True),
         Arg(name="step_uuid", type="str", description="Step UUID", required=True),
     ],
 )
