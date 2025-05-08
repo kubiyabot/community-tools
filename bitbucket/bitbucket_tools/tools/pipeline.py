@@ -20,71 +20,40 @@ pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
     description="Get logs for a specific pipeline",
     content="""
-    # Echo the arguments for debugging
-    echo "Workspace: $workspace"
-    echo "Repository: $repo"
-    echo "Pipeline UUID/Build Number: $pipeline_uuid"
-    echo "Step UUID: $step_uuid"
+    # Minimize output to avoid corruption
+    set -e
     
     # Handle both UUID and build number formats for pipeline_uuid
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
         # If pipeline_uuid is numeric, first get the actual UUID
         PIPELINE_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid"
-        echo "Fetching pipeline UUID from build number..."
         
         PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_API_URL")
-        
-        # Extract the UUID from the response
         ACTUAL_PIPELINE_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
         
         if [ -z "$ACTUAL_PIPELINE_UUID" ] || [ "$ACTUAL_PIPELINE_UUID" == "null" ]; then
-            echo "No pipeline found with build number $pipeline_uuid."
-            echo "API Response:"
-            echo "$PIPELINE_RESPONSE" | jq '.'
+            echo "No pipeline found with build number $pipeline_uuid"
             exit 1
         fi
-        
-        echo "Found pipeline with UUID: $ACTUAL_PIPELINE_UUID"
     else
-        # If pipeline_uuid is already in UUID format, use it directly
         ACTUAL_PIPELINE_UUID="$pipeline_uuid"
-        echo "Using provided pipeline UUID: $ACTUAL_PIPELINE_UUID"
     fi
     
-    # Store the step UUID in a variable to ensure it's not truncated
-    STEP_UUID="$step_uuid"
-    echo "Step UUID: $STEP_UUID"
+    # Write the API URL to a file to avoid output corruption
+    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log"
     
-    # Construct the logs API URL
-    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$STEP_UUID/log"
-    
-    # Debug: Print the URL components separately to identify any issues
-    echo "Debug URL components:"
-    echo "- Base: https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines"
-    echo "- Pipeline UUID: $ACTUAL_PIPELINE_UUID"
-    echo "- Step UUID: $STEP_UUID"
-    
-    # Get logs using the actual UUID
-    echo "Fetching logs..."
-    LOG_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL")
+    # Get logs using the actual UUID - write to file first to avoid output corruption
+    curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL" > /tmp/pipeline_log_response.json
     
     # Check if there was an error with the API call
-    if echo "$LOG_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-        echo "Error fetching logs:"
-        echo "$LOG_RESPONSE" | jq '.'
-        
-        # Additional debugging for error cases
-        echo "Full API URL that was used (for debugging):"
-        echo "$LOGS_API_URL" | tr -d '\\n' > /tmp/api_url.txt
-        cat /tmp/api_url.txt
-        echo ""
-        
+    if grep -q "error" /tmp/pipeline_log_response.json; then
+        echo "Error fetching logs. Details:"
+        cat /tmp/pipeline_log_response.json
         exit 1
     fi
     
     # Output the logs
-    echo "Log content:"
-    echo "$LOG_RESPONSE" | jq -r '.content // "No logs available"'
+    cat /tmp/pipeline_log_response.json | jq -r '.content // "No logs available"'
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
