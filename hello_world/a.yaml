@@ -102,21 +102,64 @@ steps:
           data: "${GENERATED_DATA}"
     output: PROCESSED_DATA
 
+  - name: format-report
+    description: Format processed data into Slack‑friendly markdown
+    depends:
+      - process-data
+    executor:
+      type: tool
+      config:
+        tool_def:
+          name: report-formatter
+          description: Converts JSON result to markdown for Slack
+          type: docker
+          image: python:3.12-slim-bullseye
+          with_files:
+            - destination: /tmp/ascript.py
+              content: |
+                #!/usr/bin/env python3
+                import os, json, textwrap
+
+                # Read the RESULT line from the previous step
+                raw = os.environ.get('data', '')
+                if raw.startswith('RESULT:'):
+                    raw = raw[len('RESULT:'):]
+
+                data = json.loads(raw)
+                stats = data.get('processed', {})
+
+                markdown = textwrap.dedent(f"""
+                :bar_chart: *Workflow demo results* :sparkles:
+
+                *Source:* `{data.get('source_name')}` (ID `{data.get('source_id')}`)
+
+                *Statistics*
+                • *Total*: {stats.get('total')}
+                • *Average*: {stats.get('average'):.2f}
+                • *Min*: {stats.get('min')}
+                • *Max*: {stats.get('max')}
+                • *Median*: {stats.get('median')}
+                • *Count*: {stats.get('count')}
+
+                ```json
+                {json.dumps(data, indent=2)}
+                ```
+                """).strip()
+
+                print(f"FORMATTED_REPORT:{markdown}")
+          content: |
+            set -e
+            python /tmp/ascript.py
+        args:
+          data: "${PROCESSED_DATA}"
+    output: FORMATTED_REPORT
+
   - name: send-to-slack
     executor:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: |
-          Send a Slack msg to channel #tf-test with a clear, nicely formatted report of the processed data:
-
-          ```
-          ${PROCESSED_DATA}
-          ```
-
-          🎉 Data processed successfully! 🚀
-          Run the message immediately with no further questions.
+        message: "${FORMATTED_REPORT}"
     output: SLACK_RESPONSE
     depends:
-      - process-data
-      - generate-data
+      - format-report
