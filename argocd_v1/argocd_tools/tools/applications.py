@@ -464,8 +464,29 @@ class ApplicationManager:
 
             # Define a function to run argocd commands with proper authentication
             run_argocd() {
+                echo "Running argocd command: argocd $* --server \\"$ARGOCD_SERVER\\" --auth-token \\"****\\" --insecure"
                 argocd "$@" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure
+                return $?
             }
+
+            # Verify environment variables
+            echo "Checking environment variables..."
+            if [ -z "$ARGOCD_SERVER" ]; then
+                echo "Error: ARGOCD_SERVER environment variable is not set"
+                exit 1
+            fi
+
+            if [ -z "$ARGOCD_AUTH_TOKEN" ]; then
+                echo "Error: ARGOCD_AUTH_TOKEN environment variable is not set"
+                exit 1
+            fi
+
+            # Test connection
+            echo "Testing ArgoCD connection..."
+            if ! run_argocd version; then
+                echo "Error: Failed to connect to ArgoCD server"
+                exit 1
+            fi
 
             # Get current application status
             echo "🔍 Checking current application status..."
@@ -480,14 +501,21 @@ class ApplicationManager:
             
             if [ "$sync_status" = "Synced" ]; then
                 echo "⚠️ Application is already synced. Forcing refresh to detect changes..."
-                run_argocd app refresh "$app_name"
-                if [ $? -ne 0 ]; then
+                # Use direct command with explicit error handling
+                echo "Running refresh command..."
+                if ! run_argocd app refresh "$app_name"; then
                     echo "❌ Failed to refresh application"
                     exit 1
                 fi
                 
                 # Check again after refresh
+                echo "Getting updated status after refresh..."
                 app_status=$(run_argocd app get "$app_name" -o json)
+                if [ $? -ne 0 ]; then
+                    echo "❌ Failed to get application status after refresh"
+                    exit 1
+                fi
+                
                 sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
                 echo "Sync status after refresh: $sync_status"
             fi
@@ -498,8 +526,7 @@ class ApplicationManager:
             
             # Perform sync with prune option
             echo "🔄 Syncing application with prune option..."
-            run_argocd app sync "$app_name" --prune
-            if [ $? -ne 0 ]; then
+            if ! run_argocd app sync "$app_name" --prune; then
                 echo "❌ Failed to sync application with prune option"
                 exit 1
             fi
@@ -507,6 +534,11 @@ class ApplicationManager:
             # Verify sync completed successfully
             echo "✅ Sync with prune completed. Verifying application status..."
             app_status=$(run_argocd app get "$app_name" -o json)
+            if [ $? -ne 0 ]; then
+                echo "❌ Failed to get application status after sync"
+                exit 1
+            fi
+            
             sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
             health_status=$(echo "$app_status" | jq -r '.status.health.status')
             
