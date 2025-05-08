@@ -17,14 +17,16 @@ steps:
                 #!/usr/bin/env python3
                 import json
                 import random
-                from datetime import datetime
+                import warnings
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                from datetime import datetime, timezone
 
                 # Generate richer random data for demo purposes
                 data = {
                     "id": random.randint(1000, 9999),
                     "values": [random.randint(1, 100) for _ in range(10)],
                     "name": f"Sample-{random.choice(['A','B', 'C', 'D', 'E'])}",
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     "tags": random.sample(['alpha', 'beta', 'gamma', 'delta', 'epsilon'], k=2)
                 }
 
