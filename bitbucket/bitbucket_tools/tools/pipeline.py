@@ -109,19 +109,21 @@ pipeline_steps = BitbucketCliTool(
         
         echo "Found pipeline with UUID $ACTUAL_UUID for build number $pipeline_uuid"
         pipeline_uuid="$ACTUAL_UUID"
-    else
-        # If it's already a UUID, make sure it has curly braces
-        if [[ ! "$pipeline_uuid" =~ ^{.*}$ ]]; then
-            # Add curly braces if they're missing
-            pipeline_uuid="{$pipeline_uuid}"
-            echo "Added curly braces to UUID: $pipeline_uuid"
-        fi
     fi
+    
+    # Ensure UUID is properly formatted with curly braces
+    # Remove any existing curly braces first, then add them back
+    pipeline_uuid=$(echo "$pipeline_uuid" | sed 's/{//g' | sed 's/}//g')
+    pipeline_uuid="{$pipeline_uuid}"
+    
+    # URL encode the UUID - specifically the curly braces
+    ENCODED_UUID=$(echo "$pipeline_uuid" | sed 's/{/%7B/g' | sed 's/}/%7D/g')
     
     # Get the steps for the pipeline
     echo "Fetching steps for pipeline $pipeline_uuid"
-    STEPS_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/"
+    STEPS_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ENCODED_UUID/steps/"
     
+    echo "API URL: $STEPS_URL"
     RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$STEPS_URL")
     
     # Check for API errors
@@ -131,8 +133,10 @@ pipeline_steps = BitbucketCliTool(
         
         # Try to get pipeline details as a fallback
         echo "Fetching pipeline details instead..."
-        PIPELINE_DETAILS=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
-            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid")
+        PIPELINE_DETAILS_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ENCODED_UUID"
+        echo "Pipeline details URL: $PIPELINE_DETAILS_URL"
+        
+        PIPELINE_DETAILS=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_DETAILS_URL")
         
         if echo "$PIPELINE_DETAILS" | jq -e '.error' > /dev/null 2>&1; then
             echo "Error fetching pipeline details:"
@@ -177,7 +181,7 @@ pipeline_steps = BitbucketCliTool(
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
         Arg(name="repo", type="str", description="Repository name", required=True),
-        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID in format {uuid} (build numbers will not work)", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID or build number", required=True),
     ],
 )
 
