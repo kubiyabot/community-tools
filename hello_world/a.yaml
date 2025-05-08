@@ -154,6 +154,21 @@ steps:
           data: "${PROCESSED_DATA}"
     output: FORMATTED_REPORT
 
+  - name: asciiify-json
+    description: AI agent converts processed JSON to an ASCII table for Slack
+    depends:
+      - process-data
+    executor:
+      type: agent
+      config:
+        teammate_name: "demo_teammate"
+        message: |
+          Convert the following JSON into a neat ASCII table (monospaced, boxed). Respond ONLY with the ASCII block—no commentary.
+
+          JSON:
+          ${PROCESSED_DATA}
+    output: ASCII_DATA
+
   - name: send-to-slack
     executor:
       type: agent
@@ -161,9 +176,12 @@ steps:
         teammate_name: "demo_teammate"
         message: |
           slack -> #tf-test:
+          ${ASCII_DATA}
+
           ${FORMATTED_REPORT}
 
           _(automated message – no reply needed)_
     output: SLACK_RESPONSE
     depends:
       - format-report
+      - asciiify-json
