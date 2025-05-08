@@ -125,8 +125,16 @@ commit_comment = BitbucketCliTool(
 
     # Check if the response is valid
     if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
+        # Generate the commit URL
+        COMMIT_URL="https://bitbucket.org/$workspace/$repo/commits/$commit_hash"
+        
         echo "✅ Comment added successfully!"
-        echo "$RESPONSE" | jq '{id: .id, content: .content.raw, created_on: .created_on}'
+        echo "$RESPONSE" | jq --arg url "$COMMIT_URL" '{
+            id: .id, 
+            content: .content.raw, 
+            created_on: .created_on,
+            commit_url: $url
+        }'
     else
         echo "❌ Failed to add comment:"
         echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
