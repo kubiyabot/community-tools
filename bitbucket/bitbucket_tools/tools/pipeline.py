@@ -74,9 +74,30 @@ pipeline_steps = BitbucketCliTool(
     name="bitbucket_pipeline_steps",
     description="Get steps for a specific pipeline",
     content="""
-    # Fetch the pipeline steps
-    RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/")
+    # Handle both UUID and build number formats
+    if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
+        # If pipeline_uuid is numeric, first get the actual UUID
+        PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid")
+        
+        # Extract the UUID from the response
+        ACTUAL_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
+        
+        if [ -z "$ACTUAL_UUID" ] || [ "$ACTUAL_UUID" == "null" ]; then
+            echo "API Response:"
+            echo "$PIPELINE_RESPONSE" | jq '.'
+            echo "No pipeline found with build number $pipeline_uuid."
+            exit 1
+        fi
+        
+        # Use the actual UUID to fetch steps
+        RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_UUID/steps/")
+    else
+        # If pipeline_uuid is already in UUID format, use it directly
+        RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
+            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/")
+    fi
     
     # Check if the response contains values
     if echo "$RESPONSE" | jq -e '.values' > /dev/null 2>&1; then
@@ -99,7 +120,7 @@ pipeline_steps = BitbucketCliTool(
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
         Arg(name="repo", type="str", description="Repository name", required=True),
-        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID or build number", required=True),
     ],
 )
 
