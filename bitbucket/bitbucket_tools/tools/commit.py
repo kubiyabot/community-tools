@@ -109,22 +109,28 @@ commit_comment = BitbucketCliTool(
     name="bitbucket_commit_comment",
     description="Add a comment to a commit",
     content="""
-    RESPONSE=$(curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \\"content\\": {
-                \\"raw\\": \\"$comment\\"
-            }
-        }" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments")
+    set -e
     
+    # Build the API URL
+    COMMENT_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments"
+
+    # Prepare JSON payload
+    JSON_PAYLOAD=$(jq -n --arg comment "$comment" '{content: {raw: $comment}}')
+
+    # Make the API call
+    RESPONSE=$(curl -s -L -X POST -H "$BITBUCKET_AUTH_HEADER" \
+        -H "Content-Type: application/json" \
+        -d "$JSON_PAYLOAD" \
+        "$COMMENT_API_URL")
+
     # Check if the response is valid
     if echo "$RESPONSE" | jq -e '.id' > /dev/null 2>&1; then
-        echo "Comment added successfully!"
+        echo "✅ Comment added successfully!"
         echo "$RESPONSE" | jq '{id: .id, content: .content.raw, created_on: .created_on}'
     else
-        echo "Failed to add comment:"
+        echo "❌ Failed to add comment:"
         echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
+        exit 1
     fi
     """,
     args=[
