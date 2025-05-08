@@ -99,7 +99,7 @@ steps:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: "Send a Slack msg to channel #tf-test saying ${PROCESSED_DATA}. and run it don't ask for questions"
+        message: "Send a Slack msg to channel #tf-test and show this a s a clear and nice report of the result result:${PROCESSED_DATA}. and run it don't ask for questions"
     output: SLACK_RESPONSE
     depends:
       - process-data
