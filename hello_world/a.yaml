@@ -159,7 +159,11 @@ steps:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: "${FORMATTED_REPORT}"
+        message: |
+          slack -> #tf-test:
+          ${FORMATTED_REPORT}
+
+          _(automated message – no reply needed)_
     output: SLACK_RESPONSE
     depends:
       - format-report
