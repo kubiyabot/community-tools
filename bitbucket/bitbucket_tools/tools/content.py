@@ -42,9 +42,8 @@ content_get = BitbucketCliTool(
     name="bitbucket_content_get",
     description="Get the contents of a file from a Bitbucket repository",
     content="""
-    curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/src/$ref/$path" | \
-        jq -r '.content'
+    curl -s -L -H "$BITBUCKET_AUTH_HEADER" \
+        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/src/$ref/$path"
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
