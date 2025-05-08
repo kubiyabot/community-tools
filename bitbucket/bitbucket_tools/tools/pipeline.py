@@ -20,6 +20,12 @@ pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
     description="Get logs for a specific pipeline",
     content="""
+    # Echo the arguments for debugging
+    echo "Workspace: $workspace"
+    echo "Repository: $repo"
+    echo "Pipeline UUID/Build Number: $pipeline_uuid"
+    echo "Step UUID: $step_uuid"
+    
     # Handle both UUID and build number formats for pipeline_uuid
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
         # If pipeline_uuid is numeric, first get the actual UUID
