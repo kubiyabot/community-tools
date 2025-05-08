@@ -462,9 +462,14 @@ class ApplicationManager:
                 exit 1
             fi
 
+            # Define a function to run argocd commands with proper authentication
+            run_argocd() {
+                argocd "$@" --server "$ARGOCD_SERVER" --auth-token "$ARGOCD_AUTH_TOKEN" --insecure
+            }
+
             # Get current application status
             echo "🔍 Checking current application status..."
-            app_status=$(argocd app get "$app_name" -o json)
+            app_status=$(run_argocd app get "$app_name" -o json)
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to get application status"
                 exit 1
@@ -475,25 +480,25 @@ class ApplicationManager:
             
             if [ "$sync_status" = "Synced" ]; then
                 echo "⚠️ Application is already synced. Forcing refresh to detect changes..."
-                argocd app refresh "$app_name"
+                run_argocd app refresh "$app_name"
                 if [ $? -ne 0 ]; then
                     echo "❌ Failed to refresh application"
                     exit 1
                 fi
                 
                 # Check again after refresh
-                app_status=$(argocd app get "$app_name" -o json)
+                app_status=$(run_argocd app get "$app_name" -o json)
                 sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
                 echo "Sync status after refresh: $sync_status"
             fi
             
             # Show resources that will be pruned
             echo "📋 Resources that will be pruned:"
-            argocd app diff "$app_name" | grep "^-" || echo "No resources to prune detected in diff"
+            run_argocd app diff "$app_name" | grep "^-" || echo "No resources to prune detected in diff"
             
             # Perform sync with prune option
             echo "🔄 Syncing application with prune option..."
-            argocd app sync "$app_name" --prune
+            run_argocd app sync "$app_name" --prune
             if [ $? -ne 0 ]; then
                 echo "❌ Failed to sync application with prune option"
                 exit 1
@@ -501,7 +506,7 @@ class ApplicationManager:
             
             # Verify sync completed successfully
             echo "✅ Sync with prune completed. Verifying application status..."
-            app_status=$(argocd app get "$app_name" -o json)
+            app_status=$(run_argocd app get "$app_name" -o json)
             sync_status=$(echo "$app_status" | jq -r '.status.sync.status')
             health_status=$(echo "$app_status" | jq -r '.status.health.status')
             
