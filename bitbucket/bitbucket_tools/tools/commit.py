@@ -111,11 +111,11 @@ commit_comment = BitbucketCliTool(
     content="""
     RESPONSE=$(curl -X POST -H "$BITBUCKET_AUTH_HEADER" \
         -H "Content-Type: application/json" \
-        -d '{
-            "content": {
-                "raw": "'$comment'"
+        -d "{
+            \\"content\\": {
+                \\"raw\\": \\"$comment\\"
             }
-        }' \
+        }" \
         "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/commit/$commit_hash/comments")
     
     # Check if the response is valid
