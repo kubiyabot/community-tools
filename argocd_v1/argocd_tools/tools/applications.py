@@ -451,9 +451,9 @@ class ApplicationManager:
             ]
         )
 
-    def prune_resources(self) -> ArgoCDBitbucketTool:
+    def prune_resources(self) -> ArgoCDTool:
         """Prune resources that have been removed from the source repository."""
-        return ArgoCDBitbucketTool(
+        return ArgoCDTool(
             name="prune_resources",
             description="Prune resources that have been removed from the source repository (like deleted CronJobs)",
             content="""
