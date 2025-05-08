@@ -29,25 +29,45 @@ pipeline_logs = BitbucketCliTool(
     # Handle both UUID and build number formats for pipeline_uuid
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
         # If pipeline_uuid is numeric, first get the actual UUID
-        PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
-            "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid")
+        PIPELINE_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid"
+        echo "Fetching pipeline UUID from build number using: $PIPELINE_API_URL"
+        
+        PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_API_URL")
         
         # Extract the UUID from the response
         ACTUAL_PIPELINE_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
         
         if [ -z "$ACTUAL_PIPELINE_UUID" ] || [ "$ACTUAL_PIPELINE_UUID" == "null" ]; then
             echo "No pipeline found with build number $pipeline_uuid."
+            echo "API Response:"
+            echo "$PIPELINE_RESPONSE" | jq '.'
             exit 1
         fi
+        
+        echo "Found pipeline with UUID: $ACTUAL_PIPELINE_UUID"
     else
         # If pipeline_uuid is already in UUID format, use it directly
         ACTUAL_PIPELINE_UUID="$pipeline_uuid"
+        echo "Using provided pipeline UUID: $ACTUAL_PIPELINE_UUID"
     fi
     
+    # Construct and display the logs API URL
+    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log"
+    echo "Fetching logs using API endpoint: $LOGS_API_URL"
+    
     # Get logs using the actual UUID
-    curl -s -H "$BITBUCKET_AUTH_HEADER" \
-        "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log" | \
-        jq -r '.content // "No logs available"'
+    LOG_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL")
+    
+    # Check if there was an error with the API call
+    if echo "$LOG_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
+        echo "Error fetching logs:"
+        echo "$LOG_RESPONSE" | jq '.'
+        exit 1
+    fi
+    
+    # Output the logs
+    echo "Log content:"
+    echo "$LOG_RESPONSE" | jq -r '.content // "No logs available"'
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
