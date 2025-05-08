@@ -2,7 +2,7 @@ name: tool_chaining_example
 description: Example DAG demonstrating data flow between tool steps
 steps:
   - name: generate-data
-    description: First tool generates data for the second step 1
+    description: First tool generates richer random data (values, timestamp, tags) for the next step
     executor:
       type: tool
       config:
@@ -17,12 +17,15 @@ steps:
                 #!/usr/bin/env python3
                 import json
                 import random
+                from datetime import datetime
 
-                # Generate some random data
+                # Generate richer random data for demo purposes
                 data = {
                     "id": random.randint(1000, 9999),
-                    "values": [random.randint(1, 100) for _ in range(5)],
-                    "name": f"Sample-{random.choice(['A','B', 'C'])}"
+                    "values": [random.randint(1, 100) for _ in range(10)],
+                    "name": f"Sample-{random.choice(['A','B', 'C', 'D', 'E'])}",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "tags": random.sample(['alpha', 'beta', 'gamma', 'delta', 'epsilon'], k=2)
                 }
 
                 # Output the data as JSON
@@ -34,7 +37,7 @@ steps:
 
 
   - name: process-data
-    description: Second tool processes data from first tool
+    description: Second tool calculates statistics (total, average, min, max, median) from previous step
     depends:
       - generate-data
     executor:
@@ -51,34 +54,37 @@ steps:
                 #!/usr/bin/env python3
                 import os
                 import json
+                from statistics import median
 
                 # Get the data from the previous step
-                input_data = os.environ.get('data')
-                
+                input_data = os.environ.get('data', '{}')
+
                 try:
-                    # Parse the JSON data
                     data = json.loads(input_data)
 
-                    # Process the data
-                    total = sum(data.get('values', [0]))
-                    avg = total / len(data.get('values', [1]))
+                    values = data.get('values', [])
+                    total = sum(values)
+                    avg = total / len(values) if values else 0
+                    min_val = min(values) if values else None
+                    max_val = max(values) if values else None
+                    median_val = median(values) if values else None
 
-                    # Output the results as a single compact line to avoid truncation issues
                     result = {
                         "source_id": data.get('id'),
                         "source_name": data.get('name'),
                         "processed": {
                             "total": total,
                             "average": avg,
-                            "count": len(data.get('values', []))
+                            "min": min_val,
+                            "max": max_val,
+                            "median": median_val,
+                            "count": len(values)
                         }
                     }
 
-                    # Output as a single line with no formatting to avoid truncation
                     print(f"RESULT:{json.dumps(result)}")
-
-                except json.JSONDecodeError as e:
-                    print(f"Error parsing data: {input_data}")
+                except (json.JSONDecodeError, TypeError) as e:
+                    print(f"Error parsing or processing data: {input_data}")
                     print(f"Error details: {str(e)}")
                     raise
           content: |
@@ -99,7 +105,15 @@ steps:
       type: agent
       config:
         teammate_name: "demo_teammate"
-        message: "Send a Slack msg to channel #tf-test and show this a s a clear and nice report of the result result:${PROCESSED_DATA}. and run it don't ask for questions"
+        message: |
+          Send a Slack msg to channel #tf-test with a clear, nicely formatted report of the processed data:
+
+          ```
+          ${PROCESSED_DATA}
+          ```
+
+          🎉 Data processed successfully! 🚀
+          Run the message immediately with no further questions.
     output: SLACK_RESPONSE
     depends:
       - process-data
