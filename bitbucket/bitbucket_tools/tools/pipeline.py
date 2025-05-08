@@ -93,17 +93,11 @@ pipeline_steps = BitbucketCliTool(
     name="bitbucket_pipeline_steps",
     description="Get steps for a specific pipeline",
     content="""
-    echo "Debug: Starting pipeline steps retrieval for workspace=$workspace, repo=$repo, pipeline_uuid=$pipeline_uuid"
-    
     # Handle both UUID and build number formats
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
-        echo "Debug: Treating $pipeline_uuid as a build number"
         # If pipeline_uuid is numeric, first get the actual UUID
         PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
             "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid")
-        
-        echo "Debug: Pipeline search response:"
-        echo "$PIPELINE_RESPONSE" | jq '.'
         
         # Extract the UUID from the response
         ACTUAL_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
@@ -113,31 +107,51 @@ pipeline_steps = BitbucketCliTool(
             exit 1
         fi
         
-        echo "Debug: Found UUID $ACTUAL_UUID for build number $pipeline_uuid"
+        echo "Found pipeline with UUID $ACTUAL_UUID for build number $pipeline_uuid"
         pipeline_uuid="$ACTUAL_UUID"
     else
-        echo "Debug: Using $pipeline_uuid as a UUID directly"
+        # If it's already a UUID, make sure it has curly braces
+        if [[ ! "$pipeline_uuid" =~ ^{.*}$ ]]; then
+            # Add curly braces if they're missing
+            pipeline_uuid="{$pipeline_uuid}"
+            echo "Added curly braces to UUID: $pipeline_uuid"
+        fi
     fi
     
-    # Try a different approach - get the steps directly
-    echo "Debug: Fetching steps for pipeline $pipeline_uuid"
+    # Get the steps for the pipeline
+    echo "Fetching steps for pipeline $pipeline_uuid"
     STEPS_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid/steps/"
-    echo "Debug: API URL: $STEPS_URL"
     
     RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$STEPS_URL")
     
     # Check for API errors
     if echo "$RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
-        echo "API Error when fetching steps:"
+        echo "Error fetching steps:"
         echo "$RESPONSE" | jq '.'
         
         # Try to get pipeline details as a fallback
-        echo "Debug: Attempting to get pipeline details instead"
+        echo "Fetching pipeline details instead..."
         PIPELINE_DETAILS=$(curl -s -H "$BITBUCKET_AUTH_HEADER" \
             "https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$pipeline_uuid")
         
-        echo "Pipeline details response:"
-        echo "$PIPELINE_DETAILS" | jq '.'
+        if echo "$PIPELINE_DETAILS" | jq -e '.error' > /dev/null 2>&1; then
+            echo "Error fetching pipeline details:"
+            echo "$PIPELINE_DETAILS" | jq '.'
+        else
+            echo "Pipeline details:"
+            echo "$PIPELINE_DETAILS" | jq '{
+                uuid: .uuid,
+                build_number: .build_number,
+                state: .state.name,
+                result: .state.result.name,
+                created_on: .created_on,
+                completed_on: .completed_on,
+                duration_in_seconds: .duration_in_seconds
+            }'
+            
+            echo "To view steps in the web UI, visit:"
+            echo "https://bitbucket.org/$workspace/$repo/pipelines/results/$(echo "$PIPELINE_DETAILS" | jq -r '.build_number')"
+        fi
         exit 1
     fi
     
@@ -148,7 +162,8 @@ pipeline_steps = BitbucketCliTool(
         echo "$RESPONSE" | jq '.values[] | {
             uuid: .uuid,
             name: .name,
-            state: .state,
+            state: .state.name,
+            result: .state.result.name,
             started_on: .started_on,
             completed_on: .completed_on,
             duration_in_seconds: .duration_in_seconds
@@ -162,7 +177,7 @@ pipeline_steps = BitbucketCliTool(
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
         Arg(name="repo", type="str", description="Repository name", required=True),
-        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID or build number", required=True),
+        Arg(name="pipeline_uuid", type="str", description="Pipeline UUID in format {uuid} (build numbers will not work)", required=True),
     ],
 )
 
