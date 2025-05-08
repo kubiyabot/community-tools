@@ -30,8 +30,7 @@ pipeline_logs = BitbucketCliTool(
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
         # If pipeline_uuid is numeric, first get the actual UUID
         PIPELINE_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid"
-        echo "Fetching pipeline UUID from build number using:"
-        echo "$PIPELINE_API_URL"
+        echo "Fetching pipeline UUID from build number..."
         
         PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_API_URL")
         
@@ -52,18 +51,34 @@ pipeline_logs = BitbucketCliTool(
         echo "Using provided pipeline UUID: $ACTUAL_PIPELINE_UUID"
     fi
     
-    # Construct and display the logs API URL
-    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log"
-    echo "Fetching logs using API endpoint:"
-    echo "$LOGS_API_URL"
+    # Store the step UUID in a variable to ensure it's not truncated
+    STEP_UUID="$step_uuid"
+    echo "Step UUID: $STEP_UUID"
+    
+    # Construct the logs API URL
+    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$STEP_UUID/log"
+    
+    # Debug: Print the URL components separately to identify any issues
+    echo "Debug URL components:"
+    echo "- Base: https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines"
+    echo "- Pipeline UUID: $ACTUAL_PIPELINE_UUID"
+    echo "- Step UUID: $STEP_UUID"
     
     # Get logs using the actual UUID
+    echo "Fetching logs..."
     LOG_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL")
     
     # Check if there was an error with the API call
     if echo "$LOG_RESPONSE" | jq -e '.error' > /dev/null 2>&1; then
         echo "Error fetching logs:"
         echo "$LOG_RESPONSE" | jq '.'
+        
+        # Additional debugging for error cases
+        echo "Full API URL that was used (for debugging):"
+        echo "$LOGS_API_URL" | tr -d '\\n' > /tmp/api_url.txt
+        cat /tmp/api_url.txt
+        echo ""
+        
         exit 1
     fi
     
