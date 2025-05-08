@@ -18,19 +18,15 @@ pipeline_list = BitbucketCliTool(
 
 pipeline_logs = BitbucketCliTool(
     name="bitbucket_pipeline_logs",
-    description="Get logs for a specific pipeline",
+    description="Get logs for a specific pipeline step (handles build number or UUID)",
     content="""
-    # Minimize output to avoid corruption
     set -e
     
-    # Handle both UUID and build number formats for pipeline_uuid
+    # Get actual pipeline UUID if a numeric build number was provided
     if [[ "$pipeline_uuid" =~ ^[0-9]+$ ]]; then
-        # If pipeline_uuid is numeric, first get the actual UUID
         PIPELINE_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/?q=build_number=$pipeline_uuid"
-        
         PIPELINE_RESPONSE=$(curl -s -H "$BITBUCKET_AUTH_HEADER" "$PIPELINE_API_URL")
         ACTUAL_PIPELINE_UUID=$(echo "$PIPELINE_RESPONSE" | jq -r '.values[0].uuid // ""')
-        
         if [ -z "$ACTUAL_PIPELINE_UUID" ] || [ "$ACTUAL_PIPELINE_UUID" == "null" ]; then
             echo "No pipeline found with build number $pipeline_uuid"
             exit 1
@@ -38,22 +34,26 @@ pipeline_logs = BitbucketCliTool(
     else
         ACTUAL_PIPELINE_UUID="$pipeline_uuid"
     fi
-    
-    # Write the API URL to a file to avoid output corruption
-    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/$ACTUAL_PIPELINE_UUID/steps/$step_uuid/log"
-    
-    # Get logs using the actual UUID - write to file first to avoid output corruption
-    curl -s -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL" > /tmp/pipeline_log_response.json
-    
-    # Check if there was an error with the API call
-    if grep -q "error" /tmp/pipeline_log_response.json; then
+
+    # Remove braces if present
+    ACTUAL_PIPELINE_UUID=$(echo "$ACTUAL_PIPELINE_UUID" | sed 's/[{}]//g')
+    STEP_UUID=$(echo "$step_uuid" | sed 's/[{}]//g')
+
+    # Build API URL (without braces)
+    LOGS_API_URL="https://api.bitbucket.org/2.0/repositories/$workspace/$repo/pipelines/%7B$ACTUAL_PIPELINE_UUID%7D/steps/%7B$STEP_UUID%7D/log"
+
+    # Fetch logs with -L to follow redirects
+    LOG_OUTPUT=$(curl -s -L -H "$BITBUCKET_AUTH_HEADER" "$LOGS_API_URL")
+
+    # Check if the API returned an error
+    if echo "$LOG_OUTPUT" | grep -q '"error"'; then
         echo "Error fetching logs. Details:"
-        cat /tmp/pipeline_log_response.json
+        echo "$LOG_OUTPUT"
         exit 1
     fi
-    
-    # Output the logs
-    cat /tmp/pipeline_log_response.json | jq -r '.content // "No logs available"'
+
+    # Output the raw logs
+    echo "$LOG_OUTPUT"
     """,
     args=[
         Arg(name="workspace", type="str", description="Bitbucket workspace slug", required=True),
@@ -62,6 +62,7 @@ pipeline_logs = BitbucketCliTool(
         Arg(name="step_uuid", type="str", description="Step UUID", required=True),
     ],
 )
+
 
 pipeline_get = BitbucketCliTool(
     name="bitbucket_pipeline_get",
