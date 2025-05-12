@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
 class SlackSearchTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL" *env]
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL", *env]
         secrets = ["SLACK_API_TOKEN", "LLM_API_KEY"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
