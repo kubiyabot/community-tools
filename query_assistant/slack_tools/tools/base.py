@@ -249,8 +249,8 @@ if __name__ == "__main__":
 
 class SlackSearchTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL", *env]
-        secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY"]
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL" *env]
+        secrets = ["SLACK_API_TOKEN", "LLM_API_KEY"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -593,31 +593,21 @@ def analyze_messages_with_llm(messages, query, channel_id):
                     {{"role": "user", "content": chunk_prompt}}
                 ]
                 
-                modified_metadata = {{
-                    "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
-                }}
-                
-                base_url = "https://lite-llm.dev.kubiya.ai/"
-                
-                # Use default value if LITELLM_API_USER is not set
-                litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
+                base_url = os.environ.get("LLM_BASE_URL")
                 
                 response = litellm.completion(
                     messages=chunk_messages,
                     model="openai/Llama-4-Scout",
-                    api_key=os.environ.get("LITELLM_API_KEY"),
+                    api_key=os.environ.get("LLM_API_KEY"),
                     base_url=base_url,
                     stream=False,
-                    user=litellm_api_user,
+                    user=os.environ.get("KUBIYA_USER_EMAIL"),
                     max_tokens=2048,
                     temperature=0.7,
                     top_p=0.1,
                     presence_penalty=0.0,
                     frequency_penalty=0.0,
                     timeout=30,
-                    extra_body={{
-                        "metadata": modified_metadata
-                    }}
                 )
                 
                 chunk_result = response.choices[0].message.content.strip()
@@ -656,31 +646,21 @@ def analyze_messages_with_llm(messages, query, channel_id):
                 {{"role": "user", "content": prompt}}
             ]
 
-            modified_metadata = {{
-                "user_id": os.environ.get("KUBIYA_USER_EMAIL", "unknown-user")
-            }}
+            base_url = os.environ.get("LLM_BASE_URL")
 
-            base_url = "https://lite-llm.dev.kubiya.ai/"
-
-            # Use default value if LITELLM_API_USER is not set
-            litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
-            
             response = litellm.completion(
                 messages=llm_messages,
                 model="openai/Llama-4-Scout",
-                api_key=os.environ.get("LITELLM_API_KEY"),
+                api_key=os.environ.get("LLM_API_KEY"),
                 base_url=base_url,
                 stream=False,
-                user=litellm_api_user,
+                user=os.environ.get("KUBIYA_USER_EMAIL"),
                 max_tokens=2048,
                 temperature=0.7,
                 top_p=0.1,
                 presence_penalty=0.0,
                 frequency_penalty=0.0,
                 timeout=30,
-                extra_body={{
-                    "metadata": modified_metadata
-                }}
             )
 
             answer = response.choices[0].message.content.strip()
@@ -698,10 +678,6 @@ def analyze_messages_with_llm(messages, query, channel_id):
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
     logger.info(f"Executing Slack search action with params: {{kwargs}}")
-    
-    # Use default value if LITELLM_API_USER is not set
-    litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
-    logger.info(f"Using LITELLM_API_USER: {{litellm_api_user}}")
     
     channel = kwargs.get('channel')
     query = kwargs.get('query')
