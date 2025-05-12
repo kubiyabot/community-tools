@@ -599,13 +599,16 @@ def analyze_messages_with_llm(messages, query, channel_id):
                 
                 base_url = "https://lite-llm.dev.kubiya.ai/"
                 
+                # Use default value if LITELLM_API_USER is not set
+                litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
+                
                 response = litellm.completion(
                     messages=chunk_messages,
                     model="openai/Llama-4-Scout",
                     api_key=os.environ.get("LITELLM_API_KEY"),
                     base_url=base_url,
                     stream=False,
-                    user="michael.bauer@kubiya.ai-staging",
+                    user=litellm_api_user,
                     max_tokens=2048,
                     temperature=0.7,
                     top_p=0.1,
@@ -659,13 +662,16 @@ def analyze_messages_with_llm(messages, query, channel_id):
 
             base_url = "https://lite-llm.dev.kubiya.ai/"
 
+            # Use default value if LITELLM_API_USER is not set
+            litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
+            
             response = litellm.completion(
                 messages=llm_messages,
                 model="openai/Llama-4-Scout",
                 api_key=os.environ.get("LITELLM_API_KEY"),
                 base_url=base_url,
                 stream=False,
-                user="michael.bauer@kubiya.ai-staging",
+                user=litellm_api_user,
                 max_tokens=2048,
                 temperature=0.7,
                 top_p=0.1,
@@ -692,6 +698,10 @@ def analyze_messages_with_llm(messages, query, channel_id):
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
     logger.info(f"Executing Slack search action with params: {{kwargs}}")
+    
+    # Use default value if LITELLM_API_USER is not set
+    litellm_api_user = os.environ.get("LITELLM_API_USER", "michael.bauer@kubiya.ai-staging")
+    logger.info(f"Using LITELLM_API_USER: {{litellm_api_user}}")
     
     channel = kwargs.get('channel')
     query = kwargs.get('query')
