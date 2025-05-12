@@ -355,7 +355,7 @@ def process_slack_messages(messages, is_reply=False):
     
     return "Messages printed individually"  # Return a placeholder
 
-def retry_with_backoff(func, max_retries=5, initial_delay=1, max_delay=60):
+def retry_with_backoff(func, max_retries=5, initial_delay=2, max_delay=60):
     retries = 0
     delay = initial_delay
     
