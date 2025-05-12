@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
 class SlackSearchTool(Tool):
     def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
-        env = ["KUBIYA_USER_EMAIL", *env]
+        env = ["KUBIYA_USER_EMAIL", "LITELLM_API_USER", *env]
         secrets = ["SLACK_API_TOKEN", "LITELLM_API_KEY"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
@@ -605,7 +605,7 @@ def analyze_messages_with_llm(messages, query, channel_id):
                     api_key=os.environ.get("LITELLM_API_KEY"),
                     base_url=base_url,
                     stream=False,
-                    user="michael.bauer@kubiya.ai-staging",
+                    user=os.environ.get("LITELLM_API_USER"),
                     max_tokens=2048,
                     temperature=0.7,
                     top_p=0.1,
@@ -665,7 +665,7 @@ def analyze_messages_with_llm(messages, query, channel_id):
                 api_key=os.environ.get("LITELLM_API_KEY"),
                 base_url=base_url,
                 stream=False,
-                user="michael.bauer@kubiya.ai-staging",
+                user=os.environ.get("LITELLM_API_USER"),
                 max_tokens=2048,
                 temperature=0.7,
                 top_p=0.1,
@@ -692,6 +692,10 @@ def analyze_messages_with_llm(messages, query, channel_id):
 def execute_slack_action(token, action, operation, **kwargs):
     client = WebClient(token=token)
     logger.info(f"Executing Slack search action with params: {{kwargs}}")
+    
+    # Check for required environment variables
+    if not os.environ.get("LITELLM_API_USER"):
+        return {{"success": False, "error": "LITELLM_API_USER environment variable is required"}}
     
     channel = kwargs.get('channel')
     query = kwargs.get('query')
