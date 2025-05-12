@@ -26,6 +26,37 @@ class ContentTools:
             # Install required packages silently
             apk add --no-cache --quiet jq curl bash ca-certificates >/dev/null 2>&1
             
+            # Function to validate Confluence connection
+            validate_confluence_connection() {
+                if [ -z "$CONFLUENCE_URL" ] || [ -z "$CONFLUENCE_USERNAME" ] || [ -z "$CONFLUENCE_API_TOKEN" ]; then
+                    echo "Error: Confluence credentials not properly configured. Please check CONFLUENCE_URL, CONFLUENCE_USERNAME, and CONFLUENCE_API_TOKEN."
+                    exit 1
+                fi
+                
+                # Test the connection
+                TEST_URL="$CONFLUENCE_URL/rest/api/space?limit=1"
+                TEST_RESULT=$(curl -s -X GET "$TEST_URL" \
+                    -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                    -H "Accept: application/json")
+                
+                # Check if the response is valid JSON
+                if ! echo "$TEST_RESULT" | jq . >/dev/null 2>&1; then
+                    echo "Error: Invalid response from Confluence API. Please check your credentials and URL."
+                    echo "Response: $TEST_RESULT"
+                    exit 1
+                fi
+                
+                # Check for error messages in the response
+                ERROR_MESSAGE=$(echo "$TEST_RESULT" | jq -r '.message // ""')
+                if [ -n "$ERROR_MESSAGE" ]; then
+                    echo "Error connecting to Confluence: $ERROR_MESSAGE"
+                    exit 1
+                fi
+            }
+            
+            # Validate connection
+            validate_confluence_connection
+            
             # Check if we have page_id or (title and space_key) or label
             if [ -z "$page_id" ] && ([ -z "$title" ] || [ -z "$space_key" ]) && [ -z "$label" ]; then
                 echo "Error: Either page_id, both title and space_key, or label are required"
@@ -66,6 +97,13 @@ class ContentTools:
                     exit 0
                 fi
                 
+                # Check if the response is valid JSON before proceeding
+                if ! echo "$SEARCH_RESULT" | jq . >/dev/null 2>&1; then
+                    echo "Error: Invalid response from Confluence API when searching for label: $label"
+                    echo "Response: $SEARCH_RESULT"
+                    exit 1
+                fi
+                
                 echo "Found $RESULT_COUNT pages with label '$label':"
                 echo ""
                 
@@ -83,6 +121,13 @@ class ContentTools:
                     PAGE_DATA=$(curl -s -X GET "$API_URL" \
                         -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
                         -H "Accept: application/json")
+                    
+                    # Check if the response is valid JSON before proceeding
+                    if ! echo "$PAGE_DATA" | jq . >/dev/null 2>&1; then
+                        echo "Error: Invalid response from Confluence API when retrieving page content"
+                        echo "Response: $PAGE_DATA"
+                        exit 1
+                    fi
                     
                     # Extract the title
                     TITLE=$(echo "$PAGE_DATA" | jq -r '.title // ""')
@@ -167,6 +212,13 @@ class ContentTools:
             PAGE_DATA=$(curl -s -X GET "$API_URL" \
                 -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
                 -H "Accept: application/json")
+            
+            # Check if the response is valid JSON before proceeding
+            if ! echo "$PAGE_DATA" | jq . >/dev/null 2>&1; then
+                echo "Error: Invalid response from Confluence API when retrieving page content"
+                echo "Response: $PAGE_DATA"
+                exit 1
+            fi
             
             # Check if we got a valid response
             if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
