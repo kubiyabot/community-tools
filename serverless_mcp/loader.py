@@ -51,7 +51,7 @@ def get_tools() -> List[Tool]:
     discover_and_define_tool = Tool(
         name="DiscoverAndDefineMCPTools",
         description="Discovers FastMCP tools from configured repositories and outputs their Kubiya tool definitions as JSON. The output of this tool is intended to be used by a tool manager to register the defined tools in Kubiya.",
-        type=ToolType.DOCKER,
+        type="docker",
         image=DISCOVER_TOOL_IMAGE_NAME, # You need to build and push this image
         # The content for a Docker tool is the command to run. 
         # Since Dockerfile.discover_tool has an ENTRYPOINT, content might not be strictly needed 
