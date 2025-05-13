@@ -1,4 +1,8 @@
-import unittest
+
+try:
+    import unittest
+except ImportError:
+    print("unittest not found, using unittest.TestCase as unittest")
 import os
 import json
 from unittest.mock import patch, MagicMock
