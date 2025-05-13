@@ -1,0 +1,55 @@
+[
+  {
+    "id": "example_mcp_server_1",
+    "git_repo_url": "https://github.com/user/example-mcp-server.git",
+    "git_branch_or_tag": "main",
+    "server_file_path": "my_server.py",
+    "mcp_instance_name": "mcp",
+    "service_port": 8000,
+    "tool_icon_url": "https://example.com/icon.png",
+    "mode": "sync",
+    "env": {
+      "LOG_LEVEL": "INFO",
+      "ENABLE_CACHE": "true",
+      "MAX_TOKENS": "512"
+    },
+    "secrets": [
+      {
+        "name": "mcp-api-credentials",
+        "mount_path": "/app/secrets"
+      },
+      "database-credentials"
+    ],
+    "volumes": [
+      "/local/configs:/app/configs:ro",
+      "/shared/cache:/app/cache",
+      "/tmp/logs:/app/logs"
+    ]
+  },
+  {
+    "id": "permanent_mcp_service",
+    "git_repo_url": "https://github.com/user/production-mcp-service.git",
+    "git_branch_or_tag": "v1.0.0",
+    "server_file_path": "server.py",
+    "mcp_instance_name": "mcp",
+    "service_port": 9000,
+    "docker_image": "user/production-mcp-service:v1.0.0",
+    "mode": "deploy",
+    "env": {
+      "CACHE_SIZE_MB": "256",
+      "API_TIMEOUT_SECONDS": "30"
+    },
+    "secrets": [
+      "openai-api-key",
+      {
+        "name": "ssl-certificates",
+        "mount_path": "/etc/ssl/certs"
+      }
+    ],
+    "volumes": [
+      "/data/persistent:/app/data:ro",
+      "/shared/models:/app/models",
+      "/var/log/mcp:/app/logs"
+    ]
+  }
+] 
