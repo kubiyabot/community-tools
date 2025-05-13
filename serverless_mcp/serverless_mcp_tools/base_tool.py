@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, FileSpec, ServiceSpec, ToolType, KubiyaArgType
+from kubiya_sdk.tools import Tool, Arg, ServiceSpec, KubiyaArgType
 from kubiya_sdk.tools.secret import Secret
 from typing import List, Dict, Any
 import logging
@@ -74,7 +74,7 @@ class ServerlessMCPTool(Tool):
         super().__init__(
             name=tool_name,
             description=tool_description,
-            type=ToolType.PYTHON, # Run python script
+            type="python", # Run python script
             image="python:3.11-slim", # Image for the Kubiya tool itself (client side)
             content=content_script,
             args=kubiya_args,
