@@ -1,5 +1,4 @@
 from kubiya_sdk.tools import Tool, Arg, ServiceSpec
-from kubiya_sdk.tools.secret import Secret
 from typing import List, Dict, Any
 import logging
 
@@ -41,11 +40,11 @@ class ServerlessMCPTool(Tool):
         secrets_config = mcp_server_config.get("secrets", [])
         for secret_config in secrets_config:
             if isinstance(secret_config, dict) and "name" in secret_config:
-                # Full secret definition with mount path, etc.
-                service_secrets.append(Secret(**secret_config))
+                # Add the dictionary directly
+                service_secrets.append(secret_config)
             elif isinstance(secret_config, str):
-                # Simple secret name, let Kubiya handle default mounting
-                service_secrets.append(Secret(name=secret_config))
+                # Simple secret name, create a basic dict
+                service_secrets.append({"name": secret_config})
             else:
                 logger.warning(f"Ignoring invalid secret configuration: {secret_config}")
 
@@ -80,9 +79,8 @@ class ServerlessMCPTool(Tool):
             args=kubiya_args,
             icon_url=tool_icon,
             with_services=[mcp_service],
-            # Secrets or env vars for the Kubiya tool itself (client side) if needed
-            # For example, if the client needs specific API keys not related to the MCP server
-            secrets=[],
+            # Secrets for the Kubiya tool itself (client side) if needed
+            secrets=service_secrets,
             env={ # Env for the client tool container
                 "KUBIYA_LOG_LEVEL": "INFO" # Example
             }
