@@ -3,8 +3,6 @@ import logging
 from typing import List
 from kubiya_sdk.tools import Tool, Arg
 
-from .serverless_mcp_tools.discovery import discover_mcp_tools_from_config, DiscoveredServerInfo
-from .serverless_mcp_tools.base_tool import ServerlessMCPTool
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
