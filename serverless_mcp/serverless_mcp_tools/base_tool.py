@@ -143,7 +143,7 @@ class ServerlessMCPTool(Tool):
                 mcp_call_args += ", "
         mcp_call_args += "}"
 
-        client_script = f"""\
+        client_script = f"""
 import asyncio
 import os
 import json
