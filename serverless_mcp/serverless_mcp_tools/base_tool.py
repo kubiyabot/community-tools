@@ -143,7 +143,7 @@ class ServerlessMCPTool(Tool):
                 mcp_call_args += ", "
         mcp_call_args += "}"
 
-        client_script = f"""
+        client_script = f"""\
 import asyncio
 import os
 import json
@@ -158,7 +158,7 @@ async def main():
     mcp_server_address = f'http://{service_host}:{service_port}/mcp' # Assuming default /mcp path for streamable-http
 
     # Parse arguments passed as environment variables by Kubiya
-{'\n'.join(arg_parsing_lines)}
+{','.join(arg_parsing_lines)}
 
     mcp_tool_name_to_call = '{mcp_tool_name}'
     mcp_tool_arguments = {mcp_call_args}
@@ -188,8 +188,7 @@ async def main():
             logger.error(f'MCP Client: Error calling tool {{mcp_tool_name_to_call}}: {{e}}', exc_info=True)
             # Propagate error to Kubiya by printing to stderr or raising an exception
             # For now, printing error message and exiting with non-zero status
-            output_file = open(os.devnull, 'w') if os.name == 'posix' else None
-            print(f'Error: {{e}}', file=output_file) # Python hides stderr by default in some K8s contexts
+            print(f'Error: {{e}}', file=open(os.devnull, 'w') if os.name == 'posix' else None) # Python hides stderr by default in some K8s contexts
             # A more robust way would be to ensure stderr is captured by Kubiya or write to a defined error file.
             raise
 
