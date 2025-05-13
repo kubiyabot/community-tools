@@ -5,7 +5,10 @@ except ImportError:
     print("unittest not found, using unittest.TestCase as unittest")
 import os
 import json
-from unittest.mock import patch, MagicMock
+try:
+    from unittest.mock import patch, MagicMock
+except ImportError:
+    print("unittest.mock not found, using mock module")
 
 # Add the parent directory (project root) to the Python path
 # to allow imports of serverless_mcp modules if tests are run directly.
