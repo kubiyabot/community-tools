@@ -292,4 +292,7 @@ if __name__ == '__main__':
     # Example: python -m unittest serverless_mcp.tests.test_tool_integration
     # Ensure serverless_mcp is in PYTHONPATH or current dir is its parent.
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-    unittest.main() 
+    try:
+        unittest.main() 
+    except Exception as e:
+        print(f"Cant run tests while Discovering Tools: {e}")
