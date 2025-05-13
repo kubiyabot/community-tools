@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List
-from kubiya_sdk.tools import Tool, Arg, KubiyaArgType
+from kubiya_sdk.tools import Tool, Arg
 
 from .serverless_mcp_tools.discovery import discover_mcp_tools_from_config, DiscoveredServerInfo
 from .serverless_mcp_tools.base_tool import ServerlessMCPTool
