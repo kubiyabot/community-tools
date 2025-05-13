@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, ServiceSpec, KubiyaArgType
+from kubiya_sdk.tools import Tool, Arg, ServiceSpec
 from kubiya_sdk.tools.secret import Secret
 from typing import List, Dict, Any
 import logging
