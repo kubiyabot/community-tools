@@ -213,6 +213,7 @@ def discover_mcp_tools_from_config(config_path: str) -> List[DiscoveredServerInf
 # Example usage (for testing)
 if __name__ == '__main__':
     # Assumes a config file exists at ../config/servers_to_sync.json relative to this script
+    print("Starting discovery...")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_file = os.path.join(script_dir, '..', 'config', 'servers_to_sync.json')
     print(f"Looking for config at: {config_file}")

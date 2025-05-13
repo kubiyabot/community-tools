@@ -71,6 +71,9 @@ def get_tools() -> List[Tool]:
 
 # For direct testing of this loader itself (python -m serverless_mcp.loader)
 if __name__ == '__main__':
+    print("Starting loader...")
+    print("Loading tools...")
+    print("Getting tools...")
     tools = get_tools()
     if tools:
         print("--- Defined Meta-Tool ---")
