@@ -15,9 +15,12 @@ except ImportError:
 import sys
 # sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from serverless_mcp.loader import get_tools
-from serverless_mcp.serverless_mcp_tools.base_tool import ServerlessMCPTool, MCP_SERVICE_IMAGE
-from serverless_mcp.serverless_mcp_tools.discovery import DiscoveredServerInfo, DiscoveredMCPToolSchema, MCPToolParameterSchema
+try:
+    from serverless_mcp.loader import get_tools
+    from serverless_mcp.serverless_mcp_tools.base_tool import ServerlessMCPTool, MCP_SERVICE_IMAGE
+    from serverless_mcp.serverless_mcp_tools.discovery import DiscoveredServerInfo, DiscoveredMCPToolSchema, MCPToolParameterSchema
+except ImportError:
+    print("serverless_mcp modules not found, using relative imports")
 
 class TestServerlessMCPIntegration(unittest.TestCase):
 
