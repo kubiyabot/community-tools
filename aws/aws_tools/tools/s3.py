@@ -5,8 +5,10 @@ from kubiya_sdk.tools.registry import tool_registry
 s3_list_buckets = AWSCliTool(
     name="s3_list_buckets",
     description="List S3 buckets",
-    content="aws s3 ls",
-    args=[],
+    content="aws s3 ls --region $region",
+    args=[
+        Arg(name="region", type="str", description="AWS region (e.g., 'me-south-1', 'us-west-2')", required=False, default="us-east-1"),
+    ],
 )
 
 s3_create_bucket = AWSCliTool(
