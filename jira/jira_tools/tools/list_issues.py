@@ -19,20 +19,8 @@ def list_issues_in_project(
     label: str = None,
 )-> List[dict]:
 
-    # Start with just the project filter
+    # Only use the project filter, ignore all other filters
     jql_query = f"project = {project_key}"
-    
-    # Only add other filters if explicitly requested
-    if status and status.strip():
-        jql_query += f" AND status = '{status}'"
-    if assignee and assignee.strip():
-        jql_query += f" AND assignee = '{assignee}'"
-    if priority and priority.strip():
-        jql_query += f" AND priority = '{priority}'"
-    if reporter and reporter.strip():
-        jql_query += f" AND reporter = '{reporter}'"
-    if label and label.strip():
-        jql_query += f" AND labels = '{label}'"
     
     # Add explicit sorting to ensure consistent results
     jql_query += " ORDER BY created ASC"

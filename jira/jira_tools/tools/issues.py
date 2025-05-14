@@ -87,15 +87,10 @@ view_issue_tool = JiraPythonTool(
 list_issue_tool = JiraPythonTool(
     name="issue_list",
     description="List Jira issues",
-    content="""python /tmp/list_issues.py "{{ .project_key }}" "{{ .issues_number }}" "{{ .status }}" "{{ .assignee }}" "{{ .priority }}" "{{ .reporter }}" "{{ .label }}" """,
+    content="""python /tmp/list_issues.py "{{ .project_key }}" "{{ .issues_number }}" """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
         Arg(name="issues_number", type="str", description="Number of issue to list", required=False),
-        Arg(name="status", type="str", description="filtering by issues status, such as Done", required=False),
-        Arg(name="assignee", type="str", description="filtering assignee user", required=False),
-        Arg(name="priority", type="str", description="filtering issues priority", required=False),
-        Arg(name="reporter", type="str", description="filtering assignee reporter", required=False),
-        Arg(name="label", type="str", description="filtering by label", required=False),
     ],
     with_files=[
         FileSpec(
