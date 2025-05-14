@@ -31,6 +31,50 @@ iam_list_policies = AWSCliTool(
     ],
 )
 
+iam_list_users = AWSCliTool(
+    name="iam_list_users",
+    description="List IAM users",
+    content="aws iam list-users $([[ -n \"$path_prefix\" ]] && echo \"--path-prefix $path_prefix\")",
+    args=[
+        Arg(name="path_prefix", type="str", description="Path prefix for filtering users", required=False),
+    ],
+)
+
+iam_get_user = AWSCliTool(
+    name="iam_get_user",
+    description="Get details of an IAM user",
+    content="aws iam get-user $([[ -n \"$user_name\" ]] && echo \"--user-name $user_name\")",
+    args=[
+        Arg(name="user_name", type="str", description="Name of the IAM user", required=False),
+    ],
+)
+
+iam_create_user = AWSCliTool(
+    name="iam_create_user",
+    description="Create a new IAM user",
+    content="aws iam create-user --user-name $user_name $([[ -n \"$path\" ]] && echo \"--path $path\") $([[ -n \"$tags\" ]] && echo \"--tags $tags\")",
+    args=[
+        Arg(name="user_name", type="str", description="Name of the IAM user to create", required=True),
+        Arg(name="path", type="str", description="Path for the user", required=False),
+        Arg(name="tags", type="str", description="Tags for the user in format 'Key=key1,Value=value1 Key=key2,Value=value2'", required=False),
+    ],
+)
+
+iam_update_user = AWSCliTool(
+    name="iam_update_user",
+    description="Update an IAM user",
+    content="aws iam update-user --user-name $user_name $([[ -n \"$new_path\" ]] && echo \"--new-path $new_path\") $([[ -n \"$new_user_name\" ]] && echo \"--new-user-name $new_user_name\")",
+    args=[
+        Arg(name="user_name", type="str", description="Current name of the IAM user", required=True),
+        Arg(name="new_path", type="str", description="New path for the user", required=False),
+        Arg(name="new_user_name", type="str", description="New name for the user", required=False),
+    ],
+)
+
 tool_registry.register("aws", iam_create_policy)
 tool_registry.register("aws", iam_attach_role_policy)
-tool_registry.register("aws", iam_list_policies) 
+tool_registry.register("aws", iam_list_policies)
+tool_registry.register("aws", iam_list_users)
+tool_registry.register("aws", iam_get_user)
+tool_registry.register("aws", iam_create_user)
+tool_registry.register("aws", iam_update_user) 
