@@ -19,34 +19,36 @@ def list_issues_in_project(
     label: str = None,
 )-> List[dict]:
 
+    # Start with just the project filter
     jql_query = f"project = {project_key}"
-    if status:
+    
+    # Only add other filters if explicitly requested
+    if status and status.strip():
         jql_query += f" AND status = '{status}'"
-    if assignee:
+    if assignee and assignee.strip():
         jql_query += f" AND assignee = '{assignee}'"
-    if priority:
+    if priority and priority.strip():
         jql_query += f" AND priority = '{priority}'"
-    if reporter:
+    if reporter and reporter.strip():
         jql_query += f" AND reporter = '{reporter}'"
-    if label:
+    if label and label.strip():
         jql_query += f" AND labels = '{label}'"
     
     # Add explicit sorting to ensure consistent results
     jql_query += " ORDER BY created ASC"
 
+    print(f"Final JQL Query: {jql_query}")
+    
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
-        "fields": "summary,created,labels,assignee,status",  # Include assignee and status for debugging
+        "fields": "summary,created,labels,assignee,status",
         "startAt": 0
     }
     try:
-        # Use the standard search endpoint
         search_url = (
             f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search"
         )
-        print(f"JQL Query: {jql_query}")
-        print(f"Requesting up to {num_issues} results")
         print(f"URL: {search_url}")
         
         response = requests.get(
@@ -55,7 +57,6 @@ def list_issues_in_project(
         response.raise_for_status()
         
         response_json = response.json()
-        print(f"Full API Response: {response_json}")
         
         total = response_json.get("total", 0)
         issues = response_json.get("issues", [])
@@ -68,8 +69,12 @@ def list_issues_in_project(
             print(f"Issue {i+1}:")
             print(f"  Key: {issue['key']}")
             print(f"  Summary: {issue['fields']['summary']}")
-            print(f"  Assignee: {issue['fields'].get('assignee')}")
-            print(f"  Status: {issue['fields'].get('status')}")
+            assignee_info = issue['fields'].get('assignee')
+            assignee_name = assignee_info.get('displayName') if assignee_info else "Unassigned"
+            print(f"  Assignee: {assignee_name}")
+            status_info = issue['fields'].get('status')
+            status_name = status_info.get('name') if status_info else "Unknown"
+            print(f"  Status: {status_name}")
         
         # If we have more issues than returned in the first request, fetch all of them
         if total > len(issues) and total > num_issues:
