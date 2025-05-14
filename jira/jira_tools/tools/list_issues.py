@@ -11,7 +11,7 @@ import requests
 
 def list_issues_in_project(
     project_key: str,
-    num_issues: int = None,  # Changed default to None (unlimited)
+    num_issues: int = None,
     status: str = None,
     assignee: str = None,
     priority: str = None,
@@ -24,8 +24,16 @@ def list_issues_in_project(
     
     # Add filters with proper JQL syntax
     if status and status.strip():
-        # Use = for exact matching, which is more reliable
-        jql_query += f" AND status = '{status.strip()}'"
+        # Handle multiple status values
+        status_values = [s.strip() for s in status.split(',')]
+        if len(status_values) == 1:
+            # Single status value
+            jql_query += f" AND status = '{status_values[0]}'"
+        else:
+            # Multiple status values - use IN operator
+            status_list = ', '.join(f"'{s}'" for s in status_values)
+            jql_query += f" AND status IN ({status_list})"
+    
     if assignee and assignee.strip():
         jql_query += f" AND assignee = '{assignee.strip()}'"
     if priority and priority.strip():

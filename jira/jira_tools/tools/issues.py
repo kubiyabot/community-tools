@@ -90,12 +90,12 @@ list_issue_tool = JiraPythonTool(
     content="""python /tmp/list_issues.py "{{ .project_key }}" "{{ .issues_number }}" "{{ .status }}" "{{ .assignee }}" "{{ .priority }}" "{{ .reporter }}" "{{ .label }}" """,
     args=[
         Arg(name="project_key", type="str", description="Jira project key", required=True),
-        Arg(name="issues_number", type="str", description="Number of issue to list", required=False),
-        Arg(name="status", type="str", description="filtering by issues status, such as Done", required=False),
-        Arg(name="assignee", type="str", description="filtering assignee user", required=False),
-        Arg(name="priority", type="str", description="filtering issues priority", required=False),
-        Arg(name="reporter", type="str", description="filtering assignee reporter", required=False),
-        Arg(name="label", type="str", description="filtering by label", required=False),
+        Arg(name="issues_number", type="str", description="Number of issue to list (leave empty for all issues)", required=False),
+        Arg(name="status", type="str", description="Filter by issue status, such as 'Done' or multiple statuses like 'To Do,Open'", required=False),
+        Arg(name="assignee", type="str", description="Filter by assignee user", required=False),
+        Arg(name="priority", type="str", description="Filter by issue priority", required=False),
+        Arg(name="reporter", type="str", description="Filter by issue reporter", required=False),
+        Arg(name="label", type="str", description="Filter by label", required=False),
     ],
     with_files=[
         FileSpec(
