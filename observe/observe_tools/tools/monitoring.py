@@ -47,14 +47,16 @@ class ObserveMonitoringTools:
             if [ -n "$start_time" ]; then
                 start_time=$(format_timestamp "$start_time")
             else
-                start_time=$(format_timestamp)
-                echo "Using default start time: $start_time (now)"
+                # Default to last 24 hours if not specified
+                start_time=$(date -u -d '24 hours ago' '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -v-24H '+%Y-%m-%dT%H:%M:%SZ')
+                echo "Using default start time: $start_time (24 hours ago)"
             fi
 
             if [ -n "$end_time" ]; then
                 end_time=$(format_timestamp "$end_time")
             else
-                end_time=$(format_timestamp)
+                # Default to current time
+                end_time=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
                 echo "Using default end time: $end_time (now)"
             fi
 
@@ -75,18 +77,24 @@ class ObserveMonitoringTools:
             RESPONSE=$(get_events "$dataset_id" "$start_time" "$end_time" "$filter" "$limit")
 
             # Format and display the results
-            EVENTS=$(echo "$RESPONSE" | jq -r '.events')
-            EVENT_COUNT=$(echo "$EVENTS" | jq -r 'length')
+            if echo "$RESPONSE" | jq -e '.events' > /dev/null 2>&1; then
+                EVENTS=$(echo "$RESPONSE" | jq -r '.events')
+                EVENT_COUNT=$(echo "$EVENTS" | jq -r 'length')
 
-            if [ "$EVENT_COUNT" -eq 0 ]; then
-                echo "No logs found matching the criteria."
-                exit 0
+                if [ "$EVENT_COUNT" -eq 0 ]; then
+                    echo "No logs found matching the criteria."
+                    exit 0
+                fi
+
+                echo "Found $EVENT_COUNT log entries:"
+                echo "============================================="
+                
+                echo "$EVENTS" | jq -r '.[] | "Timestamp: \(.timestamp)", "Resource ID: \(.resource_id // \"N/A\")", "Labels: \(.labels | tostring)", "Fields: \(.fields | tostring)", "============================================="'
+            else
+                echo "Could not extract events from response. Displaying full response:"
+                echo "============================================="
+                echo "$RESPONSE" | jq '.'
             fi
-
-            echo "Found $EVENT_COUNT log entries:"
-            echo "============================================="
-            
-            echo "$EVENTS" | jq -r '.[] | "Timestamp: \(.timestamp)", "Resource ID: \(.resource_id // \"N/A\")", "Labels: \(.labels | tostring)", "Fields: \(.fields | tostring)", "============================================="'
             
             echo ""
             echo "Log query completed successfully."

@@ -37,7 +37,7 @@ class MonitoringTools:
             name="datadog_alert_details",
             description="Retrieve details of a triggered DataDog alert (event)",
             content="""
-            apk add --no-cache jq
+            apk add --no-cache -q jq
             validate_datadog_connection
 
             if [ -z "$alert_id" ]; then
@@ -76,7 +76,7 @@ class MonitoringTools:
             name="compare_error_rates",
             description="Compare error rates for the past week vs the previous week using log aggregation",
             content="""
-            apk add --no-cache jq coreutils
+            apk add --no-cache -q jq coreutils
             validate_datadog_connection
 
             if [ -z "$service" ]; then
@@ -166,7 +166,7 @@ class MonitoringTools:
             name="query_logs",
             description="Fetch logs based on alert context",
             content="""
-            apk add --no-cache jq
+            apk add --no-cache -q jq
             validate_datadog_connection
 
             if [ -z "$service" ] || [ -z "$status" ]; then
@@ -222,7 +222,7 @@ class MonitoringTools:
             name="search_logs_by_string",
             description="Search logs using a custom query string with flexible time range",
             content="""
-            apk add --no-cache jq
+            apk add --no-cache -q jq
             validate_datadog_connection
 
             if [ -z "$query_string" ]; then
@@ -293,7 +293,7 @@ class MonitoringTools:
             name="search_logs_by_timeframe",
             description="Search logs within specific time periods with precise time control",
             content="""
-            apk add --no-cache jq coreutils
+            apk add --no-cache -q jq coreutils
             validate_datadog_connection
 
             # Parse time inputs (support both relative and absolute time formats)
@@ -621,7 +621,7 @@ class MonitoringTools:
             name="list_datadog_incidents",
             description="List Datadog incidents with filtering options such as status, time range, and services",
             content="""
-            apk add --no-cache jq coreutils
+            apk add --no-cache -q jq coreutils
             validate_datadog_connection
 
             # Build the query parameter string with page parameters only if provided
@@ -762,7 +762,7 @@ class MonitoringTools:
             name="get_datadog_incident_details",
             description="Get detailed information about a specific incident including timeline, attachments, and related data",
             content="""
-            apk add --no-cache jq
+            apk add --no-cache -q jq
             validate_datadog_connection
 
             if [ -z "$incident_id" ]; then
