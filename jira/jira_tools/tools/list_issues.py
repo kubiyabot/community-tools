@@ -40,12 +40,21 @@ def list_issues_in_project(
         search_url = (
             f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
         )
+        print(f"JQL Query: {jql_query}")
+        print(f"Requesting up to {num_issues} results")
+        
         response = requests.get(
             search_url, headers=get_jira_basic_headers(), params=params
         )
         response.raise_for_status()
-
-        issues = response.json().get("issues", [])
+        
+        response_json = response.json()
+        total = response_json.get("total", 0)
+        issues = response_json.get("issues", [])
+        
+        print(f"Total issues matching criteria: {total}")
+        print(f"Issues returned in this request: {len(issues)}")
+        
         latest_issues = [
             {
                 "key": issue["key"],
