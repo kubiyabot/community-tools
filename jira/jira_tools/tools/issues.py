@@ -84,6 +84,24 @@ view_issue_tool = JiraPythonTool(
         )
     ])
 
+view_multiple_issues_tool = JiraPythonTool(
+    name="view_multiple_issues",
+    description="View details of multiple Jira issues at once",
+    content="""python /tmp/view_issue.py {{ .issue_keys }} --multiple""",
+    args=[
+        Arg(name="issue_keys", type="str", description="Space-separated list of issue keys (e.g., 'JRA-817 JRA-818 JRA-819')", required=True)
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/view_issue.py",
+            content=inspect.getsource(view_issue),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 list_issue_tool = JiraPythonTool(
     name="issue_list",
     description="List Jira issues",
@@ -251,6 +269,7 @@ view_sprint_tool = JiraPythonTool(
         create_epic_tool,
         create_story_tool,
         view_issue_tool,
+        view_multiple_issues_tool,
         list_issue_tool,
         add_comment_issue_tool,
         update_issue_status_tool,
