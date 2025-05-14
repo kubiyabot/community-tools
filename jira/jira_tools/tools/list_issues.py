@@ -27,9 +27,12 @@ def list_issues_in_project(
 
     print(f"Final JQL Query: {jql_query}")
     
+    # Set a reasonable page size for pagination
+    page_size = 100
+    
     params = {
         "jql": jql_query,
-        "maxResults": num_issues,
+        "maxResults": page_size,  # Use page_size instead of num_issues for API requests
         "fields": "summary,created,labels,assignee,status",
         "startAt": 0
     }
@@ -50,25 +53,16 @@ def list_issues_in_project(
         issues = response_json.get("issues", [])
         
         print(f"Total issues matching criteria: {total}")
-        print(f"Issues returned in this request: {len(issues)}")
+        print(f"Issues returned in first page: {len(issues)}")
         
-        # Print details about each issue for debugging
-        for i, issue in enumerate(issues):
-            print(f"Issue {i+1}:")
-            print(f"  Key: {issue['key']}")
-            print(f"  Summary: {issue['fields']['summary']}")
-            assignee_info = issue['fields'].get('assignee')
-            assignee_name = assignee_info.get('displayName') if assignee_info else "Unassigned"
-            print(f"  Assignee: {assignee_name}")
-            status_info = issue['fields'].get('status')
-            status_name = status_info.get('name') if status_info else "Unknown"
-            print(f"  Status: {status_name}")
-        
-        # If we have more issues than returned in the first request, fetch all of them
-        if total > len(issues) and total > num_issues:
-            print(f"Fetching all {total} issues...")
-            all_issues = []
-            for start_at in range(0, total, num_issues):
+        # If there are more issues than returned in the first request, fetch additional pages
+        if total > len(issues):
+            print(f"Fetching additional pages to get all {total} issues...")
+            all_issues = issues.copy()
+            
+            # Start from the next page
+            for start_at in range(page_size, total, page_size):
+                print(f"Fetching page starting at {start_at}...")
                 params["startAt"] = start_at
                 response = requests.get(
                     search_url, headers=get_jira_basic_headers(), params=params
@@ -79,8 +73,33 @@ def list_issues_in_project(
                 print(f"Fetched {len(batch)} more issues, total so far: {len(all_issues)}")
                 if len(batch) == 0:
                     break
+                
+                # If we've reached the requested number of issues, stop fetching more
+                if num_issues and len(all_issues) >= num_issues:
+                    print(f"Reached requested limit of {num_issues} issues")
+                    break
+            
             issues = all_issues
             print(f"Total issues fetched: {len(issues)}")
+        
+        # Limit the results to the requested number if specified
+        if num_issues and len(issues) > num_issues:
+            print(f"Limiting results to requested {num_issues} issues")
+            issues = issues[:num_issues]
+        
+        # Print details about each issue for debugging (limit to first 20 for readability)
+        display_count = min(20, len(issues))
+        print(f"Displaying first {display_count} issues:")
+        for i, issue in enumerate(issues[:display_count]):
+            print(f"Issue {i+1}:")
+            print(f"  Key: {issue['key']}")
+            print(f"  Summary: {issue['fields']['summary']}")
+            assignee_info = issue['fields'].get('assignee')
+            assignee_name = assignee_info.get('displayName') if assignee_info else "Unassigned"
+            print(f"  Assignee: {assignee_name}")
+            status_info = issue['fields'].get('status')
+            status_name = status_info.get('name') if status_info else "Unknown"
+            print(f"  Status: {status_name}")
         
         latest_issues = [
             {
