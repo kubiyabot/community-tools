@@ -30,15 +30,19 @@ def list_issues_in_project(
         jql_query += f" AND reporter = '{reporter}'"
     if label:
         jql_query += f" AND labels = '{label}'"
+    
+    # Add explicit sorting to ensure consistent results
+    jql_query += " ORDER BY created ASC"
 
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
         "fields": "summary,created,labels",
+        "startAt": 0  # Explicitly start at the first result
     }
     try:
         search_url = (
-            f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search"
+            f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
         )
         print(f"JQL Query: {jql_query}")
         print(f"Requesting up to {num_issues} results")
@@ -57,6 +61,24 @@ def list_issues_in_project(
         
         print(f"Total issues matching criteria: {total}")
         print(f"Issues returned in this request: {len(issues)}")
+        
+        # If we have more issues than returned in the first request, fetch all of them
+        if total > len(issues) and total > num_issues:
+            print(f"Fetching all {total} issues...")
+            all_issues = []
+            for start_at in range(0, total, num_issues):
+                params["startAt"] = start_at
+                response = requests.get(
+                    search_url, headers=get_jira_basic_headers(), params=params
+                )
+                response.raise_for_status()
+                batch = response.json().get("issues", [])
+                all_issues.extend(batch)
+                print(f"Fetched {len(batch)} more issues, total so far: {len(all_issues)}")
+                if len(batch) == 0:
+                    break
+            issues = all_issues
+            print(f"Total issues fetched: {len(issues)}")
         
         latest_issues = [
             {
