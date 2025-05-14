@@ -108,10 +108,9 @@ def list_issues_in_project(
             print(f"Limiting results to requested {num_issues} issues")
             issues = issues[:num_issues]
         
-        # Print details about each issue for debugging (limit to first 20 for readability)
-        display_count = min(20, len(issues))
-        print(f"Displaying first {display_count} issues:")
-        for i, issue in enumerate(issues[:display_count]):
+        # Print details about each issue for debugging
+        print(f"Displaying all {len(issues)} issues:")
+        for i, issue in enumerate(issues):
             print(f"Issue {i+1}:")
             print(f"  Key: {issue['key']}")
             print(f"  Summary: {issue['fields']['summary']}")
