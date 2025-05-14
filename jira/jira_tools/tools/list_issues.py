@@ -22,10 +22,10 @@ def list_issues_in_project(
     # Start with the project filter
     jql_query = f"project = {project_key}"
     
-    # Add filters, but handle status more flexibly
+    # Add filters with proper JQL syntax
     if status and status.strip():
-        # Use the ~ operator for partial/case-insensitive matching
-        jql_query += f" AND status ~ \"{status.strip()}\""
+        # Use = for exact matching, which is more reliable
+        jql_query += f" AND status = '{status.strip()}'"
     if assignee and assignee.strip():
         jql_query += f" AND assignee = '{assignee.strip()}'"
     if priority and priority.strip():
@@ -128,6 +128,10 @@ def list_issues_in_project(
 
     except requests.exceptions.RequestException as e:
         print(f"An error occurred: {e}")
+        # Print more details about the error for debugging
+        if hasattr(e, 'response') and e.response:
+            print(f"Response status code: {e.response.status_code}")
+            print(f"Response text: {e.response.text}")
         return []
 
 
