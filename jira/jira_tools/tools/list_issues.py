@@ -37,12 +37,13 @@ def list_issues_in_project(
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
-        "fields": "summary,created,labels",
-        "startAt": 0  # Explicitly start at the first result
+        "fields": "summary,created,labels,assignee,status",  # Include assignee and status for debugging
+        "startAt": 0
     }
     try:
+        # Use the standard search endpoint
         search_url = (
-            f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search/jql"
+            f"{ATLASSIAN_JIRA_API_URL}/{get_jira_cloud_id()}/rest/api/3/search"
         )
         print(f"JQL Query: {jql_query}")
         print(f"Requesting up to {num_issues} results")
@@ -61,6 +62,14 @@ def list_issues_in_project(
         
         print(f"Total issues matching criteria: {total}")
         print(f"Issues returned in this request: {len(issues)}")
+        
+        # Print details about each issue for debugging
+        for i, issue in enumerate(issues):
+            print(f"Issue {i+1}:")
+            print(f"  Key: {issue['key']}")
+            print(f"  Summary: {issue['fields']['summary']}")
+            print(f"  Assignee: {issue['fields'].get('assignee')}")
+            print(f"  Status: {issue['fields'].get('status')}")
         
         # If we have more issues than returned in the first request, fetch all of them
         if total > len(issues) and total > num_issues:
