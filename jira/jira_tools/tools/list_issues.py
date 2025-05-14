@@ -11,7 +11,7 @@ import requests
 
 def list_issues_in_project(
     project_key: str,
-    num_issues: int = 5,
+    num_issues: int = None,  # Changed default to None (unlimited)
     status: str = None,
     assignee: str = None,
     priority: str = None,
@@ -154,8 +154,8 @@ def main():
         reporter = args.reporter if args.reporter and args.reporter != '<no value>' else None
         label = args.label if args.label and args.label != '<no value>' else None
 
-        # Convert issues_number to int if present, otherwise use default
-        issues_number = int(issues_number) if issues_number else 5
+        # Convert issues_number to int if present, otherwise use None (unlimited)
+        issues_number = int(issues_number) if issues_number else None
 
         latest_issues = list_issues_in_project(
             args.project_key,
