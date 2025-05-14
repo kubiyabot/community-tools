@@ -19,8 +19,21 @@ def list_issues_in_project(
     label: str = None,
 )-> List[dict]:
 
-    # Only use the project filter, ignore all other filters
+    # Start with the project filter
     jql_query = f"project = {project_key}"
+    
+    # Add filters, but handle status more flexibly
+    if status and status.strip():
+        # Use the ~ operator for partial/case-insensitive matching
+        jql_query += f" AND status ~ \"{status.strip()}\""
+    if assignee and assignee.strip():
+        jql_query += f" AND assignee = '{assignee.strip()}'"
+    if priority and priority.strip():
+        jql_query += f" AND priority = '{priority.strip()}'"
+    if reporter and reporter.strip():
+        jql_query += f" AND reporter = '{reporter.strip()}'"
+    if label and label.strip():
+        jql_query += f" AND labels = '{label.strip()}'"
     
     # Add explicit sorting to ensure consistent results
     jql_query += " ORDER BY created ASC"
@@ -32,7 +45,7 @@ def list_issues_in_project(
     
     params = {
         "jql": jql_query,
-        "maxResults": page_size,  # Use page_size instead of num_issues for API requests
+        "maxResults": page_size,
         "fields": "summary,created,labels,assignee,status",
         "startAt": 0
     }
