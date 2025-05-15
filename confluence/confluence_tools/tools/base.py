@@ -41,7 +41,8 @@ class ConfluenceTool(Tool):
     type: str = "docker"
     mermaid: str = DEFAULT_MERMAID
     
-    def __init__(self, name, description, content, args=None, image="curlimages/curl:8.1.2"):
+    def __init__(self, name, description, content, args=None, image="curlimages/curl:8.1.2", 
+                 env=None, secrets=None):
         # Add basic validation function to the content
         helper_functions = """
             # Basic validation function for Confluence tools
@@ -65,6 +66,16 @@ class ConfluenceTool(Tool):
         
         content = helper_functions + "\n" + content
         
+        # Combine default environment variables with any additional ones
+        all_env = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME"]
+        if env:
+            all_env.extend(env)
+        
+        # Combine default secrets with any additional ones
+        all_secrets = ["CONFLUENCE_API_TOKEN"]
+        if secrets:
+            all_secrets.extend(secrets)
+        
         super().__init__(
             name=name,
             description=description,
@@ -73,8 +84,8 @@ class ConfluenceTool(Tool):
             image=image,
             icon_url=CONFLUENCE_ICON_URL,
             type="docker",
-            secrets=["CONFLUENCE_API_TOKEN"],
-            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME"]
+            secrets=all_secrets,
+            env=all_env
         )
 
     def get_args(self) -> List[Arg]:
