@@ -1,8 +1,5 @@
-from typing import List
-from .base import ConfluenceTool, Arg, FileSpec, ContentAnalyzerTool
+from .base import ConfluenceTool, Arg, ContentAnalyzerTool
 from kubiya_sdk.tools.registry import tool_registry
-import inspect
-from . import space_content_analyzer
 
 class ContentTools:
     """Confluence content access and management tools."""
