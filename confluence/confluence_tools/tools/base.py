@@ -292,12 +292,17 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
             try:
                 response = litellm.completion(
                     messages=messages,
-                    model="openai/gpt-3.5-turbo",
+                    model="openai/Llama-4-Scout",
                     api_key=os.environ.get("LLM_API_KEY", ""),
                     base_url=os.environ.get("LLM_BASE_URL", ""),
                     stream=False,
-                    max_tokens=1000,
-                    temperature=0.3,
+                    user=os.environ.get("KUBIYA_USER_EMAIL", ""),
+                    max_tokens=2048,
+                    temperature=0.7,
+                    top_p=0.1,
+                    presence_penalty=0.0,
+                    frequency_penalty=0.0,
+                    timeout=30,
                 )
                 
                 chunk_result = response.choices[0].message.content.strip()
@@ -355,12 +360,17 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
         try:
             response = litellm.completion(
                 messages=messages,
-                model="openai/gpt-3.5-turbo",
+                model="openai/Llama-4-Scout",
                 api_key=os.environ.get("LLM_API_KEY", ""),
                 base_url=os.environ.get("LLM_BASE_URL", ""),
                 stream=False,
-                max_tokens=1500,
-                temperature=0.3,
+                user=os.environ.get("KUBIYA_USER_EMAIL", ""),
+                max_tokens=2048,
+                temperature=0.7,
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=30,
             )
             
             final_answer = response.choices[0].message.content.strip()
@@ -409,12 +419,17 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
             try:
                 response = litellm.completion(
                     messages=messages,
-                    model="openai/gpt-3.5-turbo",
+                    model="openai/Llama-4-Scout",
                     api_key=os.environ.get("LLM_API_KEY", ""),
                     base_url=os.environ.get("LLM_BASE_URL", ""),
                     stream=False,
-                    max_tokens=1000,
-                    temperature=0.3,
+                    user=os.environ.get("KUBIYA_USER_EMAIL", ""),
+                    max_tokens=2048,
+                    temperature=0.7,
+                    top_p=0.1,
+                    presence_penalty=0.0,
+                    frequency_penalty=0.0,
+                    timeout=30,
                 )
                 
                 final_answer = response.choices[0].message.content.strip()
