@@ -492,6 +492,7 @@ class ContentTools:
             description="Analyze content from a Confluence space to answer specific questions using AI. The tool retrieves all content from the specified space, processes it with AI, and provides relevant answers to your query.",
             content="""
             # Install required packages
+            apt-get update -qq && apt-get install -qq -y curl
             pip install -q requests litellm
             
             # Run the analyzer script
