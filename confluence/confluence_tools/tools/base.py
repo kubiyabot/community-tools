@@ -207,8 +207,8 @@ def get_space_content(space_key: str) -> Optional[Dict[str, Any]]:
     username = os.environ.get("CONFLUENCE_USERNAME", "")
     api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
     
-    # Build the URL
-    content_url = f"{{confluence_url}}/rest/api/space/{{space_key}}/content"
+    # Build the URL with a higher limit (max is 100 per request)
+    content_url = f"{{confluence_url}}/rest/api/space/{{space_key}}/content?limit=100"
     
     logger.info(f"Fetching content from space '{{space_key}}' at URL: {{content_url}}")
     
@@ -218,7 +218,85 @@ def get_space_content(space_key: str) -> Optional[Dict[str, Any]]:
         return None
     
     try:
-        return json.loads(result)
+        data = json.loads(result)
+        
+        # Check if we need to paginate for more results
+        all_pages = []
+        all_blogs = []
+        
+        # Add initial results
+        if "page" in data and "results" in data["page"]:
+            all_pages.extend(data["page"]["results"])
+            
+        if "blogpost" in data and "results" in data["blogpost"]:
+            all_blogs.extend(data["blogpost"]["results"])
+        
+        # Handle pagination for pages if needed
+        if "page" in data and "_links" in data["page"] and "next" in data["page"]["_links"]:
+            logger.info("More than 100 pages found, retrieving additional pages...")
+            next_url = data["page"]["_links"]["next"]
+            while next_url:
+                full_next_url = f"{{confluence_url}}{{next_url}}"
+                logger.info(f"Fetching next page batch from: {{full_next_url}}")
+                next_result = make_api_request(full_next_url, (username, api_token))
+                if not next_result:
+                    break
+                    
+                try:
+                    next_data = json.loads(next_result)
+                    if "results" in next_data:
+                        all_pages.extend(next_data["results"])
+                        
+                    # Check if there are more pages
+                    if "_links" in next_data and "next" in next_data["_links"]:
+                        next_url = next_data["_links"]["next"]
+                    else:
+                        next_url = None
+                except json.JSONDecodeError:
+                    logger.error("Error parsing paginated response")
+                    next_url = None
+        
+        # Handle pagination for blogs if needed
+        if "blogpost" in data and "_links" in data["blogpost"] and "next" in data["blogpost"]["_links"]:
+            logger.info("More than 100 blog posts found, retrieving additional blog posts...")
+            next_url = data["blogpost"]["_links"]["next"]
+            while next_url:
+                full_next_url = f"{{confluence_url}}{{next_url}}"
+                logger.info(f"Fetching next blog batch from: {{full_next_url}}")
+                next_result = make_api_request(full_next_url, (username, api_token))
+                if not next_result:
+                    break
+                    
+                try:
+                    next_data = json.loads(next_result)
+                    if "results" in next_data:
+                        all_blogs.extend(next_data["results"])
+                        
+                    # Check if there are more blogs
+                    if "_links" in next_data and "next" in next_data["_links"]:
+                        next_url = next_data["_links"]["next"]
+                    else:
+                        next_url = None
+                except json.JSONDecodeError:
+                    logger.error("Error parsing paginated response")
+                    next_url = None
+        
+        # Update the data with all pages and blogs
+        if all_pages:
+            if "page" not in data:
+                data["page"] = {{}}
+            data["page"]["results"] = all_pages
+            data["page"]["size"] = len(all_pages)
+            
+        if all_blogs:
+            if "blogpost" not in data:
+                data["blogpost"] = {{}}
+            data["blogpost"]["results"] = all_blogs
+            data["blogpost"]["size"] = len(all_blogs)
+            
+        logger.info(f"Total pages retrieved: {{len(all_pages)}}, Total blogs retrieved: {{len(all_blogs)}}")
+        return data
+        
     except json.JSONDecodeError:
         logger.error("Error parsing response from Confluence API")
         return None
