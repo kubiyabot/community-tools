@@ -42,7 +42,7 @@ class ConfluenceTool(Tool):
     mermaid: str = DEFAULT_MERMAID
     
     def __init__(self, name, description, content, args=None, image="curlimages/curl:8.1.2", 
-                 env=None, secrets=None):
+                 env=None, secrets=None, with_files=None):
         # Add basic validation function to the content
         helper_functions = """
             # Basic validation function for Confluence tools
@@ -85,7 +85,8 @@ class ConfluenceTool(Tool):
             icon_url=CONFLUENCE_ICON_URL,
             type="docker",
             secrets=all_secrets,
-            env=all_env
+            env=all_env,
+            with_files=with_files
         )
 
     def get_args(self) -> List[Arg]:
