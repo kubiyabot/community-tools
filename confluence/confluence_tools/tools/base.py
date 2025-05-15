@@ -210,6 +210,8 @@ def get_space_content(space_key: str) -> Optional[Dict[str, Any]]:
     # Build the URL
     content_url = f"{{confluence_url}}/rest/api/space/{{space_key}}/content"
     
+    logger.info(f"Fetching content from space '{{space_key}}' at URL: {{content_url}}")
+    
     # Make the API request
     result = make_api_request(content_url, (username, api_token))
     if not result:
@@ -522,8 +524,26 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
     page_count = content_result.get("page", {{}}).get("size", 0)
     blog_count = content_result.get("blogpost", {{}}).get("size", 0)
     
+    logger.info(f"Found {{page_count}} pages and {{blog_count}} blog posts in space '{{space_key}}'")
+    
     if page_count == 0 and blog_count == 0:
         return {{"success": True, "message": f"No content found in space: {{space_key}}"}}
+    
+    # Log details about each page found
+    if page_count > 0:
+        logger.info("Pages found in the space:")
+        for idx, page in enumerate(content_result.get("page", {{}}).get("results", []), 1):
+            page_id = page.get("id", "unknown")
+            page_title = page.get("title", "untitled")
+            logger.info(f"  {{idx}}. Page ID: {{page_id}}, Title: {{page_title}}")
+    
+    # Log details about each blog post found
+    if blog_count > 0:
+        logger.info("Blog posts found in the space:")
+        for idx, blog in enumerate(content_result.get("blogpost", {{}}).get("results", []), 1):
+            blog_id = blog.get("id", "unknown")
+            blog_title = blog.get("title", "untitled")
+            logger.info(f"  {{idx}}. Blog ID: {{blog_id}}, Title: {{blog_title}}")
     
     # If no query, just return the content list
     if not query:
@@ -565,18 +585,26 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
         
         # Extract page IDs and titles
         if "page" in content_result and "results" in content_result["page"]:
-            for page in content_result["page"]["results"]:
+            logger.info("Fetching full content for each page:")
+            for idx, page in enumerate(content_result["page"]["results"], 1):
                 page_id = page.get("id")
+                page_title = page.get("title", "untitled")
                 if page_id:
+                    logger.info(f"  {{idx}}. Fetching content for page: {{page_title}} (ID: {{page_id}})")
                     page_content = get_page_content(page_id)
                     if page_content:
+                        logger.info(f"     ✓ Successfully retrieved content ({{len(page_content.get('content', ''))}} characters)")
                         pages.append(page_content)
+                    else:
+                        logger.warning(f"     ✗ Failed to retrieve content for page: {{page_title}}")
         
         # Process with LLM
         if not pages:
             return {{"success": True, "message": "No page content found to process"}}
         
+        logger.info(f"Processing {{len(pages)}} pages with LLM for query: '{{query}}'")
         result = process_with_llm(pages, query)
+        logger.info("LLM processing completed successfully")
         return {{"success": True, "answer": result}}
 
 if __name__ == "__main__":
