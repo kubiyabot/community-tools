@@ -2,15 +2,21 @@
 import os
 import sys
 import json
-import subprocess
 import logging
-from typing import List, Dict, Any
+import requests
+import litellm
+from typing import Dict, List, Any, Tuple, Optional
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def validate_confluence_connection():
+def validate_confluence_connection() -> Tuple[bool, str]:
+    """Validate Confluence API connection using credentials from environment variables.
+    
+    Returns:
+        Tuple[bool, str]: Success status and message
+    """
     confluence_url = os.environ.get("CONFLUENCE_URL", "")
     username = os.environ.get("CONFLUENCE_USERNAME", "")
     api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
@@ -19,43 +25,80 @@ def validate_confluence_connection():
         return False, "Confluence credentials not properly configured"
     
     # Test the connection
-    cmd = [
-        "curl", "-s",
-        "-u", f"{username}:{api_token}",
-        "-H", "Accept: application/json",
-        f"{confluence_url.rstrip('/')}/rest/api/space?limit=1"
-    ]
-    
     try:
-        process = subprocess.run(cmd, capture_output=True, text=True)
-        if process.returncode != 0:
-            return False, f"Connection test failed: {process.stderr}"
+        url = f"{confluence_url.rstrip('/')}/rest/api/space?limit=1"
+        response = requests.get(
+            url,
+            auth=(username, api_token),
+            headers={"Accept": "application/json"},
+            timeout=10  # Add timeout for better error handling
+        )
+        
+        # Check status code
+        if response.status_code != 200:
+            return False, f"Connection test failed: HTTP {response.status_code} - {response.text}"
+        
+        # Check if the response is empty
+        if not response.text.strip():
+            return False, "Empty response from Confluence API. Please check your credentials and URL."
         
         # Check if the response is valid JSON
-        response = json.loads(process.stdout)
-        
-        # Check for error messages
-        if "message" in response:
-            return False, f"Confluence API error: {response['message']}"
-        
-        return True, "Connection successful"
-    except Exception as e:
+        try:
+            data = response.json()
+            
+            # Check for error messages
+            if "message" in data:
+                return False, f"Confluence API error: {data['message']}"
+            
+            return True, "Connection successful"
+        except ValueError as e:
+            return False, f"Invalid JSON response from Confluence API: {e}. Raw response: {response.text[:100]}..."
+    except requests.exceptions.RequestException as e:
         return False, f"Connection test error: {str(e)}"
-
-# Function to run shell commands
-def run_command(cmd):
-    try:
-        process = subprocess.run(cmd, capture_output=True, text=True)
-        if process.returncode != 0:
-            logger.error(f"Command error: {process.stderr}")
-            return None
-        return process.stdout
     except Exception as e:
-        logger.error(f"Command execution error: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
+
+def make_api_request(url: str, auth_tuple: Tuple[str, str]) -> Optional[str]:
+    """Make a GET request to the Confluence API.
+    
+    Args:
+        url: The API endpoint URL
+        auth_tuple: Tuple of (username, api_token)
+        
+    Returns:
+        Optional[str]: Response text or None if request failed
+    """
+    try:
+        response = requests.get(
+            url,
+            auth=auth_tuple,
+            headers={"Accept": "application/json"},
+            timeout=10  # Add timeout for better error handling
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"API request error: HTTP {response.status_code} - {response.text}")
+            return None
+        
+        return response.text
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request error: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
         return None
 
 # Get space content
-def get_space_content(space_key, limit=None):
+def get_space_content(space_key: str, limit: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    """Retrieve content from a Confluence space.
+    
+    Args:
+        space_key: The key of the Confluence space
+        limit: Optional limit on the number of results
+        
+    Returns:
+        Optional[Dict[str, Any]]: JSON response data or None if request failed
+    """
     confluence_url = os.environ.get("CONFLUENCE_URL", "").rstrip('/')
     username = os.environ.get("CONFLUENCE_USERNAME", "")
     api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
@@ -65,15 +108,8 @@ def get_space_content(space_key, limit=None):
     if limit:
         content_url += f"?limit={limit}"
     
-    # Execute the curl command
-    cmd = [
-        "curl", "-s",
-        "-u", f"{username}:{api_token}",
-        "-H", "Accept: application/json",
-        content_url
-    ]
-    
-    result = run_command(cmd)
+    # Make the API request
+    result = make_api_request(content_url, (username, api_token))
     if not result:
         return None
     
@@ -84,19 +120,22 @@ def get_space_content(space_key, limit=None):
         return None
 
 # Get page content
-def get_page_content(page_id):
+def get_page_content(page_id: str) -> Optional[Dict[str, str]]:
+    """Retrieve the content of a specific Confluence page.
+    
+    Args:
+        page_id: The ID of the Confluence page
+        
+    Returns:
+        Optional[Dict[str, str]]: Page data or None if request failed
+    """
     confluence_url = os.environ.get("CONFLUENCE_URL", "").rstrip('/')
     username = os.environ.get("CONFLUENCE_USERNAME", "")
     api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
     
-    cmd = [
-        "curl", "-s",
-        "-u", f"{username}:{api_token}",
-        "-H", "Accept: application/json",
-        f"{confluence_url}/rest/api/content/{page_id}?expand=body.storage"
-    ]
+    url = f"{confluence_url}/rest/api/content/{page_id}?expand=body.storage"
     
-    result = run_command(cmd)
+    result = make_api_request(url, (username, api_token))
     if not result:
         return None
     
@@ -113,15 +152,16 @@ def get_page_content(page_id):
         return None
 
 # Process content with LLM
-def process_with_llm(pages, user_query):
-    # Install litellm if needed
-    try:
-        import litellm
-    except ImportError:
-        logger.info("Installing required packages...")
-        subprocess.run(["pip", "install", "-q", "litellm"], check=True)
-        import litellm
+def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
+    """Process page content with LLM to answer user query.
     
+    Args:
+        pages: List of page data dictionaries
+        user_query: The user's query to answer
+        
+    Returns:
+        str: LLM-generated answer based on page content
+    """
     if not pages:
         return "No content found to process."
     
@@ -309,7 +349,16 @@ def process_with_llm(pages, user_query):
     return "No relevant information found in the space content."
 
 # Chunk content into manageable pieces
-def chunk_content(content, max_size=8000):
+def chunk_content(content: str, max_size: int = 8000) -> List[str]:
+    """Split content into manageable chunks for LLM processing.
+    
+    Args:
+        content: The text content to chunk
+        max_size: Maximum size of each chunk in characters
+        
+    Returns:
+        List[str]: List of content chunks
+    """
     if len(content) <= max_size:
         return [content]
     
@@ -357,7 +406,16 @@ def chunk_content(content, max_size=8000):
     
     return chunks
 
-def execute_confluence_action(action, **kwargs):
+def execute_confluence_action(action: str, **kwargs) -> Dict[str, Any]:
+    """Execute a Confluence action with the given parameters.
+    
+    Args:
+        action: The action to execute
+        **kwargs: Additional parameters for the action
+        
+    Returns:
+        Dict[str, Any]: Result of the action
+    """
     logger.info(f"Executing Confluence {action} action with params: {kwargs}")
     
     # Validate connection
