@@ -11,7 +11,7 @@ class ContentTools:
             self.get_page_content(),
             self.search_content(),
             self.list_spaces(),
-            self.get_space_content(),
+            self.get_space_content_analyzer(),
         ]
         
         for tool in tools:
@@ -416,7 +416,78 @@ class ContentTools:
         """Get content from a Confluence space."""
         return ConfluenceTool(
             name="confluence_space_content",
-            description="Get content from a Confluence space with optional natural language query processing",
+            description="Get content from a Confluence space",
+            content="""
+            # Install required packages silently
+            apk add --no-cache --quiet jq curl bash ca-certificates
+            
+            # Basic validation
+            validate_confluence_connection
+            
+            if [ -z "$space_key" ]; then
+                echo "Error: Space key is required"
+                exit 1
+            fi
+
+            # Set limit with default
+            LIMIT=${limit:-25}
+            
+            # Remove trailing slashes from URL
+            CONFLUENCE_URL=$(echo "$CONFLUENCE_URL" | sed 's/\/$//')
+            
+            # For Atlassian Cloud
+            if [[ "$CONFLUENCE_URL" == *"atlassian.net"* ]]; then
+                # Use v1 API for Atlassian Cloud
+                CONTENT_URL="$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$LIMIT"
+            else
+                # For self-hosted Confluence
+                CONTENT_URL="$CONFLUENCE_URL/rest/api/space/$space_key/content?limit=$LIMIT"
+            fi
+            
+            echo "Retrieving content from space: $space_key"
+            CONTENT_RESULT=$(curl -s -X GET "$CONTENT_URL" \
+                -u "$CONFLUENCE_USERNAME:$CONFLUENCE_API_TOKEN" \
+                -H "Accept: application/json")
+            
+            # Check if we got a valid response
+            if [ "$(echo "$CONTENT_RESULT" | jq -r '.statusCode // ""')" != "" ]; then
+                echo "Error: $(echo "$CONTENT_RESULT" | jq -r '.message // "Unknown error"')"
+                exit 1
+            fi
+            
+            # Check if we got any results
+            PAGE_COUNT=$(echo "$CONTENT_RESULT" | jq '.page.size // 0')
+            BLOG_COUNT=$(echo "$CONTENT_RESULT" | jq '.blogpost.size // 0')
+            
+            if [ "$PAGE_COUNT" -eq 0 ] && [ "$BLOG_COUNT" -eq 0 ]; then
+                echo "No content found in space: $space_key"
+                exit 0
+            fi
+            
+            # Display pages
+            if [ "$PAGE_COUNT" -gt 0 ]; then
+                echo "=== Pages in $space_key ==="
+                echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.page.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
+            fi
+            
+            # Display blog posts
+            if [ "$BLOG_COUNT" -gt 0 ]; then
+                echo "=== Blog Posts in $space_key ==="
+                echo "$CONTENT_RESULT" | jq -r --arg base_url "$CONFLUENCE_URL" '.blogpost.results[] | "ID: \(.id)\nTitle: \(.title)\nType: \(.type)\nURL: \($base_url)/display/'"$space_key"'/\(.id)\n"'
+            fi
+            """,
+            args=[
+                Arg(name="space_key", description="Space key to get content from", required=True),
+                Arg(name="limit", description="Maximum number of results to return", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+    def get_space_content_analyzer(self) -> ConfluenceTool:
+        """Analyze Confluence space content to answer natural language queries."""
+        return ConfluenceTool(
+            name="confluence_space_content_analyzer",
+            description="Analyze content from a Confluence space to answer specific questions using AI. The tool retrieves all content from the specified space, processes it with AI, and provides relevant answers to your query.",
             content="""#!/usr/bin/env python3
 import os
 import sys
@@ -879,9 +950,8 @@ if __name__ == "__main__":
     print(json.dumps(result))
         """,
             args=[
-                Arg(name="space_key", description="Space key to get content from", required=True),
-                Arg(name="limit", description="Optional limit on number of results to return", required=False),
-                Arg(name="query", description="Natural language query to search within the space content", required=False)
+                Arg(name="space_key", description="Space key to analyze content from", required=True),
+                Arg(name="query", description="Natural language query about the content in this space", required=True)
             ],
             env=["LLM_BASE_URL", "KUBIYA_USER_EMAIL"],
             secrets=["LLM_API_KEY"],
