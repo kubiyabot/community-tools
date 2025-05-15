@@ -378,7 +378,7 @@ def get_channel_messages(client, channel_id, oldest):
             thread_ts = msg.get("thread_ts")
             if thread_ts and thread_ts == msg.get("ts"):
                 replies = get_thread_replies(client, channel_id, thread_ts)
-                processed_msg["replies"] = [{"message": r.get("text", ""), "timestamp": r.get("ts", "")} for r in replies]
+                processed_msg["replies"] = [{{"message": r.get("text", ""), "timestamp": r.get("ts", "")}} for r in replies]
             else:
                 processed_msg["replies"] = []
             processed_messages.append(processed_msg)
