@@ -5,7 +5,7 @@ from kubiya_sdk.tools.registry import tool_registry
 s3_list_buckets = AWSCliTool(
     name="s3_list_buckets",
     description="List S3 buckets",
-    content="aws s3api list-buckets --no-sign-request",
+    content="aws s3 ls",
     args=[],
 )
 
