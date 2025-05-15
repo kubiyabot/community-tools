@@ -2,7 +2,7 @@ from typing import List
 from .base import ConfluenceTool, Arg, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
-from .space_content_analyzer import space_content_analyzer
+from . import space_content_analyzer
 
 class ContentTools:
     """Confluence content access and management tools."""
