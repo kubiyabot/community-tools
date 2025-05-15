@@ -7,18 +7,40 @@ from basic_funcs import (
     get_jira_basic_headers,
     setup_client_cert_files,
     get_jira_user_id,
-    get_jira_auth
+    get_jira_auth,
+    test_jira_connection,
 )
+import urllib3
+
+# Suppress only the specific InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def get_project_issue_types(project_key: str) -> List[str]:
     """Fetch available issue types for the project"""
+    # Test connection first
+    if not test_jira_connection():
+        print("Failed to establish connection to Jira. Please check your configuration.")
+        return []
+        
     server_url = get_jira_server_url()
-    url = f"{server_url}/rest/api/3/project/{project_key}"
+    url = f"{server_url}/rest/api/2/project/{project_key}"  # Changed from api/3 to api/2
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
+    headers = get_jira_basic_headers()
+    
+    # Add browser-like headers
+    headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    })
     
     response = requests.get(
         url,
-        headers=get_jira_basic_headers(),
+        headers=headers,
+        auth=auth,
         cert=(cert_path, key_path),
         verify=False  # Often needed for self-hosted instances
     )
@@ -36,13 +58,17 @@ def get_project_issue_types(project_key: str) -> List[str]:
 def get_priority_id(priority_name: str) -> str:
     """Get priority ID from priority name"""
     server_url = get_jira_server_url()
-    url = f"{server_url}/rest/api/3/priority"
+    url = f"{server_url}/rest/api/2/priority"  # Changed from api/3 to api/2
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()
+    headers = get_jira_basic_headers()
     
     response = requests.get(
         url,
-        headers=get_jira_basic_headers(),
-        cert=(cert_path, key_path)
+        headers=headers,
+        auth=auth,
+        cert=(cert_path, key_path),
+        verify=False
     )
     
     if response.status_code == 200:
@@ -74,20 +100,12 @@ def base_jira_payload(
         if issue_type not in available_types:
             raise ValueError(f"Invalid issue type '{issue_type}'. Available types are: {', '.join(available_types)}")
     
+    # Simplified payload format for Jira Server
     payload = {
         "fields": {
             "project": {"key": project_key},
             "summary": name,
-            "description": {
-                "type": "doc",
-                "version": 1,
-                "content": [
-                    {
-                        "type": "paragraph",
-                        "content": [{"text": description, "type": "text"}],
-                    }
-                ],
-            },
+            "description": description,  # Simplified format for Jira Server
             "issuetype": {"name": issue_type},
         }
     }
@@ -110,10 +128,25 @@ def base_jira_payload(
 
 def create_issue(project_key: str, summary: str, description: str, issue_type: str, 
                 assignee_email: str = None, label: str = None, parent_id: str = None):
+    # Test connection first
+    if not test_jira_connection():
+        print("Failed to establish connection to Jira. Please check your configuration.")
+        return False
+        
     server_url = get_jira_server_url()
     issue_url = f"{server_url}/rest/api/2/issue"
     cert_path, key_path = setup_client_cert_files()
     auth = get_jira_auth()
+    headers = get_jira_basic_headers()
+    
+    # Add browser-like headers
+    headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+    })
 
     try:
         # Create payload
@@ -136,26 +169,43 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
         # Make request
         response = requests.post(
             issue_url,
-            headers=get_jira_basic_headers(),
+            headers=headers,
             auth=auth,
             cert=(cert_path, key_path),
             verify=False,
             data=json.dumps(payload)
         )
+        
+        if response.status_code == 403:
+            if 'X-Authentication-Denied-Reason' in response.headers:
+                if 'CAPTCHA_CHALLENGE' in response.headers['X-Authentication-Denied-Reason']:
+                    print("CAPTCHA verification required. Please log in through the web interface first.")
+                    print("URL:", response.headers.get('X-Authentication-Denied-Reason').split('login-url=')[1])
+                    return False
+            
+        if response.status_code == 401:
+            print("Authentication failed. Please check your credentials and certificates.")
+            return False
 
         # Handle response
         if response.status_code == 201:
             print("✅ Issue created successfully.")
             print(f"Response: {json.dumps(response.json(), indent=2)}")
+            return True
         else:
             error_data = response.json()
             print(f"❌ Failed to create issue. Status code: {response.status_code}")
             print(f"Error details: {json.dumps(error_data, indent=2)}")
             response.raise_for_status()
+            return False
 
     except ValueError as e:
         print(f"❌ Validation error: {str(e)}")
         raise RuntimeError(f"Validation error: {str(e)}")
+    except requests.exceptions.SSLError as e:
+        print("\nSSL Error occurred. Please check your certificates.")
+        print(str(e))
+        return False
     except requests.exceptions.RequestException as e:
         print(f"❌ Request failed: {str(e)}")
         if hasattr(e, 'response') and e.response is not None:
@@ -164,10 +214,10 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
                 print(f"Error details: {json.dumps(error_details, indent=2)}")
             except:
                 print(f"Raw response: {e.response.text}")
-        raise RuntimeError(f"Failed to create issue: {str(e)}")
+        return False
     except Exception as e:
         print(f"❌ Unexpected error: {str(e)}")
-        raise RuntimeError(f"Failed to create issue: {str(e)}")
+        return False
 
 def main():
     import argparse
@@ -187,32 +237,18 @@ def main():
 
     no_value = "<no value>"  # when no value is injected
 
-    try:
-        create_issue(
-            project_key=args.project_key,
-            summary=args.name,
-            description=args.description,
-            issue_type=args.issue_type,
-            assignee_email=args.assignee_email if args.assignee_email != no_value else None,
-            label=args.label if args.label != no_value else None,
-            parent_id=args.parent_id if args.parent_id != no_value else None
-        )
-
-    except ValueError as e:
-        print(f"❌ Validation error: {str(e)}")
-        raise RuntimeError(f"Validation error: {str(e)}")
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Request failed: {str(e)}")
-        if hasattr(e, 'response') and e.response is not None:
-            try:
-                error_details = e.response.json()
-                print(f"Error details: {json.dumps(error_details, indent=2)}")
-            except:
-                print(f"Raw response: {e.response.text}")
-        raise RuntimeError(f"Failed to create issue: {str(e)}")
-    except Exception as e:
-        print(f"❌ Unexpected error: {str(e)}")
-        raise RuntimeError(f"Failed to create issue: {str(e)}")
+    success = create_issue(
+        project_key=args.project_key,
+        summary=args.name,
+        description=args.description,
+        issue_type=args.issue_type,
+        assignee_email=args.assignee_email if args.assignee_email != no_value else None,
+        label=args.label if args.label != no_value else None,
+        parent_id=args.parent_id if args.parent_id != no_value else None
+    )
+    
+    if not success:
+        raise RuntimeError(f"Failed to create issue")
 
 if __name__ == "__main__":
     main() 
