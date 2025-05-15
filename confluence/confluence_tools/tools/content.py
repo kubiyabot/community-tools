@@ -1,5 +1,5 @@
 from typing import List
-from .base import ConfluenceTool, Arg, FileSpec
+from .base import ConfluenceTool, Arg, FileSpec, ContentAnalyzerTool
 from kubiya_sdk.tools.registry import tool_registry
 import inspect
 from . import space_content_analyzer
@@ -485,31 +485,14 @@ class ContentTools:
             image="curlimages/curl:8.1.2"
         )
 
-    def get_space_content_analyzer(self) -> ConfluenceTool:
+    def get_space_content_analyzer(self) -> ContentAnalyzerTool:
         """Analyze Confluence space content to answer natural language queries."""
-        return ConfluenceTool(
+        return ContentAnalyzerTool(
             name="confluence_space_content_analyzer",
             description="Analyze content from a Confluence space to answer specific questions using AI. The tool retrieves all content from the specified space, processes it with AI, and provides relevant answers to your query.",
-            content="""
-            # Install required packages silently
-            apt-get update -qq >/dev/null 2>&1 && apt-get install -qq -y curl >/dev/null 2>&1
-            pip install -q requests litellm >/dev/null 2>&1
-            
-            # Run the analyzer script
-            python3 /tmp/space_content_analyzer.py
-            """,
             args=[
                 Arg(name="space_key", description="Space key to analyze content from", required=True),
                 Arg(name="query", description="Natural language query about the content in this space", required=True)
-            ],
-            env=["LLM_BASE_URL", "KUBIYA_USER_EMAIL"],
-            secrets=["LLM_API_KEY"],
-            image="python:3.11-slim",
-            with_files=[
-                FileSpec(
-                    destination="/tmp/space_content_analyzer.py",
-                    content=inspect.getsource(space_content_analyzer)
-                )
             ]
         )
 
