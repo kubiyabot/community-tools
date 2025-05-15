@@ -30,15 +30,6 @@ def create_issue_comment(issue_key, comment_text):
     auth = get_jira_auth()
     headers = get_jira_basic_headers()
     
-    # Add browser-like headers similar to list_issues.py
-    headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-    })
-    
     try:
         response = requests.post(
             comment_url, 

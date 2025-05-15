@@ -21,20 +21,44 @@ def get_jira_server_url() -> str:
     return url
 
 def get_jira_user_id(email: str) -> str:
-    """Get user account ID by email"""
+    """Get user account ID or name by email"""
     server_url = get_jira_server_url()
-    user_search_url = f"{server_url}/rest/api/3/user/search?query={email}"
+    # Change to API v2 for Jira Server compatibility
+    user_search_url = f"{server_url}/rest/api/2/user/search?username={email}"
     cert_path, key_path = setup_client_cert_files()
+    auth = get_jira_auth()  # Add authentication
 
     try:
         response = requests.get(
             user_search_url, 
             cert=(cert_path, key_path),
-            headers={"Accept": "application/json"},
+            headers=get_jira_basic_headers(),  # Use consistent headers
+            auth=auth,  # Add authentication
             verify=False
         )
         response.raise_for_status()
-        return response.json()[0]["accountId"]
+        
+        users = response.json()
+        if not users:
+            logger.error(f"No users found with email/username: {email}")
+            raise ValueError(f"No users found with email/username: {email}")
+            
+        user = users[0]
+        
+        # For Jira Server, try different user identifiers in order of preference
+        if "accountId" in user:
+            logger.info(f"Using accountId for user {email}")
+            return user["accountId"]
+        elif "name" in user:
+            logger.info(f"Using name for user {email}")
+            return user["name"]
+        elif "key" in user:
+            logger.info(f"Using key for user {email}")
+            return user["key"]
+        else:
+            logger.error(f"Could not find a valid identifier for user {email}")
+            raise ValueError(f"Could not find a valid identifier for user {email}")
+            
     except HTTPError as e:
         logger.error(f"Failed to get user ID: {e}")
         raise RuntimeError(f"Failed to get user ID: {e}")

@@ -20,9 +20,12 @@ def assign_issue(issue_key: str, assignee_email: str):
     except Exception as e:
         raise ValueError(f"Could not find user with email {assignee_email}: {str(e)}")
     
-    payload = {
-        "accountId": user_id
-    } if user_id else {"accountId": None}  # None to unassign
+    # For Jira Server, use the "name" field
+    if user_id:
+        payload = {"name": user_id}  # For Jira Server
+    else:
+        # Unassign
+        payload = {"name": None}
     
     cert_path, key_path = setup_client_cert_files()
     response = requests.put(

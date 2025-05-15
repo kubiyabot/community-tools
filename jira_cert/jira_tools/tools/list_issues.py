@@ -75,15 +75,6 @@ def list_issues_in_project(
         auth = get_jira_auth()
         headers = get_jira_basic_headers()
         
-        # Add browser-like headers
-        headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'application/json',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-        })
-        
         session = create_session_with_retry()
         response = session.get(
             search_url, 

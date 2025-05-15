@@ -28,15 +28,6 @@ def get_project_issue_types(project_key: str) -> List[str]:
     auth = get_jira_auth()
     headers = get_jira_basic_headers()
     
-    # Add browser-like headers
-    headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-    })
-    
     response = requests.get(
         url,
         headers=headers,
@@ -138,15 +129,6 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
     cert_path, key_path = setup_client_cert_files()
     auth = get_jira_auth()
     headers = get_jira_basic_headers()
-    
-    # Add browser-like headers
-    headers.update({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-    })
 
     try:
         # Create payload
