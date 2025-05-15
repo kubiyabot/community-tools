@@ -722,4 +722,5 @@ if __name__ == "__main__":
                 )
             ],
             mermaid=mermaid_diagram,
+            long_running=True
         )
