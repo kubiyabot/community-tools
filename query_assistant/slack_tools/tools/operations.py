@@ -156,24 +156,52 @@ slack_get_thread_replies = SlackTool(
     ],
 )
 
-# Add new Slack Search Messages Tool
 slack_search_messages = SlackSearchTool(
     name="slack_search_messages",
-    description="Search for messages in a Slack channel within a time period using natural language queries",
+    description="""
+Search for messages in a Slack channel using a natural language query within a given time window. 
+Returns all matching messages and thread replies from the specified channel.
+
+- This tool performs a raw search. It may return exact matches, partial matches, or discussions that are only tangentially related.
+- The assistant must analyze *both top-level messages and thread replies* for relevance.
+- If the results are large, analyze in chunks and summarize with clear distinctions between:
+  - Confirmed findings (direct answers to the query)
+  - Inferred or related information
+  - Irrelevant or general discussion
+
+IMPORTANT:
+- The `query` must be passed exactly as provided by the user. Do not rephrase, modify, or interpret it.
+- The tool returns raw text. You must process and extract useful context from the returned content before replying.
+""",
     action="conversations_history",
     args=[
-        Arg(name="channel", type="str", description="The ID of the channel to search in", required=True),
-        Arg(name="query", type="str", description="The search query exactly as provided by the user. Do not modify, summarize, or interpret the query - pass it through verbatim", required=True),
-        Arg(name="oldest", type="str", description="Filter messages by time. Use format like '1h' (1 hour), '2d' (2 days), '30m' (30 minutes)", required=True),
+        Arg(
+            name="channel",
+            type="str",
+            description="The ID of the Slack channel to search messages in",
+            required=True,
+        ),
+        Arg(
+            name="query",
+            type="str",
+            description="The exact query provided by the user. Do not modify, rephrase, or interpret it. Pass it through verbatim.",
+            required=True,
+        ),
+        Arg(
+            name="oldest",
+            type="str",
+            description="The age of messages to include, e.g., '1h' (1 hour), '2d' (2 days), '30m' (30 minutes), '180d' (180 days)",
+            required=True,
+        ),
     ],
 )
 
-# Slack Summarize Thread Tool
+
 slack_summarize_thread = SlackSummaryTool(
     name="slack_summarize_thread",
     description="Retrieve all messages from a Slack thread using the thread timestamp and channel ID from the environment",
     action="conversations_replies",
-    args=[],  # No arguments needed
+    args=[]
 )
 
 # Update the all_tools list
