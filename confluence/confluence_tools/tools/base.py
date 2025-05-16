@@ -986,8 +986,8 @@ def get_page_content(page_id):
 
 def create_knowledge_item(title, content, labels, space_key):
     try:
-        # Create a temporary file for the content
-        with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+        # Create a temporary file with .md extension
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.md') as temp_file:
             temp_file.write(content)
             content_file_path = temp_file.name
         
@@ -1010,6 +1010,7 @@ def create_knowledge_item(title, content, labels, space_key):
         
         logger.info(f"Running shell command: {shell_cmd}")
         logger.info(f"Content file size: {os.path.getsize(content_file_path)} bytes")
+        logger.info(f"Content file path: {content_file_path}")
         
         # Try with verbose output
         os.environ["KUBIYA_DEBUG"] = "true"
