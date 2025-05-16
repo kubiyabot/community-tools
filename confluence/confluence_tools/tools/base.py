@@ -1005,15 +1005,8 @@ def create_knowledge_item(title, content, labels, space_key):
         else:
             logger.info(f"Using KUBIYA_API_KEY: {api_key}")
         
-        # Instead of using subprocess.run with a list, create a shell command string
-        # This ensures proper quoting of arguments
-        shell_cmd = f'''
-        /usr/local/bin/kubiya knowledge create \\
-            --name "{title}" \\
-            --desc "Imported from Confluence space: {space_key}" \\
-            --labels {all_labels} \\
-            --content-file "{content_file_path}"
-        '''
+        # Create a single-line shell command with proper quoting
+        shell_cmd = f'/usr/local/bin/kubiya knowledge create --name "{title}" --desc "Imported from Confluence space: {space_key}" --labels {all_labels} --content-file "{content_file_path}"'
         
         logger.info(f"Running shell command: {shell_cmd}")
         logger.info(f"Content file size: {os.path.getsize(content_file_path)} bytes")
