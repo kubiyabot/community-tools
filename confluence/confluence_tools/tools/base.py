@@ -1003,8 +1003,7 @@ def create_knowledge_item(title, content, labels, space_key):
             "--name", title,
             "--desc", f"Imported from Confluence space: {space_key}",
             "--labels", all_labels,
-            "--content-file", content_file_path,
-            "--output", "json"
+            "--content-file", content_file_path
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True)
