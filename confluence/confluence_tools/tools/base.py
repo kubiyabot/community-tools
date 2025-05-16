@@ -1005,23 +1005,24 @@ def create_knowledge_item(title, content, labels, space_key):
         else:
             logger.info(f"Using KUBIYA_API_KEY: {api_key}")
         
-        # Create the knowledge item using Kubiya CLI
-        cmd = [
-            "/usr/local/bin/kubiya", "knowledge", "create",
-            "--name", title,
-            "--desc", f"Imported from Confluence space: {space_key}",
-            "--labels", all_labels,
-            "--content-file", content_file_path
-        ]
+        # Instead of using subprocess.run with a list, create a shell command string
+        # This ensures proper quoting of arguments
+        shell_cmd = f'''
+        /usr/local/bin/kubiya knowledge create \\
+            --name "{title}" \\
+            --desc "Imported from Confluence space: {space_key}" \\
+            --labels {all_labels} \\
+            --content-file "{content_file_path}"
+        '''
         
-        # Log the command (without the content file)
-        logger.info(f"Running command: {' '.join(cmd)}")
+        logger.info(f"Running shell command: {shell_cmd}")
         logger.info(f"Content file size: {os.path.getsize(content_file_path)} bytes")
         
         # Try with verbose output
         os.environ["KUBIYA_DEBUG"] = "true"
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        # Execute the shell command
+        result = subprocess.run(shell_cmd, shell=True, capture_output=True, text=True)
         
         # Clean up the temporary file
         os.unlink(content_file_path)
