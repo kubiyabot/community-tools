@@ -724,3 +724,48 @@ if __name__ == "__main__":
             mermaid=mermaid_diagram,
             long_running=True
         )
+
+class ConfluenceToKnowledgeTool(Tool):
+    """Base class for importing Confluence content to Kubiya knowledge."""
+    
+    def __init__(self, name, description, python_script, args):
+        # Shell script to set up the environment and run the Python script
+        shell_script = """
+#!/bin/sh
+set -e
+
+# Install required packages
+apk add --no-cache --quiet curl python3 py3-pip jq >/dev/null 2>&1
+pip install --quiet requests >/dev/null 2>&1
+
+# Download Kubiya CLI
+echo "Downloading Kubiya CLI..."
+curl -L https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64 -o /usr/local/bin/kubiya >/dev/null 2>&1
+chmod +x /usr/local/bin/kubiya
+
+# Create Python script
+cat > /tmp/import_confluence.py << 'EOF'
+{python_script}
+EOF
+
+# Run the Python script
+python3 /tmp/import_confluence.py
+
+# Clean up
+rm -f /tmp/import_confluence.py
+"""
+        
+        # Format the shell script with the Python script content
+        formatted_shell_script = shell_script.format(python_script=python_script)
+        
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=CONFLUENCE_ICON_URL,
+            type="docker",
+            image="python:3.9-alpine",
+            content=formatted_shell_script,
+            args=args,
+            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_API_KEY"],
+            secrets=["CONFLUENCE_API_TOKEN"]
+        )

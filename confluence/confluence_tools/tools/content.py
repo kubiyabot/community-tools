@@ -1,4 +1,4 @@
-from .base import ConfluenceTool, Arg, ContentAnalyzerTool
+from .base import ConfluenceTool, Arg, ContentAnalyzerTool, ConfluenceToKnowledgeTool
 from kubiya_sdk.tools.registry import tool_registry
 
 class ContentTools:
@@ -11,6 +11,7 @@ class ContentTools:
             self.search_content(),
             self.list_spaces(),
             self.get_space_content_analyzer(),
+            self.import_space_to_knowledge(),
         ]
         
         for tool in tools:
@@ -490,6 +491,400 @@ class ContentTools:
             args=[
                 Arg(name="space_key", description="Space key to analyze content from", required=True),
                 Arg(name="query", description="Natural language query about the content in this space", required=True)
+            ]
+        )
+
+    def import_space_to_knowledge(self) -> ConfluenceToKnowledgeTool:
+        """Import all content from a Confluence space to Kubiya knowledge."""
+        
+        # Python script for importing Confluence content to Kubiya knowledge
+        python_script = """
+import os
+import sys
+import json
+import logging
+import requests
+import tempfile
+import subprocess
+from typing import Dict, List, Any, Optional
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def validate_confluence_connection():
+    confluence_url = os.environ.get("CONFLUENCE_URL", "")
+    username = os.environ.get("CONFLUENCE_USERNAME", "")
+    api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
+    
+    if not confluence_url or not username or not api_token:
+        logger.error("Confluence credentials not properly configured")
+        return False
+    
+    # Test the connection
+    try:
+        url = f"{confluence_url.rstrip('/')}/rest/api/space?limit=1"
+        response = requests.get(
+            url,
+            auth=(username, api_token),
+            headers={"Accept": "application/json"},
+            timeout=10
+        )
+        
+        # Check status code
+        if response.status_code != 200:
+            logger.error(f"Connection test failed: HTTP {response.status_code} - {response.text}")
+            return False
+        
+        # Check if the response is valid JSON
+        try:
+            data = response.json()
+            
+            # Check for error messages
+            if "message" in data:
+                logger.error(f"Confluence API error: {data['message']}")
+                return False
+            
+            logger.info("Confluence connection successful")
+            return True
+        except ValueError as e:
+            logger.error(f"Invalid JSON response from Confluence API: {e}")
+            return False
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Connection test error: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        return False
+
+def make_api_request(url, auth_tuple):
+    try:
+        response = requests.get(
+            url,
+            auth=auth_tuple,
+            headers={"Accept": "application/json"},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            logger.error(f"API request error: HTTP {response.status_code} - {response.text}")
+            return None
+        
+        return response.text
+    except Exception as e:
+        logger.error(f"API request error: {str(e)}")
+        return None
+
+def get_space_content(space_key):
+    confluence_url = os.environ.get("CONFLUENCE_URL", "").rstrip('/')
+    username = os.environ.get("CONFLUENCE_USERNAME", "")
+    api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
+    
+    # Build the URL with a higher limit (max is 100 per request)
+    content_url = f"{confluence_url}/rest/api/space/{space_key}/content?limit=100"
+    
+    logger.info(f"Fetching content from space '{space_key}' at URL: {content_url}")
+    
+    # Make the API request
+    result = make_api_request(content_url, (username, api_token))
+    if not result:
+        return None
+    
+    try:
+        data = json.loads(result)
+        
+        # Check if we need to paginate for more results
+        all_pages = []
+        all_blogs = []
+        
+        # Add initial results
+        if "page" in data and "results" in data["page"]:
+            all_pages.extend(data["page"]["results"])
+            
+        if "blogpost" in data and "results" in data["blogpost"]:
+            all_blogs.extend(data["blogpost"]["results"])
+        
+        # Handle pagination for pages if needed
+        if "page" in data and "_links" in data["page"] and "next" in data["page"]["_links"]:
+            logger.info("More than 100 pages found, retrieving additional pages...")
+            next_url = data["page"]["_links"]["next"]
+            while next_url:
+                full_next_url = f"{confluence_url}{next_url}"
+                logger.info(f"Fetching next page batch from: {full_next_url}")
+                next_result = make_api_request(full_next_url, (username, api_token))
+                if not next_result:
+                    break
+                    
+                try:
+                    next_data = json.loads(next_result)
+                    if "results" in next_data:
+                        all_pages.extend(next_data["results"])
+                        
+                    # Check if there are more pages
+                    if "_links" in next_data and "next" in next_data["_links"]:
+                        next_url = next_data["_links"]["next"]
+                    else:
+                        next_url = None
+                except json.JSONDecodeError:
+                    logger.error("Error parsing paginated response")
+                    next_url = None
+        
+        # Handle pagination for blogs if needed
+        if "blogpost" in data and "_links" in data["blogpost"] and "next" in data["blogpost"]["_links"]:
+            logger.info("More than 100 blog posts found, retrieving additional blog posts...")
+            next_url = data["blogpost"]["_links"]["next"]
+            while next_url:
+                full_next_url = f"{confluence_url}{next_url}"
+                logger.info(f"Fetching next blog batch from: {full_next_url}")
+                next_result = make_api_request(full_next_url, (username, api_token))
+                if not next_result:
+                    break
+                    
+                try:
+                    next_data = json.loads(next_result)
+                    if "results" in next_data:
+                        all_blogs.extend(next_data["results"])
+                        
+                    # Check if there are more blogs
+                    if "_links" in next_data and "next" in next_data["_links"]:
+                        next_url = next_data["_links"]["next"]
+                    else:
+                        next_url = None
+                except json.JSONDecodeError:
+                    logger.error("Error parsing paginated response")
+                    next_url = None
+        
+        # Update the data with all pages and blogs
+        if all_pages:
+            if "page" not in data:
+                data["page"] = {}
+            data["page"]["results"] = all_pages
+            data["page"]["size"] = len(all_pages)
+            
+        if all_blogs:
+            if "blogpost" not in data:
+                data["blogpost"] = {}
+            data["blogpost"]["results"] = all_blogs
+            data["blogpost"]["size"] = len(all_blogs)
+            
+        logger.info(f"Total pages retrieved: {len(all_pages)}, Total blogs retrieved: {len(all_blogs)}")
+        return data
+        
+    except json.JSONDecodeError:
+        logger.error("Error parsing response from Confluence API")
+        return None
+
+def get_page_content(page_id):
+    confluence_url = os.environ.get("CONFLUENCE_URL", "").rstrip('/')
+    username = os.environ.get("CONFLUENCE_USERNAME", "")
+    api_token = os.environ.get("CONFLUENCE_API_TOKEN", "")
+    
+    url = f"{confluence_url}/rest/api/content/{page_id}?expand=body.storage,metadata.labels"
+    
+    result = make_api_request(url, (username, api_token))
+    if not result:
+        return None
+    
+    try:
+        data = json.loads(result)
+        
+        # Extract labels
+        labels = []
+        if "metadata" in data and "labels" in data["metadata"] and "results" in data["metadata"]["labels"]:
+            for label in data["metadata"]["labels"]["results"]:
+                if "name" in label:
+                    labels.append(label["name"])
+        
+        return {
+            "id": data.get("id"),
+            "title": data.get("title"),
+            "content": data.get("body", {}).get("storage", {}).get("value", ""),
+            "url": f"{confluence_url}/pages/viewpage.action?pageId={page_id}",
+            "labels": ",".join(labels)
+        }
+    except json.JSONDecodeError:
+        logger.error("Error parsing page content response")
+        return None
+
+def create_knowledge_item(title, content, labels, space_key):
+    try:
+        # Create a temporary file for the content
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as temp_file:
+            temp_file.write(content)
+            content_file_path = temp_file.name
+        
+        # Prepare labels with confluence space key
+        if labels:
+            all_labels = f"{labels},confluence,space-{space_key}"
+        else:
+            all_labels = f"confluence,space-{space_key}"
+        
+        # Create the knowledge item using Kubiya CLI
+        cmd = [
+            "/usr/local/bin/kubiya", "knowledge", "create",
+            "--name", title,
+            "--desc", f"Imported from Confluence space: {space_key}",
+            "--labels", all_labels,
+            "--content-file", content_file_path,
+            "--output", "json"
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Clean up the temporary file
+        os.unlink(content_file_path)
+        
+        if result.returncode != 0:
+            logger.error(f"Error creating knowledge item: {result.stderr}")
+            return None
+        
+        return result.stdout.strip()
+    except Exception as e:
+        logger.error(f"Error creating knowledge item: {str(e)}")
+        return None
+
+def main():
+    # Check for required environment variables
+    if not validate_confluence_connection():
+        print(json.dumps({"success": False, "error": "Confluence connection failed"}))
+        sys.exit(1)
+    
+    # Get arguments from environment variables
+    space_key = os.environ.get("space_key", "")
+    include_blogs = os.environ.get("include_blogs", "true").lower() == "true"
+    
+    if not space_key:
+        print(json.dumps({"success": False, "error": "space_key is required"}))
+        sys.exit(1)
+    
+    # Get space content
+    content_result = get_space_content(space_key)
+    
+    if not content_result:
+        print(json.dumps({"success": False, "error": f"Failed to retrieve content from space: {space_key}"}))
+        sys.exit(1)
+    
+    # Check if we got any results
+    page_count = content_result.get("page", {}).get("size", 0)
+    blog_count = content_result.get("blogpost", {}).get("size", 0)
+    
+    logger.info(f"Found {page_count} pages and {blog_count} blog posts in space '{space_key}'")
+    
+    if page_count == 0 and blog_count == 0:
+        print(json.dumps({"success": True, "message": f"No content found in space: {space_key}"}))
+        sys.exit(0)
+    
+    # Process pages
+    imported_count = 0
+    failed_count = 0
+    
+    if page_count > 0:
+        logger.info(f"Importing {page_count} pages from space '{space_key}'...")
+        
+        for idx, page in enumerate(content_result.get("page", {}).get("results", []), 1):
+            page_id = page.get("id")
+            page_title = page.get("title", "untitled")
+            
+            if page_id:
+                logger.info(f"[{idx}/{page_count}] Processing page: {page_title} (ID: {page_id})")
+                page_data = get_page_content(page_id)
+                
+                if page_data and page_data.get("content"):
+                    # Create knowledge item
+                    result = create_knowledge_item(
+                        page_data["title"],
+                        page_data["content"],
+                        page_data["labels"],
+                        space_key
+                    )
+                    
+                    if result:
+                        try:
+                            result_json = json.loads(result)
+                            if "uuid" in result_json:
+                                logger.info(f"✅ Successfully imported page '{page_title}' as knowledge item with UUID: {result_json['uuid']}")
+                                imported_count += 1
+                            else:
+                                logger.error(f"❌ Failed to import page '{page_title}': {result}")
+                                failed_count += 1
+                        except json.JSONDecodeError:
+                            logger.error(f"❌ Failed to import page '{page_title}': Invalid response format")
+                            failed_count += 1
+                    else:
+                        logger.error(f"❌ Failed to import page '{page_title}'")
+                        failed_count += 1
+                else:
+                    logger.error(f"❌ Failed to retrieve content for page '{page_title}'")
+                    failed_count += 1
+    
+    # Process blog posts if requested
+    if include_blogs and blog_count > 0:
+        logger.info(f"Importing {blog_count} blog posts from space '{space_key}'...")
+        
+        for idx, blog in enumerate(content_result.get("blogpost", {}).get("results", []), 1):
+            blog_id = blog.get("id")
+            blog_title = blog.get("title", "untitled")
+            
+            if blog_id:
+                logger.info(f"[{idx}/{blog_count}] Processing blog post: {blog_title} (ID: {blog_id})")
+                blog_data = get_page_content(blog_id)
+                
+                if blog_data and blog_data.get("content"):
+                    # Create knowledge item with blog label
+                    labels = blog_data["labels"]
+                    if labels:
+                        labels += ",blog"
+                    else:
+                        labels = "blog"
+                    
+                    result = create_knowledge_item(
+                        blog_data["title"],
+                        blog_data["content"],
+                        labels,
+                        space_key
+                    )
+                    
+                    if result:
+                        try:
+                            result_json = json.loads(result)
+                            if "uuid" in result_json:
+                                logger.info(f"✅ Successfully imported blog post '{blog_title}' as knowledge item with UUID: {result_json['uuid']}")
+                                imported_count += 1
+                            else:
+                                logger.error(f"❌ Failed to import blog post '{blog_title}': {result}")
+                                failed_count += 1
+                        except json.JSONDecodeError:
+                            logger.error(f"❌ Failed to import blog post '{blog_title}': Invalid response format")
+                            failed_count += 1
+                    else:
+                        logger.error(f"❌ Failed to import blog post '{blog_title}'")
+                        failed_count += 1
+                else:
+                    logger.error(f"❌ Failed to retrieve content for blog post '{blog_title}'")
+                    failed_count += 1
+    
+    # Print summary
+    summary = {
+        "success": True,
+        "space_key": space_key,
+        "total_content_items": page_count + (blog_count if include_blogs else 0),
+        "imported_count": imported_count,
+        "failed_count": failed_count
+    }
+    
+    print(json.dumps(summary))
+
+if __name__ == "__main__":
+    main()
+"""
+        
+        return ConfluenceToKnowledgeTool(
+            name="confluence_import_to_knowledge",
+            description="Import all content from a Confluence space into Kubiya knowledge items",
+            python_script=python_script,
+            args=[
+                Arg(name="space_key", description="Key of the Confluence space to import", required=True),
+                Arg(name="include_blogs", description="Whether to include blog posts in the import (true/false)", required=False, default="true"),
             ]
         )
 
