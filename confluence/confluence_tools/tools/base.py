@@ -121,7 +121,7 @@ class ConfluenceTool(Tool):
 class ContentAnalyzerTool(Tool):
     def __init__(self, name, description, args, mermaid_diagram=None):
         env = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_USER_EMAIL", "LLM_BASE_URL"]
-        secrets = ["CONFLUENCE_API_TOKEN", "LLM_API_KEY"]
+        secrets = ["CONFLUENCE_API_TOKEN", "LLM_API_KEY", "SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
@@ -138,6 +138,51 @@ from typing import Dict, List, Any, Tuple, Optional
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+def send_slack_notification(message: str) -> bool:
+    slack_token = os.environ.get("SLACK_API_TOKEN")
+    channel_id = os.environ.get("SLACK_CHANNEL_ID")
+    thread_ts = os.environ.get("SLACK_THREAD_TS")
+    
+    if not slack_token or not channel_id:
+        logger.warning("Slack notification skipped: missing token or channel ID")
+        return False
+    
+    try:
+        headers = {{
+            "Authorization": f"Bearer {{slack_token}}",
+            "Content-Type": "application/json"
+        }}
+        
+        payload = {{
+            "channel": channel_id,
+            "text": message
+        }}
+        
+        # If we have a thread_ts, add it to the payload to post in the thread
+        if thread_ts:
+            payload["thread_ts"] = thread_ts
+        
+        response = requests.post(
+            "https://slack.com/api/chat.postMessage",
+            headers=headers,
+            json=payload
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("ok"):
+                logger.info(f"Slack notification sent successfully to channel {{channel_id}}")
+                return True
+            else:
+                logger.warning(f"Slack API error: {{data.get('error')}}")
+                return False
+        else:
+            logger.warning(f"Slack API HTTP error: {{response.status_code}}")
+            return False
+    except Exception as e:
+        logger.error(f"Error sending Slack notification: {{str(e)}}")
+        return False
 
 def validate_confluence_connection() -> Tuple[bool, str]:
     confluence_url = os.environ.get("CONFLUENCE_URL", "")
@@ -684,6 +729,10 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
         logger.info(f"Processing {{len(pages)}} pages with LLM for query: '{{query}}'")
         result = process_with_llm(pages, query)
         logger.info("LLM processing completed successfully")
+        
+        # Send Slack notification about completion
+        notification_message = f"✅ Confluence content analysis complete for space *{{space_key}}*\\nQuery: _{{query}}_\\n\\nThe answer is now available in the Kubiya chat."
+        send_slack_notification(notification_message)
 
         return {{"success": True, "answer": result}}
 
