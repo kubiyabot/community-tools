@@ -2,7 +2,7 @@ import inspect
 from typing import List
 from kubiya_sdk.tools import Arg, FileSpec
 from ..base import JiraCertTool, register_jira_tool
-from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops, list_projects
+from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops, list_projects, create_release_tasks
 
 class BaseCreationIssueTool(JiraCertTool):
     def __init__(self, name: str, issue_type: str, extra_content: str = "",
@@ -244,6 +244,28 @@ list_projects_tool = JiraCertTool(
         )
     ])
 
+create_release_tasks_tool = JiraCertTool(
+    name="create_release_tasks",
+    description="Create a release task with 7 subtasks for different environments in KUBIKA2 board",
+    content="""python /tmp/create_release_tasks.py "{{ .release_date }}" """,
+    args=[
+        Arg(name="release_date", type="str", description="Release date in DD.MM.YY format (e.g., 25.05.24)", required=True),
+    ],
+    with_files=[
+        FileSpec(
+            destination="/tmp/create_release_tasks.py",
+            content=inspect.getsource(create_release_tasks),
+        ),
+        FileSpec(
+            destination="/tmp/create_issue.py",
+            content=inspect.getsource(create_issue),
+        ),
+        FileSpec(
+            destination="/tmp/basic_funcs.py",
+            content=inspect.getsource(basic_funcs),
+        )
+    ])
+
 [
     register_jira_tool(tool) for tool in [
         create_task_tool,
@@ -261,5 +283,6 @@ list_projects_tool = JiraCertTool(
         move_to_sprint_tool,
         view_sprint_tool,
         list_projects_tool,
+        create_release_tasks_tool
     ]
 ] 
