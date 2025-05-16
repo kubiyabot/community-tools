@@ -1179,8 +1179,8 @@ if __name__ == "__main__":
             image="python:3.9-slim",  # Changed from Alpine to Debian-based image
             content=shell_script,
             args=args,
-            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME"],
-            secrets=["CONFLUENCE_API_TOKEN", "KUBIYA_API_KEY"],
+            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_API_KEY"],
+            secrets=["CONFLUENCE_API_TOKEN"],
             with_files=[
                 FileSpec(
                     destination="/tmp/import_confluence.py",
