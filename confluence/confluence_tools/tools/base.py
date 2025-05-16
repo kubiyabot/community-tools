@@ -736,7 +736,7 @@ set -e
 
 # Install required packages
 apt-get update -qq >/dev/null 2>&1
-apt-get install -qq -y curl python3 python3-pip jq >/dev/null 2>&1
+apt-get install -qq -y curl python3 python3-pip jq file >/dev/null 2>&1
 pip3 install --quiet requests >/dev/null 2>&1
 
 # Download Kubiya CLI with proper error handling
@@ -766,6 +766,10 @@ fi
 echo "Kubiya CLI installed successfully at $CLI_PATH"
 ls -la "$CLI_PATH"
 file "$CLI_PATH"
+
+# Test the CLI
+echo "Testing Kubiya CLI..."
+"$CLI_PATH" --help || echo "CLI help command failed, but continuing..."
 
 # Run the Python script (now provided as a file spec)
 python3 /tmp/import_confluence.py
