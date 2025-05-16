@@ -394,7 +394,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
         # Process this batch with the LLM
         prompt = (
             f"You are analyzing content from multiple Confluence pages to answer a user query.\\n\\n"
-            f"User Query: {{user_query}}\n\n"
+            f"User Query: {{user_query}}\\n\\n"
             f"Content from multiple pages:\\n{{combined_content}}\\n\\n"
             f"IMPORTANT INSTRUCTIONS:\\n"
             f"1. If this content contains information relevant to the query, provide a DETAILED and COMPREHENSIVE answer.\\n"
