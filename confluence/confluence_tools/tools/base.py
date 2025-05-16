@@ -435,7 +435,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
                 
                 if detail_level > 50:  # If response has more than 50 words
                     logger.info(f"  ✓ Found DETAILED relevant information in chunk {{batch_start+1}} ({{detail_level}} words)")
-                    batch_results.append({{
+                    all_results.append({{
                         "chunk": batch_start+1,
                         "result": chunk_result,
                         "detail_level": detail_level,
@@ -443,7 +443,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
                     }})
                 else:
                     logger.info(f"  ⚠ Found BRIEF relevant information in chunk {{batch_start+1}} ({{detail_level}} words)")
-                    batch_results.append({{
+                    all_results.append({{
                         "chunk": batch_start+1,
                         "result": chunk_result,
                         "detail_level": detail_level,
@@ -454,7 +454,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
                 
         except Exception as e:
             logger.error(f"Error processing batch {{batch_start+1}}: {{str(e)}}")
-            batch_results.append({{
+            all_results.append({{
                 "chunk": batch_start+1,
                 "result": f"Error processing this batch: {{str(e)}}",
                 "detail_level": 0,
