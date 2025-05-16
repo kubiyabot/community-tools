@@ -997,13 +997,13 @@ def create_knowledge_item(title, content, labels, space_key):
         else:
             all_labels = f"confluence,space-{space_key}"
         
-        # Log the API key status (without revealing it)
+        # Log the full API key for debugging
         api_key = os.environ.get("KUBIYA_API_KEY", "")
         if not api_key:
             logger.error("KUBIYA_API_KEY environment variable is not set")
             return None
         else:
-            logger.info(f"Using KUBIYA_API_KEY: {api_key[:3]}...{api_key[-3:] if len(api_key) > 6 else ''}")
+            logger.info(f"Using KUBIYA_API_KEY: {api_key}")
         
         # Create the knowledge item using Kubiya CLI
         cmd = [
