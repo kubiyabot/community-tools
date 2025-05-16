@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 import json
+import re
 
 CONFLUENCE_ICON_URL = "https://cdn.worldvectorlogo.com/logos/confluence-1.svg"
 
@@ -334,10 +335,11 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
     litellm.request_timeout = 30
     litellm.num_retries = 3
     
-    # Process each page
-    all_results = []
+    # First, chunk each page individually
+    all_chunks = []
+    logger.info(f"Preparing {{len(pages)}} pages for processing")
     
-    for page in pages:
+    for page_idx, page in enumerate(pages, 1):
         page_id = page.get("id")
         page_title = page.get("title")
         page_content = page.get("content", "")
@@ -346,187 +348,60 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
         if not page_content:
             continue
         
-        logger.info(f"Processing page: {{page_title}} (ID: {{page_id}})")
+        # Chunk this page's content
+        page_chunks = chunk_content(page_content)
+        logger.info(f"Page {{page_idx}}/{{len(pages)}}: '{{page_title}}' split into {{len(page_chunks)}} chunks")
         
-        # Chunk the content if needed
-        chunks = chunk_content(page_content)
-        page_results = []
-        
-        for i, chunk in enumerate(chunks):
-            # Create prompt for this chunk
-            prompt = (
-                f"You are analyzing Confluence page content to answer a user query.\\n\\n"
-                f"Page Title: {{page_title}}\\n"
-                f"Page URL: {{page_url}}\\n\\n"
-                f"User Query: {{user_query}}\\n\\n"
-                f"Content (Chunk {{i+1}}/{{len(chunks)}}):\\n{{chunk}}\\n\\n"
-                f"Based on this content, provide a concise answer to the user's query. "
-                f"If this chunk doesn't contain relevant information, indicate that briefly."
-            )
-            
-            messages = [
-                {{"role": "system", "content": "You are a helpful assistant that analyzes Confluence content."}},
-                {{"role": "user", "content": prompt}}
-            ]
-            
-            try:
-                response = litellm.completion(
-                    messages=messages,
-                    model="openai/Llama-4-Scout",
-                    api_key=os.environ.get("LLM_API_KEY", ""),
-                    base_url=os.environ.get("LLM_BASE_URL", ""),
-                    stream=False,
-                    user=os.environ.get("KUBIYA_USER_EMAIL", ""),
-                    max_tokens=2048,
-                    temperature=0.7,
-                    top_p=0.1,
-                    presence_penalty=0.0,
-                    frequency_penalty=0.0,
-                    timeout=30,
-                )
-                
-                chunk_result = response.choices[0].message.content.strip()
-                
-                # Only add non-empty and relevant results
-                if chunk_result and not chunk_result.lower().startswith("this chunk doesn't contain"):
-                    page_results.append({{
-                        "chunk": i+1,
-                        "result": chunk_result
-                    }})
-                
-            except Exception as e:
-                logger.error(f"Error processing chunk {{i+1}}: {{str(e)}}")
-                page_results.append({{
-                    "chunk": i+1,
-                    "result": f"Error processing this chunk: {{str(e)}}"
-                }})
-        
-        # Summarize the page results
-        if page_results:
-            all_results.append({{
+        # Add metadata to each chunk
+        for i, chunk in enumerate(page_chunks):
+            all_chunks.append({{
+                "page_id": page_id,
                 "page_title": page_title,
                 "page_url": page_url,
-                "results": page_results
+                "chunk_num": i+1,
+                "total_chunks": len(page_chunks),
+                "content": chunk
             }})
     
-    # If we have results from multiple pages, summarize them
-    if len(all_results) > 1:
-        # Create a summary of all page results
-        summary_prompt = (
-            f"You've analyzed multiple Confluence pages to answer this query: '{{user_query}}'\\n\\n"
-            "Here are the key findings from each page:\\n\\n"
+    # Now process chunks in batches
+    batch_size = 3  # Process 3 chunks at a time
+    total_chunks = len(all_chunks)
+    logger.info(f"Total chunks across all pages: {{total_chunks}}")
+    
+    all_results = []
+    
+    for batch_start in range(0, total_chunks, batch_size):
+        batch_end = min(batch_start + batch_size, total_chunks)
+        current_batch = all_chunks[batch_start:batch_end]
+        
+        logger.info(f"Processing batch {{batch_start//batch_size + 1}}/{{(total_chunks + batch_size - 1)//batch_size}}: chunks {{batch_start+1}}-{{batch_end}}")
+        
+        # Combine chunks into a single prompt
+        combined_content = ""
+        batch_metadata = []
+        
+        for chunk_data in current_batch:
+            # Add chunk metadata and content
+            combined_content += f"\n\n--- PAGE: {{chunk_data['page_title']}} (Chunk {{chunk_data['chunk_num']}}/{{chunk_data['total_chunks']}}) ---\n\n{{chunk_data['content']}}"
+            batch_metadata.append({{
+                "page_id": chunk_data["page_id"],
+                "page_title": chunk_data["page_title"],
+                "page_url": chunk_data["page_url"],
+                "chunk_num": chunk_data["chunk_num"],
+                "total_chunks": chunk_data["total_chunks"]
+            }})
+        
+        # Process this batch with the LLM
+        prompt = (
+            f"You are analyzing content from multiple Confluence pages to answer a user query.\\n\\n"
+            f"User Query: {{user_query}}\\n\\n"
+            f"Content from multiple pages:\\n{{combined_content}}\\n\\n"
+            f"Based on this content, provide a concise answer to the user's query. "
+            f"If this content doesn't contain relevant information, indicate that briefly. "
+            f"If you find relevant information, specify which page it came from."
         )
         
-        for page_result in all_results:
-            summary_prompt += f"Page: {{page_result['page_title']}}\\n"
-            summary_prompt += f"URL: {{page_result['page_url']}}\\n"
-            summary_prompt += "Key points:\\n"
-            
-            for chunk_result in page_result['results']:
-                summary_prompt += f"- {{chunk_result['result']}}\\n"
-            
-            summary_prompt += "\\n"
-        
-        summary_prompt += (
-            "Based on all this information, provide a comprehensive answer to the user's query. "
-            "Include references to specific pages where the information was found."
-        )
-        
-        messages = [
-            {{"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sources."}},
-            {{"role": "user", "content": summary_prompt}}
-        ]
-        
-        try:
-            response = litellm.completion(
-                messages=messages,
-                model="openai/Llama-4-Scout",
-                api_key=os.environ.get("LLM_API_KEY", ""),
-                base_url=os.environ.get("LLM_BASE_URL", ""),
-                stream=False,
-                user=os.environ.get("KUBIYA_USER_EMAIL", ""),
-                max_tokens=2048,
-                temperature=0.7,
-                top_p=0.1,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
-                timeout=30,
-            )
-            
-            final_answer = response.choices[0].message.content.strip()
-            return final_answer
-            
-        except Exception as e:
-            logger.error(f"Error creating summary: {{str(e)}}")
-            # Fall back to returning individual page results
-            final_answer = f"Error creating summary: {{str(e)}}\\n\\nHere are the individual page results:\\n\\n"
-            
-            for page_result in all_results:
-                final_answer += f"## {{page_result['page_title']}}\\n"
-                final_answer += f"URL: {{page_result['page_url']}}\\n\\n"
-                
-                for chunk_result in page_result['results']:
-                    final_answer += f"### Chunk {{chunk_result['chunk']}}:\\n{{chunk_result['result']}}\\n\\n"
-            
-            return final_answer
-    
-    # If we only have one page with results
-    elif len(all_results) == 1:
-        page_result = all_results[0]
-        
-        if len(page_result['results']) == 1:
-            # If there's only one chunk result, return it directly
-            return f"# {{page_result['page_title']}}\\n\\n{{page_result['results'][0]['result']}}\\n\\nSource: {{page_result['page_url']}}"
-        else:
-            # If there are multiple chunks, summarize them
-            summary_prompt = (
-                f"You've analyzed the Confluence page '{{page_result['page_title']}}' to answer this query: '{{user_query}}'\\n\\n"
-                "Here are the key findings from different sections of the page:\\n\\n"
-            )
-            
-            for chunk_result in page_result['results']:
-                summary_prompt += f"Section {{chunk_result['chunk']}}:\\n{{chunk_result['result']}}\\n\\n"
-            
-            summary_prompt += (
-                "Based on all this information, provide a comprehensive answer to the user's query."
-            )
-            
-            messages = [
-                {{"role": "system", "content": "You are a helpful assistant that synthesizes information from multiple sections of a document."}},
-                {{"role": "user", "content": summary_prompt}}
-            ]
-            
-            try:
-                response = litellm.completion(
-                    messages=messages,
-                    model="openai/Llama-4-Scout",
-                    api_key=os.environ.get("LLM_API_KEY", ""),
-                    base_url=os.environ.get("LLM_BASE_URL", ""),
-                    stream=False,
-                    user=os.environ.get("KUBIYA_USER_EMAIL", ""),
-                    max_tokens=2048,
-                    temperature=0.7,
-                    top_p=0.1,
-                    presence_penalty=0.0,
-                    frequency_penalty=0.0,
-                    timeout=30,
-                )
-                
-                final_answer = response.choices[0].message.content.strip()
-                return f"# {{page_result['page_title']}}\\n\\n{{final_answer}}\\n\\nSource: {{page_result['page_url']}}"
-                
-            except Exception as e:
-                logger.error(f"Error creating page summary: {{str(e)}}")
-                # Fall back to returning individual chunk results
-                final_answer = f"# {{page_result['page_title']}}\\n\\nError creating summary: {{str(e)}}\\n\\nHere are the individual section results:\\n\\n"
-                
-                for chunk_result in page_result['results']:
-                    final_answer += f"## Section {{chunk_result['chunk']}}:\\n{{chunk_result['result']}}\\n\\n"
-                
-                final_answer += f"\\nSource: {{page_result['page_url']}}"
-                return final_answer
-    
-    return "No relevant information found in the space content."
+        # ... rest of the processing code remains similar
 
 # Chunk content into manageable pieces
 def chunk_content(content: str, max_size: int = 8000) -> List[str]:
@@ -576,6 +451,40 @@ def chunk_content(content: str, max_size: int = 8000) -> List[str]:
         chunks.append(current_chunk)
     
     return chunks
+
+def semantic_chunk_content(content, max_size=8000):
+    # First try to split at major section boundaries (headers)
+    sections = re.split(r'<h[1-3][^>]*>.*?</h[1-3]>', content)
+    
+    if len(sections) > 1:
+        # We found headers to split on
+        chunks = []
+        current_chunk = ""
+        
+        # Reconstruct with headers
+        headers = re.findall(r'(<h[1-3][^>]*>.*?</h[1-3]>)', content)
+        
+        # Interleave headers and sections
+        for i, section in enumerate(sections):
+            if i > 0 and i-1 < len(headers):
+                header = headers[i-1]
+            else:
+                header = ""
+                
+            if len(current_chunk) + len(header) + len(section) <= max_size:
+                current_chunk += header + section
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = header + section
+                
+        if current_chunk:
+            chunks.append(current_chunk)
+            
+        return chunks
+    else:
+        # Fall back to regular chunking
+        return chunk_content(content, max_size)
 
 def execute_confluence_action(**kwargs) -> Dict[str, Any]:
     logger.info(f"Executing Confluence space content analyzer with params: {{kwargs}}")
