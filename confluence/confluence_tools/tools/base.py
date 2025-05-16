@@ -731,12 +731,13 @@ class ConfluenceToKnowledgeTool(Tool):
     def __init__(self, name, description, python_script, args):
         # Shell script to set up the environment and run the Python script
         shell_script = """
-#!/bin/sh
+#!/bin/bash
 set -e
 
 # Install required packages
-apk add --no-cache --quiet curl python3 py3-pip jq >/dev/null 2>&1
-pip install --quiet requests >/dev/null 2>&1
+apt-get update -qq >/dev/null 2>&1
+apt-get install -qq -y curl python3 python3-pip jq >/dev/null 2>&1
+pip3 install --quiet requests >/dev/null 2>&1
 
 # Download Kubiya CLI with proper error handling
 echo "Downloading Kubiya CLI..."
@@ -763,7 +764,8 @@ if [ ! -x "$CLI_PATH" ]; then
 fi
 
 echo "Kubiya CLI installed successfully at $CLI_PATH"
-"$CLI_PATH" --version
+ls -la "$CLI_PATH"
+file "$CLI_PATH"
 
 # Create Python script
 cat > /tmp/import_confluence.py << 'EOF'
@@ -785,7 +787,7 @@ rm -f /tmp/import_confluence.py
             description=description,
             icon_url=CONFLUENCE_ICON_URL,
             type="docker",
-            image="python:3.9-alpine",
+            image="python:3.9-slim",  # Changed from Alpine to Debian-based image
             content=formatted_shell_script,
             args=args,
             env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME"],
