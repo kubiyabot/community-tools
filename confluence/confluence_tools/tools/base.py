@@ -139,7 +139,7 @@ from typing import Dict, List, Any, Tuple, Optional
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def send_slack_notification(message: str) -> bool:
+def send_slack_notification(message: str, answer: str, relevant_pages: List[Dict[str, str]] = None) -> bool:
     slack_token = os.environ.get("SLACK_API_TOKEN")
     channel_id = os.environ.get("SLACK_CHANNEL_ID")
     thread_ts = os.environ.get("SLACK_THREAD_TS")
@@ -154,9 +154,28 @@ def send_slack_notification(message: str) -> bool:
             "Content-Type": "application/json"
         }}
         
+        # Create a message with the answer and page links
+        full_message = message + "\\n\\n"
+        
+        # Add a condensed version of the answer (first 500 chars)
+        if len(answer) > 500:
+            full_message += f"*Answer Summary:*\\n{{answer[:500]}}... _(full answer in Kubiya chat)_\\n\\n"
+        else:
+            full_message += f"*Answer:*\\n{{answer}}\\n\\n"
+        
+        # Add links to relevant pages if available
+        if relevant_pages and len(relevant_pages) > 0:
+            full_message += "*Relevant Confluence Pages:*\\n"
+            for page in relevant_pages:
+                title = page.get('title', 'Untitled')
+                url = page.get('url', '')
+                if url:
+                    full_message += f"• <{{url}}|{{title}}>\\n"
+        
         payload = {{
             "channel": channel_id,
-            "text": message
+            "text": full_message,
+            "mrkdwn": True
         }}
         
         # If we have a thread_ts, add it to the payload to post in the thread
@@ -372,9 +391,9 @@ def get_page_content(page_id: str) -> Optional[Dict[str, str]]:
         return None
 
 # Process content with LLM
-def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
+def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> Tuple[str, List[Dict[str, str]]]:
     if not pages:
-        return "No content found to process."
+        return "No content found to process.", []
     
     # Set up LLM
     litellm.request_timeout = 30
@@ -566,17 +585,17 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
             
             # Format the final answer to include source links
             formatted_answer = format_final_answer(final_answer, relevant_pages)
-            return formatted_answer
+            return formatted_answer, relevant_pages
             
         except Exception as e:
             logger.error(f"Error creating summary: {{str(e)}}")
             # Fall back to returning the most detailed result
             if all_results:
-                return f"Error creating summary: {{str(e)}}\\n\\nMost relevant information found:\\n\\n{{all_results[0].get('result', 'No details available')}}"
+                return f"Error creating summary: {{str(e)}}\\n\\nMost relevant information found:\\n\\n{{all_results[0].get('result', 'No details available')}}", relevant_pages
             else:
-                return f"Error creating summary: {{str(e)}}\\n\\nNo relevant information was found."
+                return f"Error creating summary: {{str(e)}}\\n\\nNo relevant information was found.", []
     
-    return "No relevant information found in the space content."
+    return "No relevant information found in the space content.", []
 
 def format_final_answer(answer, relevant_pages):
     formatted_answer = answer
@@ -727,12 +746,12 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
             return {{"success": True, "message": "No page content found to process"}}
         
         logger.info(f"Processing {{len(pages)}} pages with LLM for query: '{{query}}'")
-        result = process_with_llm(pages, query)
+        result, relevant_pages = process_with_llm(pages, query)
         logger.info("LLM processing completed successfully")
         
-        # Send Slack notification about completion
-        notification_message = f"✅ Confluence content analysis complete for space *{{space_key}}*\\nQuery: _{{query}}_\\n\\nThe answer is now available in the Kubiya chat."
-        send_slack_notification(notification_message)
+        # Send Slack notification about completion with the answer and page links
+        notification_message = f"✅ Confluence content analysis complete for space *{{space_key}}*\\nQuery: _{{query}}_"
+        send_slack_notification(notification_message, result, relevant_pages)
 
         return {{"success": True, "answer": result}}
 
