@@ -766,6 +766,6 @@ rm -f /tmp/import_confluence.py
             image="python:3.9-alpine",
             content=formatted_shell_script,
             args=args,
-            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_API_KEY"],
-            secrets=["CONFLUENCE_API_TOKEN"]
+            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME"],
+            secrets=["CONFLUENCE_API_TOKEN", "KUBIYA_API_KEY"]
         )
