@@ -782,5 +782,6 @@ if __name__ == "__main__":
                     content=script_content
                 )
             ],
-            mermaid=mermaid_diagram
+            mermaid=mermaid_diagram,
+            long_running=True
         )
