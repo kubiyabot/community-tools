@@ -394,7 +394,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
         # Process this batch with the LLM
         prompt = (
             f"You are analyzing content from multiple Confluence pages to answer a user query.\\n\\n"
-            f"User Query: {{user_query}}\\n\\n"
+            f"User Query: {{user_query}}\n\n"
             f"Content from multiple pages:\\n{{combined_content}}\\n\\n"
             f"IMPORTANT INSTRUCTIONS:\\n"
             f"1. If this content contains information relevant to the query, provide a DETAILED and COMPREHENSIVE answer.\\n"
@@ -684,29 +684,6 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
         logger.info(f"Processing {{len(pages)}} pages with LLM for query: '{{query}}'")
         result = process_with_llm(pages, query)
         logger.info("LLM processing completed successfully")
-
-        # Sort results by detail level before summarizing
-        all_results.sort(key=lambda x: sum([r["detail_level"] for r in x["results"]]), reverse=True)
-
-        # Use the most detailed results first in the summary
-        detailed_findings = ""
-        for batch_result in all_results[:5]:  # Focus on top 5 most detailed batches
-            for chunk_result in batch_result["results"]:
-                detailed_findings += f"From page '{{chunk_result['page_info']['page_title']}}':\\n{{chunk_result['result']}}\\n\\n"
-
-        # In the final summary step:
-        summary_prompt = (
-            f"You've analyzed multiple Confluence pages to answer this query: '{{user_query}}'\\n\\n"
-            f"Here are the detailed findings from each relevant section:\\n\\n"
-            f"{{detailed_findings}}\\n\\n"
-            f"IMPORTANT INSTRUCTIONS:\\n"
-            f"1. Provide a COMPREHENSIVE answer that includes ALL relevant details from the findings.\\n"
-            f"2. Do not over-summarize or omit important information.\\n"
-            f"3. Include specific examples, steps, code snippets, or explanations from the original content.\\n"
-            f"4. Clearly reference which Confluence page(s) each piece of information came from.\\n"
-            f"5. Format your response with clear sections and include the full URLs to relevant pages.\\n\\n"
-            f"Your comprehensive response:"
-        )
 
         return {{"success": True, "answer": result}}
 
