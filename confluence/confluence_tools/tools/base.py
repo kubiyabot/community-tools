@@ -692,7 +692,7 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
         detailed_findings = ""
         for batch_result in all_results[:5]:  # Focus on top 5 most detailed batches
             for chunk_result in batch_result["results"]:
-                detailed_findings += f"From page '{{chunk_result['page_info']['page_title']}}':\n{{chunk_result['result']}}\n\n"
+                detailed_findings += f"From page '{{chunk_result['page_info']['page_title']}}':\\n{{chunk_result['result']}}\\n\\n"
 
         # In the final summary step:
         summary_prompt = (
