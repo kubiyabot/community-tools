@@ -1,4 +1,3 @@
-import argparse
 import sys
 from datetime import datetime
 
@@ -86,6 +85,7 @@ def create_release_tasks(release_date: str) -> bool:
     return subtask_success
 
 def main():
+    import argparse
     parser = argparse.ArgumentParser(description="Create Jira release tasks")
     parser.add_argument("release_date", help="Release date in DD.MM.YY format (e.g., 25.05.24)")
     args = parser.parse_args()
