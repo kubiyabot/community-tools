@@ -1,7 +1,6 @@
 from typing import List, Optional, Dict, Any
 from kubiya_sdk.tools import Tool, Arg, FileSpec
 import json
-import re
 
 CONFLUENCE_ICON_URL = "https://cdn.worldvectorlogo.com/logos/confluence-1.svg"
 
@@ -133,6 +132,7 @@ import json
 import logging
 import requests
 import litellm
+import re
 from typing import Dict, List, Any, Tuple, Optional
 
 # Set up logging
@@ -382,7 +382,7 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
         
         for chunk_data in current_batch:
             # Add chunk metadata and content
-            combined_content += f"\n\n--- PAGE: {{chunk_data['page_title']}} (Chunk {{chunk_data['chunk_num']}}/{{chunk_data['total_chunks']}}) ---\n\n{{chunk_data['content']}}"
+            combined_content += f"\\n\\n--- PAGE: {{chunk_data['page_title']}} (Chunk {{chunk_data['chunk_num']}}/{{chunk_data['total_chunks']}}) ---\\n\\n{{chunk_data['content']}}"
             batch_metadata.append({{
                 "page_id": chunk_data["page_id"],
                 "page_title": chunk_data["page_title"],
@@ -396,61 +396,153 @@ def process_with_llm(pages: List[Dict[str, str]], user_query: str) -> str:
             f"You are analyzing content from multiple Confluence pages to answer a user query.\\n\\n"
             f"User Query: {{user_query}}\\n\\n"
             f"Content from multiple pages:\\n{{combined_content}}\\n\\n"
-            f"Based on this content, provide a concise answer to the user's query. "
-            f"If this content doesn't contain relevant information, indicate that briefly. "
-            f"If you find relevant information, specify which page it came from."
+            f"IMPORTANT INSTRUCTIONS:\\n"
+            f"1. If this content contains information relevant to the query, provide a DETAILED and COMPREHENSIVE answer.\\n"
+            f"2. Include ALL relevant details, examples, steps, or explanations from the content.\\n"
+            f"3. Do not summarize excessively - preserve important details.\\n"
+            f"4. Clearly specify which page(s) the information came from.\\n"
+            f"5. If the content doesn't contain relevant information, briefly indicate that.\\n\\n"
+            f"Your detailed response:"
         )
         
-        # ... rest of the processing code remains similar
-
-# Chunk content into manageable pieces
-def chunk_content(content: str, max_size: int = 8000) -> List[str]:
-    if len(content) <= max_size:
-        return [content]
-    
-    # Try to split at paragraph boundaries
-    paragraphs = content.split('\\n\\n')
-    chunks = []
-    current_chunk = ""
-    
-    for para in paragraphs:
-        if len(current_chunk) + len(para) + 2 <= max_size:
-            if current_chunk:
-                current_chunk += '\\n\\n'
-            current_chunk += para
-        else:
-            if current_chunk:
-                chunks.append(current_chunk)
+        messages = [
+            {{"role": "system", "content": "You are a detail-oriented assistant that analyzes Confluence content. Your primary goal is to provide COMPREHENSIVE and DETAILED answers, preserving all relevant information from the source material. Never sacrifice important details for brevity."}},
+            {{"role": "user", "content": prompt}}
+        ]
+        
+        try:
+            response = litellm.completion(
+                messages=messages,
+                model="openai/Llama-4-Scout",
+                api_key=os.environ.get("LLM_API_KEY", ""),
+                base_url=os.environ.get("LLM_BASE_URL", ""),
+                stream=False,
+                user=os.environ.get("KUBIYA_USER_EMAIL", ""),
+                max_tokens=4096,  # Increased from 2048
+                temperature=0.3,  # Lower temperature for more detailed/factual responses
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=45,  # Increased timeout for longer responses
+            )
             
-            # If a single paragraph is too large, split it further
-            if len(para) > max_size:
-                # Split at sentence boundaries
-                sentences = para.replace('. ', '.\\n').split('\\n')
-                current_chunk = ""
+            chunk_result = response.choices[0].message.content.strip()
+            
+            # Process chunk results with detail level assessment
+            if "no relevant information" not in chunk_result.lower() and "doesn't contain" not in chunk_result.lower():
+                # Check how detailed the response is
+                detail_level = len(chunk_result.split())
                 
-                for sentence in sentences:
-                    if len(current_chunk) + len(sentence) + 1 <= max_size:
-                        if current_chunk:
-                            current_chunk += ' '
-                        current_chunk += sentence
-                    else:
-                        if current_chunk:
-                            chunks.append(current_chunk)
-                        
-                        # If a single sentence is too large, just split it
-                        if len(sentence) > max_size:
-                            for i in range(0, len(sentence), max_size):
-                                chunks.append(sentence[i:i+max_size])
-                            current_chunk = ""
-                        else:
-                            current_chunk = sentence
+                if detail_level > 50:  # If response has more than 50 words
+                    logger.info(f"  ✓ Found DETAILED relevant information in chunk {{batch_start+1}} ({{detail_level}} words)")
+                    batch_results.append({{
+                        "chunk": batch_start+1,
+                        "result": chunk_result,
+                        "detail_level": detail_level,
+                        "page_info": current_batch[0]  # Use the first chunk's page info
+                    }})
+                else:
+                    logger.info(f"  ⚠ Found BRIEF relevant information in chunk {{batch_start+1}} ({{detail_level}} words)")
+                    batch_results.append({{
+                        "chunk": batch_start+1,
+                        "result": chunk_result,
+                        "detail_level": detail_level,
+                        "page_info": current_batch[0]
+                    }})
             else:
-                current_chunk = para
+                logger.info(f"  ✗ No relevant information in batch {{batch_start+1}}")
+                
+        except Exception as e:
+            logger.error(f"Error processing batch {{batch_start+1}}: {{str(e)}}")
+            batch_results.append({{
+                "chunk": batch_start+1,
+                "result": f"Error processing this batch: {{str(e)}}",
+                "detail_level": 0,
+                "page_info": current_batch[0] if current_batch else {{"page_title": "Unknown", "page_url": ""}}
+            }})
     
-    if current_chunk:
-        chunks.append(current_chunk)
+    # Sort results by detail level
+    all_results.sort(key=lambda x: x.get("detail_level", 0), reverse=True)
     
-    return chunks
+    # If we have results, create a comprehensive summary
+    if all_results:
+        # Use the most detailed results first in the summary
+        detailed_findings = ""
+        relevant_pages = []
+        
+        for result in all_results[:5]:  # Focus on top 5 most detailed results
+            page_info = result.get("page_info", {{}})
+            detailed_findings += f"From page '{{page_info.get('page_title', 'Unknown')}}':\\n{{result.get('result', '')}}\\n\\n"
+            
+            # Collect unique pages for references
+            page_data = {{
+                "title": page_info.get("page_title", "Unknown"),
+                "url": page_info.get("page_url", "")
+            }}
+            if page_data not in relevant_pages:
+                relevant_pages.append(page_data)
+        
+        # Create final summary
+        summary_prompt = (
+            f"You've analyzed multiple Confluence pages to answer this query: '{{user_query}}'\\n\\n"
+            f"Here are the detailed findings from each relevant section:\\n\\n"
+            f"{{detailed_findings}}\\n\\n"
+            f"IMPORTANT INSTRUCTIONS:\\n"
+            f"1. Provide a COMPREHENSIVE answer that includes ALL relevant details from the findings.\\n"
+            f"2. Do not over-summarize or omit important information.\\n"
+            f"3. Include specific examples, steps, code snippets, or explanations from the original content.\\n"
+            f"4. Clearly reference which Confluence page(s) each piece of information came from.\\n"
+            f"5. Format your response with clear sections and include the full URLs to relevant pages.\\n\\n"
+            f"Your comprehensive response:"
+        )
+        
+        messages = [
+            {{"role": "system", "content": "You are a detail-oriented assistant that synthesizes information from multiple sources."}},
+            {{"role": "user", "content": summary_prompt}}
+        ]
+        
+        try:
+            response = litellm.completion(
+                messages=messages,
+                model="openai/Llama-4-Scout",
+                api_key=os.environ.get("LLM_API_KEY", ""),
+                base_url=os.environ.get("LLM_BASE_URL", ""),
+                stream=False,
+                user=os.environ.get("KUBIYA_USER_EMAIL", ""),
+                max_tokens=4096,
+                temperature=0.3,
+                top_p=0.1,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                timeout=45,
+            )
+            
+            final_answer = response.choices[0].message.content.strip()
+            
+            # Format the final answer to include source links
+            formatted_answer = format_final_answer(final_answer, relevant_pages)
+            return formatted_answer
+            
+        except Exception as e:
+            logger.error(f"Error creating summary: {{str(e)}}")
+            # Fall back to returning the most detailed result
+            if all_results:
+                return f"Error creating summary: {{str(e)}}\\n\\nMost relevant information found:\\n\\n{{all_results[0].get('result', 'No details available')}}"
+            else:
+                return f"Error creating summary: {{str(e)}}\\n\\nNo relevant information was found."
+    
+    return "No relevant information found in the space content."
+
+def format_final_answer(answer, relevant_pages):
+    formatted_answer = answer
+    
+    # Add source links section if not already included
+    if "Source" not in formatted_answer and "References" not in formatted_answer:
+        formatted_answer += "\\n\\n## Sources\\n"
+        for page in relevant_pages:
+            formatted_answer += f"- [{{page['title']}}]({{page['url']}})\\n"
+    
+    return formatted_answer
 
 def semantic_chunk_content(content, max_size=8000):
     # First try to split at major section boundaries (headers)
@@ -592,7 +684,90 @@ def execute_confluence_action(**kwargs) -> Dict[str, Any]:
         logger.info(f"Processing {{len(pages)}} pages with LLM for query: '{{query}}'")
         result = process_with_llm(pages, query)
         logger.info("LLM processing completed successfully")
+
+        # Sort results by detail level before summarizing
+        all_results.sort(key=lambda x: sum([r["detail_level"] for r in x["results"]]), reverse=True)
+
+        # Use the most detailed results first in the summary
+        detailed_findings = ""
+        for batch_result in all_results[:5]:  # Focus on top 5 most detailed batches
+            for chunk_result in batch_result["results"]:
+                detailed_findings += f"From page '{{chunk_result['page_info']['page_title']}}':\n{{chunk_result['result']}}\n\n"
+
+        # In the final summary step:
+        summary_prompt = (
+            f"You've analyzed multiple Confluence pages to answer this query: '{{user_query}}'\\n\\n"
+            f"Here are the detailed findings from each relevant section:\\n\\n"
+            f"{{detailed_findings}}\\n\\n"
+            f"IMPORTANT INSTRUCTIONS:\\n"
+            f"1. Provide a COMPREHENSIVE answer that includes ALL relevant details from the findings.\\n"
+            f"2. Do not over-summarize or omit important information.\\n"
+            f"3. Include specific examples, steps, code snippets, or explanations from the original content.\\n"
+            f"4. Clearly reference which Confluence page(s) each piece of information came from.\\n"
+            f"5. Format your response with clear sections and include the full URLs to relevant pages.\\n\\n"
+            f"Your comprehensive response:"
+        )
+
         return {{"success": True, "answer": result}}
+
+def format_final_answer(answer, relevant_pages):
+    formatted_answer = answer
+    
+    # Add source links section if not already included
+    if "Source" not in formatted_answer and "References" not in formatted_answer:
+        formatted_answer += "\\n\\n## Sources\\n"
+        for page in relevant_pages:
+            formatted_answer += f"- [{{page['title']}}]({{page['url']}})\\n"
+    
+    return formatted_answer
+
+def chunk_content(content: str, max_size: int = 8000) -> List[str]:
+    if len(content) <= max_size:
+        return [content]
+    
+    # Try to split at paragraph boundaries
+    paragraphs = content.split('\\n\\n')
+    chunks = []
+    current_chunk = ""
+    
+    for para in paragraphs:
+        if len(current_chunk) + len(para) + 2 <= max_size:
+            if current_chunk:
+                current_chunk += '\\n\\n'
+            current_chunk += para
+        else:
+            if current_chunk:
+                chunks.append(current_chunk)
+            
+            # If a single paragraph is too large, split it further
+            if len(para) > max_size:
+                # Split at sentence boundaries
+                sentences = para.replace('. ', '.\\n').split('\\n')
+                current_chunk = ""
+                
+                for sentence in sentences:
+                    if len(current_chunk) + len(sentence) + 1 <= max_size:
+                        if current_chunk:
+                            current_chunk += ' '
+                        current_chunk += sentence
+                    else:
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                        
+                        # If a single sentence is too large, just split it
+                        if len(sentence) > max_size:
+                            for i in range(0, len(sentence), max_size):
+                                chunks.append(sentence[i:i+max_size])
+                            current_chunk = ""
+                        else:
+                            current_chunk = sentence
+            else:
+                current_chunk = para
+    
+    if current_chunk:
+        chunks.append(current_chunk)
+    
+    return chunks
 
 if __name__ == "__main__":
     # Check for required environment variables
