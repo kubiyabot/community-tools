@@ -80,6 +80,7 @@ def base_jira_payload(
         issue_type: str,
         assignee_email: str = None,
         label: str = None,
+        priority: str = None,
 ) -> Dict:
     # Validate required fields
     if not project_key or not name or not description or not issue_type:
@@ -111,14 +112,21 @@ def base_jira_payload(
 
     # Set labels if provided
     if label and label != "<no value>":
-        payload["fields"]["labels"] = [label]
+        payload["fields"]["labels"] = [l.strip() for l in label.split(",")]
     else:
         payload["fields"]["labels"] = []
-
+        
+    # Set priority if provided
+    if priority and priority != "<no value>":
+        priority_id = get_priority_id(priority)
+        if priority_id:
+            payload["fields"]["priority"] = {"id": priority_id}
+    
     return payload
 
 def create_issue(project_key: str, summary: str, description: str, issue_type: str, 
-                assignee_email: str = None, label: str = None, parent_id: str = None):
+                assignee_email: str = None, label: str = None, parent_id: str = None,
+                priority: str = None):
     # Test connection first
     if not test_jira_connection():
         print("Failed to establish connection to Jira. Please check your configuration.")
@@ -139,6 +147,7 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
             issue_type=issue_type,
             assignee_email=assignee_email,
             label=label,
+            priority=priority,
         )
 
         # Add parent for subtasks
@@ -171,9 +180,11 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
 
         # Handle response
         if response.status_code == 201:
-            print("✅ Issue created successfully.")
-            print(f"Response: {json.dumps(response.json(), indent=2)}")
-            return True
+            response_data = response.json()
+            issue_key = response_data.get('key')
+            print(f"✅ Issue created successfully: {issue_key}")
+            print(f"Response: {json.dumps(response_data, indent=2)}")
+            return issue_key
         else:
             error_data = response.json()
             print(f"❌ Failed to create issue. Status code: {response.status_code}")
@@ -209,7 +220,7 @@ def main():
     parser.add_argument("name", help="Summary or name of the issue")
     parser.add_argument("description", help="Description of the issue")
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
-    parser.add_argument("--priority", help="Priority of the issue (Low, Medium, High)", default=None)
+    parser.add_argument("--priority", help="Priority of the issue (Low, Medium, High, Major)", default=None)
     parser.add_argument(
         "--assignee_email", help="Assignee's email address", default=None
     )
@@ -219,18 +230,21 @@ def main():
 
     no_value = "<no value>"  # when no value is injected
 
-    success = create_issue(
+    result = create_issue(
         project_key=args.project_key,
         summary=args.name,
         description=args.description,
         issue_type=args.issue_type,
         assignee_email=args.assignee_email if args.assignee_email != no_value else None,
         label=args.label if args.label != no_value else None,
-        parent_id=args.parent_id if args.parent_id != no_value else None
+        parent_id=args.parent_id if args.parent_id != no_value else None,
+        priority=args.priority if args.priority != no_value else None
     )
     
-    if not success:
+    if not result:
         raise RuntimeError(f"Failed to create issue")
+    
+    return result
 
 if __name__ == "__main__":
     main() 
