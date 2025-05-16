@@ -738,10 +738,32 @@ set -e
 apk add --no-cache --quiet curl python3 py3-pip jq >/dev/null 2>&1
 pip install --quiet requests >/dev/null 2>&1
 
-# Download Kubiya CLI
+# Download Kubiya CLI with proper error handling
 echo "Downloading Kubiya CLI..."
-curl -L https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64 -o /usr/local/bin/kubiya >/dev/null 2>&1
-chmod +x /usr/local/bin/kubiya
+CLI_URL="https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64"
+CLI_PATH="/usr/local/bin/kubiya"
+
+# Create a temporary file for downloading
+TMP_CLI_PATH="/tmp/kubiya-cli"
+
+# Download with curl, showing progress and handling errors
+if ! curl -L "$CLI_URL" -o "$TMP_CLI_PATH" --fail --silent --show-error; then
+    echo "Failed to download Kubiya CLI from $CLI_URL"
+    exit 1
+fi
+
+# Move to final location and make executable
+mv "$TMP_CLI_PATH" "$CLI_PATH"
+chmod +x "$CLI_PATH"
+
+# Verify the CLI was installed correctly
+if [ ! -x "$CLI_PATH" ]; then
+    echo "Error: Kubiya CLI was not installed correctly at $CLI_PATH"
+    exit 1
+fi
+
+echo "Kubiya CLI installed successfully at $CLI_PATH"
+"$CLI_PATH" --version
 
 # Create Python script
 cat > /tmp/import_confluence.py << 'EOF'
