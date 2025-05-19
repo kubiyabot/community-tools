@@ -741,7 +741,7 @@ pip3 install --quiet requests >/dev/null 2>&1
 
 # Download Kubiya CLI with proper error handling
 echo "Downloading Kubiya CLI..."
-CLI_URL="https://github.com/kubiyabot/cli/releases/download/v0.0.6/kubiya-linux-amd64"
+CLI_URL="https://github.com/kubiyabot/cli/releases/download/v1.0.14/kubiya-cli-linux-amd64"
 CLI_PATH="/usr/local/bin/kubiya"
 
 # Create a temporary file for downloading
