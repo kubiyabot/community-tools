@@ -10,12 +10,12 @@ class BaseCreationIssueTool(JiraCertTool):
         if extra_args is None:
             extra_args = []
         description = f"Create new jira {issue_type}"
-        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} --assignee_email="{{{{ .assignee_email }}}}" --label="{{{{ .label }}}}" {extra_content}"""
+        content = f"""python /tmp/create_issue.py "{{{{ .project_key }}}}" "{{{{ .name }}}}" "{{{{ .description }}}}" {issue_type} --assignee_name="{{{{ .assignee_name }}}}" --label="{{{{ .label }}}}" {extra_content}"""
         args = [
             Arg(name="project_key", type="str", description="Jira project key", required=True),
             Arg(name="name", type="str", description=f"{issue_type} name", required=True),
             Arg(name="description", type="str", description=f"{issue_type} description", required=True),
-            Arg(name="assignee_email", type="str", description=f"{issue_type} assignee user", required=False),
+            Arg(name="assignee_name", type="str", description=f"{issue_type} assignee user", required=False),
             Arg(name="label", default="", type="str", description=f"{issue_type} label", required=False),
         ]
         args.extend(extra_args)
@@ -133,10 +133,10 @@ update_issue_status_tool = JiraCertTool(
 assign_issue_tool = JiraCertTool(
     name="assign_issue",
     description="Assign issue to user",
-    content="""python /tmp/assign_issue.py "{{ .issue_key }}" "{{ .assignee_email }}" """,
+    content="""python /tmp/assign_issue.py "{{ .issue_key }}" "{{ .assignee_name }}" """,
     args=[
         Arg(name="issue_key", type="str", description="Issue key", required=True),
-        Arg(name="assignee_email", type="str", description="Assignee email", required=True),
+        Arg(name="assignee_name", type="str", description="Assignee name", required=True),
     ],
     with_files=[
         FileSpec(
