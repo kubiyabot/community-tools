@@ -78,7 +78,7 @@ def base_jira_payload(
         name: str,
         description: str,
         issue_type: str,
-        assignee_email: str = None,
+        assignee_name: str = None,
         label: str = None,
         priority: str = None,
 ) -> Dict:
@@ -103,10 +103,10 @@ def base_jira_payload(
     }
 
     # Set assignee if provided
-    if assignee_email and assignee_email != "<no value>":
+    if assignee_name and assignee_name != "<no value>":
         try:
             # For Jira Server, we should use name instead of id
-            payload["fields"]["assignee"] = {"name": assignee_email}
+            payload["fields"]["assignee"] = {"name": assignee_name}
         except Exception as e:
             print(f"Warning: Could not set assignee: {e}")
 
@@ -125,7 +125,7 @@ def base_jira_payload(
     return payload
 
 def create_issue(project_key: str, summary: str, description: str, issue_type: str, 
-                assignee_email: str = None, label: str = None, parent_id: str = None,
+                assignee_name: str = None, label: str = None, parent_id: str = None,
                 priority: str = None):
     # Test connection first
     if not test_jira_connection():
@@ -145,7 +145,7 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
             name=summary,
             description=description,
             issue_type=issue_type,
-            assignee_email=assignee_email,
+            assignee_name=assignee_name,
             label=label,
             priority=priority,
         )
@@ -222,7 +222,7 @@ def main():
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
     parser.add_argument("--priority", help="Priority of the issue (Low, Medium, High, Major)", default=None)
     parser.add_argument(
-        "--assignee_email", help="Assignee's email address", default=None
+        "--assignee_name", help="Assignee's username in Jira", default=None
     )
     parser.add_argument("--label", help="Label for the issue", default="")
     parser.add_argument("--parent_id", help="parent id for the task", default="")
@@ -235,7 +235,7 @@ def main():
         summary=args.name,
         description=args.description,
         issue_type=args.issue_type,
-        assignee_email=args.assignee_email if args.assignee_email != no_value else None,
+        assignee_name=args.assignee_name if args.assignee_name != no_value else None,
         label=args.label if args.label != no_value else None,
         parent_id=args.parent_id if args.parent_id != no_value else None,
         priority=args.priority if args.priority != no_value else None
