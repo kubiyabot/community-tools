@@ -1005,8 +1005,14 @@ def create_knowledge_item(title, content, labels, space_key):
         else:
             logger.info(f"Using KUBIYA_API_KEY: {api_key}")
         
-        # Create a shell command matching the example format
-        shell_cmd = f'/usr/local/bin/kubiya knowledge create --name "{title}" --desc "Imported from Confluence space: {space_key}" --labels {all_labels} --content-file {content_file_path}'
+        # Get the owner from KUBIYA_USER_EMAIL
+        owner = os.environ.get("KUBIYA_USER_EMAIL", "")
+        if not owner:
+            logger.error("KUBIYA_USER_EMAIL environment variable is not set")
+            return None
+        
+        # Create a shell command matching the example format, now with owner flag
+        shell_cmd = f'/usr/local/bin/kubiya knowledge create --name "{title}" --desc "Imported from Confluence space: {space_key}" --labels {all_labels} --content-file {content_file_path} --owner {owner}'
         
         logger.info(f"Running shell command: {shell_cmd}")
         logger.info(f"Content file size: {os.path.getsize(content_file_path)} bytes")
@@ -1174,7 +1180,7 @@ if __name__ == "__main__":
             image="python:3.9-slim",  # Changed from Alpine to Debian-based image
             content=shell_script,
             args=args,
-            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_API_KEY"],
+            env=["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_API_KEY", "KUBIYA_USER_EMAIL"],
             secrets=["CONFLUENCE_API_TOKEN"],
             with_files=[
                 FileSpec(
