@@ -1002,8 +1002,6 @@ def create_knowledge_item(title, content, labels, space_key):
         if not api_key:
             logger.error("KUBIYA_API_KEY environment variable is not set")
             return None
-        else:
-            logger.info(f"Using KUBIYA_API_KEY: {api_key}")
         
         # Get the owner from KUBIYA_USER_EMAIL
         owner = os.environ.get("KUBIYA_USER_EMAIL", "")
@@ -1032,7 +1030,8 @@ def create_knowledge_item(title, content, labels, space_key):
             logger.error(f"Command output: {result.stdout}")
             return None
         
-        return result.stdout.strip()
+        # Return the raw output - don't try to parse as JSON since the CLI might not return valid JSON
+        return {"success": True, "message": "Knowledge item created successfully", "output": result.stdout.strip()}
     except Exception as e:
         logger.error(f"Error creating knowledge item: {str(e)}")
         return None
@@ -1093,17 +1092,8 @@ def main():
                     )
                     
                     if result:
-                        try:
-                            result_json = json.loads(result)
-                            if "uuid" in result_json:
-                                logger.info(f"✅ Successfully imported page '{page_title}' as knowledge item with UUID: {result_json['uuid']}")
-                                imported_count += 1
-                            else:
-                                logger.error(f"❌ Failed to import page '{page_title}': {result}")
-                                failed_count += 1
-                        except json.JSONDecodeError:
-                            logger.error(f"❌ Failed to import page '{page_title}': Invalid response format")
-                            failed_count += 1
+                        logger.info(f"✅ Successfully imported page '{page_title}'")
+                        imported_count += 1
                     else:
                         logger.error(f"❌ Failed to import page '{page_title}'")
                         failed_count += 1
@@ -1139,17 +1129,8 @@ def main():
                     )
                     
                     if result:
-                        try:
-                            result_json = json.loads(result)
-                            if "uuid" in result_json:
-                                logger.info(f"✅ Successfully imported blog post '{blog_title}' as knowledge item with UUID: {result_json['uuid']}")
-                                imported_count += 1
-                            else:
-                                logger.error(f"❌ Failed to import blog post '{blog_title}': {result}")
-                                failed_count += 1
-                        except json.JSONDecodeError:
-                            logger.error(f"❌ Failed to import blog post '{blog_title}': Invalid response format")
-                            failed_count += 1
+                        logger.info(f"✅ Successfully imported blog post '{blog_title}'")
+                        imported_count += 1
                     else:
                         logger.error(f"❌ Failed to import blog post '{blog_title}'")
                         failed_count += 1
