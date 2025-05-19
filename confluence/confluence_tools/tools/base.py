@@ -120,7 +120,7 @@ class ConfluenceTool(Tool):
     
 class ContentAnalyzerTool(Tool):
     def __init__(self, name, description, args, mermaid_diagram=None):
-        env = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_USER_EMAIL", "LLM_BASE_URL"]
+        env = ["CONFLUENCE_URL", "CONFLUENCE_USERNAME", "KUBIYA_USER_EMAIL", "LLM_BASE_URL", "SLACK_CHANNEL_ID", "SLACK_THREAD_TS"]
         secrets = ["CONFLUENCE_API_TOKEN", "LLM_API_KEY", "SLACK_API_TOKEN"]
         
         arg_names_json = json.dumps([arg.name for arg in args])
