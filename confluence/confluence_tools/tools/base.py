@@ -973,12 +973,16 @@ def get_page_content(page_id):
                 if "name" in label:
                     labels.append(label["name"])
         
+        # Get content and check if it's empty
+        content = data.get("body", {}).get("storage", {}).get("value", "")
+        
         return {
             "id": data.get("id"),
             "title": data.get("title"),
-            "content": data.get("body", {}).get("storage", {}).get("value", ""),
+            "content": content,
             "url": f"{confluence_url}/pages/viewpage.action?pageId={page_id}",
-            "labels": ",".join(labels)
+            "labels": ",".join(labels),
+            "is_empty": not content or content.strip() == ""
         }
     except json.JSONDecodeError:
         logger.error("Error parsing page content response")
@@ -1082,7 +1086,11 @@ def main():
                 logger.info(f"[{idx}/{page_count}] Processing page: {page_title} (ID: {page_id})")
                 page_data = get_page_content(page_id)
                 
-                if page_data and page_data.get("content"):
+                if page_data:
+                    if page_data.get("is_empty", False):
+                        logger.info(f"ℹ️ Skipping page '{page_title}' - page has no content")
+                        continue
+                        
                     # Create knowledge item
                     result = create_knowledge_item(
                         page_data["title"],
