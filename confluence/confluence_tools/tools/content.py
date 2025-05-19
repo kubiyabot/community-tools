@@ -10,7 +10,8 @@ class ContentTools:
             self.get_page_content(),
             self.search_content(),
             self.list_spaces(),
-            self.get_space_content_analyzer()
+            self.get_space_content_analyzer(),
+            self.test_env(),
         ]
         
         for tool in tools:
@@ -491,6 +492,19 @@ class ContentTools:
                 Arg(name="space_key", description="Space key to analyze content from", required=True),
                 Arg(name="query", description="Natural language query about the content in this space", required=True)
             ]
+        )
+
+    def test_env(self) -> ConfluenceTool:
+        """Simple tool that prints all environment variables."""
+        return ConfluenceTool(
+            name="confluence_test_env",
+            description="Print all environment variables for debugging purposes",
+            content="""
+            # Just print all environment variables
+            env | sort
+            """,
+            args=[],
+            image="curlimages/curl:8.1.2"
         )
 
 ContentTools() 
