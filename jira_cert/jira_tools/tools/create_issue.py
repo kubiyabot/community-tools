@@ -105,8 +105,8 @@ def base_jira_payload(
     # Set assignee if provided
     if assignee_email and assignee_email != "<no value>":
         try:
-            user_id = get_jira_user_id(assignee_email)
-            payload["fields"]["assignee"] = {"id": user_id}
+            # For Jira Server, we should use name instead of id
+            payload["fields"]["assignee"] = {"name": assignee_email}
         except Exception as e:
             print(f"Warning: Could not set assignee: {e}")
 
