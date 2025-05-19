@@ -1,6 +1,7 @@
 import json
 import requests
 from typing import Dict, List
+import os
 
 from basic_funcs import (
     get_jira_server_url,
@@ -81,6 +82,7 @@ def base_jira_payload(
         assignee_name: str = None,
         label: str = None,
         priority: str = None,
+        component: str = None,
 ) -> Dict:
     # Validate required fields
     if not project_key or not name or not description or not issue_type:
@@ -122,16 +124,48 @@ def base_jira_payload(
         if priority_id:
             payload["fields"]["priority"] = {"id": priority_id}
     
+    # Set component if provided
+    if component and component != "<no value>":
+        payload["fields"]["components"] = [{"name": component}]
+    
     return payload
 
 def create_issue(project_key: str, summary: str, description: str, issue_type: str, 
-                assignee_name: str = None, label: str = None, parent_id: str = None,
-                priority: str = None):
+                assignee_email: str = None, label: str = None, 
+                parent_id: str = None, priority: str = None, component: str = None):
+    """
+    Create a Jira issue with the given parameters.
+    If assignee_email is provided, it will be converted to a Jira username.
+    If no assignee_email is provided, it will use KUBIYA_USER_EMAIL environment variable.
+    """
     # Test connection first
     if not test_jira_connection():
         print("Failed to establish connection to Jira. Please check your configuration.")
         return False
-        
+    
+    # Initialize assignee_name to None
+    assignee_name = None
+    
+    # If assignee_email is provided, convert it to a username
+    if assignee_email and assignee_email != "<no value>":
+        try:
+            assignee_name = get_jira_user_id(assignee_email)
+            print(f"✅ Found Jira user: {assignee_name} for email: {assignee_email}")
+        except Exception as e:
+            print(f"⚠️ Could not find Jira user for email {assignee_email}: {str(e)}")
+            print("Will try to use current user instead.")
+    
+    # If no assignee is specified or the provided email couldn't be found, use the current user
+    if not assignee_name:
+        user_email = os.environ.get("KUBIYA_USER_EMAIL")
+        if user_email:
+            try:
+                assignee_name = get_jira_user_id(user_email)
+                print(f"✅ Using current user as assignee: {assignee_name} (from email: {user_email})")
+            except Exception as e:
+                print(f"⚠️ Could not find Jira user for current user email {user_email}: {str(e)}")
+                print("Issue will be created without an assignee.")
+    
     server_url = get_jira_server_url()
     issue_url = f"{server_url}/rest/api/2/issue"
     cert_path, key_path = setup_client_cert_files()
@@ -148,6 +182,7 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
             assignee_name=assignee_name,
             label=label,
             priority=priority,
+            component=component,
         )
 
         # Add parent for subtasks
@@ -221,11 +256,10 @@ def main():
     parser.add_argument("description", help="Description of the issue")
     parser.add_argument("issue_type", help="Type of the issue (e.g., Bug, Task)")
     parser.add_argument("--priority", help="Priority of the issue (Low, Medium, High, Major)", default=None)
-    parser.add_argument(
-        "--assignee_name", help="Assignee's username in Jira", default=None
-    )
+    parser.add_argument("--assignee_email", help="Email of user to assign the issue to (defaults to current user if not specified)", default=None)
     parser.add_argument("--label", help="Label for the issue", default="")
     parser.add_argument("--parent_id", help="parent id for the task", default="")
+    parser.add_argument("--component", help="Component for the issue", default="")
     args = parser.parse_args()
 
     no_value = "<no value>"  # when no value is injected
@@ -235,10 +269,11 @@ def main():
         summary=args.name,
         description=args.description,
         issue_type=args.issue_type,
-        assignee_name=args.assignee_name if args.assignee_name != no_value else None,
+        assignee_email=args.assignee_email if args.assignee_email != no_value else None,
         label=args.label if args.label != no_value else None,
         parent_id=args.parent_id if args.parent_id != no_value else None,
-        priority=args.priority if args.priority != no_value else None
+        priority=args.priority if args.priority != no_value else None,
+        component=args.component if args.component != no_value else None
     )
     
     if not result:

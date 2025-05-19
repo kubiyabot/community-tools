@@ -1,4 +1,5 @@
 import sys
+import os
 from datetime import datetime
 
 from create_issue import create_issue, test_jira_connection
@@ -33,23 +34,22 @@ def create_release_tasks(release_date: str) -> bool:
     
     # Create the main task
     print(f"Creating main release task: {main_task_summary}")
-    main_task_success = create_issue(
+    main_task_id = create_issue(
         project_key=project_key,
         summary=main_task_summary,
         description=main_task_description,
         issue_type=main_task_type,
         label=f"{release_date},operations,release,new",
+        component="Kubika-O",
         # Priority is set to Major by default in the payload
+        # assignee_name is automatically handled in create_issue
     )
     
-    if not main_task_success:
+    if not main_task_id:
         print("❌ Failed to create main release task")
         return False
     
-    # Get the main task ID from the response
-    # Note: We need to modify create_issue to return the issue key
-    # For now, we'll assume it's available
-    main_task_id = input("Please enter the main task ID that was just created: ")
+    print(f"✅ Created main release task: {main_task_id}")
     
     # Define subtasks
     environments = [
@@ -76,6 +76,7 @@ def create_release_tasks(release_date: str) -> bool:
             issue_type="Sub-task",
             parent_id=main_task_id,
             label=f"{release_date},operations,release"
+            # assignee_name is automatically handled in create_issue
         )
         
         if not success:

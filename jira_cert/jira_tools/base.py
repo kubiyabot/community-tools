@@ -14,7 +14,7 @@ pip install kubiya-sdk > /dev/null
             """,
             content=content,
             args=args,
-            env=["JIRA_SERVER_URL"],
+            env=["JIRA_SERVER_URL", "KUBIYA_USER_EMAIL"],
             secrets=["JIRA_CLIENT_CERT", "JIRA_CLIENT_KEY", "JIRA_USER_CREDS"],
             with_files=with_files if with_files else [],
             mermaid=mermaid_diagram,
