@@ -36,7 +36,7 @@ helm_list_recent = KubernetesTool(
             description="Number of hours to look back for Helm releases (1-5)",
             required=True,
             type="int",
-            default=1
+            default="1"
         )
     ],
     image="kubiya/helm-kubectl:latest"  # Using an image with Helm installed
