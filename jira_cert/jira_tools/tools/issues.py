@@ -14,7 +14,7 @@ class BaseCreationIssueTool(JiraCertTool):
         args = [
             Arg(name="project_key", type="str", description="Jira project key", required=True),
             Arg(name="name", type="str", description=f"{issue_type} name", required=True),
-            Arg(name="description", type="str", description=f"{issue_type} description", required=True),
+            Arg(name="description", type="str", description=f"{issue_type} description", required=False),
             Arg(name="assignee_email", type="str", description=f"Email of user to assign the {issue_type} to (defaults to you if not specified)", required=False),
             Arg(name="label", default="", type="str", description=f"{issue_type} label", required=False),
         ]

@@ -85,8 +85,8 @@ def base_jira_payload(
         component: str = None,
 ) -> Dict:
     # Validate required fields
-    if not project_key or not name or not description or not issue_type:
-        raise ValueError("project_key, name, description, and issue_type are required")
+    if not project_key or not name or not issue_type:
+        raise ValueError("project_key, name, and issue_type are required")
 
     # Get available issue types for the project
     available_types = get_project_issue_types(project_key)
@@ -99,10 +99,13 @@ def base_jira_payload(
         "fields": {
             "project": {"key": project_key},
             "summary": name,
-            "description": description,  # Simplified format for Jira Server
             "issuetype": {"name": issue_type},
         }
     }
+
+    # Add description if provided
+    if description:
+        payload["fields"]["description"] = description
 
     # Set assignee if provided
     if assignee_name and assignee_name != "<no value>":
