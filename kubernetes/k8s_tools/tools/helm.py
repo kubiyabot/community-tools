@@ -39,7 +39,7 @@ helm_list_recent = KubernetesTool(
             default="1"
         )
     ],
-    image="kubiya/helm-kubectl:latest"  # Using an image with Helm installed
+    image="alpine/helm"  # Using an image with Helm installed
 )
 
 # Register the tool
