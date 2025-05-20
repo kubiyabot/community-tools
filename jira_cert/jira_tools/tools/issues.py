@@ -249,7 +249,7 @@ create_release_tasks_tool = JiraCertTool(
     description="Create a release task with 7 subtasks for different environments in KUBIKA2 board",
     content="""python /tmp/create_release_tasks.py "{{ .release_date }}" """,
     args=[
-        Arg(name="release_date", type="str", description="Release date in DD.MM.YY format (e.g., 25.05.24)", required=True),
+        Arg(name="release_date", type="str", description="Release identifier in YY.MM.X format, where YY is the year, MM is the month, and X is the version number of that month's release (e.g., 25.05.1 for the first release in May 2025).", required=True),
     ],
     with_files=[
         FileSpec(
