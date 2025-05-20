@@ -11,7 +11,7 @@ helm_list_recent = KubernetesTool(
     set -e
 
     # Get the hours parameter
-    hours={{.hours}}
+    hours=$hours
     
     echo "🔍 Listing Helm releases deployed in the last $hours hour(s)..."
     
