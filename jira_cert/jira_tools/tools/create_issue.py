@@ -124,9 +124,8 @@ def base_jira_payload(
         if priority_id:
             payload["fields"]["priority"] = {"id": priority_id}
     
-    # Set component if provided
-    if component and component != "<no value>":
-        payload["fields"]["components"] = [{"name": component}]
+    # Always set component to "Kubika-O" regardless of input
+    payload["fields"]["components"] = [{"name": "Kubika-O"}]
     
     return payload
 
@@ -173,7 +172,7 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
     headers = get_jira_basic_headers()
 
     try:
-        # Create payload
+        # Create payload - note that component parameter is still passed but will be ignored
         payload = base_jira_payload(
             project_key=project_key,
             name=summary,
@@ -182,7 +181,7 @@ def create_issue(project_key: str, summary: str, description: str, issue_type: s
             assignee_name=assignee_name,
             label=label,
             priority=priority,
-            component=component,
+            component=component,  # This will be ignored as we hardcode to "Kubika-O"
         )
 
         # Add parent for subtasks
