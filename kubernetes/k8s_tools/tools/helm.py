@@ -23,8 +23,8 @@ helm_list_recent = KubernetesTool(
     # Execute helm list command
     if output=$(helm list -A -o json); then
         echo "✅ Helm releases retrieved successfully:"
-        # Parse JSON output and filter by last updated time
-        echo "$output" | jq -r '.[] | select(.updated | fromdateiso8601 | . >= '$time_ago') | {name: .name, namespace: .namespace, revision: .revision, updated: .updated, status: .status, chart: .chart}'
+        # Parse JSON output and filter by last updated time using proper date format handling
+        echo "$output" | jq -r --argjson time "$time_ago" '.[] | select(.updated | try (strptime("%Y-%m-%d %H:%M:%S.%f %z %Z") | mktime) catch 0 > $time) | {name: .name, namespace: .namespace, revision: .revision, updated: .updated, status: .status, chart: .chart}'
     else
         echo "❌ Failed to retrieve Helm releases"
         exit 1
