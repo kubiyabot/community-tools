@@ -45,19 +45,6 @@ class ArgoCDTool(Tool):
         # Add helper functions to the content
         helper_functions = """
             # Helper functions for ArgoCD tools
-            validate_argocd_connection() {
-                if [ -z "$ARGOCD_DOMAIN" ] || [ -z "$ARGOCD_TOKEN" ]; then
-                    echo "Error: ARGOCD_DOMAIN and ARGOCD_TOKEN environment variables are required"
-                    exit 1
-                fi
-
-                # Test connection
-                if ! curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications" > /dev/null; then
-                    echo "Error: Could not connect to ArgoCD API"
-                    exit 1
-                fi
-            }
-
             login_argocd_cli() {
                 # Login to ArgoCD CLI
                 argocd login "$ARGOCD_DOMAIN" --auth-token "$ARGOCD_TOKEN" --insecure

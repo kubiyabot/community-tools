@@ -36,7 +36,6 @@ class ApplicationTools:
             description="List all applications managed by ArgoCD",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
 
             echo "=== ArgoCD Applications ==="
             
@@ -71,8 +70,7 @@ class ApplicationTools:
             description="Get detailed information about a specific ArgoCD application",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -123,8 +121,7 @@ class ApplicationTools:
             description="Synchronize an ArgoCD application with its source repository",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -192,8 +189,7 @@ class ApplicationTools:
             description="Get the synchronization status of an ArgoCD application",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -249,8 +245,7 @@ class ApplicationTools:
             description="Create a new ArgoCD application from a Git repository",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             # Validate required parameters
             if [ -z "$app_name" ] || [ -z "$repo_url" ] || [ -z "$path" ] || [ -z "$dest_namespace" ]; then
                 echo "Error: Missing required parameters"
@@ -351,8 +346,7 @@ class ApplicationTools:
             description="Delete an ArgoCD application and optionally its resources",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1

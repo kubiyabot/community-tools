@@ -33,8 +33,7 @@ class ProjectTools:
             name="argocd_list_projects",
             description="List all projects in ArgoCD",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
+            apk add --no-cache -q jq curl
 
             echo "=== ArgoCD Projects ==="
             
@@ -65,8 +64,7 @@ class ProjectTools:
             description="Get detailed information about a specific ArgoCD project",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
                 exit 1
@@ -127,8 +125,7 @@ class ProjectTools:
             description="Create a new ArgoCD project with specified settings",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             # Validate required parameters
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
@@ -201,8 +198,7 @@ class ProjectTools:
             description="Delete an ArgoCD project",
             content="""
             apk add --no-cache jq curl
-            validate_argocd_connection
-            
+
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
                 exit 1
