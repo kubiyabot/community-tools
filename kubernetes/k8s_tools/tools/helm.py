@@ -35,7 +35,7 @@ helm_list_recent = KubernetesTool(
             name="hours",
             description="Number of hours to look back for Helm releases (1-5)",
             required=True,
-            type="integer",
+            type="int",
             default=1
         )
     ],
