@@ -121,7 +121,7 @@ class DeploymentTools:
             
             # Fetch deployment details
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps&version=v1")
             
             # Parse and display deployment details
             if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
@@ -251,7 +251,7 @@ class DeploymentTools:
             
             # Fetch deployment manifest - using resourceName as required by the API
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps&version=v1")
             
             # Check for API errors
             if echo "$RESPONSE" | grep -q "error"; then
