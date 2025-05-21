@@ -1,0 +1,377 @@
+from typing import List
+import sys
+from .base import ArgoCDTool, Arg
+from kubiya_sdk.tools.registry import tool_registry
+
+class DeploymentTools:
+    """ArgoCD deployment management tools."""
+
+    def __init__(self):
+        """Initialize and register all ArgoCD deployment tools."""
+        try:
+            tools = [
+                self.list_deployments(),
+                self.get_deployment_details(),
+                self.get_deployment_sync_status(),
+                self.get_deployment_manifest(),
+                self.get_deployment_logs()
+            ]
+            
+            for tool in tools:
+                try:
+                    tool_registry.register("argocd", tool)
+                    print(f"✅ Registered: {tool.name}")
+                except Exception as e:
+                    print(f"❌ Failed to register {tool.name}: {str(e)}", file=sys.stderr)
+                    raise
+        except Exception as e:
+            print(f"❌ Failed to register ArgoCD deployment tools: {str(e)}", file=sys.stderr)
+            raise
+
+    def list_deployments(self) -> ArgoCDTool:
+        """List all deployments across all ArgoCD applications or within a specific application."""
+        return ArgoCDTool(
+            name="argocd_list_deployments",
+            description="List all Deployment resources across ArgoCD applications",
+            content="""
+            apk add --no-cache -q jq curl
+
+            # Set default values for optional parameters
+            APP_NAME=${app_name:-""}
+            
+            echo "=== ArgoCD Deployments ==="
+            
+            if [ -z "$APP_NAME" ]; then
+                # Get all applications first
+                APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications")
+                
+                echo "Searching for deployments across all applications..."
+                
+                # Create an empty array to store deployments
+                DEPLOYMENTS="[]"
+                
+                # Iterate through each application to get its deployments
+                for APP in $(echo "$APPS_RESPONSE" | jq -r '.items[].metadata.name'); do
+                    echo "Checking application: $APP"
+                    
+                    # Get resource tree for this application
+                    TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$APP/resource-tree")
+                    
+                    # Extract deployments and add application name
+                    APP_DEPLOYMENTS=$(echo "$TREE_RESPONSE" | jq -c '[.nodes[] | select(.kind == "Deployment") | {
+                        app: "'"$APP"'",
+                        name: .name,
+                        namespace: .namespace,
+                        group: .group,
+                        version: .version,
+                        sync_status: .syncStatus,
+                        health_status: .health.status
+                    }]')
+                    
+                    # Combine with existing deployments
+                    DEPLOYMENTS=$(echo "$DEPLOYMENTS" "$APP_DEPLOYMENTS" | jq -s 'add')
+                done
+                
+                # Display results
+                echo "$DEPLOYMENTS"
+            else
+                # Get deployments for a specific application
+                echo "Searching for deployments in application: $APP_NAME"
+                
+                # Get resource tree for this application
+                TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$APP_NAME/resource-tree")
+                
+                # Extract deployments
+                DEPLOYMENTS=$(echo "$TREE_RESPONSE" | jq '[.nodes[] | select(.kind == "Deployment") | {
+                    app: "'"$APP_NAME"'",
+                    name: .name,
+                    namespace: .namespace,
+                    group: .group,
+                    version: .version,
+                    sync_status: .syncStatus,
+                    health_status: .health.status
+                }]')
+                
+                # Display results
+                echo "$DEPLOYMENTS"
+            fi
+            """,
+            args=[
+                Arg(name="app_name", description="Name of the ArgoCD application (optional)", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+        
+    def get_deployment_details(self) -> ArgoCDTool:
+        """Get detailed information about a specific Deployment."""
+        return ArgoCDTool(
+            name="argocd_deployment_details",
+            description="Get detailed information about a specific Deployment",
+            content="""
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
+            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ]; then
+                echo "Error: Missing required parameters"
+                echo "Required: app_name, deployment_name, namespace"
+                exit 1
+            fi
+            
+            # Set default values for optional parameters
+            RESOURCE_GROUP=${resource_group:-"apps"}
+            RESOURCE_VERSION=${resource_version:-"v1"}
+            
+            echo "=== Deployment Details: $deployment_name in $namespace ==="
+            
+            # Fetch deployment details
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?name=$deployment_name&namespace=$namespace&kind=Deployment&group=$RESOURCE_GROUP&version=$RESOURCE_VERSION")
+            
+            # Parse and display deployment details
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
+                name: .metadata.name,
+                namespace: .metadata.namespace,
+                replicas: .spec.replicas,
+                strategy: .spec.strategy.type,
+                selector: .spec.selector,
+                containers: [.spec.template.spec.containers[] | {
+                    name: .name,
+                    image: .image,
+                    resources: .resources
+                }],
+                status: {
+                    replicas: .status.replicas,
+                    available_replicas: .status.availableReplicas,
+                    ready_replicas: .status.readyReplicas,
+                    updated_replicas: .status.updatedReplicas
+                }
+            }' 2>/dev/null); then
+                echo "Failed to parse deployment details. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
+            
+            # Get replicasets for this deployment
+            echo "=== ReplicaSets for Deployment ==="
+            TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree")
+            
+            # Find ReplicaSets that belong to this deployment
+            REPLICASETS=$(echo "$TREE_RESPONSE" | jq -r '[.nodes[] | select(.kind == "ReplicaSet" and .parentRefs[].name == "'"$deployment_name"'") | {
+                name: .name,
+                generation: .info[].value,
+                revision: .info[1].value,
+                status: .health.status,
+                pods: .info[2].value
+            }]')
+            
+            echo "$REPLICASETS"
+            """,
+            args=[
+                Arg(name="app_name", description="Name of the ArgoCD application", required=True),
+                Arg(name="deployment_name", description="Name of the Deployment", required=True),
+                Arg(name="namespace", description="Namespace of the Deployment", required=True),
+                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
+                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+        
+    def get_deployment_sync_status(self) -> ArgoCDTool:
+        """Get the sync status of a specific Deployment."""
+        return ArgoCDTool(
+            name="argocd_deployment_sync_status",
+            description="Get the synchronization status of a Deployment resource",
+            content="""
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
+            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ]; then
+                echo "Error: Missing required parameters"
+                echo "Required: app_name, deployment_name, namespace"
+                exit 1
+            fi
+            
+            # Set default values for optional parameters
+            RESOURCE_GROUP=${resource_group:-"apps"}
+            RESOURCE_VERSION=${resource_version:-"v1"}
+            
+            echo "=== Sync Status for Deployment: $deployment_name in $namespace ==="
+            
+            # Fetch application resource tree
+            TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree")
+            
+            # Find the deployment in the resource tree
+            DEPLOYMENT_STATUS=$(echo "$TREE_RESPONSE" | jq '.nodes[] | select(.kind == "Deployment" and .name == "'"$deployment_name"'" and .namespace == "'"$namespace"'") | {
+                name: .name,
+                namespace: .namespace,
+                sync_status: .syncStatus,
+                health_status: .health.status,
+                hook_status: .hookStatus,
+                hook_type: .hookType,
+                created_at: .createdAt
+            }')
+            
+            if [ -z "$DEPLOYMENT_STATUS" ]; then
+                echo "Deployment not found in application resource tree"
+            else
+                echo "$DEPLOYMENT_STATUS"
+            fi
+            
+            # Get comparison results to see if there are any differences
+            echo "=== Comparison with Git source ==="
+            COMPARISON_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name")
+            
+            # Extract resources with differences
+            DIFF_RESOURCES=$(echo "$COMPARISON_RESPONSE" | jq '.status.resources[] | select(.kind == "Deployment" and .name == "'"$deployment_name"'" and .namespace == "'"$namespace"'")')
+            
+            if [ -z "$DIFF_RESOURCES" ]; then
+                echo "No sync differences found for this deployment"
+            else
+                echo "$DIFF_RESOURCES"
+            fi
+            """,
+            args=[
+                Arg(name="app_name", description="Name of the ArgoCD application", required=True),
+                Arg(name="deployment_name", description="Name of the Deployment", required=True),
+                Arg(name="namespace", description="Namespace of the Deployment", required=True),
+                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
+                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+        
+    def get_deployment_manifest(self) -> ArgoCDTool:
+        """Get the full manifest of a specific Deployment."""
+        return ArgoCDTool(
+            name="argocd_deployment_manifest",
+            description="Get the full YAML manifest of a Deployment resource",
+            content="""
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
+            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ]; then
+                echo "Error: Missing required parameters"
+                echo "Required: app_name, deployment_name, namespace"
+                exit 1
+            fi
+            
+            # Set default values for optional parameters
+            RESOURCE_GROUP=${resource_group:-"apps"}
+            RESOURCE_VERSION=${resource_version:-"v1"}
+            FORMAT=${format:-"json"}
+            
+            echo "=== Manifest for Deployment: $deployment_name in $namespace ==="
+            
+            # Fetch deployment manifest
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?name=$deployment_name&namespace=$namespace&kind=Deployment&group=$RESOURCE_GROUP&version=$RESOURCE_VERSION")
+            
+            # Output in requested format
+            if [ "$FORMAT" = "yaml" ]; then
+                # Install yq for YAML conversion if needed
+                apk add --no-cache -q yq
+                
+                # Convert to YAML and display
+                echo "$RESPONSE" | yq -P
+            else
+                # Display as formatted JSON
+                echo "$RESPONSE" | jq '.'
+            fi
+            """,
+            args=[
+                Arg(name="app_name", description="Name of the ArgoCD application", required=True),
+                Arg(name="deployment_name", description="Name of the Deployment", required=True),
+                Arg(name="namespace", description="Namespace of the Deployment", required=True),
+                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
+                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False),
+                Arg(name="format", description="Output format: json or yaml (default: json)", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+        
+    def get_deployment_logs(self) -> ArgoCDTool:
+        """Get logs from pods controlled by a specific Deployment."""
+        return ArgoCDTool(
+            name="argocd_deployment_logs",
+            description="Get logs from pods controlled by a Deployment",
+            content="""
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
+            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ]; then
+                echo "Error: Missing required parameters"
+                echo "Required: app_name, deployment_name, namespace"
+                exit 1
+            fi
+            
+            # Set default values for optional parameters
+            CONTAINER=${container:-""}
+            TAIL_LINES=${tail_lines:-100}
+            
+            echo "=== Logs for Deployment: $deployment_name in $namespace ==="
+            
+            # First, get the resource tree to find pods related to this deployment
+            TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree")
+            
+            # Find ReplicaSets for this deployment first
+            REPLICASET_NAMES=$(echo "$TREE_RESPONSE" | jq -r '.nodes[] | select(.kind == "ReplicaSet" and .parentRefs[].name == "'"$deployment_name"'") | .name')
+            
+            if [ -z "$REPLICASET_NAMES" ]; then
+                echo "No ReplicaSets found for this deployment"
+                exit 1
+            fi
+            
+            # Find pods belonging to the ReplicaSets
+            PODS=()
+            for RS in $REPLICASET_NAMES; do
+                # Only get pods for the current ReplicaSet (with highest generation/revision number)
+                POD_NAMES=$(echo "$TREE_RESPONSE" | jq -r '.nodes[] | select(.kind == "Pod" and .parentRefs[].name == "'"$RS"'" and .health.status == "Healthy") | .name')
+                
+                if [ -n "$POD_NAMES" ]; then
+                    for POD in $POD_NAMES; do
+                        PODS+=("$POD")
+                    done
+                    # Once we found pods for a ReplicaSet, we can stop (assuming it's the current one)
+                    break
+                fi
+            done
+            
+            if [ ${#PODS[@]} -eq 0 ]; then
+                echo "No pods found for this deployment"
+                exit 1
+            fi
+            
+            # Get logs for each pod
+            for POD in "${PODS[@]}"; do
+                echo "=== Logs from pod: $POD ==="
+                
+                # Build query parameters
+                QUERY="podName=$POD&namespace=$namespace&tailLines=$TAIL_LINES"
+                if [ -n "$CONTAINER" ]; then
+                    QUERY="$QUERY&container=$CONTAINER"
+                fi
+                
+                # Fetch logs
+                RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
+                    "$ARGOCD_DOMAIN/api/v1/applications/$app_name/pods/$POD/logs?$QUERY")
+                
+                echo "$RESPONSE"
+                
+                # Only show logs from the first pod if no specific container was requested
+                if [ -z "$CONTAINER" ]; then
+                    break
+                fi
+            done
+            """,
+            args=[
+                Arg(name="app_name", description="Name of the ArgoCD application", required=True),
+                Arg(name="deployment_name", description="Name of the Deployment", required=True),
+                Arg(name="namespace", description="Namespace of the Deployment", required=True),
+                Arg(name="container", description="Container name (if Pod has multiple containers)", required=False),
+                Arg(name="tail_lines", description="Number of lines to show from the end", required=False)
+            ],
+            image="curlimages/curl:8.1.2"
+        )
+
+DeploymentTools() 
