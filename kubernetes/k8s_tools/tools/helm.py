@@ -22,13 +22,11 @@ helm_list_recent = KubernetesTool(
     
     # Execute helm list command
     if output=$(helm list -A -o json); then
-        echo "✅ Helm releases retrieved successfully:"
+        echo "✅ Helm releases retrieved successfully"
         
         # Parse JSON output and filter by last updated time using proper date format handling
         filtered_output=$(echo "$output" | jq -r --argjson time "$time_ago" '[.[] | select(.updated | try (strptime("%Y-%m-%d %H:%M:%S.%f %z %Z") | mktime) catch 0 > $time) | {name: .name, namespace: .namespace, revision: .revision, updated: .updated, status: .status, chart: .chart}]')
         
-        echo "🔍 Filtered output:"
-        echo "$filtered_output"
         # Check if the filtered result is an empty array
         if [ "$(echo "$filtered_output" | jq 'length')" -eq "0" ]; then
             echo "⚠️ No machines found deployed in the last $hours hour(s)"
