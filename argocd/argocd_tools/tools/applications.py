@@ -35,21 +35,16 @@ class ApplicationTools:
             name="argocd_list_applications",
             description="List all applications managed by ArgoCD",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
+            apk add --no-cache -q jq curl
 
             echo "=== ArgoCD Applications ==="
             
             # Fetch applications
-            RESPONSE=$(get_applications)
-            
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve applications"
-                exit 1
-            fi
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications")
             
             # Parse and display applications
-            echo "$RESPONSE" | jq -r '.items[] | {
+            echo "Attempting to parse applications..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq -r '.items[] | {
                 name: .metadata.name,
                 project: .spec.project,
                 sync_status: .status.sync.status,
@@ -57,8 +52,13 @@ class ApplicationTools:
                 repo: .spec.source.repoURL,
                 path: .spec.source.path,
                 target_revision: .spec.source.targetRevision,
-                destination: .spec.destination.server + " / " + .spec.destination.namespace
-            }' | jq -s '.'
+                destination: "\(.spec.destination.server)/\(.spec.destination.namespace)"
+            }' | jq -s '.' 2>/dev/null); then
+                echo "Failed to parse applications. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[],
             image="curlimages/curl:8.1.2"
@@ -70,9 +70,9 @@ class ApplicationTools:
             name="argocd_application_details",
             description="Get detailed information about a specific ArgoCD application",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -81,22 +81,11 @@ class ApplicationTools:
             echo "=== Application Details: $app_name ==="
             
             # Fetch application details
-            RESPONSE=$(get_application_details "$app_name")
-            
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve application details"
-                exit 1
-            fi
-            
-            # Check if application exists
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name")
             
             # Parse and display application details
-            echo "$RESPONSE" | jq '{
+            echo "Attempting to parse application details..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
                 name: .metadata.name,
                 project: .spec.project,
                 sync_status: .status.sync.status,
@@ -110,7 +99,12 @@ class ApplicationTools:
                 },
                 auto_sync: .spec.syncPolicy.automated,
                 created_at: .metadata.creationTimestamp
-            }'
+            }' 2>/dev/null); then
+                echo "Failed to parse application details. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[Arg(name="app_name", description="Name of the ArgoCD application", required=True)],
             image="curlimages/curl:8.1.2"
@@ -122,9 +116,9 @@ class ApplicationTools:
             name="argocd_sync_application",
             description="Synchronize an ArgoCD application with its source repository",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -155,25 +149,20 @@ class ApplicationTools:
                 }' \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name/sync")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to sync application"
-                exit 1
-            fi
-            
-            # Check for errors
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
-            
-            echo "Sync initiated for application: $app_name"
-            echo "Sync details:"
-            echo "$RESPONSE" | jq '{
+            # Parse and display response
+            echo "Attempting to parse sync result..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
                 revision: .operationState.syncResult.revision,
                 phase: .operationState.phase,
                 message: .operationState.message
-            }'
+            }' 2>/dev/null); then
+                echo "Failed to parse sync result. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "Sync initiated for application: $app_name"
+                echo "Sync details:"
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
@@ -191,9 +180,9 @@ class ApplicationTools:
             name="argocd_sync_status",
             description="Get the synchronization status of an ArgoCD application",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -202,23 +191,21 @@ class ApplicationTools:
             echo "=== Sync Status: $app_name ==="
             
             # Fetch application details
-            RESPONSE=$(get_application_details "$app_name")
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve application details"
+            # Get sync status and health status
+            echo "Attempting to parse application status..."
+            if ! SYNC_STATUS=$(echo "$RESPONSE" | jq '.status.sync' 2>/dev/null); then
+                echo "Failed to parse sync status. Raw response:"
+                echo "$RESPONSE"
                 exit 1
             fi
             
-            # Check if application exists
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
+            if ! HEALTH_STATUS=$(echo "$RESPONSE" | jq '.status.health' 2>/dev/null); then
+                echo "Failed to parse health status. Raw response:"
+                echo "$RESPONSE"
                 exit 1
             fi
-            
-            # Get sync status
-            SYNC_STATUS=$(echo "$RESPONSE" | jq '.status.sync')
-            HEALTH_STATUS=$(echo "$RESPONSE" | jq '.status.health')
             
             echo "Application: $app_name"
             echo "Sync status: $(echo "$SYNC_STATUS" | jq -r '.status')"
@@ -226,17 +213,24 @@ class ApplicationTools:
             echo "Health status: $(echo "$HEALTH_STATUS" | jq -r '.status')"
             
             # Get detailed resource tree
-            RESOURCES=$(get_application_sync_status "$app_name")
+            RESOURCE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree")
             
-            echo "Resource status:"
-            echo "$RESOURCES" | jq '.nodes[] | {
+            # Parse and display resource status
+            echo "Attempting to parse resource status..."
+            if ! PARSED_RESOURCES=$(echo "$RESOURCE_RESPONSE" | jq '.nodes[] | {
                 kind: .kind,
                 name: .name,
                 namespace: .namespace,
                 health: .health.status,
                 status: .syncStatus,
                 message: .health.message
-            }' | jq -s '.'
+            }' | jq -s '.' 2>/dev/null); then
+                echo "Failed to parse resource status. Raw response:"
+                echo "$RESOURCE_RESPONSE"
+            else
+                echo "Resource status:"
+                echo "$PARSED_RESOURCES"
+            fi
             """,
             args=[Arg(name="app_name", description="Name of the ArgoCD application", required=True)],
             image="curlimages/curl:8.1.2"
@@ -248,9 +242,8 @@ class ApplicationTools:
             name="argocd_create_application",
             description="Create a new ArgoCD application from a Git repository",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
             # Validate required parameters
             if [ -z "$app_name" ] || [ -z "$repo_url" ] || [ -z "$path" ] || [ -z "$dest_namespace" ]; then
                 echo "Error: Missing required parameters"
@@ -304,20 +297,9 @@ class ApplicationTools:
                 }' \
                 "$ARGOCD_DOMAIN/api/v1/applications")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to create application"
-                exit 1
-            fi
-            
-            # Check for errors
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
-            
-            echo "Application created successfully:"
-            echo "$RESPONSE" | jq '{
+            # Parse and display response
+            echo "Attempting to parse response..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
                 name: .metadata.name,
                 project: .spec.project,
                 repo: .spec.source.repoURL,
@@ -327,7 +309,13 @@ class ApplicationTools:
                     namespace: .spec.destination.namespace
                 },
                 auto_sync: .spec.syncPolicy.automated
-            }'
+            }' 2>/dev/null); then
+                echo "Failed to parse response. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "Application created successfully:"
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
@@ -350,9 +338,9 @@ class ApplicationTools:
             name="argocd_delete_application",
             description="Delete an ArgoCD application and optionally its resources",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
             if [ -z "$app_name" ]; then
                 echo "Error: Application name is required"
                 exit 1
@@ -369,23 +357,20 @@ class ApplicationTools:
                 -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name?cascade=$CASCADE&propagationPolicy=$PROPAGATION_POLICY")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to delete application"
-                exit 1
-            fi
-            
-            # Check for errors
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
+            # Parse and display response
+            echo "Attempting to parse response..."
+            if ! ERROR_CHECK=$(echo "$RESPONSE" | jq -r '.code // 0' 2>/dev/null); then
+                echo "Failed to parse response. Raw response:"
+                echo "$RESPONSE"
+            elif [ "$ERROR_CHECK" -ne 0 ]; then
                 echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
-            
-            echo "Application deletion initiated: $app_name"
-            if [ "$CASCADE" = "true" ]; then
-                echo "All application resources will be deleted"
             else
-                echo "Application will be removed from ArgoCD but resources will remain in the cluster"
+                echo "Application deletion initiated: $app_name"
+                if [ "$CASCADE" = "true" ]; then
+                    echo "All application resources will be deleted"
+                else
+                    echo "Application will be removed from ArgoCD but resources will remain in the cluster"
+                fi
             fi
             """,
             args=[

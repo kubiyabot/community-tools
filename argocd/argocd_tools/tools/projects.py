@@ -33,26 +33,26 @@ class ProjectTools:
             name="argocd_list_projects",
             description="List all projects in ArgoCD",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
+            apk add --no-cache -q jq curl
 
             echo "=== ArgoCD Projects ==="
             
             # Fetch projects
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve projects"
-                exit 1
-            fi
-            
             # Parse and display projects
-            echo "$RESPONSE" | jq -r '.items[] | {
+            echo "Attempting to parse projects..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq -r '.items[] | {
                 name: .metadata.name,
                 description: .spec.description,
                 source_repos: .spec.sourceRepos,
                 destinations: .spec.destinations
-            }' | jq -s '.'
+            }' | jq -s '.' 2>/dev/null); then
+                echo "Failed to parse projects. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[],
             image="curlimages/curl:8.1.2"
@@ -64,9 +64,9 @@ class ProjectTools:
             name="argocd_project_details",
             description="Get detailed information about a specific ArgoCD project",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
-            
+            apk add --no-cache -q jq curl
+
+            # Validate required parameters
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
                 exit 1
@@ -77,20 +77,9 @@ class ProjectTools:
             # Fetch project details
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects/$project_name")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve project details"
-                exit 1
-            fi
-            
-            # Check if project exists
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
-            
             # Parse and display project details
-            echo "$RESPONSE" | jq '{
+            echo "Attempting to parse project details..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
                 name: .metadata.name,
                 description: .spec.description,
                 source_repos: .spec.sourceRepos,
@@ -98,23 +87,29 @@ class ProjectTools:
                 cluster_resource_whitelist: .spec.clusterResourceWhitelist,
                 namespace_resource_blacklist: .spec.namespaceResourceBlacklist,
                 roles: .spec.roles
-            }'
+            }' 2>/dev/null); then
+                echo "Failed to parse project details. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             
             # Get applications in project
             echo "=== Applications in Project ==="
             APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
             
-            if [ -z "$APPS_RESPONSE" ]; then
-                echo "Error: Failed to retrieve applications in project"
-                exit 1
-            fi
-            
             # Parse and display applications
-            echo "$APPS_RESPONSE" | jq -r '.items[] | {
+            echo "Attempting to parse applications..."
+            if ! PARSED_APPS=$(echo "$APPS_RESPONSE" | jq -r '.items[] | {
                 name: .metadata.name,
                 sync_status: .status.sync.status,
                 health_status: .status.health.status
-            }' | jq -s '.'
+            }' | jq -s '.' 2>/dev/null); then
+                echo "Failed to parse applications. Raw response:"
+                echo "$APPS_RESPONSE"
+            else
+                echo "$PARSED_APPS"
+            fi
             """,
             args=[Arg(name="project_name", description="Name of the ArgoCD project", required=True)],
             image="curlimages/curl:8.1.2"
@@ -126,21 +121,38 @@ class ProjectTools:
             name="argocd_create_project",
             description="Create a new ArgoCD project with specified settings",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
+            apk add --no-cache -q jq curl
             
             # Validate required parameters
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
                 exit 1
             fi
-            
+
             # Set default values for optional parameters
             DESCRIPTION="${description:-}"
             SOURCE_REPOS="${source_repos:-*}"
             DESTINATIONS="${destinations:-*,*}"
             
             echo "=== Creating Project: $project_name ==="
+            
+            # Prepare destinations JSON
+            DEST_JSON=""
+            IFS=','
+            for dest in $DESTINATIONS; do
+                SERVER="${dest%:*}"
+                NAMESPACE="${dest#*:}"
+                if [ "$SERVER" = "$NAMESPACE" ]; then NAMESPACE="*"; fi
+                DEST_JSON="$DEST_JSON{\"server\": \"$SERVER\", \"namespace\": \"$NAMESPACE\"},"
+            done
+            DEST_JSON=$(echo "$DEST_JSON" | sed 's/,$//')
+            
+            # Prepare source repos JSON
+            REPOS_JSON=""
+            for repo in ${SOURCE_REPOS//,/ }; do
+                REPOS_JSON="$REPOS_JSON\"$repo\","
+            done
+            REPOS_JSON=$(echo "$REPOS_JSON" | sed 's/,$//')
             
             # Create project
             RESPONSE=$(curl -s -k -X POST \
@@ -152,38 +164,25 @@ class ProjectTools:
                     },
                     "spec": {
                         "description": "'"$DESCRIPTION"'",
-                        "sourceRepos": ["'"${SOURCE_REPOS//,/\",\"}"'"],
-                        "destinations": [
-                            '"$(IFS=,; for dest in $DESTINATIONS; do
-                                SERVER="${dest%:*}"
-                                NAMESPACE="${dest#*:}"
-                                if [ "$SERVER" = "$NAMESPACE" ]; then NAMESPACE="*"; fi
-                                echo "{\"server\": \"$SERVER\", \"namespace\": \"$NAMESPACE\"},"
-                            done | sed 's/,$//')"'
-                        ]
+                        "sourceRepos": ['"$REPOS_JSON"'],
+                        "destinations": ['"$DEST_JSON"']
                     }
                 }' \
                 "$ARGOCD_DOMAIN/api/v1/projects")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to create project"
-                exit 1
-            fi
-            
-            # Check for errors
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
-                echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
-            fi
-            
-            echo "Project created successfully:"
-            echo "$RESPONSE" | jq '{
+            # Parse and display response
+            echo "Attempting to parse response..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
                 name: .metadata.name,
                 description: .spec.description,
                 source_repos: .spec.sourceRepos,
                 destinations: .spec.destinations
-            }'
+            }' 2>/dev/null); then
+                echo "Failed to parse response. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[
                 Arg(name="project_name", description="Name of the ArgoCD project", required=True),
@@ -200,50 +199,57 @@ class ProjectTools:
             name="argocd_delete_project",
             description="Delete an ArgoCD project",
             content="""
-            apk add --no-cache jq curl
-            validate_argocd_connection
+            apk add --no-cache -q jq curl
             
+            # Validate required parameters
             if [ -z "$project_name" ]; then
                 echo "Error: Project name is required"
                 exit 1
             fi
+
+            echo "=== Deleting Project: $project_name ==="
             
             # Check if project has applications
-            echo "=== Checking Project Applications ==="
+            echo "Checking for applications in project..."
             APPS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications?project=$project_name")
-            APPS_COUNT=$(echo "$APPS_RESPONSE" | jq '.items | length')
             
-            if [ "$APPS_COUNT" -gt 0 ]; then
-                if [ "$force" != "true" ]; then
-                    echo "Error: Project has $APPS_COUNT applications. Use force=true to delete anyway."
-                    echo "Applications in project:"
-                    echo "$APPS_RESPONSE" | jq -r '.items[].metadata.name'
-                    exit 1
-                else
-                    echo "Warning: Deleting project with $APPS_COUNT applications because force=true"
-                fi
+            # Parse applications response
+            if ! APPS_COUNT=$(echo "$APPS_RESPONSE" | jq '.items | length' 2>/dev/null); then
+                echo "Failed to check for applications. Raw response:"
+                echo "$APPS_RESPONSE"
+                return 1
             fi
             
-            echo "=== Deleting Project: $project_name ==="
+            if [ "$APPS_COUNT" -gt 0 ] && [ "$force" != "true" ]; then
+                echo "Project has $APPS_COUNT applications. Use force=true to delete anyway."
+                echo "Attempting to list applications..."
+                if ! APP_NAMES=$(echo "$APPS_RESPONSE" | jq -r '.items[].metadata.name' 2>/dev/null); then
+                    echo "Failed to list applications. Raw response:"
+                    echo "$APPS_RESPONSE"
+                else
+                    echo "Applications in project:"
+                    echo "$APP_NAMES"
+                fi
+                return 1
+            elif [ "$APPS_COUNT" -gt 0 ]; then
+                echo "Warning: Deleting project with $APPS_COUNT applications because force=true"
+            fi
             
             # Delete project
             RESPONSE=$(curl -s -k -X DELETE \
                 -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/projects/$project_name")
             
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to delete project"
-                exit 1
-            fi
-            
-            # Check for errors
-            ERROR_CODE=$(echo "$RESPONSE" | jq -r '.code // 0')
-            if [ "$ERROR_CODE" -ne 0 ]; then
+            # Parse and display response
+            echo "Attempting to parse response..."
+            if ! ERROR_CHECK=$(echo "$RESPONSE" | jq -r '.code // 0' 2>/dev/null); then
+                echo "Failed to parse response. Raw response:"
+                echo "$RESPONSE"
+            elif [ "$ERROR_CHECK" -ne 0 ]; then
                 echo "Error: $(echo "$RESPONSE" | jq -r '.message')"
-                exit 1
+            else
+                echo "Project deleted successfully: $project_name"
             fi
-            
-            echo "Project deleted successfully: $project_name"
             """,
             args=[
                 Arg(name="project_name", description="Name of the ArgoCD project", required=True),
