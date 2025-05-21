@@ -41,21 +41,19 @@ class ProjectTools:
             echo "curl -s -k -H 'Authorization: Bearer $ARGOCD_TOKEN' '$ARGOCD_DOMAIN/api/v1/projects'"
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
             
-            echo "Response:"
-            echo "$RESPONSE"
-            
-            if [ -z "$RESPONSE" ]; then
-                echo "Error: Failed to retrieve projects"
-                exit 1
-            fi
-            
             # Parse and display projects
-            echo "$RESPONSE" | jq -r '.items[] | {
+            echo "Attempting to parse projects..."
+            if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq -r '.items[] | {
                 name: .metadata.name,
                 description: .spec.description,
                 source_repos: .spec.sourceRepos,
                 destinations: .spec.destinations
-            }' | jq -s '.'
+            }' | jq -s '.' 2>/dev/null); then
+                echo "Failed to parse projects. Raw response:"
+                echo "$RESPONSE"
+            else
+                echo "$PARSED_RESPONSE"
+            fi
             """,
             args=[],
             image="curlimages/curl:8.1.2"
