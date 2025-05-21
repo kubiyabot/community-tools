@@ -217,7 +217,7 @@ class ProjectTools:
             if ! APPS_COUNT=$(echo "$APPS_RESPONSE" | jq '.items | length' 2>/dev/null); then
                 echo "Failed to check for applications. Raw response:"
                 echo "$APPS_RESPONSE"
-                exit 1
+                return 1
             fi
             
             if [ "$APPS_COUNT" -gt 0 ] && [ "$force" != "true" ]; then
@@ -230,7 +230,7 @@ class ProjectTools:
                     echo "Applications in project:"
                     echo "$APP_NAMES"
                 fi
-                exit 1
+                return 1
             elif [ "$APPS_COUNT" -gt 0 ]; then
                 echo "Warning: Deleting project with $APPS_COUNT applications because force=true"
             fi
