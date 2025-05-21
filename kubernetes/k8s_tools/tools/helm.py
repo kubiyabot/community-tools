@@ -50,7 +50,8 @@ helm_list_recent = KubernetesTool(
             type="int",
             default="1"
         )
-    ]
+    ],
+    #image="alpine/helm"  # Using an image with Helm installed
 )
 
 # Register the tool
