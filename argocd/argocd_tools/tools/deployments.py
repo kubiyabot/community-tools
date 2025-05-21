@@ -302,7 +302,7 @@ class DeploymentTools:
             fi
             
             # Set default values for optional parameters
-            TAIL_LINES=${tail_lines:-1000}
+            TAIL_LINES=${tail_lines:-100}
             
             echo "=== Logs for Deployment: $deployment_name in $namespace ==="
             
@@ -335,7 +335,7 @@ class DeploymentTools:
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
                 Arg(name="namespace", description="Namespace of the Deployment", required=True),
                 Arg(name="app_namespace", description="Namespace of the ArgoCD application", required=True),
-                Arg(name="tail_lines", description="Number of lines to show from the end (default: 1000)", required=False)
+                Arg(name="tail_lines", description="Number of lines to show from the end (default: 100)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
