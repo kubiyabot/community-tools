@@ -52,7 +52,7 @@ class ApplicationTools:
                 repo: .spec.source.repoURL,
                 path: .spec.source.path,
                 target_revision: .spec.source.targetRevision,
-                destination: .spec.destination.server + " / " + .spec.destination.namespace
+                destination: "\(.spec.destination.server)/\(.spec.destination.namespace)"
             }' | jq -s '.' 2>/dev/null); then
                 echo "Failed to parse applications. Raw response:"
                 echo "$RESPONSE"
