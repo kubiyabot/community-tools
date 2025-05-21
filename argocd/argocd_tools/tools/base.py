@@ -42,34 +42,7 @@ class ArgoCDTool(Tool):
     mermaid: str = DEFAULT_MERMAID
     
     def __init__(self, name, description, content, args=None, image="argoproj/argocd:latest"):
-        # Add helper functions to the content
-        helper_functions = """
-            # Helper functions for ArgoCD tools
-            login_argocd_cli() {
-                # Login to ArgoCD CLI
-                argocd login "$ARGOCD_DOMAIN" --auth-token "$ARGOCD_TOKEN" --insecure
-                if [ $? -ne 0 ]; then
-                    echo "Error: Failed to login to ArgoCD CLI"
-                    exit 1
-                fi
-            }
-
-            get_application_details() {
-                local app_name="$1"
-                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name"
-            }
-
-            get_applications() {
-                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications"
-            }
-
-            get_application_sync_status() {
-                local app_name="$1"
-                curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree"
-            }
-        """
-        
-        content = helper_functions + "\n" + content
+        content = content
         
         super().__init__(
             name=name,
