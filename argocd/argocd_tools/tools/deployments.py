@@ -295,9 +295,9 @@ class DeploymentTools:
             apk add --no-cache -q jq curl
 
             # Validate required parameters
-            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ]; then
+            if [ -z "$app_name" ] || [ -z "$deployment_name" ] || [ -z "$namespace" ] || [ -z "$app_namespace" ]; then
                 echo "Error: Missing required parameters"
-                echo "Required: app_name, deployment_name, namespace"
+                echo "Required: app_name, deployment_name, namespace, app_namespace"
                 exit 1
             fi
             
@@ -307,10 +307,10 @@ class DeploymentTools:
             echo "=== Logs for Deployment: $deployment_name in $namespace ==="
             
             # Build query parameters for the direct logs endpoint
-            QUERY="appNamespace=$namespace&namespace=$namespace&follow=false&group=apps&kind=Deployment&resourceName=$deployment_name&tailLines=$TAIL_LINES&sinceSeconds=0"
+            QUERY="appNamespace=$app_namespace&namespace=$namespace&follow=false&group=apps&kind=Deployment&resourceName=$deployment_name&tailLines=$TAIL_LINES&sinceSeconds=0"
             
-            # Fetch logs using the direct deployment logs endpoint
             echo "curl -s -k -H \"Authorization: Bearer $ARGOCD_TOKEN\" \"$ARGOCD_DOMAIN/api/v1/applications/$app_name/logs?$QUERY\""
+            # Fetch logs using the direct deployment logs endpoint
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name/logs?$QUERY")
             
@@ -334,6 +334,7 @@ class DeploymentTools:
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
                 Arg(name="namespace", description="Namespace of the Deployment", required=True),
+                Arg(name="app_namespace", description="Namespace of the ArgoCD application", required=True),
                 Arg(name="tail_lines", description="Number of lines to show from the end (default: 1000)", required=False)
             ],
             image="curlimages/curl:8.1.2"
