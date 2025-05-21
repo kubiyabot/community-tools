@@ -202,9 +202,17 @@ class ResourceTools:
             EVENTS_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name/events?resourceName=$resource_name&resourceNamespace=$resource_namespace")
             
+            # Check if items exists and is not null in response
+            ITEMS_COUNT=$(echo "$EVENTS_RESPONSE" | jq '.items | length // 0')
+            
+            if [ "$ITEMS_COUNT" = "0" ]; then
+                echo "No events found for this resource."
+                exit 0
+            fi
+            
             # Parse and display events
-            echo "Attempting to parse events..."
-            if ! PARSED_EVENTS=$(echo "$EVENTS_RESPONSE" | jq '.items[] | {
+            echo "Found $ITEMS_COUNT events. Parsing..."
+            PARSED_EVENTS=$(echo "$EVENTS_RESPONSE" | jq '.items[] | {
                 type: .type,
                 reason: .reason,
                 message: .message,
@@ -212,16 +220,9 @@ class ResourceTools:
                 lastTimestamp: .lastTimestamp,
                 count: .count,
                 involvedObject: .involvedObject
-            }' | jq -s '.' 2>/dev/null); then
-                echo "Failed to parse events. Raw response:"
-                echo "$EVENTS_RESPONSE"
-            else
-                if [ "$(echo "$PARSED_EVENTS" | jq 'length')" -eq 0 ]; then
-                    echo "No events found for this resource."
-                else
-                    echo "$PARSED_EVENTS"
-                fi
-            fi
+            }' | jq -s '.')
+            
+            echo "$PARSED_EVENTS"
             """,
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
