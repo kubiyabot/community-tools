@@ -117,15 +117,11 @@ class DeploymentTools:
                 exit 1
             fi
             
-            # Set default values for optional parameters
-            RESOURCE_GROUP=${resource_group:-"apps"}
-            RESOURCE_VERSION=${resource_version:-"v1"}
-            
             echo "=== Deployment Details: $deployment_name in $namespace ==="
             
             # Fetch deployment details
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?name=$deployment_name&namespace=$namespace&kind=Deployment&group=$RESOURCE_GROUP&version=$RESOURCE_VERSION")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps")
             
             # Parse and display deployment details
             if ! PARSED_RESPONSE=$(echo "$RESPONSE" | jq '{
@@ -170,9 +166,7 @@ class DeploymentTools:
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
-                Arg(name="namespace", description="Namespace of the Deployment", required=True),
-                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
-                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False)
+                Arg(name="namespace", description="Namespace of the Deployment", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
@@ -191,10 +185,6 @@ class DeploymentTools:
                 echo "Required: app_name, deployment_name, namespace"
                 exit 1
             fi
-            
-            # Set default values for optional parameters
-            RESOURCE_GROUP=${resource_group:-"apps"}
-            RESOURCE_VERSION=${resource_version:-"v1"}
             
             echo "=== Sync Status for Deployment: $deployment_name in $namespace ==="
             
@@ -234,9 +224,7 @@ class DeploymentTools:
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
-                Arg(name="namespace", description="Namespace of the Deployment", required=True),
-                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
-                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False)
+                Arg(name="namespace", description="Namespace of the Deployment", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
@@ -257,15 +245,25 @@ class DeploymentTools:
             fi
             
             # Set default values for optional parameters
-            RESOURCE_GROUP=${resource_group:-"apps"}
-            RESOURCE_VERSION=${resource_version:-"v1"}
             FORMAT=${format:-"json"}
             
             echo "=== Manifest for Deployment: $deployment_name in $namespace ==="
             
-            # Fetch deployment manifest
+            # Fetch deployment manifest - using resourceName as required by the API
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?name=$deployment_name&namespace=$namespace&kind=Deployment&group=$RESOURCE_GROUP&version=$RESOURCE_VERSION")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource?resourceName=$deployment_name&namespace=$namespace&kind=Deployment&group=apps")
+            
+            # Check for API errors
+            if echo "$RESPONSE" | grep -q "error"; then
+                echo "API Error occurred:"
+                echo "$RESPONSE"
+                
+                # Try alternative API endpoint as fallback
+                echo "Trying alternative endpoint..."
+                RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
+                    "$ARGOCD_DOMAIN/api/v1/applications/$app_name/manifests?revision=&all=true" | \
+                    jq --arg name "$deployment_name" '.manifests[] | select(.metadata.name == $name and .kind == "Deployment")')
+            fi
             
             # Output in requested format
             if [ "$FORMAT" = "yaml" ]; then
@@ -283,8 +281,6 @@ class DeploymentTools:
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
                 Arg(name="namespace", description="Namespace of the Deployment", required=True),
-                Arg(name="resource_group", description="API Group of the Deployment (default: apps)", required=False),
-                Arg(name="resource_version", description="Version of the Deployment (default: v1)", required=False),
                 Arg(name="format", description="Output format: json or yaml (default: json)", required=False)
             ],
             image="curlimages/curl:8.1.2"
@@ -306,7 +302,6 @@ class DeploymentTools:
             fi
             
             # Set default values for optional parameters
-            CONTAINER=${container:-""}
             TAIL_LINES=${tail_lines:-100}
             
             echo "=== Logs for Deployment: $deployment_name in $namespace ==="
@@ -323,53 +318,41 @@ class DeploymentTools:
             fi
             
             # Find pods belonging to the ReplicaSets
-            PODS=()
+            PODS=""
             for RS in $REPLICASET_NAMES; do
                 # Only get pods for the current ReplicaSet (with highest generation/revision number)
                 POD_NAMES=$(echo "$TREE_RESPONSE" | jq -r '.nodes[] | select(.kind == "Pod" and .parentRefs[].name == "'"$RS"'" and .health.status == "Healthy") | .name')
                 
                 if [ -n "$POD_NAMES" ]; then
-                    for POD in $POD_NAMES; do
-                        PODS+=("$POD")
-                    done
+                    PODS="$POD_NAMES"
                     # Once we found pods for a ReplicaSet, we can stop (assuming it's the current one)
                     break
                 fi
             done
             
-            if [ ${#PODS[@]} -eq 0 ]; then
+            if [ -z "$PODS" ]; then
                 echo "No pods found for this deployment"
                 exit 1
             fi
             
-            # Get logs for each pod
-            for POD in "${PODS[@]}"; do
-                echo "=== Logs from pod: $POD ==="
-                
-                # Build query parameters
-                QUERY="podName=$POD&namespace=$namespace&tailLines=$TAIL_LINES"
-                if [ -n "$CONTAINER" ]; then
-                    QUERY="$QUERY&container=$CONTAINER"
-                fi
-                
-                # Fetch logs
-                RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                    "$ARGOCD_DOMAIN/api/v1/applications/$app_name/pods/$POD/logs?$QUERY")
-                
-                echo "$RESPONSE"
-                
-                # Only show logs from the first pod if no specific container was requested
-                if [ -z "$CONTAINER" ]; then
-                    break
-                fi
-            done
+            # Get logs for the first pod only
+            POD=$(echo "$PODS" | awk '{print $1}')
+            echo "=== Logs from pod: $POD ==="
+            
+            # Build query parameters
+            QUERY="podName=$POD&namespace=$namespace&tailLines=$TAIL_LINES"
+            
+            # Fetch logs
+            RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/pods/$POD/logs?$QUERY")
+            
+            echo "$RESPONSE"
             """,
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
                 Arg(name="namespace", description="Namespace of the Deployment", required=True),
-                Arg(name="container", description="Container name (if Pod has multiple containers)", required=False),
-                Arg(name="tail_lines", description="Number of lines to show from the end", required=False)
+                Arg(name="tail_lines", description="Number of lines to show from the end (default: 100)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
