@@ -287,10 +287,10 @@ class DeploymentTools:
         )
         
     def get_deployment_logs(self) -> ArgoCDTool:
-        """Get logs from pods controlled by a specific Deployment."""
+        """Get logs from a specific Deployment."""
         return ArgoCDTool(
             name="argocd_deployment_logs",
-            description="Get logs from pods controlled by a Deployment",
+            description="Get logs from a Deployment resource",
             content="""
             apk add --no-cache -q jq curl
 
@@ -302,57 +302,38 @@ class DeploymentTools:
             fi
             
             # Set default values for optional parameters
-            TAIL_LINES=${tail_lines:-100}
+            TAIL_LINES=${tail_lines:-1000}
             
             echo "=== Logs for Deployment: $deployment_name in $namespace ==="
             
-            # First, get the resource tree to find pods related to this deployment
-            TREE_RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/applications/$app_name/resource-tree")
+            # Build query parameters for the direct logs endpoint
+            QUERY="appNamespace=$namespace&namespace=$namespace&follow=false&group=apps&kind=Deployment&resourceName=$deployment_name&tailLines=$TAIL_LINES&sinceSeconds=0"
             
-            # Find ReplicaSets for this deployment first
-            REPLICASET_NAMES=$(echo "$TREE_RESPONSE" | jq -r '.nodes[] | select(.kind == "ReplicaSet" and .parentRefs[].name == "'"$deployment_name"'") | .name')
-            
-            if [ -z "$REPLICASET_NAMES" ]; then
-                echo "No ReplicaSets found for this deployment"
-                exit 1
-            fi
-            
-            # Find pods belonging to the ReplicaSets
-            PODS=""
-            for RS in $REPLICASET_NAMES; do
-                # Only get pods for the current ReplicaSet (with highest generation/revision number)
-                POD_NAMES=$(echo "$TREE_RESPONSE" | jq -r '.nodes[] | select(.kind == "Pod" and .parentRefs[].name == "'"$RS"'" and .health.status == "Healthy") | .name')
-                
-                if [ -n "$POD_NAMES" ]; then
-                    PODS="$POD_NAMES"
-                    # Once we found pods for a ReplicaSet, we can stop (assuming it's the current one)
-                    break
-                fi
-            done
-            
-            if [ -z "$PODS" ]; then
-                echo "No pods found for this deployment"
-                exit 1
-            fi
-            
-            # Get logs for the first pod only
-            POD=$(echo "$PODS" | awk '{print $1}')
-            echo "=== Logs from pod: $POD ==="
-            
-            # Build query parameters
-            QUERY="podName=$POD&namespace=$namespace&tailLines=$TAIL_LINES"
-            
-            # Fetch logs
+            # Fetch logs using the direct deployment logs endpoint
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
-                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/pods/$POD/logs?$QUERY")
+                "$ARGOCD_DOMAIN/api/v1/applications/$app_name/logs?$QUERY")
             
-            echo "$RESPONSE"
+            # Parse into a cleaner format with timestamp, content and pod
+            echo "$RESPONSE" | jq -r '
+                if type == "array" then
+                    .[]
+                else
+                    .
+                end |
+                if has("result") then
+                    "[\(.result.timeStampStr)] [\(.result.podName)] \(.result.content)"
+                elif has("content") then
+                    "[\(.timeStampStr)] [\(.podName)] \(.content)"
+                else
+                    .
+                end
+            ' 2>/dev/null || echo "$RESPONSE"
             """,
             args=[
                 Arg(name="app_name", description="Name of the ArgoCD application", required=True),
                 Arg(name="deployment_name", description="Name of the Deployment", required=True),
                 Arg(name="namespace", description="Namespace of the Deployment", required=True),
-                Arg(name="tail_lines", description="Number of lines to show from the end (default: 100)", required=False)
+                Arg(name="tail_lines", description="Number of lines to show from the end (default: 1000)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
