@@ -41,6 +41,9 @@ class ProjectTools:
             echo "curl -s -k -H 'Authorization: Bearer $ARGOCD_TOKEN' '$ARGOCD_DOMAIN/api/v1/projects'"
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
             
+            echo "Response:"
+            echo "$RESPONSE"
+            
             if [ -z "$RESPONSE" ]; then
                 echo "Error: Failed to retrieve projects"
                 exit 1
