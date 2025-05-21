@@ -310,6 +310,7 @@ class DeploymentTools:
             QUERY="appNamespace=$namespace&namespace=$namespace&follow=false&group=apps&kind=Deployment&resourceName=$deployment_name&tailLines=$TAIL_LINES&sinceSeconds=0"
             
             # Fetch logs using the direct deployment logs endpoint
+            echo "curl -s -k -H \"Authorization: Bearer $ARGOCD_TOKEN\" \"$ARGOCD_DOMAIN/api/v1/applications/$app_name/logs?$QUERY\""
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" \
                 "$ARGOCD_DOMAIN/api/v1/applications/$app_name/logs?$QUERY")
             
