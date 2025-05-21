@@ -38,6 +38,7 @@ class ProjectTools:
             echo "=== ArgoCD Projects ==="
             
             # Fetch projects
+            echo "curl -s -k -H 'Authorization: Bearer $ARGOCD_TOKEN' '$ARGOCD_DOMAIN/api/v1/projects'"
             RESPONSE=$(curl -s -k -H "Authorization: Bearer $ARGOCD_TOKEN" "$ARGOCD_DOMAIN/api/v1/projects")
             
             if [ -z "$RESPONSE" ]; then
