@@ -266,9 +266,46 @@ ingress_analyzer_tool = KubernetesTool(
     content="""
     #!/bin/bash
     set -e
-    echo "Ingress Analysis:"
-    echo "================="
-    kubectl get ingress --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host,PATHS:.spec.rules[*].http.paths[*].path,SERVICES:.spec.rules[*].http.paths[*].backend.service.name
+
+    # ---- Ingress Controller Health Analysis ----
+    echo "=============================="
+    echo "🩺 Checking Ingress Controller Pods Health..."
+    # Change this selector if you use a different ingress controller
+    controller_selector="app.kubernetes.io/name=ingress-nginx"
+
+    kubectl get pods --all-namespaces -l $controller_selector -o json | jq -c '.items[]' | while read pod_json; do
+      pod_name=$(echo $pod_json | jq -r '.metadata.name')
+      ns=$(echo $pod_json | jq -r '.metadata.namespace')
+      status=$(echo $pod_json | jq -r '.status.phase')
+      restarts=$(echo $pod_json | jq -r '[.status.containerStatuses[]?.restartCount] | add // 0')
+
+      echo "🔹 Controller pod [$pod_name] in namespace [$ns]"
+
+      # Check for pending or terminating
+      if [[ "$status" == "Pending" ]] || [[ "$status" == "Terminating" ]]; then
+        echo "  ❌ Pod status: $status"
+      else
+        echo "  ✅ Pod status: $status"
+      fi
+
+      # Check restart count
+      if (( restarts > 0 )); then
+        echo "  ⚠️ Pod has restarted $restarts times (recent restarts!)"
+      else
+        echo "  ✅ No recent restarts"
+      fi
+
+      # Check logs for errors (last 50 lines)
+      errors=$(kubectl logs -n $ns $pod_name --tail=50 2>/dev/null | grep -iE 'error|fail|exception' | tail -n5)
+      if [[ ! -z "$errors" ]]; then
+        echo "  ❌ Recent errors in logs:"
+        echo "$errors" | sed 's/^/    /'
+      else
+        echo "  ✅ No recent errors in pod logs"
+      fi
+
+      echo ""
+    done
     """,
     args=[],
 )
