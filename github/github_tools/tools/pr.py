@@ -322,11 +322,7 @@ echo "💬 Processing comment for pull request #$number in $repo..."
 export REPO="$repo"
 export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
-export WORKFLOW_FAILURE_SUMMARY="$workflow_failure_summary"
-export WORKFLOW_FAILURE_REASON="$workflow_failure_reason"
-export WORKFLOW_FAILURE_FIXES="$workflow_failure_fixes"
-export RECOMMENDED_FIX="$recommended_fix"
-export DETAILED_ERROR_LOGS="$detailed_error_logs"
+export FAILURES_AND_FIXES="$failures_and_fixes"
 
 if ! command -v python3 >/dev/null 2>&1; then
     apk add --quiet python3 py3-pip >/dev/null 2>&1
@@ -433,33 +429,43 @@ fi
             required=True
         ),
         Arg(
-            name="workflow_failure_summary",
+            name="failures_and_fixes",
             type="str",
-            description="A concise summary of what failed in the workflow. Example: 'Build failed due to missing dependency'",
-            required=True
-        ),
-        Arg(
-            name="workflow_failure_reason",
-            type="str",
-            description="Explanation of why the workflow failed. Example: 'The React package is missing from package.json'",
-            required=True
-        ),
-        Arg(
-            name="workflow_failure_fixes",
-            type="str",
-            description="Detailed steps to fix the issue, in markdown format. Example: '1. Add React as a dependency: `npm install --save react`\n2. Update import statements'",
-            required=True
-        ),
-        Arg(
-            name="recommended_fix",
-            type="str",
-            description="The most important fix to apply. Example: 'Run `npm install --save react` to add the missing dependency'",
-            required=True
-        ),
-        Arg(
-            name="detailed_error_logs",
-            type="str",
-            description="Raw error logs from the workflow run. Example: 'Error: Cannot find module 'react'\n  at /app/src/index.js:1:1'",
+            description="""Detailed analysis of workflow failures and suggested fixes in GitHub Markdown format.
+
+The required format uses standard GitHub Markdown formatting:
+- Headers (### for headings) to identify each issue
+- Bold/italic text for emphasis
+- Lists (bullet points or numbered) for steps
+- Code blocks (``` for code snippets)
+
+Focus on critical issues with accurate, focused, and practical fixes.
+Each suggestion must directly address the root cause of the failure.
+
+Example format:
+```
+### Build Failure in dependency-installation step
+
+The build is failing because the 'react' package is missing from package.json.
+
+**Recommended fix:**
+Add React as a dependency by running:
+```npm install --save react```
+
+### Type Error in src/components/Counter.tsx
+
+The component is trying to use a string value where a number is expected.
+
+**Recommended fix:**
+Convert the string value to a number:
+```typescript
+// Change this:
+const count: number = value;
+// To this:
+const count: number = parseInt(value, 10);
+```
+```
+""",
             required=True
         )
     ],
