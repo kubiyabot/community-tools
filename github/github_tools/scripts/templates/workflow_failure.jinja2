@@ -1,12 +1,37 @@
-# Workflow Status
-
-Workflow analysis completed for PR: [#{{ number }}](https://github.com/{{ repo }}/pull/{{ number }})
-
 ## 🔬 Critical Issues Analysis
-{{ failures_and_fixes }}
+### 🚨 Workflow Failure Analysis
 
+#### **❌ What Failed**
+{{ workflow_failure_summary }}
+
+#### **🛠️ Why It Failed**
+{{ workflow_failure_reason }}
+
+#### **🔧 How to Fix It**
+{{ workflow_failure_fixes }}
+
+<details>
+<summary>🌟 Recommended Fix</summary>
+{{ recommended_fix }}
+</details>
+
+<details>
+<summary>📝 Detailed Error Logs</summary>
+```
+{{ detailed_error_logs }}
+```
+</details>
+
+<details>
+<summary>🔗 Run Details</summary>
+```
+{{ run_details }}
+```
+</details>
+
+<details>
+<summary>📊 Diagram</summary>
 {% if workflow_steps and workflow_steps|length > 0 %}
-### 📊 Workflow Steps:
 ```mermaid
 graph LR;
 {% for step in workflow_steps %}
@@ -22,7 +47,8 @@ graph LR;
 {% endfor %}
 ```
 {% endif %}
----
+</details>
+
 
 #### Was this comment helpful? 👍 or 👎 Please let us know your feedback!
 

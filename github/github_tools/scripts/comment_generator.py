@@ -85,7 +85,12 @@ def generate_comment(variables: dict) -> str:
         # Create template context
         context = {
             'workflow_steps': workflow_steps,
-            'failures_and_fixes': variables['failures_and_fixes'],  # Use as is without parsing
+            'workflow_failure_summary': variables.get('workflow_failure_summary', 'Workflow failed with errors'),
+            'workflow_failure_reason': variables.get('workflow_failure_reason', 'See detailed error logs'),
+            'workflow_failure_fixes': variables.get('workflow_failure_fixes', 'No specific fixes available'),
+            'recommended_fix': variables.get('recommended_fix', 'Review the error logs for details'),
+            'detailed_error_logs': variables.get('detailed_error_logs', 'No detailed logs available'),
+            'run_details': f"PR #{variables['pr_number']} in {variables['repo']}",
             'number': variables['pr_number'],
             'repo': variables['repo'],
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
@@ -111,11 +116,14 @@ def main():
     try:
         # Get variables from environment
         required_vars = [
-            'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS', 
-            'FAILURES_AND_FIXES'
+            'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS',
+            'WORKFLOW_FAILURE_SUMMARY', 'WORKFLOW_FAILURE_REASON', 'WORKFLOW_FAILURE_FIXES',
+            'RECOMMENDED_FIX', 'DETAILED_ERROR_LOGS'
         ]
         
         variables = {}
+        
+        # Add required variables
         for var in required_vars:
             if var not in os.environ:
                 print(f"Missing required environment variable: {var}")
