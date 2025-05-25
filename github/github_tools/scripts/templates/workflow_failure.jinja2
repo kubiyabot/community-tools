@@ -3,14 +3,21 @@
 #### **❌ What Failed**
 {{ workflow_failure_summary }}
 
-#### **🛠️ Why It Failed**
-{{ workflow_failure_reason }}
+<details>
+<summary>🛠️ Why It Failed</summary>
 
-#### **🔧 How to Fix It**
-{{ workflow_failure_fixes }}
+{{ workflow_failure_reason }}
+</details>
 
 <details>
-<summary>🌟 Recommended Fix</summary>
+<summary>🔧 How to Fix It</summary>
+
+{{ workflow_failure_fixes }}
+</details>
+
+<details>
+<summary>🌟 Detailed Fix Steps</summary>
+
 {{ recommended_fix }}
 </details>
 
@@ -24,13 +31,14 @@
 
 <details>
 <summary>🔗 Run Details</summary>
+
 {{ run_details }}
 </details>
 
 <details>
 <summary>📊 Diagram</summary>
-{% if workflow_steps and workflow_steps|length > 0 %}
 
+{% if workflow_steps and workflow_steps|length > 0 %}
 ```mermaid
 graph LR;
 {% for step in workflow_steps %}
@@ -48,9 +56,6 @@ graph LR;
 {% endif %}
 </details>
 
-
-#### Was this comment helpful? 👍 or 👎 Please let us know your feedback!
-
 <sub align="center">
-🤖 This comment was generated automatically by Kubiya AI at {{ timestamp }}
+Was this comment helpful? 👍 or 👎 Please let us know your feedback!
 </sub>
