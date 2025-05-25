@@ -267,6 +267,42 @@ ingress_analyzer_tool = KubernetesTool(
     #!/bin/bash
     set -e
 
+    # ---- Main Ingress Analysis ----
+    echo "🔍 Fetching Ingress Info..."
+    kubectl get ingress --all-namespaces -o json | jq -r '
+      .items[] |
+      .metadata.namespace as $ns |
+      .metadata.name as $name |
+      .spec.rules[]? |
+      .host as $host |
+      .http.paths[]? |
+      "\($ns) \($name) \($host) \(.backend.service.name)"' | while read ns name host service; do
+
+      echo "🔎 Ingress [$name] in [$ns]: Host=$host → Service=$service"
+
+      ip=$(dig +short "$host" | head -n1)
+      if [ -z "$ip" ]; then
+        echo "  ❌ DNS not resolving: $host"
+      else
+        echo "  🌐 DNS OK: $ip"
+        curl -s --max-time 3 -o /dev/null -w "  🔁 HTTP Status: %{http_code}\n" http://$host || echo "  ❌ HTTP request failed"
+      fi
+
+      echo "  🔗 Validating service and endpoints..."
+      svc_info=$(kubectl get svc $service -n $ns -o json 2>/dev/null || echo "MISSING")
+      if [[ "$svc_info" == "MISSING" ]]; then
+        echo "  ❌ Service $service not found"
+      else
+        endpoints=$(kubectl get endpoints $service -n $ns -o json | jq -r '.subsets[]?.addresses[]?.ip' || echo "")
+        if [ -z "$endpoints" ]; then
+          echo "  ❌ No active endpoints for $service"
+        else
+          echo "  ✅ Endpoints found: $endpoints"
+        fi
+      fi
+      echo ""
+    done
+
     # ---- Ingress Controller Health Analysis ----
     echo "=============================="
     echo "🩺 Checking Ingress Controller Pods Health..."
@@ -290,7 +326,7 @@ ingress_analyzer_tool = KubernetesTool(
 
       # Check restart count
       if (( restarts > 0 )); then
-        echo "  ⚠️ Pod has restarted $restarts times (recent restarts!)"
+        echo "  ⚠️  Pod has restarted $restarts times (recent restarts!)"
       else
         echo "  ✅ No recent restarts"
       fi
