@@ -87,8 +87,8 @@ def generate_comment(variables: dict) -> str:
             'workflow_steps': workflow_steps,
             'workflow_failure_summary': variables.get('workflow_failure_summary', 'Workflow failed with errors'),
             'workflow_failure_reason': variables.get('workflow_failure_reason', 'See detailed error logs'),
-            'workflow_failure_fixes': variables.get('workflow_failure_fixes', 'No specific fixes available'),
-            'recommended_fix': variables.get('recommended_fix', 'Review the error logs for details'),
+            'workflow_failure_fixes': variables.get('workflow_failure_fixes', 'Fix the issues identified in the error logs'),
+            'recommended_fix': variables.get('recommended_fix', 'Detailed instructions:\n1. Review the error logs carefully\n2. Address each error according to the guidance above\n3. Commit and push your changes\n4. Re-run the workflow'),
             'detailed_error_logs': variables.get('detailed_error_logs', 'No detailed logs available'),
             'run_details': f"PR #{variables['pr_number']} in {variables['repo']}",
             'number': variables['pr_number'],
@@ -121,6 +121,18 @@ def main():
             'RECOMMENDED_FIX', 'DETAILED_ERROR_LOGS'
         ]
         
+        # Map environment variable names to context variable names
+        env_to_context = {
+            'WORKFLOW_FAILURE_SUMMARY': 'workflow_failure_summary',
+            'WORKFLOW_FAILURE_REASON': 'workflow_failure_reason',
+            'WORKFLOW_FAILURE_FIXES': 'workflow_failure_fixes',
+            'RECOMMENDED_FIX': 'recommended_fix',
+            'DETAILED_ERROR_LOGS': 'detailed_error_logs',
+            'REPO': 'repo',
+            'PR_NUMBER': 'pr_number',
+            'WORKFLOW_STEPS': 'workflow_steps'
+        }
+        
         variables = {}
         
         # Add required variables
@@ -128,7 +140,7 @@ def main():
             if var not in os.environ:
                 print(f"Missing required environment variable: {var}")
                 raise KeyError(f"Missing required environment variable: {var}")
-            variables[var.lower()] = os.environ[var]
+            variables[env_to_context[var]] = os.environ[var]
         
         comment = generate_comment(variables)
         print(comment)

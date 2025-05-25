@@ -311,7 +311,7 @@ fi
 
 github_pr_comment_workflow_failure = GitHubCliTool(
     name="github_pr_comment_workflow_failure",
-    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes.",
+    description="Add a workflow failure analysis comment to a pull request with detailed error analysis and suggested fixes. All text fields support GitHub Markdown formatting.",
     content="""
 #!/bin/bash
 set -euo pipefail
@@ -322,11 +322,11 @@ echo "💬 Processing comment for pull request #$number in $repo..."
 export REPO="$repo"
 export PR_NUMBER="$number"
 export WORKFLOW_STEPS="$workflow_steps"
-export WORKFLOW_FAILURE_SUMMARY="$workflow_failure_summary"
-export WORKFLOW_FAILURE_REASON="$workflow_failure_reason"
-export WORKFLOW_FAILURE_FIXES="$workflow_failure_fixes"
-export RECOMMENDED_FIX="$recommended_fix"
-export DETAILED_ERROR_LOGS="$detailed_error_logs"
+export WORKFLOW_FAILURE_SUMMARY="$failure_summary"
+export WORKFLOW_FAILURE_REASON="$failure_cause"
+export WORKFLOW_FAILURE_FIXES="$quick_fix_summary"
+export RECOMMENDED_FIX="$detailed_fix_steps"
+export DETAILED_ERROR_LOGS="$error_logs"
 
 if ! command -v python3 >/dev/null 2>&1; then
     apk add --quiet python3 py3-pip >/dev/null 2>&1
@@ -433,33 +433,60 @@ fi
             required=True
         ),
         Arg(
-            name="workflow_failure_summary",
+            name="failure_summary",
             type="str",
-            description="A concise summary of what failed in the workflow. Example: 'Build failed due to missing dependency'",
+            description="A concise summary of what failed in the workflow. Supports GitHub Markdown formatting. Example: 'Build failed due to missing dependency'",
             required=True
         ),
         Arg(
-            name="workflow_failure_reason",
+            name="failure_cause",
             type="str",
-            description="Explanation of why the workflow failed. Example: 'The React package is missing from package.json'",
+            description="Explanation of why the workflow failed. Supports GitHub Markdown formatting. Example: 'The React package is missing from package.json'",
             required=True
         ),
         Arg(
-            name="workflow_failure_fixes",
+            name="quick_fix_summary",
             type="str",
-            description="Detailed steps to fix the issue, in markdown format. Example: '1. Add React as a dependency: `npm install --save react`\n2. Update import statements'",
+            description="Short summary of how to fix the issue. This appears in the main section of the comment. Supports GitHub Markdown formatting. Example: 'Add the missing React dependency to package.json'",
             required=True
         ),
         Arg(
-            name="recommended_fix",
+            name="detailed_fix_steps",
             type="str",
-            description="The most important fix to apply. Example: 'Run `npm install --save react` to add the missing dependency'",
+            description="""Detailed, in-depth recommendations and specific action items to fix the issue. This should include specific commands, code examples, or step-by-step instructions. 
+
+Supports full GitHub Markdown formatting including:
+- Lists and numbered steps
+- **Bold** and *italic* text
+- Code blocks with syntax highlighting using triple backticks
+- Inline code with single backticks
+- Links, tables, and other GitHub Markdown features
+
+Example:
+```markdown
+### Fix Package Dependencies
+
+1. Add React as a dependency:
+   ```bash
+   npm install --save react
+   ```
+
+2. Update your import statements:
+   ```jsx
+   import React from 'react';
+   ```
+
+3. Make sure to rebuild your application:
+   ```bash
+   npm run build
+   ```
+```""",
             required=True
         ),
         Arg(
-            name="detailed_error_logs",
+            name="error_logs",
             type="str",
-            description="Raw error logs from the workflow run. Example: 'Error: Cannot find module 'react'\n  at /app/src/index.js:1:1'",
+            description="Raw error logs from the workflow run. Will be displayed in a code block. Example: 'Error: Cannot find module 'react'\n  at /app/src/index.js:1:1'",
             required=True
         )
     ],
