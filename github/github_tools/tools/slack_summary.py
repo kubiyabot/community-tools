@@ -36,7 +36,8 @@ python /opt/scripts/send_slack.py "investigation" "{{ .pr_title }}" "{{ .pr_url 
                 name="pr_title",
                 description=(
                     "The title of the PR that failed.\n"
-                    "*Example*: `Fix checkout validation`"
+                    "*Example*: `Fix checkout validation`\n"
+                    "*Format*: Plain text, no special formatting needed"
                 ),
                 required=True,
             ),
@@ -44,7 +45,8 @@ python /opt/scripts/send_slack.py "investigation" "{{ .pr_title }}" "{{ .pr_url 
                 name="pr_url",
                 description=(
                     "The URL of the PR that failed.\n"
-                    "*Example*: `https://github.com/org/repo/pull/123`"
+                    "*Example*: `https://github.com/org/repo/pull/123`\n"
+                    "*Format*: Full GitHub PR URL"
                 ),
                 required=True,
             ),
@@ -95,7 +97,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="pr_title",
                 description=(
                     "The title of the PR that failed.\n"
-                    "*Example*: `Fix checkout validation`"
+                    "*Example*: `Fix checkout validation`\n"
+                    "*Format*: Plain text, no special formatting needed"
                 ),
                 required=True,
             ),
@@ -103,7 +106,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="pr_url",
                 description=(
                     "The URL of the PR that failed.\n"
-                    "*Example*: `https://github.com/org/repo/pull/123`"
+                    "*Example*: `https://github.com/org/repo/pull/123`\n"
+                    "*Format*: Full GitHub PR URL"
                 ),
                 required=True,
             ),
@@ -111,7 +115,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="author",
                 description=(
                     "The author of the PR.\n"
-                    "*Example*: `@dev_alice`"
+                    "*Example*: `@dev_alice`\n"
+                    "*Format*: GitHub username with @ prefix"
                 ),
                 required=True,
             ),
@@ -119,7 +124,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="branch",
                 description=(
                     "The branch name where the failure occurred.\n"
-                    "*Example*: `feature/payment-bug`"
+                    "*Example*: `feature/payment-bug`\n"
+                    "*Format*: Branch name as it appears in GitHub"
                 ),
                 required=True,
             ),
@@ -127,7 +133,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="what_failed",
                 description=(
                     "A description of what failed in the workflow.\n"
-                    "*Example*: `Tried to access user.email, but user was undefined`"
+                    "*Example*: `Tried to access user.email, but user was undefined`\n"
+                    "*Format*: Plain text description of the failure"
                 ),
                 required=True,
             ),
@@ -135,7 +142,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="why_failed",
                 description=(
                     "An explanation of why the failure occurred.\n"
-                    "*Example*: `The user object was undefined during test execution, likely due to a missing or incorrect mock setup`"
+                    "*Example*: `The user object was undefined during test execution, likely due to a missing or incorrect mock setup`\n"
+                    "*Format*: Plain text explanation of the root cause"
                 ),
                 required=True,
             ),
@@ -143,7 +151,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="how_to_fix",
                 description=(
                     "Instructions on how to fix the failure.\n"
-                    "*Example*: `Check if user is correctly mocked before test run. Make sure the email property exists before accessing it`"
+                    "*Example*: `Check if user is correctly mocked before test run. Make sure the email property exists before accessing it`\n"
+                    "*Format*: Plain text instructions"
                 ),
                 required=True,
             ),
@@ -151,7 +160,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="error_details",
                 description=(
                     "The error message to display.\n"
-                    "*Example*: `TypeError: Cannot read property 'email' of undefined`"
+                    "*Example*: `TypeError: Cannot read property 'email' of undefined`\n"
+                    "*Format*: Raw error message, will be formatted with backticks in Slack"
                 ),
                 required=True,
             ),
@@ -159,7 +169,8 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
                 name="stack_trace_url",
                 description=(
                     "URL to the full stack trace.\n"
-                    "*Example*: `https://ci.example.com/build/123/logs#L42`"
+                    "*Example*: `https://ci.example.com/build/123/logs#L42`\n"
+                    "*Format*: Full URL to the error logs or stack trace"
                 ),
                 required=True,
             ),
