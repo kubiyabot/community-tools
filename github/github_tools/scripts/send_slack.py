@@ -152,24 +152,45 @@ def main():
             print(json.dumps({"success": False, "error": "DESTINATION_CHANNEL is not set"}))
             sys.exit(1)
 
-        if len(sys.argv) < 2:
-            print(json.dumps({"success": False, "error": "Usage: send_slack.py <message_type> [args...]"}))
-            sys.exit(1)
-
-        message_type = sys.argv[1]
-        if message_type == "investigation":
-            if len(sys.argv) != 4:
-                print(json.dumps({"success": False, "error": "Usage for investigation: send_slack.py investigation <pr_title> <pr_url>"}))
+        # Check if input is JSON
+        if len(sys.argv) == 2 and sys.argv[1].startswith('{'):
+            try:
+                data = json.loads(sys.argv[1])
+                message_type = "summary"
+                args = [
+                    data["pr_title"],
+                    data["pr_url"],
+                    data["author"],
+                    data["branch"],
+                    data["what_failed"],
+                    data["why_failed"],
+                    data["how_to_fix"],
+                    data["error_details"],
+                    data["stack_trace_url"]
+                ]
+            except (json.JSONDecodeError, KeyError) as e:
+                print(json.dumps({"success": False, "error": f"Invalid JSON input: {str(e)}"}))
                 sys.exit(1)
-            args = sys.argv[2:4]
-        elif message_type == "summary":
-            if len(sys.argv) != 11:
-                print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url>"}))
-                sys.exit(1)
-            args = sys.argv[2:11]
         else:
-            print(json.dumps({"success": False, "error": "Invalid message type. Must be 'investigation' or 'summary'"}))
-            sys.exit(1)
+            # Handle command line arguments
+            if len(sys.argv) < 2:
+                print(json.dumps({"success": False, "error": "Usage: send_slack.py <message_type> [args...] or send_slack.py <json_data>"}))
+                sys.exit(1)
+
+            message_type = sys.argv[1]
+            if message_type == "investigation":
+                if len(sys.argv) != 4:
+                    print(json.dumps({"success": False, "error": "Usage for investigation: send_slack.py investigation <pr_title> <pr_url>"}))
+                    sys.exit(1)
+                args = sys.argv[2:4]
+            elif message_type == "summary":
+                if len(sys.argv) != 11:
+                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url>"}))
+                    sys.exit(1)
+                args = sys.argv[2:11]
+            else:
+                print(json.dumps({"success": False, "error": "Invalid message type. Must be 'investigation' or 'summary'"}))
+                sys.exit(1)
 
         client = WebClient(token=token)
         result = send_slack_message(client, channel, message_type, *args)
