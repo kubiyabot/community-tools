@@ -168,9 +168,9 @@ python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{
             Arg(
                 name="stack_trace_url",
                 description=(
-                    "URL to the full stack trace.\n"
-                    "*Example*: `https://ci.example.com/build/123/logs#L42`\n"
-                    "*Format*: Full URL to the error logs or stack trace"
+                    "URL to the GitHub Actions run or CI/CD logs where the error occurred.\n"
+                    "*Example*: `https://github.com/org/repo/actions/runs/1234567890`\n"
+                    "*Format*: Full GitHub Actions run URL or CI/CD logs URL that shows the error details"
                 ),
                 required=True,
             ),
