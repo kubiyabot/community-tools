@@ -104,7 +104,7 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🔗 *Error Details:*\n```\n{error_details}\n```\n\n<{stack_trace_url}|View full stack trace>"
+                    "text": f"🔗 *Error Details:*\n```\n{error_details.replace('\\n', '\n')}\n```\n\n<{stack_trace_url}|View full stack trace>"
                 }
             },
             {
