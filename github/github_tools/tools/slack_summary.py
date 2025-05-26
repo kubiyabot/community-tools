@@ -86,24 +86,31 @@ class SlackWorkflowSummaryTool(Tool):
         description="""Send a failure summary message to Slack with PR details, failure information, and error details. The message includes PR title, URL, author, branch, what failed, why it failed, how to fix it, error details, and a link to the stack trace.""",
         content="""
 set -e
-apk add --quiet py3-pip > /dev/null 2>&1
+apk add --quiet py3-pip jq > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
-# Create JSON input
-JSON_INPUT=$(cat <<EOF
-{
-  "pr_title": "{{ .pr_title }}",
-  "pr_url": "{{ .pr_url }}",
-  "author": "{{ .author }}",
-  "branch": "{{ .branch }}",
-  "what_failed": "{{ .what_failed }}",
-  "why_failed": "{{ .why_failed }}",
-  "how_to_fix": "{{ .how_to_fix }}",
-  "error_details": "{{ .error_details }}",
-  "stack_trace_url": "{{ .stack_trace_url }}"
-}
-EOF
-)
+# Create JSON input with proper escaping
+JSON_INPUT=$(jq -n \
+  --arg pr_title "{{ .pr_title }}" \
+  --arg pr_url "{{ .pr_url }}" \
+  --arg author "{{ .author }}" \
+  --arg branch "{{ .branch }}" \
+  --arg what_failed "{{ .what_failed }}" \
+  --arg why_failed "{{ .why_failed }}" \
+  --arg how_to_fix "{{ .how_to_fix }}" \
+  --arg error_details "{{ .error_details }}" \
+  --arg stack_trace_url "{{ .stack_trace_url }}" \
+  '{
+    "pr_title": $pr_title,
+    "pr_url": $pr_url,
+    "author": $author,
+    "branch": $branch,
+    "what_failed": $what_failed,
+    "why_failed": $why_failed,
+    "how_to_fix": $how_to_fix,
+    "error_details": $error_details,
+    "stack_trace_url": $stack_trace_url
+  }')
 
 # Run the Python script with JSON input
 python /opt/scripts/send_slack.py "$JSON_INPUT"
