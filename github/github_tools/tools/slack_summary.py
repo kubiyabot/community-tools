@@ -83,31 +83,30 @@ class SlackWorkflowSummaryTool(Tool):
     def __init__(
         self,
         name="slack_workflow_summary",
-        description="""Send a failure summary message to Slack with PR details, failure information, and error details.
-
-Supports two input formats:
-1. Command-line arguments (traditional)
-2. JSON object (recommended for automation)
-
-Example JSON:
-{
-  "pr_title": "Update main.go",
-  "pr_url": "https://github.com/org/repo/pull/123",
-  "author": "@dev_alice",
-  "branch": "feature/payment-bug",
-  "what_failed": "Build process failed",
-  "why_failed": "Build failed due to undefined function",
-  "how_to_fix": "Ensure all functions are defined",
-  "error_details": "ERROR: failed to solve",
-  "stack_trace_url": "https://github.com/org/repo/actions/runs/1234567890"
-}""",
+        description="""Send a failure summary message to Slack with PR details, failure information, and error details. The message includes PR title, URL, author, branch, what failed, why it failed, how to fix it, error details, and a link to the stack trace.""",
         content="""
 set -e
 apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
-# Run the Python script
-python /opt/scripts/send_slack.py "summary" "{{ .pr_title }}" "{{ .pr_url }}" "{{ .author }}" "{{ .branch }}" "{{ .what_failed }}" "{{ .why_failed }}" "{{ .how_to_fix }}" "{{ .error_details }}" "{{ .stack_trace_url }}"
+# Create JSON input
+JSON_INPUT=$(cat <<EOF
+{
+  "pr_title": "{{ .pr_title }}",
+  "pr_url": "{{ .pr_url }}",
+  "author": "{{ .author }}",
+  "branch": "{{ .branch }}",
+  "what_failed": "{{ .what_failed }}",
+  "why_failed": "{{ .why_failed }}",
+  "how_to_fix": "{{ .how_to_fix }}",
+  "error_details": "{{ .error_details }}",
+  "stack_trace_url": "{{ .stack_trace_url }}"
+}
+EOF
+)
+
+# Run the Python script with JSON input
+python /opt/scripts/send_slack.py "$JSON_INPUT"
 """,
         args=[
             Arg(
