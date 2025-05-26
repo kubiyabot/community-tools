@@ -40,9 +40,9 @@ echo "🔀 Head branch: $head"
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 # Get the expanded disclaimer
@@ -145,9 +145,9 @@ echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 gh pr merge --repo $repo $number --$merge_method -b "Merged via automated workflow${KUBIYA_DISCLAIMER}"
@@ -172,9 +172,9 @@ echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 gh pr close --repo $repo $number -c "Closed via automated workflow${KUBIYA_DISCLAIMER}"
@@ -241,9 +241,9 @@ $body
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 # Get existing comments by the current user
@@ -350,9 +350,9 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="$DEFAULT_GITHUB_ACTOR"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "$DEFAULT_GITHUB_ACTOR")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 # Get existing comments by the current user
@@ -485,9 +485,9 @@ echo "🔗 PR Link: https://github.com/$repo/pull/$number"
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="kubiya-production[bot]"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production[bot]")
 fi
 
 FULL_BODY="$body${KUBIYA_DISCLAIMER}"
