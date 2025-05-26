@@ -85,25 +85,22 @@ class SlackWorkflowSummaryTool(Tool):
         name="slack_workflow_summary",
         description="""Send a failure summary message to Slack with PR details, failure information, and error details.
 
-The tool supports two input formats:
-1. Command-line arguments (traditional way)
-2. JSON object (new way, recommended for automated use)
+Supports two input formats:
+1. Command-line arguments (traditional)
+2. JSON object (recommended for automation)
 
-JSON Format Example:
+Example JSON:
 {
   "pr_title": "Update main.go",
   "pr_url": "https://github.com/org/repo/pull/123",
   "author": "@dev_alice",
   "branch": "feature/payment-bug",
-  "what_failed": "Build process failed in the 'Buildx and push' step",
-  "why_failed": "The build failed due to an undefined function",
-  "how_to_fix": "Ensure that all functions are correctly defined",
-  "error_details": "ERROR: failed to solve: process did not complete successfully",
+  "what_failed": "Build process failed",
+  "why_failed": "Build failed due to undefined function",
+  "how_to_fix": "Ensure all functions are defined",
+  "error_details": "ERROR: failed to solve",
   "stack_trace_url": "https://github.com/org/repo/actions/runs/1234567890"
-}
-
-Command-line Format:
-slack_workflow_summary --pr_title "Update main.go" --pr_url "https://github.com/org/repo/pull/123" --author "@dev_alice" --branch "feature/payment-bug" --what_failed "Build process failed" --why_failed "The build failed" --how_to_fix "Fix the error" --error_details "ERROR: failed to solve" --stack_trace_url "https://github.com/org/repo/actions/runs/1234567890" """,
+}""",
         content="""
 set -e
 apk add --quiet py3-pip > /dev/null 2>&1
