@@ -89,25 +89,50 @@ set -e
 apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
-# Create JSON input using Python for proper escaping
-JSON_INPUT=$(python3 << 'EOF'
+# Create temporary Python script
+cat > /tmp/create_json.py << 'EOF'
 import json
 import sys
 
+# Read all arguments
+pr_title = sys.argv[1]
+pr_url = sys.argv[2]
+author = sys.argv[3]
+branch = sys.argv[4]
+what_failed = sys.argv[5]
+why_failed = sys.argv[6]
+how_to_fix = sys.argv[7]
+error_details = sys.argv[8]
+stack_trace_url = sys.argv[9]
+
+# Create the data structure
 data = {
-    "pr_title": "{{ .pr_title }}",
-    "pr_url": "{{ .pr_url }}",
-    "author": "{{ .author }}",
-    "branch": "{{ .branch }}",
-    "what_failed": "{{ .what_failed }}",
-    "why_failed": "{{ .why_failed }}",
-    "how_to_fix": "{{ .how_to_fix }}",
-    "error_details": "{{ .error_details }}",
-    "stack_trace_url": "{{ .stack_trace_url }}"
+    "pr_title": pr_title,
+    "pr_url": pr_url,
+    "author": author,
+    "branch": branch,
+    "what_failed": what_failed,
+    "why_failed": why_failed,
+    "how_to_fix": how_to_fix,
+    "error_details": error_details,
+    "stack_trace_url": stack_trace_url
 }
-print(json.dumps(data))
+
+# Print the JSON with proper escaping
+print(json.dumps(data, ensure_ascii=False))
 EOF
-)
+
+# Create JSON input using Python script with proper argument escaping
+JSON_INPUT=$(python3 /tmp/create_json.py \
+  "$(echo '{{ .pr_title }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .pr_url }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .author }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .branch }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .what_failed }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .why_failed }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .how_to_fix }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .error_details }}' | sed 's/"/\\"/g')" \
+  "$(echo '{{ .stack_trace_url }}' | sed 's/"/\\"/g')")
 
 # Run the Python script with JSON input
 python /opt/scripts/send_slack.py "$JSON_INPUT"
