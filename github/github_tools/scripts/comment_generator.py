@@ -116,7 +116,7 @@ def main():
     try:
         # Get variables from environment
         required_vars = [
-            'REPO', 'PR_NUMBER', 'WORKFLOW_STEPS',
+            'REPO', 'PR_NUMBER', 
             'WORKFLOW_FAILURE_SUMMARY', 'WORKFLOW_FAILURE_REASON', 'WORKFLOW_FAILURE_FIXES',
             'RECOMMENDED_FIX', 'DETAILED_ERROR_LOGS'
         ]
@@ -129,8 +129,7 @@ def main():
             'RECOMMENDED_FIX': 'recommended_fix',
             'DETAILED_ERROR_LOGS': 'detailed_error_logs',
             'REPO': 'repo',
-            'PR_NUMBER': 'pr_number',
-            'WORKFLOW_STEPS': 'workflow_steps'
+            'PR_NUMBER': 'pr_number'
         }
         
         variables = {}
@@ -141,6 +140,9 @@ def main():
                 print(f"Missing required environment variable: {var}")
                 raise KeyError(f"Missing required environment variable: {var}")
             variables[env_to_context[var]] = os.environ[var]
+        
+        # Set default empty workflow steps
+        variables['workflow_steps'] = '[]'
         
         comment = generate_comment(variables)
         print(comment)
