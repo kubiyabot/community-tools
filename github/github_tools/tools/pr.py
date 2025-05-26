@@ -321,7 +321,6 @@ echo "💬 Processing comment for pull request #$number in $repo..."
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
-export WORKFLOW_STEPS="$workflow_steps"
 export WORKFLOW_FAILURE_SUMMARY="$failure_summary"
 export WORKFLOW_FAILURE_REASON="$failure_cause"
 export WORKFLOW_FAILURE_FIXES="$quick_fix_summary"
@@ -410,26 +409,6 @@ fi
             name="number", 
             type="str", 
             description="Pull request number. Example: '123'", 
-            required=True
-        ),
-        Arg(
-            name="workflow_steps",
-            type="str",
-            description="""JSON array of workflow steps. Example:
-[
-    {
-        "name": "Install Dependencies",
-        "status": "success",
-        "conclusion": "success",
-        "number": 1
-    },
-    {
-        "name": "Run Tests",
-        "status": "failure",
-        "conclusion": "Summary of the failure",
-        "number": 2
-    }
-]""",
             required=True
         ),
         Arg(
