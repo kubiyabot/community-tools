@@ -104,7 +104,7 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🔗 *Error Details:*\n```\n{error_details.replace('\\n', '\n')}\n```\n\n<{stack_trace_url}|View full stack trace>"
+                    "text": "🔗 *Error Details:*\n```\n" + error_details.replace(r'\n', '\n') + "\n```\n\n<" + stack_trace_url + "|View full stack trace>"
                 }
             },
             {
@@ -135,7 +135,7 @@ def send_slack_message(client, channel, message_type, *args):
             blocks=blocks["blocks"],
             text=fallback_text
         )
-        return {"success": True, "result": response.data}
+        return {"success": True, "result": {"ok": response["ok"], "channel": response["channel"], "ts": response["ts"]}}
     except SlackApiError as e:
         return {"success": False, "error": str(e)}
 
