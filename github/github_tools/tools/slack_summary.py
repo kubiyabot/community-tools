@@ -90,7 +90,7 @@ apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
 # Create JSON input using Python for proper escaping
-JSON_INPUT=$(python3 -c '
+JSON_INPUT=$(python3 << 'EOF'
 import json
 import sys
 
@@ -106,7 +106,8 @@ data = {
     "stack_trace_url": "{{ .stack_trace_url }}"
 }
 print(json.dumps(data))
-')
+EOF
+)
 
 # Run the Python script with JSON input
 python /opt/scripts/send_slack.py "$JSON_INPUT"
