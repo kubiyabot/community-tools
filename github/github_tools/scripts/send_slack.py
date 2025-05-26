@@ -83,28 +83,28 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❌ What Failed:*\n{what_failed}"
+                    "text": f"*❌ What Failed:*\n```\n{what_failed}\n```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❓ Why It Failed:*\n{why_failed}"
+                    "text": f"*❓ Why It Failed:*\n```\n{why_failed}\n```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🛠️ How to Fix:*\n{how_to_fix}"
+                    "text": f"*🛠️ How to Fix:*\n```\n{how_to_fix}\n```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"🔗 *Error Details:*\n`{error_details}`...\n\n<{stack_trace_url}|View full stack trace>"
+                    "text": f"🔗 *Error Details:*\n```\n{error_details}\n```\n\n<{stack_trace_url}|View full stack trace>"
                 }
             },
             {
