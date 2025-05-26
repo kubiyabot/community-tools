@@ -15,7 +15,7 @@ KUBIYA_DISCLAIMER = '''
 '''
 
 # Default GitHub actor name to use when API call fails (app token case)
-DEFAULT_GITHUB_ACTOR="kubiya-production"
+DEFAULT_GITHUB_ACTOR="kubiya-production[bot]"
 
 # No shell functions here - all actor detection is inline in the shell scripts
 
@@ -350,9 +350,9 @@ GENERATED_COMMENT=$(python3 /opt/scripts/comment_generator.py 2>&1) || {
 API_RESPONSE=$(gh api user 2>&1 || echo "ERROR")
 if [[ "$API_RESPONSE" == *"Resource not accessible"* ]] || [[ "$API_RESPONSE" == *"ERROR"* ]]; then
     echo "Using default GitHub actor due to API error"
-    GITHUB_ACTOR="kubiya-production"
+    GITHUB_ACTOR="$DEFAULT_GITHUB_ACTOR"
 else
-    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "kubiya-production")
+    GITHUB_ACTOR=$(echo "$API_RESPONSE" | jq -r '.login' 2>/dev/null || echo "$DEFAULT_GITHUB_ACTOR")
 fi
 
 # Get existing comments by the current user
