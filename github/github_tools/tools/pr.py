@@ -453,34 +453,25 @@ fi
         Arg(
             name="detailed_fix_steps",
             type="str",
-            description="""Detailed, in-depth recommendations and specific action items to fix the issue. This should include specific commands, code examples, or step-by-step instructions. 
+            description="""Step-by-step fix instructions in a numbered list format. This should provide clear, specific actions to fix the issue.
 
-Supports full GitHub Markdown formatting including:
-- Lists and numbered steps
-- **Bold** and *italic* text
-- Code blocks with syntax highlighting using triple backticks
-- Inline code with single backticks
-- Links, tables, and other GitHub Markdown features
+Format as a numbered list with each step being a clear, actionable instruction. For example:
 
-Example:
 ```markdown
-### Fix Package Dependencies
+1. Add the missing React dependency by running `npm install --save react`
+2. Update the import statement in src/App.js from `import React from 'React'` to `import React from 'react'`
+3. Rebuild the application with `npm run build` to verify the changes work
 
-1. Add React as a dependency:
-   ```bash
-   npm install --save react
-   ```
+```
 
-2. Update your import statements:
-   ```jsx
-   import React from 'react';
-   ```
+You can use GitHub Markdown formatting including:
+- Code blocks with syntax highlighting
+- Inline code with backticks
+- Bold and italic text for emphasis
+- Links to documentation
 
-3. Make sure to rebuild your application:
-   ```bash
-   npm run build
-   ```
-```""",
+Keep each step concise and focused on a single action.
+""",
             required=True
         ),
         Arg(
