@@ -177,7 +177,7 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                 description=(
                     "The error message to display.\n"
                     "*Example*: `TypeError: Cannot read property 'email' of undefined`\n"
-                    "*Format*: Raw error message, will be formatted with backticks in Slack"
+                    "*Format*: Error message with backticks (e.g. `Error: undefined: dsadas`)"
                 ),
                 required=True,
             ),
