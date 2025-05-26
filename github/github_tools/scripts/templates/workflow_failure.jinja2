@@ -1,61 +1,25 @@
-## 🚨 Workflow Failure Analysis
-
-#### **❌ What Failed**
+### 🚨 What Failed
 {{ workflow_failure_summary }}
 
-<details>
-<summary>🛠️ Why It Failed</summary>
 
+### 🧠 Why It Failed
 {{ workflow_failure_reason }}
-</details>
 
-<details>
-<summary>🔧 How to Fix It</summary>
 
+### 🔧 How to Fix
 {{ workflow_failure_fixes }}
-</details>
 
 <details>
-<summary>🌟 Detailed Fix Steps</summary>
+<summary>🪜 Step-by-Step Fix Instructions</summary>
 
 {{ recommended_fix }}
 </details>
 
+### 📄 Error Details
 <details>
-<summary>📝 Detailed Error Logs</summary>
+<summary>📝 Error Message</summary>
 
 ```
 {{ detailed_error_logs }}
 ```
 </details>
-
-<details>
-<summary>🔗 Run Details</summary>
-
-{{ run_details }}
-</details>
-
-<details>
-<summary>📊 Diagram</summary>
-
-{% if workflow_steps and workflow_steps|length > 0 %}
-```mermaid
-graph LR;
-{% for step in workflow_steps %}
-    {{ loop.index }}["{{ step.name }}{{ ' ❌' if step.status == 'failure' else ' ✅' }}"];
-    {% if not loop.first %}
-    {{ loop.index - 1 }} --> {{ loop.index }};
-    {% endif %}
-    {% if step.status == 'failure' %}
-    style {{ loop.index }} fill:#ff6b6b,stroke:#333,stroke-width:4px;
-    {% else %}
-    style {{ loop.index }} fill:#51cf66,stroke:#333,stroke-width:2px;
-    {% endif %}
-{% endfor %}
-```
-{% endif %}
-</details>
-
-<sub align="center">
-Was this comment helpful? 👍 or 👎 Please let us know your feedback!
-</sub>
