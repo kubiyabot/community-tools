@@ -149,8 +149,9 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                 name="what_failed",
                 description=(
                     "A description of what failed in the workflow.\n"
-                    "*Example*: `Tried to access user.email, but user was undefined`\n"
-                    "*Format*: Plain text description of the failure"
+                    "*Example*: Tried to access user.email, but user was undefined\n"
+                    "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
+                    "*Important*: Send as raw text, the script will handle formatting"
                 ),
                 required=True,
             ),
@@ -158,8 +159,9 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                 name="why_failed",
                 description=(
                     "An explanation of why the failure occurred.\n"
-                    "*Example*: `The user object was undefined during test execution, likely due to a missing or incorrect mock setup`\n"
-                    "*Format*: Plain text explanation of the root cause"
+                    "*Example*: The user object was undefined during test execution, likely due to a missing or incorrect mock setup\n"
+                    "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
+                    "*Important*: Send as raw text, the script will handle formatting"
                 ),
                 required=True,
             ),
@@ -167,8 +169,9 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                 name="how_to_fix",
                 description=(
                     "Instructions on how to fix the failure.\n"
-                    "*Example*: `Check if user is correctly mocked before test run. Make sure the email property exists before accessing it`\n"
-                    "*Format*: Plain text instructions"
+                    "*Example*: Check if user is correctly mocked before test run. Make sure the email property exists before accessing it\n"
+                    "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
+                    "*Important*: Send as raw text, the script will handle formatting"
                 ),
                 required=True,
             ),
@@ -176,8 +179,9 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                 name="error_details",
                 description=(
                     "The error message to display.\n"
-                    "*Example*: `TypeError: Cannot read property 'email' of undefined`\n"
-                    "*Format*: Error message with backticks (e.g. `Error: undefined: dsadas`)"
+                    "*Example*: Error: undefined: dsadas\n"
+                    "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
+                    "*Important*: Send as raw text, the script will handle formatting"
                 ),
                 required=True,
             ),
