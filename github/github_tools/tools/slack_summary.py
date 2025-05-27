@@ -89,21 +89,41 @@ set -e
 apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
-# Create temporary Python script
+# Create temporary files for each parameter to avoid shell escaping issues
+echo '{{ .pr_title }}' > /tmp/pr_title.txt
+echo '{{ .pr_url }}' > /tmp/pr_url.txt
+echo '{{ .author }}' > /tmp/author.txt
+echo '{{ .branch }}' > /tmp/branch.txt
+echo '{{ .what_failed }}' > /tmp/what_failed.txt
+echo '{{ .why_failed }}' > /tmp/why_failed.txt
+echo '{{ .how_to_fix }}' > /tmp/how_to_fix.txt
+echo '{{ .error_details }}' > /tmp/error_details.txt
+echo '{{ .stack_trace_url }}' > /tmp/stack_trace_url.txt
+
+# Create Python script to read from files and create JSON
 cat > /tmp/create_json.py << 'EOF'
 import json
 import sys
 
-# Read all arguments
-pr_title = sys.argv[1]
-pr_url = sys.argv[2]
-author = sys.argv[3]
-branch = sys.argv[4]
-what_failed = sys.argv[5]
-why_failed = sys.argv[6]
-how_to_fix = sys.argv[7]
-error_details = sys.argv[8]
-stack_trace_url = sys.argv[9]
+# Read all parameters from files
+def read_file(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except Exception as e:
+        print(f"Error reading {filename}: {e}", file=sys.stderr)
+        return ""
+
+# Read all the parameters
+pr_title = read_file('/tmp/pr_title.txt')
+pr_url = read_file('/tmp/pr_url.txt')
+author = read_file('/tmp/author.txt')
+branch = read_file('/tmp/branch.txt')
+what_failed = read_file('/tmp/what_failed.txt')
+why_failed = read_file('/tmp/why_failed.txt')
+how_to_fix = read_file('/tmp/how_to_fix.txt')
+error_details = read_file('/tmp/error_details.txt')
+stack_trace_url = read_file('/tmp/stack_trace_url.txt')
 
 # Create the data structure
 data = {
@@ -122,20 +142,14 @@ data = {
 print(json.dumps(data, ensure_ascii=False))
 EOF
 
-# Create JSON input using Python script with proper argument escaping
-JSON_INPUT=$(python3 /tmp/create_json.py \
-  "$(echo '{{ .pr_title }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .pr_url }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .author }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .branch }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .what_failed }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .why_failed }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .how_to_fix }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .error_details }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .stack_trace_url }}' | sed 's/"/\\"/g')")
+# Create JSON input using Python script
+JSON_INPUT=$(python3 /tmp/create_json.py)
 
 # Run the Python script with JSON input
 python /opt/scripts/send_slack.py "$JSON_INPUT"
+
+# Clean up temporary files
+rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/how_to_fix.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/create_json.py
 """,
         args=[
             Arg(
