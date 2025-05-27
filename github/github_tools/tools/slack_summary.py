@@ -90,16 +90,16 @@ apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
 # Create temporary files for each parameter to avoid shell escaping issues
-echo '{{ .pr_title }}' > /tmp/pr_title.txt
-echo '{{ .pr_url }}' > /tmp/pr_url.txt
-echo '{{ .author }}' > /tmp/author.txt
-echo '{{ .branch }}' > /tmp/branch.txt
-echo '{{ .what_failed }}' > /tmp/what_failed.txt
-echo '{{ .why_failed }}' > /tmp/why_failed.txt
-echo '{{ .how_to_fix }}' > /tmp/how_to_fix.txt
-echo '{{ .error_details }}' > /tmp/error_details.txt
-echo '{{ .stack_trace_url }}' > /tmp/stack_trace_url.txt
-echo '{{ .triggered_on }}' > /tmp/triggered_on.txt
+printf '%s' '{{ .pr_title }}' > /tmp/pr_title.txt
+printf '%s' '{{ .pr_url }}' > /tmp/pr_url.txt
+printf '%s' '{{ .author }}' > /tmp/author.txt
+printf '%s' '{{ .branch }}' > /tmp/branch.txt
+printf '%s' '{{ .what_failed }}' > /tmp/what_failed.txt
+printf '%s' '{{ .why_failed }}' > /tmp/why_failed.txt
+printf '%s' '{{ .how_to_fix }}' > /tmp/how_to_fix.txt
+printf '%s' '{{ .error_details }}' > /tmp/error_details.txt
+printf '%s' '{{ .stack_trace_url }}' > /tmp/stack_trace_url.txt
+printf '%s' '{{ .triggered_on }}' > /tmp/triggered_on.txt
 
 # Create Python script to read from files and create JSON
 cat > /tmp/create_json.py << 'EOF'
