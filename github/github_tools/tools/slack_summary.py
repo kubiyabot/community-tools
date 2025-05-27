@@ -26,7 +26,7 @@ class SlackInvestigationTool(Tool):
         content="""
 set -e
 apk add --quiet py3-pip > /dev/null 2>&1
-pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
+pip install slack-sdk fuzzywuzzy python-Levenshtein pytz 2>&1 | grep -v '[notice]' > /dev/null
 
 # Run the Python script
 python /opt/scripts/send_slack.py "investigation" "{{ .pr_title }}" "{{ .pr_url }}"
@@ -87,7 +87,7 @@ class SlackWorkflowSummaryTool(Tool):
         content="""
 set -e
 apk add --quiet py3-pip > /dev/null 2>&1
-pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
+pip install slack-sdk fuzzywuzzy python-Levenshtein pytz 2>&1 | grep -v '[notice]' > /dev/null
 
 # Create temporary files for each parameter to avoid shell escaping issues
 echo '{{ .pr_title }}' > /tmp/pr_title.txt

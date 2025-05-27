@@ -43,6 +43,24 @@ def find_channel(client, channel_input):
     print(f"Channel not found: {channel_input}")
     sys.exit(1)
 
+def _truncate_error_details(error_details, max_lines=3):
+    """Truncate error details to max_lines and add ellipsis if needed."""
+    # First, handle escaped newlines
+    processed_details = error_details.replace(r'\\n', chr(10))
+    
+    # Split into lines
+    lines = processed_details.split('\n')
+    
+    # If 3 lines or fewer, return as is
+    if len(lines) <= max_lines:
+        return processed_details
+    
+    # Take first max_lines and add ellipsis
+    truncated_lines = lines[:max_lines]
+    truncated_lines.append('...')
+    
+    return '\n'.join(truncated_lines)
+
 def create_investigation_message(pr_title, pr_url):
     return {
         "blocks": [
@@ -57,13 +75,31 @@ def create_investigation_message(pr_title, pr_url):
     }
 
 def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url):
+    # Extract PR number from URL if possible, otherwise use title
+    pr_number = ""
+    if "/pull/" in pr_url:
+        try:
+            pr_number = "#" + pr_url.split("/pull/")[1].split("/")[0] + " - "
+        except:
+            pr_number = ""
+    
+    # Get current timestamp in a readable format
+    from datetime import datetime
+    import pytz
+    
+    # Use IST timezone as shown in the example
+    ist = pytz.timezone('Asia/Kolkata')
+    current_time = datetime.now(ist)
+    formatted_time = current_time.strftime("%b %d, %Y at %I:%M %p IST")
+    
     return {
         "blocks": [
             {
-                "type": "section",
+                "type": "header",
                 "text": {
-                    "type": "mrkdwn",
-                    "text": f"🚨 *PR Failed*: [{pr_title}]({pr_url})"
+                    "type": "plain_text",
+                    "text": f"🚨 PR Failure: {pr_number}{pr_title}",
+                    "emoji": True
                 }
             },
             {
@@ -76,35 +112,46 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     {
                         "type": "mrkdwn",
                         "text": f"📂 *Branch*: `{branch}`"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🔗 <{pr_url}|View PR in GitHub>"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🕒 *Triggered On*: {formatted_time}"
                     }
                 ]
             },
             {
+                "type": "divider"
+            },
+            {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❌ What Failed:*\n```\n{what_failed}\n```"
+                    "text": f"▸ *What Failed*\n```{what_failed}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❓ Why It Failed:*\n```\n{why_failed}\n```"
+                    "text": f"▸ *Why It Failed*\n```{why_failed}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🛠️ How to Fix:*\n```\n{how_to_fix}\n```"
+                    "text": f"▸ *How to Fix*\n```{how_to_fix}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "🔗 *Error Details:*\n```\n" + error_details.replace(r'\n', '\n') + "\n```\n\n<" + stack_trace_url + "|View full stack trace>"
+                    "text": f"▸ *Error Details*\n```{_truncate_error_details(error_details)}```\n\n<{stack_trace_url}|View full stack trace>"
                 }
             },
             {
@@ -113,6 +160,19 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     {
                         "type": "mrkdwn",
                         "text": "💬 Need help? Reply with `fix it step by step`, `explain the error`, `show logs here` or `show all affected files` for more details and guidance."
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": " ",
+                        "emoji": True
                     }
                 ]
             }
