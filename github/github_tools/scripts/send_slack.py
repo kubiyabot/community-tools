@@ -43,8 +43,8 @@ def find_channel(client, channel_input):
     print(f"Channel not found: {channel_input}")
     sys.exit(1)
 
-def _truncate_error_details(error_details, max_lines=3, max_line_length=100):
-    """Truncate error details to max_lines and add ellipsis if needed. Also truncate very long lines."""
+def _truncate_error_details(error_details, max_lines=3):
+    """Truncate error details to max_lines and add ellipsis on a new line if needed."""
     # First, handle escaped newlines
     processed_details = error_details.replace(r'\\n', chr(10))
     
@@ -55,28 +55,11 @@ def _truncate_error_details(error_details, max_lines=3, max_line_length=100):
     logger.info(f"Error details truncation: {len(lines)} lines found (max: {max_lines})")
     logger.info(f"Lines: {lines}")
     
-    # Truncate very long lines first
-    truncated_lines = []
-    line_was_truncated = False
-    
-    for line in lines:
-        if len(line) > max_line_length:
-            truncated_lines.append(line[:max_line_length] + '...')
-            line_was_truncated = True
-            logger.info(f"Line truncated from {len(line)} to {max_line_length} characters")
-        else:
-            truncated_lines.append(line)
-    
-    # If we have too many lines, truncate to max_lines
-    if len(truncated_lines) > max_lines:
-        truncated_lines = truncated_lines[:max_lines]
+    # If we have more lines than allowed, truncate and add ellipsis on new line
+    if len(lines) > max_lines:
+        truncated_lines = lines[:max_lines]
         truncated_lines.append('...')
-        logger.info(f"Truncated to {max_lines} lines with ellipsis")
-        return '\n'.join(truncated_lines)
-    
-    # If any line was truncated but we don't need to truncate line count
-    if line_was_truncated:
-        logger.info("Line length truncation applied")
+        logger.info(f"Truncated to {max_lines} lines with ellipsis on new line")
         return '\n'.join(truncated_lines)
     
     # No truncation needed
@@ -113,8 +96,9 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
     from datetime import datetime
     current_time = datetime.now()
     formatted_time = current_time.strftime("%b %d, %Y at %I:%M %p %Z").replace(" ", " ").strip()
-    if not formatted_time.endswith(('EST', 'PST', 'MST', 'CST', 'EDT', 'PDT', 'MDT', 'CDT', 'UTC')):
-        formatted_time += " Local"
+    # Remove trailing timezone if it's empty or just whitespace
+    if formatted_time.endswith(' '):
+        formatted_time = formatted_time.rstrip()
     
     # Extract PR number from URL if possible, otherwise use title
     pr_number = ""
