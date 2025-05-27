@@ -43,8 +43,8 @@ def find_channel(client, channel_input):
     print(f"Channel not found: {channel_input}")
     sys.exit(1)
 
-def _truncate_error_details(error_details, max_lines=3):
-    """Truncate error details to max_lines and add ellipsis if needed."""
+def _truncate_error_details(error_details, max_lines=3, max_line_length=100):
+    """Truncate error details to max_lines and add ellipsis if needed. Also truncate very long lines."""
     # First, handle escaped newlines
     processed_details = error_details.replace(r'\\n', chr(10))
     
@@ -55,17 +55,33 @@ def _truncate_error_details(error_details, max_lines=3):
     logger.info(f"Error details truncation: {len(lines)} lines found (max: {max_lines})")
     logger.info(f"Lines: {lines}")
     
-    # If 3 lines or fewer, return as is
-    if len(lines) <= max_lines:
-        logger.info("No truncation needed - returning full content")
-        return processed_details
+    # Truncate very long lines first
+    truncated_lines = []
+    line_was_truncated = False
     
-    # Take first max_lines and add ellipsis
-    truncated_lines = lines[:max_lines]
-    truncated_lines.append('...')
+    for line in lines:
+        if len(line) > max_line_length:
+            truncated_lines.append(line[:max_line_length] + '...')
+            line_was_truncated = True
+            logger.info(f"Line truncated from {len(line)} to {max_line_length} characters")
+        else:
+            truncated_lines.append(line)
     
-    logger.info(f"Truncated to {len(truncated_lines)} lines with ellipsis")
-    return '\n'.join(truncated_lines)
+    # If we have too many lines, truncate to max_lines
+    if len(truncated_lines) > max_lines:
+        truncated_lines = truncated_lines[:max_lines]
+        truncated_lines.append('...')
+        logger.info(f"Truncated to {max_lines} lines with ellipsis")
+        return '\n'.join(truncated_lines)
+    
+    # If any line was truncated but we don't need to truncate line count
+    if line_was_truncated:
+        logger.info("Line length truncation applied")
+        return '\n'.join(truncated_lines)
+    
+    # No truncation needed
+    logger.info("No truncation needed - returning full content")
+    return processed_details
 
 def create_investigation_message(pr_title, pr_url):
     return {
