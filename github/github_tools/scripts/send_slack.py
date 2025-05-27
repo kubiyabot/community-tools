@@ -43,28 +43,41 @@ def find_channel(client, channel_input):
     print(f"Channel not found: {channel_input}")
     sys.exit(1)
 
-def _truncate_error_details(error_details, max_lines=3):
-    """Truncate error details to max_lines and add ellipsis on a new line if needed."""
+def _truncate_error_details(error_details, max_lines=3, max_line_length=100):
+    """Truncate error details to max_lines and add ellipsis on a new line if needed. Also split very long lines."""
     # First, handle escaped newlines
     processed_details = error_details.replace(r'\\n', chr(10))
     
     # Split into lines
     lines = processed_details.split('\n')
     
+    # Split very long lines into multiple lines
+    final_lines = []
+    for line in lines:
+        if len(line) <= max_line_length:
+            final_lines.append(line)
+        else:
+            # Split long line into chunks
+            while len(line) > max_line_length:
+                final_lines.append(line[:max_line_length])
+                line = line[max_line_length:]
+            if line:  # Add remaining part if any
+                final_lines.append(line)
+    
     # Debug logging
-    logger.info(f"Error details truncation: {len(lines)} lines found (max: {max_lines})")
-    logger.info(f"Lines: {lines}")
+    logger.info(f"Error details truncation: {len(final_lines)} lines found after splitting long lines (max: {max_lines})")
+    logger.info(f"Lines: {final_lines}")
     
     # If we have more lines than allowed, truncate and add ellipsis on new line
-    if len(lines) > max_lines:
-        truncated_lines = lines[:max_lines]
+    if len(final_lines) > max_lines:
+        truncated_lines = final_lines[:max_lines]
         truncated_lines.append('...')
-        logger.info(f"Truncated to {max_lines} lines with ellipsis on new line")
+        logger.info(f"Truncated to {max_lines} lines with ellipsis as 4th line")
         return '\n'.join(truncated_lines)
     
     # No truncation needed
     logger.info("No truncation needed - returning full content")
-    return processed_details
+    return '\n'.join(final_lines)
 
 def create_investigation_message(pr_title, pr_url):
     return {
