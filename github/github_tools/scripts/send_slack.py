@@ -51,14 +51,20 @@ def _truncate_error_details(error_details, max_lines=3):
     # Split into lines
     lines = processed_details.split('\n')
     
+    # Debug logging
+    logger.info(f"Error details truncation: {len(lines)} lines found (max: {max_lines})")
+    logger.info(f"Lines: {lines}")
+    
     # If 3 lines or fewer, return as is
     if len(lines) <= max_lines:
+        logger.info("No truncation needed - returning full content")
         return processed_details
     
     # Take first max_lines and add ellipsis
     truncated_lines = lines[:max_lines]
     truncated_lines.append('...')
     
+    logger.info(f"Truncated to {len(truncated_lines)} lines with ellipsis")
     return '\n'.join(truncated_lines)
 
 def create_investigation_message(pr_title, pr_url):
