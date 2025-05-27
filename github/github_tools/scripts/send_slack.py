@@ -74,7 +74,20 @@ def create_investigation_message(pr_title, pr_url):
         ]
     }
 
-def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url):
+def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on):
+    # Debug output to help identify parameter issues
+    logger.info(f"Creating summary message with parameters:")
+    logger.info(f"  pr_title: '{pr_title}'")
+    logger.info(f"  pr_url: '{pr_url}'")
+    logger.info(f"  author: '{author}'")
+    logger.info(f"  branch: '{branch}'")
+    logger.info(f"  what_failed: '{what_failed}'")
+    logger.info(f"  why_failed: '{why_failed}'")
+    logger.info(f"  how_to_fix: '{how_to_fix}'")
+    logger.info(f"  error_details: '{error_details}'")
+    logger.info(f"  stack_trace_url: '{stack_trace_url}'")
+    logger.info(f"  triggered_on: '{triggered_on}'")
+    
     # Extract PR number from URL if possible, otherwise use title
     pr_number = ""
     if "/pull/" in pr_url:
@@ -82,15 +95,6 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
             pr_number = "#" + pr_url.split("/pull/")[1].split("/")[0] + " - "
         except:
             pr_number = ""
-    
-    # Get current timestamp in a readable format
-    from datetime import datetime
-    import pytz
-    
-    # Use IST timezone as shown in the example
-    ist = pytz.timezone('Asia/Kolkata')
-    current_time = datetime.now(ist)
-    formatted_time = current_time.strftime("%b %d, %Y at %I:%M %p IST")
     
     return {
         "blocks": [
@@ -119,7 +123,7 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     },
                     {
                         "type": "mrkdwn",
-                        "text": f"🕒 *Triggered On*: {formatted_time}"
+                        "text": f"🕒 *Triggered On*: {triggered_on}"
                     }
                 ]
             },
@@ -186,8 +190,8 @@ def send_slack_message(client, channel, message_type, *args):
             blocks = create_investigation_message(pr_title, pr_url)
             fallback_text = f"Incoming PR Failure Detected\nWe're analyzing PR {pr_title} ({pr_url}) triggered by a failed GitHub Action.\nSit tight, we're investigating the root cause..."
         else:  # summary
-            pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url = args
-            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url)
+            pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on = args
+            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on)
             fallback_text = f"PR Failed: {pr_title}\nAuthor: {author}\nBranch: {branch}\nWhat Failed: {what_failed}\nWhy It Failed: {why_failed}\nHow to Fix: {how_to_fix}\nError Details: {error_details}\nStack Trace: {stack_trace_url}"
         
         response = client.chat_postMessage(
@@ -226,7 +230,8 @@ def main():
                     data["why_failed"],
                     data["how_to_fix"],
                     data["error_details"],
-                    data["stack_trace_url"]
+                    data["stack_trace_url"],
+                    data["triggered_on"]
                 ]
             except (json.JSONDecodeError, KeyError) as e:
                 print(json.dumps({"success": False, "error": f"Invalid JSON input: {str(e)}"}))
@@ -244,10 +249,10 @@ def main():
                     sys.exit(1)
                 args = sys.argv[2:4]
             elif message_type == "summary":
-                if len(sys.argv) != 11:
-                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url>"}))
+                if len(sys.argv) != 12:
+                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url> <triggered_on>"}))
                     sys.exit(1)
-                args = sys.argv[2:11]
+                args = sys.argv[2:12]
             else:
                 print(json.dumps({"success": False, "error": "Invalid message type. Must be 'investigation' or 'summary'"}))
                 sys.exit(1)
