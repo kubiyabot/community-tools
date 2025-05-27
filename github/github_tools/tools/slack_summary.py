@@ -126,6 +126,10 @@ cat > /tmp/stack_trace_url.txt << 'EOF'
 {{ .stack_trace_url }}
 EOF
 
+cat > /tmp/triggered_on.txt << 'EOF'
+{{ .triggered_on }}
+EOF
+
 # Create Python script to read from files and create JSON
 cat > /tmp/create_json.py << 'EOF'
 import json
@@ -150,6 +154,7 @@ why_failed = read_file('/tmp/why_failed.txt')
 how_to_fix = read_file('/tmp/how_to_fix.txt')
 error_details = read_file('/tmp/error_details.txt')
 stack_trace_url = read_file('/tmp/stack_trace_url.txt')
+triggered_on = read_file('/tmp/triggered_on.txt')
 
 # Create the data structure
 data = {
@@ -161,7 +166,8 @@ data = {
     "why_failed": why_failed,
     "how_to_fix": how_to_fix,
     "error_details": error_details,
-    "stack_trace_url": stack_trace_url
+    "stack_trace_url": stack_trace_url,
+    "triggered_on": triggered_on
 }
 
 # Print the JSON with proper escaping
@@ -175,7 +181,7 @@ JSON_INPUT=$(python3 /tmp/create_json.py)
 python /opt/scripts/send_slack.py "$JSON_INPUT"
 
 # Clean up temporary files
-rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/how_to_fix.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/create_json.py
+rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/how_to_fix.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/triggered_on.txt /tmp/create_json.py
 """,
         args=[
             Arg(
@@ -260,6 +266,15 @@ rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/wha
                     "URL to the GitHub Actions run or CI/CD logs where the error occurred.\n"
                     "*Example*: `https://github.com/org/repo/actions/runs/1234567890`\n"
                     "*Format*: Full GitHub Actions run URL or CI/CD logs URL that shows the error details"
+                ),
+                required=True,
+            ),
+            Arg(
+                name="triggered_on",
+                description=(
+                    "The workflow **Failure Time:** in ISO format.\n"
+                    "*Example*: `2025-05-27T15:03:06.4036321Z`\n"
+                    "*Format*: ISO 8601 timestamp indicating when the workflow failed (will be converted to human-readable format)"
                 ),
                 required=True,
             ),
