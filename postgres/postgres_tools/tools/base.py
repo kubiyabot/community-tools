@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg
+from kubiya_sdk.tools import Tool, Arg, FileSpec
 
 POSTGRES_ICON_URL = "https://cdn-icons-png.flaticon.com/512/5968/5968342.png"
 
