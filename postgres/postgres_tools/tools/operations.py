@@ -37,10 +37,7 @@ class PostgresOperations:
                 # Backup and Maintenance
                 self.backup_table(),
                 self.analyze_table_stats(),
-                self.check_table_sizes(),
-                
-                # Environment-specific Tools
-                self.run_production_query()
+                self.check_table_sizes()
             ]
             
             for tool in tools:
@@ -332,6 +329,8 @@ fi
 if [ -n "$limit_rows" ]; then
     echo "Limit: $limit_rows"
 fi
+echo "User: $USER"
+echo "Timestamp: $(date)"
 echo ""
 
 # Build the SELECT statement
@@ -362,10 +361,10 @@ psql -c "$SQL"
 """,
             args=[
                 Arg(name="table_name", type="str", description="Name of the table to query", required=True),
-                Arg(name="columns", type="str", description="Columns to select (optional, defaults to * for all columns, e.g., 'name, email, created_at')", required=False),
-                Arg(name="where_condition", type="str", description="WHERE condition (optional, e.g., 'age > 25 AND status = active')", required=False),
-                Arg(name="order_by", type="str", description="ORDER BY clause (optional, e.g., 'created_at DESC, name ASC')", required=False),
-                Arg(name="limit_rows", type="str", description="Number of rows to limit (optional, e.g., '10')", required=False)
+                Arg(name="columns", type="str", description="Columns to select (optional, defaults to * for all columns)", required=False),
+                Arg(name="where_condition", type="str", description="WHERE condition (optional)", required=False),
+                Arg(name="order_by", type="str", description="ORDER BY clause (optional)", required=False),
+                Arg(name="limit_rows", type="str", description="Number of rows to limit (optional)", required=False)
             ]
         )
 
@@ -753,66 +752,6 @@ ORDER BY size_bytes DESC;
 "
 """,
             args=[]
-        )
-
-    def run_production_query(self) -> PostgresCliTool:
-        """Runs a SELECT query on production database by specifying table, columns, and conditions."""
-        return PostgresCliTool(
-            name="run_postgres_production_query",
-            description="Runs a SELECT query on production database by specifying table, columns, and conditions.",
-            content="""
-echo "🔒 PRODUCTION DATABASE QUERY"
-echo "============================"
-echo "Table: $table_name"
-echo "Columns: ${columns:-*}"
-if [ -n "$where_condition" ]; then
-    echo "Where: $where_condition"
-fi
-if [ -n "$order_by" ]; then
-    echo "Order by: $order_by"
-fi
-if [ -n "$limit_rows" ]; then
-    echo "Limit: $limit_rows"
-fi
-echo "User: $USER"
-echo "Timestamp: $(date)"
-echo "Environment: PRODUCTION"
-echo ""
-
-# Build the SELECT statement
-SQL="SELECT ${columns:-*} FROM $table_name"
-
-# Add WHERE clause if specified
-if [ -n "$where_condition" ]; then
-    SQL="$SQL WHERE $where_condition"
-fi
-
-# Add ORDER BY if specified
-if [ -n "$order_by" ]; then
-    SQL="$SQL ORDER BY $order_by"
-fi
-
-# Add LIMIT if specified
-if [ -n "$limit_rows" ]; then
-    SQL="$SQL LIMIT $limit_rows"
-fi
-
-SQL="$SQL;"
-
-echo "Generated SQL:"
-echo "$SQL"
-echo ""
-
-echo "🔍 Executing SELECT query on production database..."
-psql -c "$SQL"
-""",
-            args=[
-                Arg(name="table_name", type="str", description="Name of the table to query", required=True),
-                Arg(name="columns", type="str", description="Columns to select (optional, defaults to * for all columns)", required=False),
-                Arg(name="where_condition", type="str", description="WHERE condition (optional)", required=False),
-                Arg(name="order_by", type="str", description="ORDER BY clause (optional)", required=False),
-                Arg(name="limit_rows", type="str", description="Number of rows to limit (optional)", required=False)
-            ]
         )
 
 # Initialize tools
