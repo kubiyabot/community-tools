@@ -251,7 +251,7 @@ else
 fi
 """,
             args=[
-                Arg(name="table_name", type="str", description="Name of the table to create", required=True),
+                Arg(name="table_name", type="str", description="Name of the table to create (use underscores, not hyphens - e.g., 'user_profiles' not 'user-profiles')", required=True),
                 Arg(name="columns", type="str", description="Column definitions (e.g., 'id SERIAL, name VARCHAR(100) NOT NULL, email VARCHAR(255) UNIQUE, created_at TIMESTAMP DEFAULT NOW()')", required=True),
                 Arg(name="primary_key", type="str", description="Primary key column name (optional, e.g., 'id')", required=False),
                 Arg(name="constraints", type="str", description="Additional constraints (optional, e.g., 'UNIQUE(email), CHECK(age > 0)')", required=False)
