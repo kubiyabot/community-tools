@@ -163,7 +163,7 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"▸ *Quick Fix Summary*\n```{quick_fix_summary}```"
+                    "text": f"▸ *How to Fix*\n```{quick_fix_summary}```"
                 }
             },
             {

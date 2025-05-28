@@ -244,9 +244,9 @@ rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/wha
                 name="quick_fix_summary",
                 description=(
                     "Short summary of how to fix the issue.\n"
-                    "*Example*: Remove or replace the undefined identifier 'dsadas' in main.go\n"
+                    "*Example*: Run flake8 Locally: Before committing, run flake8 locally to catch any linting issues.\n"
                     "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
-                    "*Important*: Send as raw text, the script will handle formatting. Backticks can break Slack message formatting."
+                    "*Important*: Send as raw text, the script will handle formatting."
                 ),
                 required=True,
             ),
