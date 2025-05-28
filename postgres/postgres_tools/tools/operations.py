@@ -315,66 +315,108 @@ ORDER BY schema_name;
 
     # Data Operations
     def run_select_query(self) -> PostgresCliTool:
-        """Runs a SELECT query against the database."""
+        """Runs a SELECT query by specifying table, columns, and conditions."""
         return PostgresCliTool(
             name="run_postgres_select_query",
-            description="Runs a SELECT query against the database.",
+            description="Runs a SELECT query by specifying table, columns, and conditions.",
             content="""
-# Validate it's a SELECT query
-if ! echo "$query" | grep -Ei '^[[:space:]]*select'; then
-    echo "❌ Only SELECT queries are allowed"
-    exit 1
+echo "🔍 Building SELECT query..."
+echo "Table: $table_name"
+echo "Columns: ${columns:-*}"
+if [ -n "$where_condition" ]; then
+    echo "Where: $where_condition"
 fi
-
-# Check for unsafe operations
-if echo "$query" | grep -Ei 'drop|delete|update|insert|alter|create|truncate'; then
-    echo "❌ Unsafe operations detected in query"
-    exit 1
+if [ -n "$order_by" ]; then
+    echo "Order by: $order_by"
 fi
-
-echo "🔍 Executing SELECT query..."
-echo "Query: $query"
+if [ -n "$limit_rows" ]; then
+    echo "Limit: $limit_rows"
+fi
 echo ""
 
-psql -c "$query"
+# Build the SELECT statement
+SQL="SELECT ${columns:-*} FROM $table_name"
+
+# Add WHERE clause if specified
+if [ -n "$where_condition" ]; then
+    SQL="$SQL WHERE $where_condition"
+fi
+
+# Add ORDER BY if specified
+if [ -n "$order_by" ]; then
+    SQL="$SQL ORDER BY $order_by"
+fi
+
+# Add LIMIT if specified
+if [ -n "$limit_rows" ]; then
+    SQL="$SQL LIMIT $limit_rows"
+fi
+
+SQL="$SQL;"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
+psql -c "$SQL"
 """,
             args=[
-                Arg(name="query", type="str", description="SELECT query to execute", required=True)
+                Arg(name="table_name", type="str", description="Name of the table to query", required=True),
+                Arg(name="columns", type="str", description="Columns to select (optional, defaults to * for all columns, e.g., 'name, email, created_at')", required=False),
+                Arg(name="where_condition", type="str", description="WHERE condition (optional, e.g., 'age > 25 AND status = active')", required=False),
+                Arg(name="order_by", type="str", description="ORDER BY clause (optional, e.g., 'created_at DESC, name ASC')", required=False),
+                Arg(name="limit_rows", type="str", description="Number of rows to limit (optional, e.g., '10')", required=False)
             ]
         )
 
     def insert_data(self) -> PostgresCliTool:
-        """Inserts data into a table."""
+        """Inserts data into a table by specifying table name, columns, and values."""
         return PostgresCliTool(
             name="insert_postgres_data",
-            description="Inserts data into a table.",
+            description="Inserts data into a table by specifying table name, columns, and values.",
             content="""
-echo "➕ Inserting data into table..."
-echo "SQL: $insert_sql"
+echo "➕ Inserting data into table: $table_name"
+echo "Columns: $columns"
+echo "Values: $values"
 echo ""
 
-psql -c "$insert_sql"
+# Build the INSERT statement
+SQL="INSERT INTO $table_name ($columns) VALUES ($values);"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
+psql -c "$SQL"
 
 if [ $? -eq 0 ]; then
     echo "✅ Data inserted successfully"
+    
+    # Show the inserted data
+    echo ""
+    echo "📋 Inserted record:"
+    psql -c "SELECT $columns FROM $table_name ORDER BY CTID DESC LIMIT 1;"
 else
     echo "❌ Failed to insert data"
     exit 1
 fi
 """,
             args=[
-                Arg(name="insert_sql", type="str", description="Complete INSERT SQL statement", required=True)
+                Arg(name="table_name", type="str", description="Name of the table to insert into", required=True),
+                Arg(name="columns", type="str", description="Column names (e.g., 'name, email, age')", required=True),
+                Arg(name="values", type="str", description="Values to insert (e.g., 'John Doe', 'john@example.com', 30)", required=True)
             ]
         )
 
     def update_data(self) -> PostgresCliTool:
-        """Updates data in a table."""
+        """Updates data in a table by specifying table, columns to update, and conditions."""
         return PostgresCliTool(
             name="update_postgres_data",
-            description="Updates data in a table.",
+            description="Updates data in a table by specifying table, columns to update, and conditions.",
             content="""
-echo "✏️  Updating data in table..."
-echo "SQL: $update_sql"
+echo "✏️  Updating data in table: $table_name"
+echo "Set: $set_clause"
+echo "Where: $where_condition"
 echo ""
 
 if [ "$confirm" != "yes" ]; then
@@ -382,29 +424,43 @@ if [ "$confirm" != "yes" ]; then
     exit 1
 fi
 
-psql -c "$update_sql"
+# Build the UPDATE statement
+SQL="UPDATE $table_name SET $set_clause WHERE $where_condition;"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
+psql -c "$SQL"
 
 if [ $? -eq 0 ]; then
     echo "✅ Data updated successfully"
+    
+    # Show the updated records
+    echo ""
+    echo "📋 Updated records:"
+    psql -c "SELECT * FROM $table_name WHERE $where_condition;"
 else
     echo "❌ Failed to update data"
     exit 1
 fi
 """,
             args=[
-                Arg(name="update_sql", type="str", description="Complete UPDATE SQL statement", required=True),
+                Arg(name="table_name", type="str", description="Name of the table to update", required=True),
+                Arg(name="set_clause", type="str", description="SET clause with column=value pairs (e.g., 'name = John Smith, age = 31')", required=True),
+                Arg(name="where_condition", type="str", description="WHERE condition to identify records (e.g., 'id = 1' or 'email = john@example.com')", required=True),
                 Arg(name="confirm", type="str", description="Type 'yes' to confirm update", required=True)
             ]
         )
 
     def delete_data(self) -> PostgresCliTool:
-        """Deletes data from a table."""
+        """Deletes data from a table by specifying table and conditions."""
         return PostgresCliTool(
             name="delete_postgres_data",
-            description="Deletes data from a table.",
+            description="Deletes data from a table by specifying table and conditions.",
             content="""
-echo "🗑️  Deleting data from table..."
-echo "SQL: $delete_sql"
+echo "🗑️  Deleting data from table: $table_name"
+echo "Where: $where_condition"
 echo ""
 
 if [ "$confirm" != "yes" ]; then
@@ -412,7 +468,26 @@ if [ "$confirm" != "yes" ]; then
     exit 1
 fi
 
-psql -c "$delete_sql"
+# Show what will be deleted first
+echo "📋 Records to be deleted:"
+psql -c "SELECT * FROM $table_name WHERE $where_condition;"
+
+echo ""
+read -p "Are you sure you want to delete these records? Type 'DELETE' to confirm: " final_confirm
+
+if [ "$final_confirm" != "DELETE" ]; then
+    echo "❌ Operation cancelled."
+    exit 1
+fi
+
+# Build the DELETE statement
+SQL="DELETE FROM $table_name WHERE $where_condition;"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
+psql -c "$SQL"
 
 if [ $? -eq 0 ]; then
     echo "✅ Data deleted successfully"
@@ -422,7 +497,8 @@ else
 fi
 """,
             args=[
-                Arg(name="delete_sql", type="str", description="Complete DELETE SQL statement", required=True),
+                Arg(name="table_name", type="str", description="Name of the table to delete from", required=True),
+                Arg(name="where_condition", type="str", description="WHERE condition to identify records to delete (e.g., 'id = 1' or 'status = inactive')", required=True),
                 Arg(name="confirm", type="str", description="Type 'yes' to confirm deletion", required=True)
             ]
         )
@@ -680,36 +756,62 @@ ORDER BY size_bytes DESC;
         )
 
     def run_production_query(self) -> PostgresCliTool:
-        """Runs a SELECT query on production database with enhanced safety and logging."""
+        """Runs a SELECT query on production database by specifying table, columns, and conditions."""
         return PostgresCliTool(
             name="run_postgres_production_query",
-            description="Runs a SELECT query on production database with enhanced safety and logging.",
+            description="Runs a SELECT query on production database by specifying table, columns, and conditions.",
             content="""
-# Validate it's a SELECT query
-if ! echo "$query" | grep -Ei '^[[:space:]]*select'; then
-    echo "❌ Only SELECT queries are allowed on production"
-    exit 1
-fi
-
-# Check for unsafe operations
-if echo "$query" | grep -Ei 'drop|delete|update|insert|alter|create|truncate'; then
-    echo "❌ Unsafe operations detected in query"
-    exit 1
-fi
-
 echo "🔒 PRODUCTION DATABASE QUERY"
 echo "============================"
-echo "Query: $query"
+echo "Table: $table_name"
+echo "Columns: ${columns:-*}"
+if [ -n "$where_condition" ]; then
+    echo "Where: $where_condition"
+fi
+if [ -n "$order_by" ]; then
+    echo "Order by: $order_by"
+fi
+if [ -n "$limit_rows" ]; then
+    echo "Limit: $limit_rows"
+fi
 echo "User: $USER"
 echo "Timestamp: $(date)"
 echo "Environment: PRODUCTION"
 echo ""
 
+# Build the SELECT statement
+SQL="SELECT ${columns:-*} FROM $table_name"
+
+# Add WHERE clause if specified
+if [ -n "$where_condition" ]; then
+    SQL="$SQL WHERE $where_condition"
+fi
+
+# Add ORDER BY if specified
+if [ -n "$order_by" ]; then
+    SQL="$SQL ORDER BY $order_by"
+fi
+
+# Add LIMIT if specified
+if [ -n "$limit_rows" ]; then
+    SQL="$SQL LIMIT $limit_rows"
+fi
+
+SQL="$SQL;"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
 echo "🔍 Executing SELECT query on production database..."
-psql -c "$query"
+psql -c "$SQL"
 """,
             args=[
-                Arg(name="query", type="str", description="SELECT query to execute on production", required=True)
+                Arg(name="table_name", type="str", description="Name of the table to query", required=True),
+                Arg(name="columns", type="str", description="Columns to select (optional, defaults to * for all columns)", required=False),
+                Arg(name="where_condition", type="str", description="WHERE condition (optional)", required=False),
+                Arg(name="order_by", type="str", description="ORDER BY clause (optional)", required=False),
+                Arg(name="limit_rows", type="str", description="Number of rows to limit (optional)", required=False)
             ]
         )
 
