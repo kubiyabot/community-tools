@@ -92,7 +92,7 @@ def create_investigation_message(pr_title, pr_url):
         ]
     }
 
-def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on):
+def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, quick_fix_summary, error_details, stack_trace_url, triggered_on):
     # Parse and format the ISO timestamp to human-readable format
     from datetime import datetime
     try:
@@ -163,7 +163,7 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"▸ *How to Fix*\n```{how_to_fix}```"
+                    "text": f"▸ *How to Fix*\n```{quick_fix_summary}```"
                 }
             },
             {
@@ -172,15 +172,6 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     "type": "mrkdwn",
                     "text": f"▸ *Error Details*\n```{_truncate_error_details(error_details)}```\n\n<{stack_trace_url}|View full stack trace>"
                 }
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": "💬 Need help? Reply with `fix it step by step`, `explain the error`, `show logs here` or `show all affected files` for more details and guidance."
-                    }
-                ]
             },
             {
                 "type": "divider"
@@ -205,9 +196,9 @@ def send_slack_message(client, channel, message_type, *args):
             blocks = create_investigation_message(pr_title, pr_url)
             fallback_text = f"Incoming PR Failure Detected\nWe're analyzing PR {pr_title} ({pr_url}) triggered by a failed GitHub Action.\nSit tight, we're investigating the root cause..."
         else:  # summary
-            pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on = args
-            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on)
-            fallback_text = f"PR Failed: {pr_title}\nAuthor: {author}\nBranch: {branch}\nWhat Failed: {what_failed}\nWhy It Failed: {why_failed}\nHow to Fix: {how_to_fix}\nError Details: {error_details}\nStack Trace: {stack_trace_url}"
+            pr_title, pr_url, author, branch, what_failed, why_failed, quick_fix_summary, error_details, stack_trace_url, triggered_on = args
+            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, quick_fix_summary, error_details, stack_trace_url, triggered_on)
+            fallback_text = f"PR Failed: {pr_title}\nAuthor: {author}\nBranch: {branch}\nWhat Failed: {what_failed}\nWhy It Failed: {why_failed}\nQuick Fix Summary: {quick_fix_summary}\nError Details: {error_details}\nStack Trace: {stack_trace_url}"
         
         response = client.chat_postMessage(
             channel=channel,
@@ -243,7 +234,7 @@ def main():
                     data["branch"],
                     data["what_failed"],
                     data["why_failed"],
-                    data["how_to_fix"],
+                    data["quick_fix_summary"],
                     data["error_details"],
                     data["stack_trace_url"],
                     data["triggered_on"]
@@ -265,7 +256,7 @@ def main():
                 args = sys.argv[2:4]
             elif message_type == "summary":
                 if len(sys.argv) != 12:
-                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url> <triggered_on>"}))
+                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <quick_fix_summary> <error_details> <stack_trace_url> <triggered_on>"}))
                     sys.exit(1)
                 args = sys.argv[2:12]
             else:

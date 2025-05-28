@@ -114,8 +114,8 @@ cat > /tmp/why_failed.txt << 'EOF'
 {{ .why_failed }}
 EOF
 
-cat > /tmp/how_to_fix.txt << 'EOF'
-{{ .how_to_fix }}
+cat > /tmp/quick_fix_summary.txt << 'EOF'
+{{ .quick_fix_summary }}
 EOF
 
 cat > /tmp/error_details.txt << 'EOF'
@@ -151,7 +151,7 @@ author = read_file('/tmp/author.txt')
 branch = read_file('/tmp/branch.txt')
 what_failed = read_file('/tmp/what_failed.txt')
 why_failed = read_file('/tmp/why_failed.txt')
-how_to_fix = read_file('/tmp/how_to_fix.txt')
+quick_fix_summary = read_file('/tmp/quick_fix_summary.txt')
 error_details = read_file('/tmp/error_details.txt')
 stack_trace_url = read_file('/tmp/stack_trace_url.txt')
 triggered_on = read_file('/tmp/triggered_on.txt')
@@ -164,7 +164,7 @@ data = {
     "branch": branch,
     "what_failed": what_failed,
     "why_failed": why_failed,
-    "how_to_fix": how_to_fix,
+    "quick_fix_summary": quick_fix_summary,
     "error_details": error_details,
     "stack_trace_url": stack_trace_url,
     "triggered_on": triggered_on
@@ -181,7 +181,7 @@ JSON_INPUT=$(python3 /tmp/create_json.py)
 python /opt/scripts/send_slack.py "$JSON_INPUT"
 
 # Clean up temporary files
-rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/how_to_fix.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/triggered_on.txt /tmp/create_json.py
+rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/quick_fix_summary.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/triggered_on.txt /tmp/create_json.py
 """,
         args=[
             Arg(
@@ -241,12 +241,12 @@ rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/wha
                 required=True,
             ),
             Arg(
-                name="how_to_fix",
+                name="quick_fix_summary",
                 description=(
-                    "Instructions on how to fix the failure.\n"
-                    "*Example*: Check if user is correctly mocked before test run. Make sure the email property exists before accessing it\n"
+                    "Short summary of how to fix the issue.\n"
+                    "*Example*: Run flake8 Locally: Before committing, run flake8 locally to catch any linting issues.\n"
                     "*Format*: Plain text only - DO NOT use backticks or any formatting\n"
-                    "*Important*: Send as raw text, the script will handle formatting"
+                    "*Important*: Send as raw text, the script will handle formatting."
                 ),
                 required=True,
             ),
