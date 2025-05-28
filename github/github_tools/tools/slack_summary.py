@@ -89,21 +89,72 @@ set -e
 apk add --quiet py3-pip > /dev/null 2>&1
 pip install slack-sdk fuzzywuzzy python-Levenshtein 2>&1 | grep -v '[notice]' > /dev/null
 
-# Create temporary Python script
+# Create temporary files for each parameter to avoid shell escaping issues
+cat > /tmp/pr_title.txt << 'EOF'
+{{ .pr_title }}
+EOF
+
+cat > /tmp/pr_url.txt << 'EOF'
+{{ .pr_url }}
+EOF
+
+cat > /tmp/author.txt << 'EOF'
+{{ .author }}
+EOF
+
+cat > /tmp/branch.txt << 'EOF'
+{{ .branch }}
+EOF
+
+cat > /tmp/what_failed.txt << 'EOF'
+{{ .what_failed }}
+EOF
+
+cat > /tmp/why_failed.txt << 'EOF'
+{{ .why_failed }}
+EOF
+
+cat > /tmp/how_to_fix.txt << 'EOF'
+{{ .how_to_fix }}
+EOF
+
+cat > /tmp/error_details.txt << 'EOF'
+{{ .error_details }}
+EOF
+
+cat > /tmp/stack_trace_url.txt << 'EOF'
+{{ .stack_trace_url }}
+EOF
+
+cat > /tmp/triggered_on.txt << 'EOF'
+{{ .triggered_on }}
+EOF
+
+# Create Python script to read from files and create JSON
 cat > /tmp/create_json.py << 'EOF'
 import json
 import sys
 
-# Read all arguments
-pr_title = sys.argv[1]
-pr_url = sys.argv[2]
-author = sys.argv[3]
-branch = sys.argv[4]
-what_failed = sys.argv[5]
-why_failed = sys.argv[6]
-how_to_fix = sys.argv[7]
-error_details = sys.argv[8]
-stack_trace_url = sys.argv[9]
+# Read all parameters from files
+def read_file(filename):
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except Exception as e:
+        print(f"Error reading {filename}: {e}", file=sys.stderr)
+        return ""
+
+# Read all the parameters
+pr_title = read_file('/tmp/pr_title.txt')
+pr_url = read_file('/tmp/pr_url.txt')
+author = read_file('/tmp/author.txt')
+branch = read_file('/tmp/branch.txt')
+what_failed = read_file('/tmp/what_failed.txt')
+why_failed = read_file('/tmp/why_failed.txt')
+how_to_fix = read_file('/tmp/how_to_fix.txt')
+error_details = read_file('/tmp/error_details.txt')
+stack_trace_url = read_file('/tmp/stack_trace_url.txt')
+triggered_on = read_file('/tmp/triggered_on.txt')
 
 # Create the data structure
 data = {
@@ -115,27 +166,22 @@ data = {
     "why_failed": why_failed,
     "how_to_fix": how_to_fix,
     "error_details": error_details,
-    "stack_trace_url": stack_trace_url
+    "stack_trace_url": stack_trace_url,
+    "triggered_on": triggered_on
 }
 
 # Print the JSON with proper escaping
 print(json.dumps(data, ensure_ascii=False))
 EOF
 
-# Create JSON input using Python script with proper argument escaping
-JSON_INPUT=$(python3 /tmp/create_json.py \
-  "$(echo '{{ .pr_title }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .pr_url }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .author }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .branch }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .what_failed }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .why_failed }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .how_to_fix }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .error_details }}' | sed 's/"/\\"/g')" \
-  "$(echo '{{ .stack_trace_url }}' | sed 's/"/\\"/g')")
+# Create JSON input using Python script
+JSON_INPUT=$(python3 /tmp/create_json.py)
 
 # Run the Python script with JSON input
 python /opt/scripts/send_slack.py "$JSON_INPUT"
+
+# Clean up temporary files
+rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/what_failed.txt /tmp/why_failed.txt /tmp/how_to_fix.txt /tmp/error_details.txt /tmp/stack_trace_url.txt /tmp/triggered_on.txt /tmp/create_json.py
 """,
         args=[
             Arg(
@@ -220,6 +266,15 @@ python /opt/scripts/send_slack.py "$JSON_INPUT"
                     "URL to the GitHub Actions run or CI/CD logs where the error occurred.\n"
                     "*Example*: `https://github.com/org/repo/actions/runs/1234567890`\n"
                     "*Format*: Full GitHub Actions run URL or CI/CD logs URL that shows the error details"
+                ),
+                required=True,
+            ),
+            Arg(
+                name="triggered_on",
+                description=(
+                    "The workflow **Failure Time:** in ISO format.\n"
+                    "*Example*: `2025-05-27T15:03:06.4036321Z`\n"
+                    "*Format*: ISO 8601 timestamp indicating when the workflow failed (will be converted to human-readable format)"
                 ),
                 required=True,
             ),

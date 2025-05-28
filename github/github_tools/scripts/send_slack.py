@@ -43,6 +43,42 @@ def find_channel(client, channel_input):
     print(f"Channel not found: {channel_input}")
     sys.exit(1)
 
+def _truncate_error_details(error_details, max_lines=3, max_line_length=100):
+    """Truncate error details to max_lines and add ellipsis on a new line if needed. Also split very long lines."""
+    # First, handle escaped newlines
+    processed_details = error_details.replace(r'\\n', chr(10))
+    
+    # Split into lines
+    lines = processed_details.split('\n')
+    
+    # Split very long lines into multiple lines
+    final_lines = []
+    for line in lines:
+        if len(line) <= max_line_length:
+            final_lines.append(line)
+        else:
+            # Split long line into chunks
+            while len(line) > max_line_length:
+                final_lines.append(line[:max_line_length])
+                line = line[max_line_length:]
+            if line:  # Add remaining part if any
+                final_lines.append(line)
+    
+    # Debug logging
+    logger.info(f"Error details truncation: {len(final_lines)} lines found after splitting long lines (max: {max_lines})")
+    logger.info(f"Lines: {final_lines}")
+    
+    # If we have more lines than allowed, truncate and add ellipsis on new line
+    if len(final_lines) > max_lines:
+        truncated_lines = final_lines[:max_lines]
+        truncated_lines.append('...')
+        logger.info(f"Truncated to {max_lines} lines with ellipsis as 4th line")
+        return '\n'.join(truncated_lines)
+    
+    # No truncation needed
+    logger.info("No truncation needed - returning full content")
+    return '\n'.join(final_lines)
+
 def create_investigation_message(pr_title, pr_url):
     return {
         "blocks": [
@@ -56,14 +92,33 @@ def create_investigation_message(pr_title, pr_url):
         ]
     }
 
-def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url):
+def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on):
+    # Parse and format the ISO timestamp to human-readable format
+    from datetime import datetime
+    try:
+        # Parse ISO format timestamp
+        dt = datetime.fromisoformat(triggered_on.replace('Z', '+00:00'))
+        formatted_time = dt.strftime("%b %d, %Y at %I:%M %p UTC")
+    except:
+        # Fallback to provided string if parsing fails
+        formatted_time = triggered_on
+    
+    # Extract PR number from URL if possible, otherwise use title
+    pr_number = ""
+    if "/pull/" in pr_url:
+        try:
+            pr_number = "#" + pr_url.split("/pull/")[1].split("/")[0] + " - "
+        except:
+            pr_number = ""
+    
     return {
         "blocks": [
             {
-                "type": "section",
+                "type": "header",
                 "text": {
-                    "type": "mrkdwn",
-                    "text": f"🚨 *PR Failed*: [{pr_title}]({pr_url})"
+                    "type": "plain_text",
+                    "text": f"🚨 PR Failure: {pr_number}{pr_title}",
+                    "emoji": True
                 }
             },
             {
@@ -76,35 +131,46 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     {
                         "type": "mrkdwn",
                         "text": f"📂 *Branch*: `{branch}`"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🔗 <{pr_url}|View PR in GitHub>"
+                    },
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🕒 *Triggered On*: {formatted_time}"
                     }
                 ]
             },
             {
+                "type": "divider"
+            },
+            {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❌ What Failed:*\n```\n{what_failed}\n```"
+                    "text": f"▸ *What Failed*\n```{what_failed}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*❓ Why It Failed:*\n```\n{why_failed}\n```"
+                    "text": f"▸ *Why It Failed*\n```{why_failed}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*🛠️ How to Fix:*\n```\n{how_to_fix}\n```"
+                    "text": f"▸ *How to Fix*\n```{how_to_fix}```"
                 }
             },
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "🔗 *Error Details:*\n```\n" + error_details.replace(r'\n', '\n') + "\n```\n\n<" + stack_trace_url + "|View full stack trace>"
+                    "text": f"▸ *Error Details*\n```{_truncate_error_details(error_details)}```\n\n<{stack_trace_url}|View full stack trace>"
                 }
             },
             {
@@ -113,6 +179,19 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
                     {
                         "type": "mrkdwn",
                         "text": "💬 Need help? Reply with `fix it step by step`, `explain the error`, `show logs here` or `show all affected files` for more details and guidance."
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "plain_text",
+                        "text": " ",
+                        "emoji": True
                     }
                 ]
             }
@@ -126,8 +205,8 @@ def send_slack_message(client, channel, message_type, *args):
             blocks = create_investigation_message(pr_title, pr_url)
             fallback_text = f"Incoming PR Failure Detected\nWe're analyzing PR {pr_title} ({pr_url}) triggered by a failed GitHub Action.\nSit tight, we're investigating the root cause..."
         else:  # summary
-            pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url = args
-            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url)
+            pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on = args
+            blocks = create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on)
             fallback_text = f"PR Failed: {pr_title}\nAuthor: {author}\nBranch: {branch}\nWhat Failed: {what_failed}\nWhy It Failed: {why_failed}\nHow to Fix: {how_to_fix}\nError Details: {error_details}\nStack Trace: {stack_trace_url}"
         
         response = client.chat_postMessage(
@@ -166,7 +245,8 @@ def main():
                     data["why_failed"],
                     data["how_to_fix"],
                     data["error_details"],
-                    data["stack_trace_url"]
+                    data["stack_trace_url"],
+                    data["triggered_on"]
                 ]
             except (json.JSONDecodeError, KeyError) as e:
                 print(json.dumps({"success": False, "error": f"Invalid JSON input: {str(e)}"}))
@@ -184,10 +264,10 @@ def main():
                     sys.exit(1)
                 args = sys.argv[2:4]
             elif message_type == "summary":
-                if len(sys.argv) != 11:
-                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url>"}))
+                if len(sys.argv) != 12:
+                    print(json.dumps({"success": False, "error": "Usage for summary: send_slack.py summary <pr_title> <pr_url> <author> <branch> <what_failed> <why_failed> <how_to_fix> <error_details> <stack_trace_url> <triggered_on>"}))
                     sys.exit(1)
-                args = sys.argv[2:11]
+                args = sys.argv[2:12]
             else:
                 print(json.dumps({"success": False, "error": "Invalid message type. Must be 'investigation' or 'summary'"}))
                 sys.exit(1)
