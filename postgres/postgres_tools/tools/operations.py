@@ -14,7 +14,6 @@ class PostgresOperations:
                 # Connection and Info Tools
                 self.check_postgres_connection(),
                 self.get_database_info(),
-                self.test_vpn_connectivity(),
                 
                 # Schema and Table Management
                 self.list_tables(),
@@ -57,20 +56,46 @@ class PostgresOperations:
 
     # Connection and Info Tools
     def check_postgres_connection(self) -> PostgresCliTool:
-        """Checks the connectivity to the PostgreSQL database."""
+        """Checks the connectivity to the PostgreSQL database with troubleshooting info."""
         return PostgresCliTool(
             name="check_postgres_connection",
-            description="Checks the connectivity to the PostgreSQL database.",
+            description="Checks the connectivity to the PostgreSQL database with troubleshooting info.",
             content="""
 echo "🔍 Testing PostgreSQL connection..."
+
 if validate_postgres_connection; then
-    echo "✅ Successfully connected to PostgreSQL"
+    echo "✅ Database connection successful"
+    
+    echo ""
+    echo "📡 Connection Details:"
     echo "Host: $PGHOST"
     echo "Port: $PGPORT"
     echo "Database: $PGDATABASE"
     echo "User: $PGUSER"
+    
+    echo ""
+    echo "⏱️ Testing query performance..."
+    time psql -c "SELECT 1;" > /dev/null 2>&1
+    
 else
-    echo "❌ Failed to connect to PostgreSQL"
+    echo "❌ Database connection failed"
+    echo ""
+    echo "🔧 Troubleshooting steps:"
+    echo "1. Check VPN connection (Azure VPN or Checkpoint VPN)"
+    echo "2. Verify IP whitelist for database access"
+    echo "3. Check database credentials"
+    echo "4. Ensure database server is running"
+    
+    echo ""
+    echo "🌐 Testing network connectivity..."
+    if command -v nc >/dev/null 2>&1; then
+        if nc -z "$PGHOST" "$PGPORT" 2>/dev/null; then
+            echo "✅ Network connectivity to $PGHOST:$PGPORT is working"
+        else
+            echo "❌ Cannot reach $PGHOST:$PGPORT - check VPN connection"
+        fi
+    fi
+    
     exit 1
 fi
 """,
@@ -118,53 +143,6 @@ FROM pg_settings
 WHERE name IN ('max_connections', 'shared_buffers', 'work_mem', 'maintenance_work_mem')
 ORDER BY name;
 "
-""",
-            args=[]
-        )
-
-    def test_vpn_connectivity(self) -> PostgresCliTool:
-        """Tests database connectivity and provides VPN troubleshooting information."""
-        return PostgresCliTool(
-            name="test_postgres_vpn_connectivity",
-            description="Tests database connectivity and provides VPN troubleshooting information.",
-            content="""
-echo "🔍 Testing PostgreSQL connectivity and network..."
-
-if validate_postgres_connection; then
-    echo "✅ Database connection successful"
-    
-    echo ""
-    echo "📡 Connection Details:"
-    echo "Host: $PGHOST"
-    echo "Port: $PGPORT"
-    echo "Database: $PGDATABASE"
-    echo "User: $PGUSER"
-    
-    echo ""
-    echo "⏱️ Testing query performance..."
-    time psql -c "SELECT 1;" > /dev/null 2>&1
-    
-else
-    echo "❌ Database connection failed"
-    echo ""
-    echo "🔧 Troubleshooting steps:"
-    echo "1. Check VPN connection (Azure VPN or Checkpoint VPN)"
-    echo "2. Verify IP whitelist for database access"
-    echo "3. Check database credentials"
-    echo "4. Ensure database server is running"
-    
-    echo ""
-    echo "🌐 Testing network connectivity..."
-    if command -v nc >/dev/null 2>&1; then
-        if nc -z "$PGHOST" "$PGPORT" 2>/dev/null; then
-            echo "✅ Network connectivity to $PGHOST:$PGPORT is working"
-        else
-            echo "❌ Cannot reach $PGHOST:$PGPORT - check VPN connection"
-        fi
-    fi
-    
-    exit 1
-fi
 """,
             args=[]
         )
@@ -224,26 +202,62 @@ ORDER BY attname;
         )
 
     def create_table(self) -> PostgresCliTool:
-        """Creates a new table with the specified SQL definition."""
+        """Creates a new table by specifying table name, columns, and constraints."""
         return PostgresCliTool(
             name="create_postgres_table",
-            description="Creates a new table with the specified SQL definition.",
+            description="Creates a new table by specifying table name, columns, and constraints.",
             content="""
-echo "🔨 Creating table..."
-echo "SQL: $sql_definition"
+echo "🔨 Creating table: $table_name"
+echo "Columns: $columns"
+if [ -n "$primary_key" ]; then
+    echo "Primary Key: $primary_key"
+fi
+if [ -n "$constraints" ]; then
+    echo "Additional Constraints: $constraints"
+fi
 echo ""
 
-psql -c "$sql_definition"
+# Build the CREATE TABLE statement
+SQL="CREATE TABLE $table_name ("
+
+# Add columns
+SQL="$SQL$columns"
+
+# Add primary key if specified
+if [ -n "$primary_key" ]; then
+    SQL="$SQL, PRIMARY KEY ($primary_key)"
+fi
+
+# Add additional constraints if specified
+if [ -n "$constraints" ]; then
+    SQL="$SQL, $constraints"
+fi
+
+SQL="$SQL);"
+
+echo "Generated SQL:"
+echo "$SQL"
+echo ""
+
+psql -c "$SQL"
 
 if [ $? -eq 0 ]; then
-    echo "✅ Table created successfully"
+    echo "✅ Table '$table_name' created successfully"
+    
+    # Show the created table structure
+    echo ""
+    echo "📋 Table Structure:"
+    psql -c "\\d+ $table_name"
 else
     echo "❌ Failed to create table"
     exit 1
 fi
 """,
             args=[
-                Arg(name="sql_definition", type="str", description="Complete CREATE TABLE SQL statement", required=True)
+                Arg(name="table_name", type="str", description="Name of the table to create", required=True),
+                Arg(name="columns", type="str", description="Column definitions (e.g., 'id SERIAL, name VARCHAR(100) NOT NULL, email VARCHAR(255) UNIQUE, created_at TIMESTAMP DEFAULT NOW()')", required=True),
+                Arg(name="primary_key", type="str", description="Primary key column name (optional, e.g., 'id')", required=False),
+                Arg(name="constraints", type="str", description="Additional constraints (optional, e.g., 'UNIQUE(email), CHECK(age > 0)')", required=False)
             ]
         )
 
