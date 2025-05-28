@@ -93,19 +93,6 @@ def create_investigation_message(pr_title, pr_url):
     }
 
 def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_failed, how_to_fix, error_details, stack_trace_url, triggered_on):
-    # Debug output to help identify parameter issues
-    logger.info(f"Creating summary message with parameters:")
-    logger.info(f"  pr_title: '{pr_title}'")
-    logger.info(f"  pr_url: '{pr_url}'")
-    logger.info(f"  author: '{author}'")
-    logger.info(f"  branch: '{branch}'")
-    logger.info(f"  what_failed: '{what_failed}'")
-    logger.info(f"  why_failed: '{why_failed}'")
-    logger.info(f"  how_to_fix: '{how_to_fix}'")
-    logger.info(f"  error_details: '{error_details}'")
-    logger.info(f"  stack_trace_url: '{stack_trace_url}'")
-    logger.info(f"  triggered_on: '{triggered_on}'")
-    
     # Parse and format the ISO timestamp to human-readable format
     from datetime import datetime
     try:
