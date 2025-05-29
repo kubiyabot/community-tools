@@ -146,9 +146,18 @@ def slack_knowledge():
         llm_key = os.environ["LLM_API_KEY"]
         llm_base_url = os.environ["LLM_BASE_URL"]
 
+        bot_user_id = _get_bot_user_id()
+
         thread_messages = get_thread_messages(
             os.environ["SLACK_CHANNEL_ID"], os.environ["SLACK_THREAD_TS"]
         )
+
+        # Remove the last message from the bot
+        for message in reversed(thread_messages):
+            if message.user == bot_user_id:
+                thread_messages.remove(message)
+                break
+
         thread_context = format_slack_thread(thread_messages)
         response = litellm.completion(
             model="openai/gpt-4o",
