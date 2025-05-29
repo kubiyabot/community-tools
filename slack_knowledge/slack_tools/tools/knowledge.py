@@ -1,4 +1,3 @@
-
 def slack_knowledge():
     import os
     import json
@@ -111,7 +110,7 @@ def slack_knowledge():
         return "\n\n---\n\n".join(formatted)
 
     def query_rag(query: str, channel_id: str) -> list[SlackMessageKnowledge]:
-        kubiya_api_url = "https://api.kubiya.ai"
+        kubiya_api_url = os.environ.get("KUBIYA_API_URL", "https://api.kubiya.ai")
         payload = {
             "threshold": 0.55,
             "query": query,
