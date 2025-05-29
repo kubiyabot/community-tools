@@ -2,13 +2,15 @@ def slack_knowledge():
     try:
         import os
         import json
+        import uuid
+
         import litellm
         import requests
-
         from pydantic import BaseModel
         from slack_sdk import WebClient
 
         client = WebClient(token=os.environ["SLACK_API_TOKEN"])
+        langfuse_trace_id = str(uuid.uuid4())
 
         class SlackMessage(BaseModel):
             ts: str
@@ -158,6 +160,7 @@ def slack_knowledge():
             response_format=ThreadResponse,
             extra_body={
                 "metadata": {
+                    "trace_id": langfuse_trace_id,
                     "kubiya_org": os.environ["KUBIYA_USER_ORG"],
                     "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
                     "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
@@ -217,6 +220,7 @@ Extract the most relevant user question from the thread to search a knowledge ba
             response_format=Answer,
             extra_body={
                 "metadata": {
+                    "trace_id": langfuse_trace_id,
                     "kubiya_org": os.environ["KUBIYA_USER_ORG"],
                     "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
                     "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
