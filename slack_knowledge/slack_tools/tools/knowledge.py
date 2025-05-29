@@ -8,6 +8,8 @@ def slack_knowledge():
         from pydantic import BaseModel
         from slack_sdk import WebClient
 
+        client = WebClient(token=os.environ["SLACK_API_TOKEN"])
+
         class SlackMessage(BaseModel):
             ts: str
             user: str
@@ -44,20 +46,20 @@ def slack_knowledge():
             references: list[AnswerReference]
 
         def get_thread_messages(channel_id: str, ts: str) -> list[SlackMessage]:
-            client = WebClient(token=os.environ["SLACK_API_TOKEN"])
             response = client.conversations_replies(ts=ts, channel=channel_id, limit=100)
 
             return [SlackMessage(**m, channel_id=channel_id) for m in response["messages"]]
 
         def remove_kubi_messages(
             messages: list[SlackMessageKnowledge],
+            bot_user_id: str,
         ) -> list[SlackMessageKnowledge]:
             filtered_messages = []
             for msg in messages:
                 # Filter out kubi messages from the thread
                 filtered_thread = []
                 for thread_msg in msg.thread:
-                    if thread_msg.metadata.user != "U07RN2DSPL7":
+                    if thread_msg.metadata.user != bot_user_id:
                         filtered_thread.append(thread_msg)
 
                 # Create a new SlackMessageKnowledge with filtered thread
@@ -136,6 +138,12 @@ def slack_knowledge():
                     f" - https://{slack_domain}.slack.com/archives/{ref.channel_id}/p{ref.ts}"
                 )
 
+        def _get_bot_user_id() -> str:
+            user_id = client.auth_test().get("user_id")
+            if not user_id:
+                raise ValueError("Bot user ID not found")
+            return user_id
+
         llm_key = os.environ["LLM_API_KEY"]
         llm_base_url = os.environ["LLM_BASE_URL"]
 
@@ -181,7 +189,7 @@ Extract the most relevant user question from the thread to search a knowledge ba
             print("No relevant information found in the knowledge base")
             return
 
-        result = remove_kubi_messages(result)
+        result = remove_kubi_messages(result, _get_bot_user_id())
         has_thread = False
         for msg in result:
             if len(msg.thread) > 0:
