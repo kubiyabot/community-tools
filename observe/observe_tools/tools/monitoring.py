@@ -89,10 +89,6 @@ class ObserveMonitoringTools:
                     }
                 }')
 
-            echo "JSON Payload:"
-            echo "$JSON_PAYLOAD" | jq '.'
-            echo "============================================="
-            
             # Call Observe API export endpoint
             RESPONSE=$(curl -s -X POST "https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval" \
                 -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY" \
@@ -100,22 +96,8 @@ class ObserveMonitoringTools:
                 -H "Accept: application/x-ndjson" \
                 -d "$JSON_PAYLOAD")
 
-            # Check if response is empty
-            if [ -z "$RESPONSE" ]; then
-                echo "No data returned from export query."
-                exit 0
-            fi
-
-            echo "Export query results:"
-            echo "============================================="
-            
-            # Process NDJSON response - each line is a separate JSON object
-            echo "$RESPONSE" | while IFS= read -r line; do
-                if [ -n "$line" ]; then
-                    echo "$line" | jq '.'
-                    echo "---------------------------------------------"
-                fi
-            done
+            # Print the response
+            echo "$RESPONSE"
             
             echo ""
             echo "Export query completed successfully."
