@@ -2,12 +2,6 @@ from kubiya_sdk.tools.models import Tool, FileSpec
 
 AWS_JIT_ICON = "https://img.icons8.com/color/200/amazon-web-services.png"
 
-# Common files needed for AWS access
-COMMON_FILES = [
-    FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
-    FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
-]
-
 # Common environment variables - added LocalStack support
 COMMON_ENV = [
     "AWS_ENDPOINT_URL",  # Added for LocalStack support
@@ -46,11 +40,36 @@ set -e
 if [ -n "$AWS_ENDPOINT_URL" ]; then
     echo ">> Configuring for LocalStack endpoint: $AWS_ENDPOINT_URL"
     export AWS_CLI_ENDPOINT_ARGS="--endpoint-url $AWS_ENDPOINT_URL"
+    
+    # Create AWS config directory and files for LocalStack
+    mkdir -p /root/.aws
+    cat > /root/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID:-test}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY:-test}
+EOF
+    
+    cat > /root/.aws/config << EOF
+[default]
+region = ${AWS_DEFAULT_REGION:-us-east-1}
+output = json
+EOF
+    
+    echo ">> AWS credentials configured for LocalStack"
 else
     export AWS_CLI_ENDPOINT_ARGS=""
 fi
 
 """ + content
+
+        # Only include AWS credential files if not using LocalStack
+        files_to_include = with_files or []
+        if not env or "AWS_ENDPOINT_URL" not in (env or []):
+            # Only add credential files for real AWS usage
+            files_to_include.extend([
+                FileSpec(source="$HOME/.aws/credentials", destination="/root/.aws/credentials"),
+                FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
+            ])
 
         super().__init__(
             name=name,
@@ -60,7 +79,7 @@ fi
             image="python:3.12-alpine",
             content=localstack_content,
             env=env or COMMON_ENV,
-            with_files=(with_files or []) + COMMON_FILES,
+            with_files=files_to_include,
             secrets=COMMON_SECRETS,
             long_running=long_running,
             mermaid=mermaid,
