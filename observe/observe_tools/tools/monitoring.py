@@ -91,11 +91,13 @@ class ObserveMonitoringTools:
                 }')
 
             # Call Observe API export endpoint
-            RESPONSE=$(curl -s -X POST "https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval" \
-                -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY" \
-                -H "Content-Type: application/json" \
-                -H "Accept: application/x-ndjson" \
-                -d "$JSON_PAYLOAD")
+            CURL_COMMAND="curl -s -X POST \"https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval\" \
+                -H \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY\" \
+                -H \"Content-Type: application/json\" \
+                -H \"Accept: application/x-ndjson\" \
+                -d \"$JSON_PAYLOAD\""
+            echo "$CURL_COMMAND"
+            RESPONSE=$(eval "$CURL_COMMAND")
 
             # Print the response
             echo "$RESPONSE"
