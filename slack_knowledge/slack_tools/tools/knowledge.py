@@ -156,6 +156,15 @@ def slack_knowledge():
             api_key=llm_key,
             base_url=llm_base_url,
             response_format=ThreadResponse,
+            extra_body={
+                "metadata": {
+                    "kubiya_org": os.environ["KUBIYA_USER_ORG"],
+                    "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
+                    "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
+                    "trace_name": "slack-knowledge",
+                    "generation_name": "slack-knowledge-thread-extraction",
+                }
+            },
             messages=[
                 {
                     "content": """
@@ -206,6 +215,15 @@ Extract the most relevant user question from the thread to search a knowledge ba
             api_key=llm_key,
             base_url=llm_base_url,
             response_format=Answer,
+            extra_body={
+                "metadata": {
+                    "kubiya_org": os.environ["KUBIYA_USER_ORG"],
+                    "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
+                    "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
+                    "trace_name": "slack-knowledge",
+                    "generation_name": "slack-knowledge-answer",
+                }
+            },
             messages=[
                 {
                     "content": """
