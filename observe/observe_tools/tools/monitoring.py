@@ -60,6 +60,7 @@ class ObserveMonitoringTools:
 
             echo "Exporting data from Observe..."
             echo "Customer ID: $OBSERVE_CUSTOMER_ID"
+            echo "Access Key: $OBSERVE_ACCESS_KEY"
             echo "Dataset ID: $dataset_id"
             echo "Input Name: $input_name"
             echo "Stage ID: $stage_id"
