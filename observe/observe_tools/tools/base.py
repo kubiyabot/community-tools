@@ -159,7 +159,7 @@ class ObserveTool(Tool):
             icon_url=OBSERVE_ICON_URL,
             type="docker",
             secrets=["OBSERVE_API_KEY", "OBSERVE_CUSTOMER_ID"],
-            env=["OBSERVE_DATASET_ID"]
+            env=[]
         )
 
     def get_args(self) -> List[Arg]:
