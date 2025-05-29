@@ -1,12 +1,33 @@
 {
-    "Data Lake Read Access": {
-        "name": "data_lake_read",
-        "description": "Grants read-only access to data lake buckets",
+    "Demo Bucket Access": {
+        "name": "demo_bucket_access",
+        "description": "Grants read-only access to demo buckets in LocalStack",
         "buckets": [
-            "company-data-lake-prod",
-            "company-data-lake-staging"
+            "demo-bucket-1",
+            "demo-bucket-2",
+            "test-data-bucket"
         ],
         "policy_template": "S3ReadOnlyPolicy",
-        "session_duration": "1h"
+        "session_duration": "PT1H"
+    },
+    "Development Bucket Full Access": {
+        "name": "dev_bucket_full_access",
+        "description": "Grants full access to development buckets in LocalStack",
+        "buckets": [
+            "dev-bucket",
+            "staging-bucket"
+        ],
+        "policy_template": "S3FullAccessPolicy",
+        "session_duration": "PT2H"
+    },
+    "Analytics Data Access": {
+        "name": "analytics_data_access",
+        "description": "Grants read access to analytics data buckets",
+        "buckets": [
+            "analytics-raw-data",
+            "analytics-processed-data"
+        ],
+        "policy_template": "S3ReadOnlyPolicy",
+        "session_duration": "PT4H"
     }
 } 

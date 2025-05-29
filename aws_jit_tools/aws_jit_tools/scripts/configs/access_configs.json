@@ -1,16 +1,23 @@
 {
-    "DB Access to Staging": {
-        "name": "Database Access to Staging",
-        "description": "Grants access to all staging RDS databases",
-        "account_id": "***1775",
-        "permission_set": "ECRReadOnly",
-        "session_duration": "1h"
+    "Developer Access to LocalStack": {
+        "name": "Developer Access to LocalStack Environment",
+        "description": "Grants developer access to LocalStack AWS environment for testing",
+        "account_id": "000000000000",
+        "permission_set": "DeveloperAccess",
+        "session_duration": "PT2H"
     },
-    "Power User to SandBox": {
-        "name": "Database Access to SandBox",
-        "description": "Grants poweruser permissions on Sandbox",
-        "account_id": "*****29",
-        "permission_set": "PowerUserAccess",
-        "session_duration": "1h"
+    "S3 Admin Access": {
+        "name": "S3 Administrator Access",
+        "description": "Grants full S3 administrative access in LocalStack",
+        "account_id": "000000000000",
+        "permission_set": "S3FullAccess",
+        "session_duration": "PT1H"
+    },
+    "Read Only Access": {
+        "name": "Read Only Access",
+        "description": "Grants read-only access to LocalStack resources",
+        "account_id": "000000000000",
+        "permission_set": "ReadOnlyAccess",
+        "session_duration": "PT30M"
     }
 } 
