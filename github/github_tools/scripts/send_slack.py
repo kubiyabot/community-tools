@@ -96,6 +96,11 @@ def create_summary_message(pr_title, pr_url, author, branch, what_failed, why_fa
     # Parse and format the ISO timestamp to human-readable format
     from datetime import datetime
     try:
+        # If triggered_on is <no value> or empty, use current UTC time
+        if not triggered_on or triggered_on == "<no value>":
+            triggered_on = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            logger.info("Using current UTC time as fallback for triggered_on")
+        
         # Parse ISO format timestamp
         dt = datetime.fromisoformat(triggered_on.replace('Z', '+00:00'))
         formatted_time = dt.strftime("%b %d, %Y at %I:%M %p UTC")
