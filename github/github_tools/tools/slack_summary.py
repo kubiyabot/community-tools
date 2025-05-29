@@ -287,11 +287,11 @@ rm -f /tmp/pr_title.txt /tmp/pr_url.txt /tmp/author.txt /tmp/branch.txt /tmp/wha
             Arg(
                 name="triggered_on",
                 description=(
-                    "The workflow **Failure Time:** in ISO format.\n"
+                    "The workflow failure timestamp in ISO format. If not provided, current UTC time will be used.\n"
                     "*Example*: `2025-05-27T15:03:06.4036321Z`\n"
-                    "*Format*: ISO 8601 timestamp indicating when the workflow failed (will be converted to human-readable format)"
+                    "*Format*: ISO 8601 timestamp (will be converted to human-readable format)"
                 ),
-                required=True,
+                required=False,
             ),
         ],
         env=[
