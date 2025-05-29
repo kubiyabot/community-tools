@@ -2,7 +2,7 @@ import inspect
 from kubiya_sdk import tool_registry
 from kubiya_sdk.tools.models import Tool, FileSpec
 
-from .knowledge import slack_knowledge
+from . import knowledge
 
 slack_knowledge_tool = Tool(
     name="slack_knowledge",
@@ -29,7 +29,7 @@ python /tmp/main.py
     with_files=[
         FileSpec(
             destination="/tmp/main.py",
-            content=inspect.getsource(slack_knowledge),
+            content=inspect.getsource(knowledge),
         )
     ],
 )
