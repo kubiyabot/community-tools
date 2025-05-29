@@ -139,6 +139,13 @@ class AWSAccessHandler:
         except Exception as e:
             self._handle_error("Failed to initialize AWS handler", e)
 
+    def _handle_error(self, message: str, error: Exception) -> None:
+        """Handle and log errors consistently."""
+        error_msg = f"{message}: {str(error)}"
+        logger.error(error_msg)
+        print_progress(error_msg, "❌")
+        sys.exit(1)
+
     def parse_iso8601_duration(self, duration: str) -> int:
         """Convert ISO8601 duration to seconds."""
         try:
