@@ -1,30 +1,4 @@
-from kubiya_sdk.tools import function_tool
 
-
-@function_tool(
-    description="answers questions based on the slack channel history",
-    requirements=[
-        "litellm==1.71.1",
-        "requests==2.32.3",
-        "pydantic==2.11.5",
-        "slack-sdk==3.35.0",
-    ],
-    env=[
-        "LLM_BASE_URL",
-        "SLACK_DOMAIN",
-        "KUBIYA_API_URL",
-        "KUBIYA_USER_ORG",
-        "SLACK_THREAD_TS",
-        "SLACK_CHANNEL_ID",
-        "KUBIYA_USER_EMAIL",
-        "KUBIYA_USER_MESSAGE",
-    ],
-    secrets=[
-        "LLM_API_KEY",
-        "KUBIYA_API_KEY",
-        "SLACK_API_TOKEN",
-    ],
-)
 def slack_knowledge():
     import os
     import json
@@ -137,7 +111,7 @@ def slack_knowledge():
         return "\n\n---\n\n".join(formatted)
 
     def query_rag(query: str, channel_id: str) -> list[SlackMessageKnowledge]:
-        kubiya_api_url = os.environ["KUBIYA_API_URL"]
+        kubiya_api_url = "https://api.kubiya.ai"
         payload = {
             "threshold": 0.55,
             "query": query,
@@ -247,3 +221,7 @@ Keep your response concise and to the point. Answer and cite answers from the kn
         print(e)
         print("tool ended with error")
         exit(1)
+
+
+if __name__ == "__main__":
+    slack_knowledge()
