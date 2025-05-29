@@ -60,7 +60,7 @@ class ObserveMonitoringTools:
 
             echo "Exporting data from Observe..."
             echo "Customer ID: $OBSERVE_CUSTOMER_ID"
-            echo "Access Key: $OBSERVE_ACCESS_KEY"
+            echo "Access Key: $OBSERVE_API_KEY"
             echo "Dataset ID: $dataset_id"
             echo "Input Name: $input_name"
             echo "Stage ID: $stage_id"
@@ -69,7 +69,7 @@ class ObserveMonitoringTools:
 
             # Call Observe API export endpoint
             curl -s -X POST "https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval" \
-                -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY" \
+                -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_API_KEY" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/x-ndjson" \
                 -d '{
