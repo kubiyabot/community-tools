@@ -12,6 +12,7 @@ python /tmp/main.py
 """,
     type="docker",
     image="python:3.12-slim",
+    on_build="pip install litellm==1.71.1 requests==2.32.3 pydantic==2.11.5 slack-sdk==3.35.0",
     env=[
         "LLM_BASE_URL",
         "SLACK_DOMAIN",
