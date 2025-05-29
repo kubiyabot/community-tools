@@ -32,18 +32,6 @@ class ObserveMonitoringTools:
             content="""
             apk add -q --no-cache jq curl
 
-            # Validate required environment variables
-            if [ -z "$OBSERVE_CUSTOMER_ID" ] || [ -z "$OBSERVE_ACCESS_KEY" ]; then
-                echo "Error: OBSERVE_CUSTOMER_ID and OBSERVE_ACCESS_KEY environment variables are required"
-                exit 1
-            fi
-
-            # Validate dataset_id environment variable
-            if [ -z "$OBSERVE_DATASET_ID" ]; then
-                echo "Error: OBSERVE_DATASET_ID environment variable is required"
-                exit 1
-            fi
-            
             dataset_id="$OBSERVE_DATASET_ID"
 
             # Set default pipeline if not provided
