@@ -1,5 +1,6 @@
 from typing import Optional, Union, TYPE_CHECKING
 import logging
+import os
 from dataclasses import dataclass
 
 # Type checking block - these types are only used during static type checking
@@ -23,6 +24,17 @@ except ImportError as e:
     logger.debug(f"Failed to import boto3/botocore: {str(e)}")
     BOTO3_AVAILABLE = False
 
+def create_client_with_endpoint(session: 'boto3.Session', service_name: str) -> 'boto3.client':
+    """Create a boto3 client with LocalStack endpoint support."""
+    client_kwargs = {}
+    
+    # Add endpoint URL if provided (for LocalStack)
+    if os.environ.get('AWS_ENDPOINT_URL'):
+        client_kwargs['endpoint_url'] = os.environ['AWS_ENDPOINT_URL']
+        logger.debug(f"Using LocalStack endpoint for {service_name}: {os.environ['AWS_ENDPOINT_URL']}")
+    
+    return session.client(service_name, **client_kwargs)
+
 def get_account_alias(session: 'Optional[boto3.Session]') -> Optional[str]:
     """Get AWS account alias if it exists.
     
@@ -41,7 +53,7 @@ def get_account_alias(session: 'Optional[boto3.Session]') -> Optional[str]:
         return None
         
     try:
-        iam = session.client('iam')
+        iam = create_client_with_endpoint(session, 'iam')
         response = iam.list_account_aliases()
         aliases = response.get('AccountAliases', [])
         return aliases[0] if aliases else None
@@ -85,7 +97,7 @@ def get_permission_set_details(
         raise ValueError("instance_arn and permission_set_arn are required")
         
     try:
-        sso_admin = session.client('sso-admin')
+        sso_admin = create_client_with_endpoint(session, 'sso-admin')
         response = sso_admin.describe_permission_set(
             InstanceArn=instance_arn,
             PermissionSetArn=permission_set_arn

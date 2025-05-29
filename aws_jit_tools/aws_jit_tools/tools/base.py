@@ -8,9 +8,12 @@ COMMON_FILES = [
     FileSpec(source="$HOME/.aws/config", destination="/root/.aws/config"),
 ]
 
-# Common environment variables
+# Common environment variables - added LocalStack support
 COMMON_ENV = [
-    "AWS_PROFILE",
+    "AWS_ENDPOINT_URL",  # Added for LocalStack support
+    "AWS_ACCESS_KEY_ID",  # Added for LocalStack support
+    "AWS_SECRET_ACCESS_KEY",  # Added for LocalStack support
+    "AWS_DEFAULT_REGION",  # Added for LocalStack support
     "KUBIYA_USER_EMAIL",
     "SLACK_CHANNEL_ID",
     "SLACK_THREAD_TS",
@@ -20,7 +23,7 @@ COMMON_ENV = [
 COMMON_SECRETS = ["SLACK_API_TOKEN"]
 
 class AWSJITTool(Tool):
-    """Base class for AWS JIT access tools."""
+    """Base class for AWS JIT access tools with LocalStack support."""
     def __init__(
         self, 
         name: str, 
@@ -35,13 +38,27 @@ class AWSJITTool(Tool):
         with_files: list = None,
         args: list = None
     ):
+        # Add LocalStack configuration to the content
+        localstack_content = """#!/bin/bash
+set -e
+
+# Configure LocalStack endpoint if provided
+if [ -n "$AWS_ENDPOINT_URL" ]; then
+    echo ">> Configuring for LocalStack endpoint: $AWS_ENDPOINT_URL"
+    export AWS_CLI_ENDPOINT_ARGS="--endpoint-url $AWS_ENDPOINT_URL"
+else
+    export AWS_CLI_ENDPOINT_ARGS=""
+fi
+
+""" + content
+
         super().__init__(
             name=name,
             description=description,
             icon_url=AWS_JIT_ICON,
             type="docker",
             image="python:3.12-alpine",
-            content=content,
+            content=localstack_content,
             env=env or COMMON_ENV,
             with_files=(with_files or []) + COMMON_FILES,
             secrets=COMMON_SECRETS,

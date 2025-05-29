@@ -93,17 +93,40 @@ def convert_to_iso8601(duration: str) -> str:
     except ValueError:
         raise ValueError(f"Invalid duration value: {value}. Must be a number.")
 
+def create_boto3_session(profile_name: Optional[str] = None) -> 'boto3.Session':
+    """Create a boto3 session with LocalStack support."""
+    session_kwargs = {}
+    if profile_name:
+        session_kwargs['profile_name'] = profile_name
+    
+    session = boto3.Session(**session_kwargs)
+    return session
+
+def create_boto3_client(service_name: str, session: 'boto3.Session') -> 'boto3.client':
+    """Create a boto3 client with LocalStack endpoint support."""
+    client_kwargs = {}
+    
+    # Add endpoint URL if provided (for LocalStack)
+    if os.environ.get('AWS_ENDPOINT_URL'):
+        client_kwargs['endpoint_url'] = os.environ['AWS_ENDPOINT_URL']
+        logger.info(f"Using LocalStack endpoint: {os.environ['AWS_ENDPOINT_URL']}")
+    
+    return session.client(service_name, **client_kwargs)
+
 class AWSAccessHandler:
     def __init__(self, profile_name: Optional[str] = None):
-        """Initialize AWS access handler."""
+        """Initialize AWS access handler with LocalStack support."""
         try:
             print_progress("Initializing AWS handler...", "🔄")
-            self.session = boto3.Session(profile_name=profile_name)
-            self.identitystore = self.session.client('identitystore')
-            self.sso_admin = self.session.client('sso-admin')
+            self.session = create_boto3_session(profile_name)
+            
+            # Create clients with LocalStack support
+            self.identitystore = create_boto3_client('identitystore', self.session)
+            self.sso_admin = create_boto3_client('sso-admin', self.session)
+            self.iam_client = create_boto3_client('iam', self.session)
+            
             self.notifications = NotificationManager()
             self.webhook_handler = WebhookHandler()
-            self.iam_client = self.session.client('iam')
             
             print_progress("Fetching SSO instance details...", "🔍")
             instances = self.sso_admin.list_instances()['Instances']
@@ -336,7 +359,7 @@ class AWSAccessHandler:
             duration_display = format_duration(duration_seconds)
             
             # Validate that the bucket exists
-            s3 = self.session.client('s3')
+            s3 = create_boto3_client('s3', self.session)
             try:
                 s3.head_bucket(Bucket=bucket_name)
             except s3.exceptions.NoSuchBucket:
@@ -480,7 +503,8 @@ class AWSAccessHandler:
     def update_bucket_policy(self, bucket_name: str, user_arn: str, grant_access: bool) -> bool:
         """Update the bucket policy to grant or revoke access to a user."""
         try:
-            s3 = self.session.client('s3')
+            # Create S3 client with LocalStack support
+            s3 = create_boto3_client('s3', self.session)
 
             # Get current bucket policy
             try:
