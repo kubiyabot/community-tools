@@ -36,7 +36,7 @@ class ObserveMonitoringTools:
 
             # Set default pipeline if not provided
             if [ -z "$pipeline" ]; then
-                pipeline="pick_col timestamp, log | limit 100"
+                pipeline="limit 100"
                 echo "Using default pipeline: $pipeline"
             fi
 
