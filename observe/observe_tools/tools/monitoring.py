@@ -66,42 +66,29 @@ class ObserveMonitoringTools:
             echo "Stage ID: $stage_id"
             echo "Pipeline: $pipeline"
             echo "Interval: $interval"
-            
-            # Build the JSON payload
-            JSON_PAYLOAD=$(jq -n \
-                --arg input_name "$input_name" \
-                --arg dataset_id "$dataset_id" \
-                --arg stage_id "$stage_id" \
-                --arg pipeline "$pipeline" \
-                '{
+
+            # Call Observe API export endpoint
+            curl -s -X POST "https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval" \
+                -H "Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY" \
+                -H "Content-Type: application/json" \
+                -H "Accept: application/x-ndjson" \
+                -d '{
                     "query": {
                         "stages": [
                             {
                                 "input": [
                                     {
-                                        "inputName": $input_name,
-                                        "datasetId": $dataset_id
+                                        "inputName": "'"$input_name"'",
+                                        "datasetId": "'"$dataset_id"'"
                                     }
                                 ],
-                                "stageID": $stage_id,
-                                "pipeline": $pipeline
+                                "stageID": "'"$stage_id"'",
+                                "pipeline": "'"$pipeline"'"
                             }
                         ]
                     }
-                }')
+                }'
 
-            # Call Observe API export endpoint
-            CURL_COMMAND="curl -s -X POST \"https://$OBSERVE_CUSTOMER_ID.observeinc.com/v1/meta/export/query?interval=$interval\" \
-                -H \"Authorization: Bearer $OBSERVE_CUSTOMER_ID $OBSERVE_ACCESS_KEY\" \
-                -H \"Content-Type: application/json\" \
-                -H \"Accept: application/x-ndjson\" \
-                -d \"$JSON_PAYLOAD\""
-            echo "$CURL_COMMAND"
-            RESPONSE=$(eval "$CURL_COMMAND")
-
-            # Print the response
-            echo "$RESPONSE"
-            
             echo ""
             echo "Export query completed successfully."
             """,
