@@ -37,11 +37,13 @@ class ObserveMonitoringTools:
             # Validate required environment variables
             validate_observe_auth
 
-            # Validate required parameters
-            if [ -z "$dataset_id" ]; then
-                echo "Error: dataset_id is required"
+            # Validate dataset_id environment variable
+            if [ -z "$OBSERVE_DATASET_ID" ]; then
+                echo "Error: OBSERVE_DATASET_ID environment variable is required"
                 exit 1
             fi
+            
+            dataset_id="$OBSERVE_DATASET_ID"
 
             # Format timestamps with helper function
             if [ -n "$start_time" ]; then
@@ -100,7 +102,6 @@ class ObserveMonitoringTools:
             echo "Log query completed successfully."
             """,
             args=[
-                Arg(name="dataset_id", description="The ID of the Observe dataset to query", required=True),
                 Arg(name="start_time", description="Start time in ISO 8601 format (e.g., 2023-01-01T00:00:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO 8601 format (e.g., 2023-01-01T01:00:00Z)", required=False),
                 Arg(name="filter", description="OPAL filter expression to filter the logs", required=False),
@@ -120,11 +121,13 @@ class ObserveMonitoringTools:
             # Validate authentication
             validate_observe_auth
             
-            # Validate required parameters
-            if [ -z "$dataset_id" ]; then
-                echo "Error: dataset_id is required"
+            # Validate dataset_id environment variable
+            if [ -z "$OBSERVE_DATASET_ID" ]; then
+                echo "Error: OBSERVE_DATASET_ID environment variable is required"
                 exit 1
             fi
+            
+            dataset_id="$OBSERVE_DATASET_ID"
             
             if [ -z "$query" ]; then
                 echo "Error: OPAL query is required"
@@ -193,7 +196,6 @@ class ObserveMonitoringTools:
             echo "Query complete."
             """,
             args=[
-                Arg(name="dataset_id", description="The ID of the Observe dataset to query", required=True),
                 Arg(name="query", description="OPAL query to execute against the dataset", required=True),
                 Arg(name="start_time", description="Start time in ISO 8601 format (e.g., 2023-01-01T00:00:00Z)", required=False),
                 Arg(name="end_time", description="End time in ISO 8601 format (e.g., 2023-01-01T01:00:00Z)", required=False)

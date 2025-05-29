@@ -174,20 +174,50 @@ class MonitoringTools:
                 exit 1
             fi
 
-            echo "Fetching logs for service: $service with status: $status"
+            # Set default values if not provided
+            LAST_HOURS="${last_hours:-1}"
+            LIMIT="${limit:-10}"
+
+            # Determine time range approach
+            if [ -n "$start_time" ]; then
+                # Use exact timeframe approach
+                START_TIME="$start_time"
+                END_TIME="${end_time:-now}"
+                echo "Fetching logs for service: $service with status: $status"
+                echo "Time range: $START_TIME to $END_TIME"
+                echo "Limit: $LIMIT logs"
+                
+                TIME_FROM="$START_TIME"
+                TIME_TO="$END_TIME"
+            else
+                # Use last hours approach
+                # Validate last_hours range
+                if [ "$LAST_HOURS" -lt 1 ] || [ "$LAST_HOURS" -gt 6 ]; then
+                    echo "Error: last_hours must be between 1 and 6"
+                    exit 1
+                fi
+                
+                echo "Fetching logs for service: $service with status: $status"
+                echo "Time range: Last $LAST_HOURS hour(s)"
+                echo "Limit: $LIMIT logs"
+                
+                TIME_FROM="now-${LAST_HOURS}h"
+                TIME_TO="now"
+            fi
+            
             RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/events/search" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Content-Type: application/json" \
                 --data-binary "{
                     \"filter\": {
-                        \"from\": \"now-1h\",
-                        \"to\": \"now\",
+                        \"from\": \"$TIME_FROM\",
+                        \"to\": \"$TIME_TO\",
                         \"query\": \"service:$service status:$status\"
                     },
                     \"sort\": \"timestamp\",
                     \"page\": {
-                        \"limit\": 10
+                        \"limit\": $LIMIT
                     }
                 }")
 
@@ -211,16 +241,20 @@ class MonitoringTools:
             """,
             args=[
                 Arg(name="service", description="Service name from alert", required=True),
-                Arg(name="status", description="Error status from alert", required=True)
+                Arg(name="status", description="Error status from alert", required=True),
+                Arg(name="last_hours", description="Number of hours to look back (1-6 hours, default: 1). Ignored if start_time is provided.", required=False),
+                Arg(name="start_time", description="Exact start time (e.g. '2024-01-01T10:00:00Z', 'now-2h'). If provided, overrides last_hours.", required=False),
+                Arg(name="end_time", description="Exact end time (e.g. '2024-01-01T15:00:00Z', 'now'). Only used with start_time. Default: 'now'", required=False),
+                Arg(name="limit", description="Maximum number of logs to return (default: 10)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
         
     def search_logs_by_string(self) -> DatadogTool:
-        """Search logs using a custom string query."""
+        """Search logs using a custom string query without time filtering."""
         return DatadogTool(
             name="search_logs_by_string",
-            description="Search logs using a custom query string with flexible time range",
+            description="Search logs using a custom query string without time constraints, only filtered by string and limit",
             content="""
             apk add --no-cache -q jq
             validate_datadog_connection
@@ -230,13 +264,11 @@ class MonitoringTools:
                 exit 1
             fi
 
-            # Set default time range if not provided
-            TIME_FROM="${time_from:-now-1h}"
-            TIME_TO="${time_to:-now}"
+            # Set default limit if not provided
             LIMIT="${limit:-20}"
 
             echo "Searching logs with query: $query_string"
-            echo "Time range: $TIME_FROM to $TIME_TO"
+            echo "Time range: No time constraints (searching all available logs)"
             echo "Limit: $LIMIT logs"
             
             RESPONSE=$(curl -s -X POST "https://api.$DD_SITE/api/v2/logs/events/search" \
@@ -245,8 +277,6 @@ class MonitoringTools:
                 -H "Content-Type: application/json" \
                 --data-binary "{
                     \"filter\": {
-                        \"from\": \"$TIME_FROM\",
-                        \"to\": \"$TIME_TO\",
                         \"query\": \"$query_string\"
                     },
                     \"sort\": \"timestamp\",
@@ -280,104 +310,33 @@ class MonitoringTools:
             """,
             args=[
                 Arg(name="query_string", description="Custom query string to search logs (e.g. 'error database connection')", required=True),
-                Arg(name="time_from", description="Start time for log search (e.g. 'now-24h', 'now-7d')", required=False),
-                Arg(name="time_to", description="End time for log search (default: 'now')", required=False),
                 Arg(name="limit", description="Maximum number of logs to return (default: 20)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
 
     def search_logs_by_timeframe(self) -> DatadogTool:
-        """Search logs within a specific time range with detailed time parsing."""
+        """Search logs within a specified timeframe."""
         return DatadogTool(
             name="search_logs_by_timeframe",
-            description="Search logs within specific time periods with precise time control",
+            description="Search logs within a specified timeframe with optional query filtering",
             content="""
             apk add --no-cache -q jq coreutils
             validate_datadog_connection
 
-            # Parse time inputs (support both relative and absolute time formats)
-            # Default to the last hour if not specified
-            TIME_PERIOD="${time_period:-hour}"
-            DURATION="${duration:-1}"
-            
-            # Calculate timestamps based on input time period
-            NOW_TS=$(date +%s)
-            
-            case "$TIME_PERIOD" in
-                minute)
-                    TIME_UNIT=60
-                    ;;
-                hour)
-                    TIME_UNIT=3600
-                    ;;
-                day)
-                    TIME_UNIT=86400
-                    ;;
-                week)
-                    TIME_UNIT=604800
-                    ;;
-                month)
-                    TIME_UNIT=2592000  # 30 days approximation
-                    ;;
-                *)
-                    echo "Error: Invalid time period. Use minute, hour, day, week, or month."
-                    exit 1
-                    ;;
-            esac
-            
-            # Calculate from time based on duration
-            FROM_TS=$((NOW_TS - (TIME_UNIT * DURATION)))
-            
-            # Override with absolute timestamps if provided
-            if [ -n "$from_timestamp" ]; then
-                FROM_TS=$from_timestamp
+            if [ -z "$start_time" ] || [ -z "$end_time" ]; then
+                echo "Error: Both start_time and end_time are required"
+                exit 1
             fi
-            
-            TO_TS=$NOW_TS
-            if [ -n "$to_timestamp" ]; then
-                TO_TS=$to_timestamp
-            fi
-            
-            # Set default service if provided
-            SERVICE_FILTER=""
-            if [ -n "$service" ]; then
-                SERVICE_FILTER="service:$service"
-            fi
-            
-            # Combine status filter if provided
-            STATUS_FILTER=""
-            if [ -n "$status" ]; then
-                if [ -n "$SERVICE_FILTER" ]; then
-                    STATUS_FILTER=" AND status:$status"
-                else
-                    STATUS_FILTER="status:$status"
-                fi
-            fi
-            
-            # Combine additional filter string if provided
-            ADDITIONAL_FILTER=""
-            if [ -n "$additional_filter" ]; then
-                if [ -n "$SERVICE_FILTER" ] || [ -n "$STATUS_FILTER" ]; then
-                    ADDITIONAL_FILTER=" AND $additional_filter"
-                else
-                    ADDITIONAL_FILTER="$additional_filter"
-                fi
-            fi
-            
-            # Combine all filters
-            QUERY="${SERVICE_FILTER}${STATUS_FILTER}${ADDITIONAL_FILTER}"
-            
-            # Default limit
+
+            # Set default values if not provided
             LIMIT="${limit:-25}"
-            
+            QUERY="${query:-}"
+
             echo "=== Log Search Parameters ==="
-            echo "Time Range: $(date -d @$FROM_TS) to $(date -d @$TO_TS)"
-            if [ -n "$QUERY" ]; then
-                echo "Query: $QUERY"
-            else
-                echo "Query: (no filters, showing all logs)"
-            fi
+            echo "Start Time: $start_time"
+            echo "End Time: $end_time"
+            echo "Query: ${QUERY:-"(no filters, showing all logs)"}"
             echo "Limit: $LIMIT logs"
             
             # Execute the API call
@@ -387,8 +346,8 @@ class MonitoringTools:
                 -H "Content-Type: application/json" \
                 --data-binary "{
                     \"filter\": {
-                        \"from\": $FROM_TS,
-                        \"to\": $TO_TS,
+                        \"from\": \"$start_time\",
+                        \"to\": \"$end_time\",
                         \"query\": \"$QUERY\"
                     },
                     \"sort\": \"timestamp\",
@@ -396,44 +355,50 @@ class MonitoringTools:
                         \"limit\": $LIMIT
                     }
                 }")
-            echo "$RESPONSE"
+
+            # Check if response is empty
+            if [ "$(echo "$RESPONSE" | jq '.data')" = "null" ]; then
+                echo "No logs found for the given timeframe and criteria"
+                exit 0
+            fi
+
+            # Format and output the logs
+            echo "$RESPONSE" | jq -r '
+                "=== Found \(.meta.page.total // 0) logs ===\n" +
+                (.data | map(
+                    "Time: \(.attributes.timestamp)\n" +
+                    "Service: \(.attributes.service // "N/A")\n" +
+                    "Status: \(.attributes.status // "N/A")\n" +
+                    "Message: \(.attributes.message // "N/A")\n" +
+                    (if .attributes.attributes then
+                        "Tags: " + (.attributes.attributes | to_entries | map("\(.key):\(.value)") | join(", ")) + "\n"
+                    else
+                        ""
+                    end) +
+                    "---"
+                ) | join("\n"))
+            '
             """,
             args=[
-                Arg(name="time_period", description="Time unit to search (minute, hour, day, week, month)", required=False),
-                Arg(name="duration", description="Number of time units to look back", required=False),
-                Arg(name="from_timestamp", description="Specific start timestamp in Unix epoch format", required=False),
-                Arg(name="to_timestamp", description="Specific end timestamp in Unix epoch format", required=False),
-                Arg(name="service", description="Filter logs by service name", required=False),
-                Arg(name="status", description="Filter logs by status (error, warning, info, etc.)", required=False),
-                Arg(name="additional_filter", description="Additional filter criteria in Datadog query syntax", required=False),
-                Arg(name="limit", description="Maximum number of logs to return", required=False)
+                Arg(name="start_time", description="Start time for the search (e.g. '2024-01-01T10:00:00Z', 'now-2h', timestamp)", required=True),
+                Arg(name="end_time", description="End time for the search (e.g. '2024-01-01T15:00:00Z', 'now', timestamp)", required=True),
+                Arg(name="query", description="Optional query string to filter logs (e.g. 'service:myapp status:error')", required=False),
+                Arg(name="limit", description="Maximum number of logs to return (default: 25)", required=False)
             ],
             image="curlimages/curl:8.1.2"
         )
 
     def get_service_map(self) -> DatadogTool:
-        """Fetch and analyze the Service Map data from Datadog."""
+        """Fetch and analyze the complete Service Map data from Datadog."""
         return DatadogTool(
             name="get_service_map",
-            description="Retrieve Service Map data to visualize service dependencies and repository mappings",
+            description="Retrieve complete Service Map data to visualize all service dependencies and repository mappings",
             content="""
             apk add --no-cache -q jq coreutils
             validate_datadog_connection
             
-            # Default to last hour if not specified
-            TIME_FROM="${time_from:-now-1h}"
-            TIME_TO="${time_to:-now}"
-            
-            # Focus on a specific service or get all services
-            SERVICE_FILTER=""
-            if [ -n "$service" ]; then
-                echo "Fetching Service Map data focused on service: $service"
-                SERVICE_FILTER="&service=$service"
-            else
-                echo "Fetching complete Service Map data"
-            fi
-            
-            echo "Time range: $TIME_FROM to $TIME_TO"
+            echo "Fetching complete Service Map data"
+            echo "Time range: now-1h to now"
             
             # First, query the service list to get service details
             echo "=== Querying Datadog Service List ==="
@@ -482,7 +447,7 @@ class MonitoringTools:
             
             # Now fetch the service map dependencies data
             echo "=== Fetching Service Map Dependencies ==="
-            DEPS_RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/service_dependencies?start=$TIME_FROM&end=$TIME_TO$SERVICE_FILTER" \
+            DEPS_RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v1/service_dependencies?start=now-1h&end=now" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Accept: application/json")
@@ -559,200 +524,35 @@ class MonitoringTools:
                 '
             else
                 echo "No service dependencies found for the specified time range."
-                if [ -n "$service" ]; then
-                    echo "Try extending the time range or checking if the service name is correct."
-                fi
-            fi
-            
-            # If a specific service was requested, show more detailed information about it
-            if [ -n "$service" ]; then
-                echo "=== Detailed Analysis for Service: $service ==="
-                
-                # Find all upstream dependencies (services that call this service)
-                echo "Upstream Dependencies (services that call $service):"
-                UPSTREAM=$(echo "$DEPS_RESPONSE" | jq -r --arg svc "$service" '
-                    (.service_dependencies | map(select(.child == $svc)) | map({
-                        caller: .parent,
-                        type: .type,
-                        calls: .calls_count,
-                        latency: .latency
-                    }) | sort_by(-.calls) | map(
-                        "\(.caller) (\(.type)) - \(.calls // 0) calls, avg latency: \(.latency // "N/A")ms"
-                    ) | join("\n"))
-                ')
-                
-                if [ "$UPSTREAM" != "" ] && [ "$UPSTREAM" != "null" ]; then
-                    echo "$UPSTREAM"
-                else
-                    echo "No upstream dependencies found."
-                fi
-                
-                # Find all downstream dependencies (services called by this service)
-                echo "Downstream Dependencies (services called by $service):"
-                DOWNSTREAM=$(echo "$DEPS_RESPONSE" | jq -r --arg svc "$service" '
-                    (.service_dependencies | map(select(.parent == $svc)) | map({
-                        called: .child,
-                        type: .type,
-                        calls: .calls_count,
-                        latency: .latency
-                    }) | sort_by(-.calls) | map(
-                        "\(.called) (\(.type)) - \(.calls // 0) calls, avg latency: \(.latency // "N/A")ms"
-                    ) | join("\n"))
-                ')
-                
-                if [ "$DOWNSTREAM" != "" ] && [ "$DOWNSTREAM" != "null" ]; then
-                    echo "$DOWNSTREAM"
-                else
-                    echo "No downstream dependencies found."
-                fi
             fi
             """,
-            args=[
-                Arg(name="service", description="Specific service to focus on in the Service Map", required=False),
-                Arg(name="time_from", description="Start time for Service Map data (e.g., 'now-24h')", required=False),
-                Arg(name="time_to", description="End time for Service Map data (default: 'now')", required=False)
-            ],
+            args=[],
             image="curlimages/curl:8.1.2"
         )
 
     def list_incidents(self) -> DatadogTool:
-        """List Datadog incidents with filtering options."""
+        """List all Datadog incidents with default settings."""
         return DatadogTool(
             name="list_datadog_incidents",
-            description="List Datadog incidents with filtering options such as status, time range, and services",
+            description="List all Datadog incidents with default settings",
             content="""
             apk add --no-cache -q jq coreutils
             validate_datadog_connection
 
-            # Build the query parameter string with page parameters only if provided
-            QUERY_PARAMS=""
-            
-            if [ -n "$page_size" ]; then
-                QUERY_PARAMS="page[size]=$page_size"
-            fi
-            
-            if [ -n "$page_number" ]; then
-                if [ -n "$QUERY_PARAMS" ]; then
-                    QUERY_PARAMS="$QUERY_PARAMS&page[number]=$page_number"
-                else
-                    QUERY_PARAMS="page[number]=$page_number"
-                fi
-            fi
-            
-            # Add optional filter parameters
-            if [ -n "$status" ]; then
-                QUERY_PARAMS="$QUERY_PARAMS&filter[status]=$status"
-            fi
-            
-            if [ -n "$service" ]; then
-                QUERY_PARAMS="$QUERY_PARAMS&filter[service]=$service"
-            fi
-            
-            if [ -n "$query_string" ]; then
-                QUERY_PARAMS="$QUERY_PARAMS&filter[query]=$query_string"
-            fi
-            
-            # Add time range filters if provided
-            if [ -n "$time_from" ]; then
-                # Convert relative time if needed (e.g., now-24h)
-                if [[ "$time_from" == now* ]]; then
-                    NOW_TS=$(date +%s)
-                    if [[ "$time_from" == "now-"* ]]; then
-                        TIME_VAL=$(echo $time_from | sed 's/now-//')
-                        TIME_UNIT=$(echo $TIME_VAL | sed 's/[0-9]//g')
-                        TIME_NUM=$(echo $TIME_VAL | sed 's/[^0-9]//g')
-                        
-                        case "$TIME_UNIT" in
-                            m|min|mins|minute|minutes)
-                                SECONDS=$((TIME_NUM * 60))
-                                ;;
-                            h|hr|hrs|hour|hours)
-                                SECONDS=$((TIME_NUM * 3600))
-                                ;;
-                            d|day|days)
-                                SECONDS=$((TIME_NUM * 86400))
-                                ;;
-                            w|week|weeks)
-                                SECONDS=$((TIME_NUM * 604800))
-                                ;;
-                            *)
-                                echo "Error: Unknown time unit in $time_from"
-                                exit 1
-                                ;;
-                        esac
-                        
-                        FROM_TS=$((NOW_TS - SECONDS))
-                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$FROM_TS"
-                    else
-                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$NOW_TS"
-                    fi
-                else
-                    # Use provided timestamp directly
-                    QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][from]=$time_from"
-                fi
-            fi
-            
-            if [ -n "$time_to" ]; then
-                # Similar conversion for end time
-                if [[ "$time_to" == now* ]]; then
-                    NOW_TS=$(date +%s)
-                    if [[ "$time_to" == "now-"* ]]; then
-                        TIME_VAL=$(echo $time_to | sed 's/now-//')
-                        TIME_UNIT=$(echo $TIME_VAL | sed 's/[0-9]//g')
-                        TIME_NUM=$(echo $TIME_VAL | sed 's/[^0-9]//g')
-                        
-                        case "$TIME_UNIT" in
-                            m|min|mins|minute|minutes)
-                                SECONDS=$((TIME_NUM * 60))
-                                ;;
-                            h|hr|hrs|hour|hours)
-                                SECONDS=$((TIME_NUM * 3600))
-                                ;;
-                            d|day|days)
-                                SECONDS=$((TIME_NUM * 86400))
-                                ;;
-                            w|week|weeks)
-                                SECONDS=$((TIME_NUM * 604800))
-                                ;;
-                            *)
-                                echo "Error: Unknown time unit in $time_to"
-                                exit 1
-                                ;;
-                        esac
-                        
-                        TO_TS=$((NOW_TS - SECONDS))
-                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$TO_TS"
-                    else
-                        QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$NOW_TS"
-                    fi
-                else
-                    # Use provided timestamp directly
-                    QUERY_PARAMS="$QUERY_PARAMS&filter[created_at][to]=$time_to"
-                fi
-            fi
-            
-            echo "Fetching incidents with parameters: $QUERY_PARAMS"
+            echo "Fetching all incidents with default settings"
             
             # Display the full curl command (with API keys masked for security)
-            echo "Executing curl command: curl -X GET \"https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS\" -H \"DD-API-KEY: ****\" -H \"DD-APPLICATION-KEY: ****\" -H \"Content-Type: application/json\" -H \"Accept: application/json\""
+            echo "Executing curl command: curl -X GET \"https://api.$DD_SITE/api/v2/incidents\" -H \"DD-API-KEY: ****\" -H \"DD-APPLICATION-KEY: ****\" -H \"Content-Type: application/json\" -H \"Accept: application/json\""
             
             # Make the API call to list incidents
-            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents?$QUERY_PARAMS" \
+            RESPONSE=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents" \
                 -H "DD-API-KEY: $DD_API_KEY" \
                 -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
                 -H "Content-Type: application/json" \
                 -H "Accept: application/json")
             echo "$RESPONSE" | jq
             """,
-            args=[
-                Arg(name="status", description="Filter incidents by status (active, stable, resolved, planned)", required=False),
-                Arg(name="service", description="Filter incidents by service name", required=False),
-                Arg(name="query_string", description="Search query to filter incidents", required=False),
-                Arg(name="time_from", description="Filter incidents created after this time (timestamp or relative time like 'now-24h')", required=False),
-                Arg(name="time_to", description="Filter incidents created before this time (timestamp or relative time like 'now')", required=False),
-                Arg(name="page_size", description="Number of incidents to return per page", required=False),
-                Arg(name="page_number", description="Page number for pagination", required=False)
-            ],
+            args=[],
             image="curlimages/curl:8.1.2"
         )
 
@@ -760,7 +560,7 @@ class MonitoringTools:
         """Retrieve detailed information about a specific Datadog incident."""
         return DatadogTool(
             name="get_datadog_incident_details",
-            description="Get detailed information about a specific incident including timeline, attachments, and related data",
+            description="Get detailed information about a specific incident including timeline and related data",
             content="""
             apk add --no-cache -q jq
             validate_datadog_connection
@@ -855,67 +655,6 @@ class MonitoringTools:
                 '
             fi
             
-            # Get related incident integrations if requested
-            if [ "$include_integrations" = "true" ]; then
-                echo ""
-                echo "=== Incident Integrations ==="
-                
-                INTEGRATIONS_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/relationships/integrations" \
-                    -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                    -H "Content-Type: application/json" \
-                    -H "Accept: application/json")
-                
-                INTEGRATIONS_COUNT=$(echo "$INTEGRATIONS_DATA" | jq '.data | length')
-                
-                if [ "$INTEGRATIONS_COUNT" -eq 0 ]; then
-                    echo "No integrations found for this incident."
-                else
-                    echo "$INTEGRATIONS_DATA" | jq -r '
-                        .data | map(
-                            "Integration ID: \(.id)",
-                            "Type: \(.type)",
-                            if .attributes then
-                                "Details: \(.attributes | to_entries | map("\(.key): \(.value)") | join(", "))"
-                            else
-                                "Details: None available"
-                            end,
-                            "---"
-                        ) | join("\n")
-                    '
-                fi
-            fi
-            
-            # Get related metrics data if requested
-            if [ "$include_metrics" = "true" ]; then
-                echo ""
-                echo "=== Related Metrics ==="
-                
-                METRICS_DATA=$(curl -s -X GET "https://api.$DD_SITE/api/v2/incidents/$incident_id/relationships/metrics" \
-                    -H "DD-API-KEY: $DD_API_KEY" \
-                    -H "DD-APPLICATION-KEY: $DD_APP_KEY" \
-                    -H "Content-Type: application/json" \
-                    -H "Accept: application/json")
-                
-                METRICS_COUNT=$(echo "$METRICS_DATA" | jq '.data | length')
-                
-                if [ "$METRICS_COUNT" -eq 0 ]; then
-                    echo "No metrics associated with this incident."
-                else
-                    echo "$METRICS_DATA" | jq -r '
-                        .data | map(
-                            "Metric: \(.id)",
-                            if .attributes then
-                                "Details: \(.attributes | to_entries | map("\(.key): \(.value)") | join(", "))"
-                            else
-                                "Details: None available"
-                            end,
-                            "---"
-                        ) | join("\n")
-                    '
-                fi
-            fi
-            
             # Get incident updates
             echo ""
             echo "=== Incident Updates ==="
@@ -942,9 +681,7 @@ class MonitoringTools:
             fi
             """,
             args=[
-                Arg(name="incident_id", description="ID of the incident to retrieve", required=True),
-                Arg(name="include_integrations", description="Whether to include integration details (true/false)", required=False),
-                Arg(name="include_metrics", description="Whether to include metrics details (true/false)", required=False)
+                Arg(name="incident_id", description="ID of the incident to retrieve", required=True)
             ],
             image="curlimages/curl:8.1.2"
         )
