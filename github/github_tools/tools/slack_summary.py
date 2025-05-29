@@ -130,6 +130,21 @@ cat > /tmp/triggered_on.txt << 'EOF'
 {{ .triggered_on }}
 EOF
 
+# Validate required parameters
+echo "Validating required parameters..."
+for param in pr_title pr_url author branch what_failed why_failed quick_fix_summary error_details stack_trace_url; do
+    if [ ! -s "/tmp/${param}.txt" ]; then
+        echo "Error: Required parameter '${param}' is empty or missing"
+        exit 1
+    fi
+done
+
+# If triggered_on is empty, use current UTC time
+if [ ! -s "/tmp/triggered_on.txt" ]; then
+    echo "Warning: triggered_on not provided, using current UTC time"
+    date -u +"%Y-%m-%dT%H:%M:%S.%3NZ" > /tmp/triggered_on.txt
+fi
+
 # Create Python script to read from files and create JSON
 cat > /tmp/create_json.py << 'EOF'
 import json
