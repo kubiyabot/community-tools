@@ -1,4 +1,5 @@
 from pathlib import Path
+import base64
 
 # Read the alert script content directly from file
 scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
@@ -23,8 +24,14 @@ k8s_alert_tool = KubernetesPythonTool(
     . /opt/venv/bin/activate > /dev/null
     pip install requests==2.32.3 2>&1 | grep -v '[notice]'
 
-    # Run the alert script
-    python /opt/scripts/alert.py "{{ .channel }}" "{{ .alert_title }}" "{{ .alert_message }}" "{{ .proposed_action }}"
+    # Create environment variables for the arguments to avoid shell escaping issues
+    export ALERT_CHANNEL="{{ .channel }}"
+    export ALERT_TITLE="{{ .alert_title }}"
+    export ALERT_MESSAGE="{{ .alert_message }}"
+    export PROPOSED_ACTION="{{ .proposed_action }}"
+
+    # Run the alert script using environment variables
+    python /opt/scripts/alert.py
     """,
     args=[
         Arg(
@@ -75,6 +82,5 @@ k8s_alert_tool = KubernetesPythonTool(
         A ->> S: Execute Approved Action
     """,
 )
-
 
 tool_registry.register("kubernetes", k8s_alert_tool)

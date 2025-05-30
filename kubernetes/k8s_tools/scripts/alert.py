@@ -117,13 +117,14 @@ def send_k8s_alert(channel, alert_title, alert_message, proposed_action):
     print(f"Successfully sent Kubernetes alert to channel {channel}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: alert.py <channel> <alert_title> <alert_message> <proposed_action>")
+    # Read arguments from environment variables
+    try:
+        channel = os.environ["ALERT_CHANNEL"]
+        alert_title = os.environ["ALERT_TITLE"]
+        alert_message = os.environ["ALERT_MESSAGE"]
+        proposed_action = os.environ["PROPOSED_ACTION"]
+    except KeyError as e:
+        print(f"Missing required environment variable: {e}")
         sys.exit(1)
-    
-    channel = sys.argv[1]
-    alert_title = sys.argv[2]
-    alert_message = sys.argv[3]
-    proposed_action = sys.argv[4]
     
     send_k8s_alert(channel, alert_title, alert_message, proposed_action)
