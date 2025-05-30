@@ -1,0 +1,129 @@
+import sys
+import os
+import json
+from datetime import datetime, timezone
+
+try:
+    import requests
+except ImportError:
+    # During discovery phase, requests might not be available
+    pass
+
+def send_k8s_alert(channel, alert_title, alert_message, proposed_action):
+    """
+    Send a Kubernetes alert notification to a Slack channel with an approval button
+    """
+    slack_token = os.environ["SLACK_API_TOKEN"]
+
+    # Prepare the Block Kit message
+    message = {
+        "channel": channel,
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": f":warning: {alert_title}",
+                    "emoji": True
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Kubernetes Alert Detected*\n{alert_message}"
+                }
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f":robot_face: *Proposed Action:*\n{proposed_action}"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": ":white_check_mark: *Ready to approve this action?*\nClick the button below to authorize the AI to proceed!"
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "✅ Approve Action",
+                            "emoji": True
+                        },
+                        "style": "primary",
+                        "value": json.dumps({
+                            "agent_uuid": os.environ.get("KUBIYA_AGENT_UUID", ""),
+                            "message": f"Use the kubectl tool to {proposed_action}"
+                        }),
+                        "action_id": "agent.process_message_1"
+                    },
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "❌ Deny",
+                            "emoji": True
+                        },
+                        "style": "danger",
+                        "value": json.dumps({
+                            "agent_uuid": os.environ.get("KUBIYA_AGENT_UUID", ""),
+                            "message": "Deny the proposed action"
+                        }),
+                        "action_id": "agent.process_message_2"
+                    }
+                ]
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"🕒 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                    }
+                ]
+            }
+        ]
+    }
+
+    # Send the message to Slack
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {slack_token}",
+    }
+    response = requests.post(
+        "https://slack.com/api/chat.postMessage",
+        headers=headers,
+        data=json.dumps(message),
+    )
+
+    if response.status_code != 200 or not response.json().get("ok"):
+        print(f"Failed to send alert: {response.text}")
+        sys.exit(1)
+    
+    print(f"Successfully sent Kubernetes alert to channel {channel}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 5:
+        print("Usage: alert.py <channel> <alert_title> <alert_message> <proposed_action>")
+        sys.exit(1)
+    
+    channel = sys.argv[1]
+    alert_title = sys.argv[2]
+    alert_message = sys.argv[3]
+    proposed_action = sys.argv[4]
+    
+    send_k8s_alert(channel, alert_title, alert_message, proposed_action)

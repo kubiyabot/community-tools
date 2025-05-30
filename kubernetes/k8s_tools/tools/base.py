@@ -1,5 +1,6 @@
 # k8s_tools/tools/base.py
 from kubiya_sdk.tools import Tool, Arg, FileSpec
+from pathlib import Path
 
 KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 
@@ -47,16 +48,33 @@ fi
             with_files=file_specs,
         )
 
-# Example usage:
-kubectl_cli = KubernetesTool(
-    name="kubectl_cli",
-    description="Runs any Kubernetes commands using the `kubectl` binary.",
-    content="kubectl {{.command}}",
-    args=[
-        Arg(
-            name="command",
-            description="The Kubernetes CLI command to run. Do not use `kubectl`, only enter its command.",
-            required=True
+class KubernetesPythonTool(Tool):
+    def __init__(
+        self,
+        name,
+        description,
+        content,
+        args=[],
+        env=[],
+        secrets=[],
+        long_running=False,
+        with_files=None,
+        image="python:3.11-slim",
+        mermaid=None,
+        with_volumes=None,
+    ):
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=KUBERNETES_ICON_URL,
+            type="docker",
+            image=image,
+            content=content,
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            with_files=with_files,
+            mermaid=mermaid,
+            with_volumes=with_volumes,
         )
-    ]
-)
