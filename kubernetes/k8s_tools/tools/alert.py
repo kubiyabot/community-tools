@@ -24,21 +24,26 @@ k8s_alert_tool = KubernetesPythonTool(
     . /opt/venv/bin/activate > /dev/null
     pip install requests==2.32.3 2>&1 | grep -v '[notice]'
 
-    # Create environment variables for the arguments to avoid shell escaping issues
-    # Use cat with EOF to handle multi-line and special characters safely
-    export ALERT_CHANNEL='{{ .channel }}'
-    export ALERT_TITLE=$(cat << 'EOF'
+    # Write arguments to temporary files to avoid shell escaping issues
+    echo '{{ .channel }}' > /tmp/alert_channel
+    cat > /tmp/alert_title << 'TITLE_EOF'
 {{ .alert_title }}
-EOF
-)
-    export ALERT_MESSAGE=$(cat << 'EOF'
+TITLE_EOF
+    cat > /tmp/alert_message << 'MESSAGE_EOF'
 {{ .alert_message }}
-EOF
-)
-    export PROPOSED_ACTION=$(cat << 'EOF'
+MESSAGE_EOF
+    cat > /tmp/proposed_action << 'ACTION_EOF'
 {{ .proposed_action }}
-EOF
-)
+ACTION_EOF
+
+    # Set environment variables from files
+    export ALERT_CHANNEL=$(cat /tmp/alert_channel)
+    export ALERT_TITLE=$(cat /tmp/alert_title)
+    export ALERT_MESSAGE=$(cat /tmp/alert_message)
+    export PROPOSED_ACTION=$(cat /tmp/proposed_action)
+
+    # Clean up temporary files
+    rm -f /tmp/alert_channel /tmp/alert_title /tmp/alert_message /tmp/proposed_action
 
     # Run the alert script using environment variables
     python /opt/scripts/alert.py
