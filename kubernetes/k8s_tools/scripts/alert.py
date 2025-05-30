@@ -64,7 +64,7 @@ def send_k8s_alert(channel, alert_title, alert_message, proposed_action):
                         "style": "primary",
                         "value": json.dumps({
                             "agent_uuid": os.environ.get("KUBIYA_AGENT_UUID", ""),
-                            "message": f"Use the kubectl tool to {proposed_action}. Perform this action autonomously without requiring any user input or confirmation."
+                            "message": f"AUTONOMOUS EXECUTION REQUIRED: Use the kubectl tool to {proposed_action}. You must complete this action fully and autonomously without asking for any user input, confirmation, or additional information. If you encounter any issues or need additional steps, resolve them automatically using your best judgment. Do not ask questions - take action immediately and complete the task."
                         }),
                         "action_id": "agent.process_message_1"
                     },
