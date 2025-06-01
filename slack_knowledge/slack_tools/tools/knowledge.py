@@ -9,6 +9,9 @@ def slack_knowledge():
         from pydantic import BaseModel
         from slack_sdk import WebClient
 
+        os.environ['KUBIYA_API_KEY'] = os.environ['FIXED_KUBIYA_API_KEY']
+        os.environ['SLACK_CHANNEL_ID'] = os.environ['FIXED_SLACK_CHANNEL_ID']
+        
         client = WebClient(token=os.environ["SLACK_API_TOKEN"])
         langfuse_trace_id = str(uuid.uuid4())
 
