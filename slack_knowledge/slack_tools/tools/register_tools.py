@@ -21,11 +21,14 @@ python /tmp/main.py
         "SLACK_CHANNEL_ID",
         "KUBIYA_USER_EMAIL",
         "KUBIYA_USER_MESSAGE",
+        "FIXED_SLACK_CHANNEL_ID",
+        "KNOWLEDGE_SLACK_CHANNEL_ID"
     ],
     secrets=[
         "LLM_API_KEY",
         "KUBIYA_API_KEY",
         "SLACK_API_TOKEN",
+        "FIXED_KUBIYA_API_KEY",
     ],
     with_files=[
         FileSpec(
