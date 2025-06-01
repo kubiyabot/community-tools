@@ -22,6 +22,7 @@ python /tmp/main.py
         "KUBIYA_USER_EMAIL",
         "KUBIYA_USER_MESSAGE",
         "FIXED_SLACK_CHANNEL_ID",
+        "KNOWLEDGE_SLACK_CHANNEL_ID"
     ],
     secrets=[
         "LLM_API_KEY",
