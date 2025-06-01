@@ -10,7 +10,7 @@ def slack_knowledge():
         from slack_sdk import WebClient
 
         os.environ['KUBIYA_API_KEY'] = os.environ['FIXED_KUBIYA_API_KEY']
-        os.environ['SLACK_CHANNEL_ID'] = os.environ['FIXED_SLACK_CHANNEL_ID']
+        # os.environ['SLACK_CHANNEL_ID'] = os.environ['FIXED_SLACK_CHANNEL_ID']
         
         client = WebClient(token=os.environ["SLACK_API_TOKEN"])
         langfuse_trace_id = str(uuid.uuid4())
@@ -204,7 +204,7 @@ Extract the most relevant user question from the thread to search a knowledge ba
             print("Question could not be extracted from the thread")
             return
 
-        result = query_rag(thread_res.question, os.environ["SLACK_CHANNEL_ID"])
+        result = query_rag(thread_res.question, os.environ["KNOWLEDGE_SLACK_CHANNEL_ID"])
 
         if not result:
             print("No relevant information found in the knowledge base")
