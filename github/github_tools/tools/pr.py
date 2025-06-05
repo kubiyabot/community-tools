@@ -318,6 +318,12 @@ set -euo pipefail
 
 echo "💬 Processing comment for pull request #$number in $repo..."
 
+# Check if PR is a draft
+if gh pr view --repo "$repo" "$number" --json isDraft -q '.isDraft' | grep -q true; then
+    echo "🚫 Draft PR – exiting."
+    exit 1
+fi
+
 # Export variables for the Python script
 export REPO="$repo"
 export PR_NUMBER="$number"
