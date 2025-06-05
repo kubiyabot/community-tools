@@ -103,11 +103,8 @@ def slack_knowledge():
                     formatted_msg += "\n\nThread Replies:"
                     for reply in thread_replies:
                         reply_content = reply.content.strip()
-                        reply_channel_id = reply.metadata.channel_id
-                        reply_ts = reply.metadata.ts
                         formatted_msg += (
                             f"\n  - {reply_content} "
-                            f"(Channel ID: {reply_channel_id}, Timestamp: {reply_ts})"
                         )
 
                 formatted.append(formatted_msg)
@@ -149,9 +146,18 @@ def slack_knowledge():
         llm_key = os.environ["LLM_API_KEY"]
         llm_base_url = os.environ["LLM_BASE_URL"]
 
+        bot_user_id = _get_bot_user_id()
+
         thread_messages = get_thread_messages(
             os.environ["SLACK_CHANNEL_ID"], os.environ["SLACK_THREAD_TS"]
         )
+
+        # Remove the last message from the bot
+        for message in reversed(thread_messages):
+            if message.user == bot_user_id:
+                thread_messages.remove(message)
+                break
+
         thread_context = format_slack_thread(thread_messages)
         response = litellm.completion(
             model="openai/gpt-4o",
@@ -232,7 +238,7 @@ Extract the most relevant user question from the thread to search a knowledge ba
                 {
                     "content": """
 You are a helpful assistant that can answer questions based on the provided knowledge base ONLY. You are given a query and a result from a knowledge base. You need to answer the query based on the result.
-Keep your response concise and to the point. Answer and cite answers from the knowledge base BUT make sure they are in an answer format.
+Keep your response concise and to the point. Answer and cite answers from the knowledge base BUT make sure they are in an answer format. When citing answers make sure to use the Main Message info as reference.
     """,
                     "role": "system",
                 },
