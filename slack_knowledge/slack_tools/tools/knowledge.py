@@ -177,10 +177,15 @@ def slack_knowledge():
             messages=[
                 {
                     "content": """
-Extract the most relevant user question from the thread to search a knowledge base.
-	•	If the users latest message is a question, return it.
+Extract the most relevant user question from the thread to search a knowledge base, or return the answer if it's already provided in the thread.
+
+Rules:
+	•	If the user's latest message is a question, return it as the question.
 	•	If not, return the most recent user question from the thread.
-	•	If the thread already contains an answer to that question, return the answer instead.
+	•	If the thread already contains a substantive answer to that question, return the actual answer content.
+	•	When extracting answers from the thread, look for the factual/informative content that directly answers the question, not just acknowledgments or confirmations.
+
+Priority: Look for substantive answers first, then extract questions if no answer is found.
 """,
                     "role": "system",
                 },
@@ -205,38 +210,6 @@ Extract the most relevant user question from the thread to search a knowledge ba
         
         if not result:
             print("No relevant information found in the knowledge base")
-            # No relevant information in knowledge base, try to answer from thread context
-            response = litellm.completion(
-                model="openai/gpt-4o",
-                api_key=llm_key,
-                base_url=llm_base_url,
-                extra_body={
-                    "metadata": {
-                        "trace_id": langfuse_trace_id,
-                        "kubiya_org": os.environ["KUBIYA_USER_ORG"],
-                        "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
-                        "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
-                        "trace_name": "slack-knowledge",
-                        "generation_name": "slack-knowledge-thread-fallback",
-                    }
-                },
-                messages=[
-                    {
-                        "content": """
-You are a helpful assistant that answers questions based on the provided thread context. 
-Answer the question concisely and to the point based on the information available in the thread.
-If the thread doesn't contain enough information to answer the question, say so clearly.
-                        """,
-                        "role": "system",
-                    },
-                    {
-                        "content": f"Question: {thread_res.question}\n\nThread context:\n{thread_context}",
-                        "role": "user",
-                    },
-                ],
-            )
-            
-            print(f"Answer (based on thread context): {response.choices[0].message.content}")
             return
 
         result = remove_kubi_messages(result, _get_bot_user_id())
