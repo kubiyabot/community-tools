@@ -177,20 +177,19 @@ def slack_knowledge():
             messages=[
                 {
                     "content": """
-Extract the **most relevant question** from a conversation thread to search a knowledge base, or return the **answer** if it’s already present in the thread.
+Extract the most relevant user question from the thread to search a knowledge base, or return the answer if it's already provided in the thread.
 
-This logic powers systems that need to determine:  
-- "What question is being asked?"  
-- "Is that question already answered in the thread?"  
-- "If so, what's the actual answer?"  
+Rules for identifying answers in the thread:
+	•	Look for direct factual responses that immediately follow a question in the conversation flow
+	•	Answers can be single words, short phrases, or longer explanations that directly address the question
+	•	If you see a pattern like: Question -> Factual Response -> Confirmation, extract the factual response as the answer
 
----
-## Core Logic
-1. **If the user's latest message is a question**, return it as the `question`.
-2. **If not**, return the **most recent user question** from the thread.
-3. **Then check if the thread contains a valid answer** to that question:
-   - If yes, return the **substantive answer**.
-   - If no, return the question as-is.
+Rules for extracting questions:
+	•	If no answer is found in the thread, extract the most relevant question
+	•	If the user's latest message is a question, return it as the question
+	•	If not, return the most recent user question from the thread
+
+Priority: ALWAYS look for substantive answers first. Only extract questions if no clear answer exists in the thread context.
 """,
                     "role": "system",
                 },
