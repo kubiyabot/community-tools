@@ -9,6 +9,9 @@ def slack_knowledge():
         from pydantic import BaseModel
         from slack_sdk import WebClient
 
+        os.environ['KUBIYA_API_KEY'] = os.environ['FIXED_KUBIYA_API_KEY']
+        # os.environ['SLACK_CHANNEL_ID'] = os.environ['FIXED_SLACK_CHANNEL_ID']
+        
         client = WebClient(token=os.environ["SLACK_API_TOKEN"])
         langfuse_trace_id = str(uuid.uuid4())
 
@@ -201,10 +204,42 @@ Extract the most relevant user question from the thread to search a knowledge ba
             print("Question could not be extracted from the thread")
             return
 
-        result = query_rag(thread_res.question, os.environ["SLACK_CHANNEL_ID"])
+        result = query_rag(thread_res.question, os.environ["KNOWLEDGE_SLACK_CHANNEL_ID"])
 
         if not result:
             print("No relevant information found in the knowledge base")
+            # No relevant information in knowledge base, try to answer from thread context
+            response = litellm.completion(
+                model="openai/gpt-4o",
+                api_key=llm_key,
+                base_url=llm_base_url,
+                extra_body={
+                    "metadata": {
+                        "trace_id": langfuse_trace_id,
+                        "kubiya_org": os.environ["KUBIYA_USER_ORG"],
+                        "trace_user_id": f"{os.environ['KUBIYA_USER_EMAIL']}-{os.environ['KUBIYA_USER_ORG']}",
+                        "kubiya_user_email": os.environ["KUBIYA_USER_EMAIL"],
+                        "trace_name": "slack-knowledge",
+                        "generation_name": "slack-knowledge-thread-fallback",
+                    }
+                },
+                messages=[
+                    {
+                        "content": """
+You are a helpful assistant that answers questions based on the provided thread context. 
+Answer the question concisely and to the point based on the information available in the thread.
+If the thread doesn't contain enough information to answer the question, say so clearly.
+                        """,
+                        "role": "system",
+                    },
+                    {
+                        "content": f"Question: {thread_res.question}\n\nThread context:\n{thread_context}",
+                        "role": "user",
+                    },
+                ],
+            )
+            
+            print(f"Answer (based on thread context): {response.choices[0].message.content}")
             return
 
         result = remove_kubi_messages(result, _get_bot_user_id())
