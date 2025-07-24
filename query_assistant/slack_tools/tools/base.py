@@ -434,6 +434,9 @@ def get_channel_messages(client, channel_id, oldest):
         cursor = None
         latest = None  # For time-based pagination
         
+        # Get today's date
+        today_date = datetime.now().strftime("%Y-%m-%d")
+        
         # Use pagination to get all messages
         while True:
             params = {{
@@ -493,11 +496,23 @@ def get_channel_messages(client, channel_id, oldest):
             user_id = msg.get("user", "")
             user_info = get_user_info(client, user_id)
             
+            # Convert timestamp to readable date
+            message_ts = msg.get("ts", "")
+            message_date = "Unknown Date"
+            if message_ts:
+                try:
+                    message_datetime = datetime.fromtimestamp(float(message_ts))
+                    message_date = message_datetime.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not parse timestamp: {{message_ts}}")
+            
             processed_msg = {{
                 "message": msg.get("text", ""),
-                "timestamp": msg.get("ts", ""),
+                "timestamp": message_ts,
                 "user_id": user_id,
-                "user_name": user_info["display_name"]
+                "user_name": user_info["display_name"],
+                "today_date": today_date,
+                "message_date": message_date
             }}
 
             # Check if message has a thread
@@ -510,11 +525,24 @@ def get_channel_messages(client, channel_id, oldest):
                 for reply in replies:
                     reply_user_id = reply.get("user", "")
                     reply_user_info = get_user_info(client, reply_user_id)
+                    
+                    # Convert reply timestamp to readable date
+                    reply_ts = reply.get("ts", "")
+                    reply_date = "Unknown Date"
+                    if reply_ts:
+                        try:
+                            reply_datetime = datetime.fromtimestamp(float(reply_ts))
+                            reply_date = reply_datetime.strftime("%Y-%m-%d")
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not parse reply timestamp: {{reply_ts}}")
+                    
                     processed_msg["replies"].append({{
                         "message": reply.get("text", ""),
-                        "timestamp": reply.get("ts", ""),
+                        "timestamp": reply_ts,
                         "user_id": reply_user_id,
-                        "user_name": reply_user_info["display_name"]
+                        "user_name": reply_user_info["display_name"],
+                        "today_date": today_date,
+                        "message_date": reply_date
                     }})
             else:
                 processed_msg["replies"] = []  # no replies
