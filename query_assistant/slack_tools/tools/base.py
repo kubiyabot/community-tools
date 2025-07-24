@@ -259,6 +259,7 @@ import os
 import sys
 import json
 import logging
+from datetime import datetime
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import litellm
@@ -269,6 +270,49 @@ import random
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Cache for user info to avoid duplicate API calls
+user_cache = {{}}
+
+def get_user_info(client, user_id):
+    \"\"\"Get user information and cache it to avoid duplicate API calls\"\"\"
+    if not user_id:
+        return {{"name": "Unknown User", "real_name": "Unknown User", "display_name": "Unknown User"}}
+    
+    # Check cache first
+    if user_id in user_cache:
+        return user_cache[user_id]
+    
+    try:
+        response = client.users_info(user=user_id)
+        user_info = response["user"]
+        
+        # Extract name information
+        name = user_info.get("name", "Unknown User")
+        real_name = user_info.get("real_name", name)
+        display_name = user_info.get("profile", {{}}).get("display_name", "")
+        
+        # Use display name if available, otherwise real name, otherwise username
+        user_display_name = display_name if display_name else (real_name if real_name else name)
+        
+        user_data = {{
+            "name": name,
+            "real_name": real_name,
+            "display_name": user_display_name
+        }}
+        
+        # Cache the result
+        user_cache[user_id] = user_data
+        logger.info(f"Retrieved user info for {{user_id}}: {{user_display_name}}")
+        
+        return user_data
+        
+    except SlackApiError as e:
+        logger.warning(f"Could not retrieve user info for {{user_id}}: {{e}}")
+        # Cache the unknown user to avoid repeated failed calls
+        user_data = {{"name": "Unknown User", "real_name": "Unknown User", "display_name": "Unknown User"}}
+        user_cache[user_id] = user_data
+        return user_data
 
 def find_channel(client, channel_input):
     logger.info(f"Attempting to find channel: {{channel_input}}")
@@ -445,9 +489,15 @@ def get_channel_messages(client, channel_id, oldest):
         processed_messages = []
         
         for msg in messages:
+            # Get user information
+            user_id = msg.get("user", "")
+            user_info = get_user_info(client, user_id)
+            
             processed_msg = {{
                 "message": msg.get("text", ""),
-                "timestamp": msg.get("ts", "")
+                "timestamp": msg.get("ts", ""),
+                "user_id": user_id,
+                "user_name": user_info["display_name"]
             }}
 
             # Check if message has a thread
@@ -456,13 +506,16 @@ def get_channel_messages(client, channel_id, oldest):
                 replies = get_thread_replies(client, channel_id, thread_ts)
                 
                 # Attach replies under parent message
-                processed_msg["replies"] = [
-                    {{
+                processed_msg["replies"] = []
+                for reply in replies:
+                    reply_user_id = reply.get("user", "")
+                    reply_user_info = get_user_info(client, reply_user_id)
+                    processed_msg["replies"].append({{
                         "message": reply.get("text", ""),
-                        "timestamp": reply.get("ts", "")
-                    }}
-                    for reply in replies
-                ]
+                        "timestamp": reply.get("ts", ""),
+                        "user_id": reply_user_id,
+                        "user_name": reply_user_info["display_name"]
+                    }})
             else:
                 processed_msg["replies"] = []  # no replies
 
@@ -518,14 +571,16 @@ def analyze_messages_with_llm(messages, query, channel_id):
             for i, msg in enumerate(messages):
                 # Create a message link using timestamp and channel ID
                 message_link = f"https://slack.com/archives/{{channel_id}}/p{{msg['timestamp'].replace('.', '')}}"
-                # Include a unique message ID and make the link more prominent
-                lines.append(f"[MSG_ID:{{i+1}}] {{msg['message']}}\\nLINK: {{message_link}}\\nTIMESTAMP: {{msg['timestamp']}}\\n")
+                # Include a unique message ID and make the link more prominent, now with user name
+                user_name = msg.get('user_name', 'Unknown User')
+                lines.append(f"[MSG_ID:{{i+1}}] {{user_name}}: {{msg['message']}}\\nLINK: {{message_link}}\\nTIMESTAMP: {{msg['timestamp']}}\\n")
                 
                 for j, reply in enumerate(msg.get("replies", [])):
                     # Create a reply link using thread timestamp and reply timestamp
                     reply_link = f"https://slack.com/archives/{{channel_id}}/p{{msg['timestamp'].replace('.', '')}}?thread_ts={{msg['timestamp']}}&cid={{channel_id}}"
-                    # Include a unique reply ID and make the link more prominent
-                    lines.append(f"  [REPLY_ID:{{i+1}}.{{j+1}}] {{reply['message']}}\\n  LINK: {{reply_link}}\\n  TIMESTAMP: {{reply['timestamp']}}\\n")
+                    # Include a unique reply ID and make the link more prominent, now with user name
+                    reply_user_name = reply.get('user_name', 'Unknown User')
+                    lines.append(f"  [REPLY_ID:{{i+1}}.{{j+1}}] {{reply_user_name}}: {{reply['message']}}\\n  LINK: {{reply_link}}\\n  TIMESTAMP: {{reply['timestamp']}}\\n")
             return "\\n".join(lines)
 
         # Format all messages first
@@ -676,6 +731,11 @@ def analyze_messages_with_llm(messages, query, channel_id):
         return f"Error during LLM analysis: {{str(e)}}"
 
 def execute_slack_action(token, action, operation, **kwargs):
+    # Print current date and time at the beginning
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.info(f"Starting Slack search execution at: {{current_datetime}}")
+    print(f"Current date and time: {{current_datetime}}")
+    
     client = WebClient(token=token)
     logger.info(f"Executing Slack search action with params: {{kwargs}}")
     
