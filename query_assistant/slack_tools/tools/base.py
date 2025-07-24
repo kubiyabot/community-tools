@@ -765,21 +765,69 @@ import os
 import sys
 import json
 import logging
+from datetime import datetime
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def process_thread_messages(messages):
+# Cache for user info to avoid duplicate API calls
+user_cache = {{}}
+
+def get_user_info(client, user_id):
+    \"\"\"Get user information and cache it to avoid duplicate API calls\"\"\"
+    if not user_id:
+        return {{"name": "Unknown User", "real_name": "Unknown User"}}
+    
+    # Check cache first
+    if user_id in user_cache:
+        return user_cache[user_id]
+    
+    try:
+        response = client.users_info(user=user_id)
+        user_info = response["user"]
+        
+        # Extract name information
+        name = user_info.get("name", "Unknown User")
+        real_name = user_info.get("real_name", name)
+        display_name = user_info.get("profile", {{}}).get("display_name", "")
+        
+        # Use display name if available, otherwise real name, otherwise username
+        user_display_name = display_name if display_name else (real_name if real_name else name)
+        
+        user_data = {{
+            "name": name,
+            "real_name": real_name,
+            "display_name": user_display_name
+        }}
+        
+        # Cache the result
+        user_cache[user_id] = user_data
+        logger.info(f"Retrieved user info for {{user_id}}: {{user_display_name}}")
+        
+        return user_data
+        
+    except SlackApiError as e:
+        logger.warning(f"Could not retrieve user info for {{user_id}}: {{e}}")
+        # Cache the unknown user to avoid repeated failed calls
+        user_data = {{"name": "Unknown User", "real_name": "Unknown User", "display_name": "Unknown User"}}
+        user_cache[user_id] = user_data
+        return user_data
+
+def process_thread_messages(client, messages):
     logger.info(f"Processing {{len(messages)}} thread messages")
     
     processed_messages = []
     
     for msg in messages:
+        user_id = msg.get("user", "")
+        user_info = get_user_info(client, user_id)
+        
         processed_msg = {{
             "text": msg.get("text", ""),
-            "user": msg.get("user", ""),
+            "user_id": user_id,
+            "user_name": user_info["display_name"],
             "timestamp": msg.get("ts", ""),
             "thread_ts": msg.get("thread_ts", "")
         }}
@@ -804,6 +852,11 @@ def process_thread_messages(messages):
     return processed_messages
 
 def execute_slack_action(token, action, operation, **kwargs):
+    # Print current date and time at the beginning
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.info(f"Starting Slack thread retrieval at: {{current_datetime}}")
+    print(f"Current date and time: {{current_datetime}}")
+    
     client = WebClient(token=token)
     logger.info(f"Executing Slack action: {{action}} for operation: {{operation}}")
     logger.info(f"Action parameters: {{kwargs}}")
@@ -844,7 +897,7 @@ def execute_slack_action(token, action, operation, **kwargs):
             return {{"success": True, "thread_messages": [], "message": "No messages found in this thread."}}
         
         # Process the thread messages
-        processed_messages = process_thread_messages(thread_messages)
+        processed_messages = process_thread_messages(client, thread_messages)
         
         # Create a thread URL for reference
         thread_url = f"https://slack.com/archives/{{channel_id}}/p{{thread_ts.replace('.', '')}}"
