@@ -610,7 +610,7 @@ Today's date: %s
 			{Role: "system", Content: "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON array only."},
 			{Role: "user", Content: prompt},
 		},
-		Model:       "agent-models",
+		Model:       "openai/Llama-4-Scout",
 		MaxTokens:   3072, // Increased for larger batch processing (10 messages)
 		Temperature: 0.1,
 		TopP:        0.1,
@@ -630,7 +630,7 @@ Today's date: %s
 		return []OOOAnalysis{}
 	}
 
-	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return []OOOAnalysis{}
 	}
