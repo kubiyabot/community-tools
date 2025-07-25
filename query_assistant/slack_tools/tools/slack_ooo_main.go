@@ -44,6 +44,7 @@ type OOODeclaration struct {
 	DeclaredOOODate    []string `json:"declared_ooo_date"`
 	DateMessageWasSent string   `json:"date_message_was_sent"`
 	RawMessage         string   `json:"raw_message"`
+	Today              string   `json:"today"`
 }
 
 type OOOResult struct {
@@ -98,7 +99,15 @@ func main() {
 
 	token := os.Getenv("SLACK_API_TOKEN")
 	if token == "" {
-		result := OOOResult{Success: false, Error: "SLACK_API_TOKEN is not set"}
+		// Use Eastern Time Zone for proper date calculation
+		loc, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			loc = time.UTC
+		}
+		currentTime := time.Now().In(loc)
+		today := currentTime.Format("2006-01-02")
+
+		result := OOOResult{Success: false, Today: today, Error: "SLACK_API_TOKEN is not set"}
 		output, _ := json.Marshal(result)
 		fmt.Println(string(output))
 		os.Exit(1)
@@ -175,7 +184,7 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 
 	channel := args["channel"]
 	if channel == "" {
-		return OOOResult{Success: false, Error: "Channel parameter is required"}
+		return OOOResult{Success: false, Today: today, Error: "Channel parameter is required"}
 	}
 
 	oldest := args["oldest"]
@@ -185,17 +194,17 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 
 	channelID, err := findChannel(api, channel)
 	if err != nil {
-		return OOOResult{Success: false, Error: fmt.Sprintf("Channel not found: %s", channel)}
+		return OOOResult{Success: false, Today: today, Error: fmt.Sprintf("Channel not found: %s", channel)}
 	}
 
 	oldestTimestamp, err := processTimeFilter(oldest)
 	if err != nil {
-		return OOOResult{Success: false, Error: fmt.Sprintf("Invalid time filter: %s", err)}
+		return OOOResult{Success: false, Today: today, Error: fmt.Sprintf("Invalid time filter: %s", err)}
 	}
 
 	messages, err := getChannelMessages(api, channelID, oldestTimestamp)
 	if err != nil {
-		return OOOResult{Success: false, Error: fmt.Sprintf("Error fetching messages: %s", err)}
+		return OOOResult{Success: false, Today: today, Error: fmt.Sprintf("Error fetching messages: %s", err)}
 	}
 
 	if len(messages) == 0 {
@@ -478,6 +487,7 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 						DeclaredOOODate:    analysis.DeclaredOOODate,
 						DateMessageWasSent: msg.MessageDate,
 						RawMessage:         msg.Message,
+						Today:              today,
 					}
 					resultChan <- declaration
 				}
