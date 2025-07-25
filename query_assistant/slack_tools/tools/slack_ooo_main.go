@@ -422,6 +422,10 @@ func extractOOODatesFromMessages(messages []MessageData, today string) []OOODecl
 	var declarationsMutex sync.Mutex
 	var wg sync.WaitGroup
 
+	// Track processed messages to prevent duplicates
+	processedMessages := make(map[string]bool)
+	var processedMutex sync.Mutex
+
 	// Process messages in batches
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -431,12 +435,31 @@ func extractOOODatesFromMessages(messages []MessageData, today string) []OOODecl
 
 		batch := messages[i:end]
 
-		// Filter out empty messages before sending to LLM
+		// Filter and deduplicate messages before sending to LLM
 		var validMessages []MessageData
 		for _, msg := range batch {
-			if strings.TrimSpace(msg.Message) != "" {
-				validMessages = append(validMessages, msg)
+			if strings.TrimSpace(msg.Message) == "" {
+				continue
 			}
+
+			// Create unique key for this exact message
+			msgKey := fmt.Sprintf("%s|%s|%s", msg.UserName, msg.MessageDate, msg.Message)
+
+			processedMutex.Lock()
+			if processedMessages[msgKey] {
+				processedMutex.Unlock()
+				continue // Skip duplicate
+			}
+			processedMessages[msgKey] = true
+			processedMutex.Unlock()
+
+			// Basic filtering - skip obvious non-OOO messages
+			if isObviousNonOOOMessage(msg.Message) {
+				log.Printf("Skipping non-OOO message from %s: %.50s...", msg.UserName, msg.Message)
+				continue
+			}
+
+			validMessages = append(validMessages, msg)
 		}
 
 		if len(validMessages) == 0 {
@@ -460,11 +483,13 @@ func extractOOODatesFromMessages(messages []MessageData, today string) []OOODecl
 
 	wg.Wait()
 
-	// Deduplicate declarations
+	// Improved deduplication - use simpler key to prevent false differences
 	declarationMap := make(map[string]*OOODeclaration)
 	for _, declaration := range allDeclarations {
-		key := fmt.Sprintf("%s_%s_%s_%s", declaration.UserName, declaration.DateMessageWasSent, declaration.RawMessage, declaration.Reason)
+		// Simplified key - don't include reason to prevent duplicate entries with different reasons
+		key := fmt.Sprintf("%s_%s_%s", declaration.UserName, declaration.DateMessageWasSent, declaration.RawMessage)
 		if existing, exists := declarationMap[key]; exists {
+			// Merge dates
 			dateSet := make(map[string]bool)
 			for _, date := range existing.DeclaredOOODate {
 				dateSet[date] = true
@@ -479,6 +504,11 @@ func extractOOODatesFromMessages(messages []MessageData, today string) []OOODecl
 			}
 			sort.Strings(mergedDates)
 			existing.DeclaredOOODate = mergedDates
+
+			// Keep the more informative reason
+			if existing.Reason == "Could not extract OOO dates from message." && declaration.Reason != "Could not extract OOO dates from message." {
+				existing.Reason = declaration.Reason
+			}
 		} else {
 			declarationMap[key] = &declaration
 		}
@@ -494,6 +524,52 @@ func extractOOODatesFromMessages(messages []MessageData, today string) []OOODecl
 	})
 
 	return finalDeclarations
+}
+
+// Basic filtering to exclude obvious non-OOO messages
+func isObviousNonOOOMessage(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+
+	// Skip empty or very short messages
+	if len(message) < 3 {
+		return true
+	}
+
+	// Common non-OOO patterns (greetings, casual messages, etc.)
+	nonOOOPatterns := []string{
+		// Greetings
+		"good morning", "good afternoon", "good evening", "good night",
+		"have a good", "have a great", "have a nice", "enjoy your",
+		"happy friday", "happy weekend", "weekend", "tgif",
+		"buen fin de semana", "tengas un buen", "que tengas",
+		"buenos días", "buenas tardes", "buenas noches",
+
+		// Casual responses
+		"thanks", "thank you", "gracias", "de nada",
+		"you're welcome", "no problem", "sounds good",
+		"perfect", "awesome", "great", "cool",
+
+		// Questions without OOO context
+		"how are you", "what's up", "how's it going",
+		"cómo estás", "qué tal", "cómo va",
+
+		// Very short responses
+		"ok", "okay", "yes", "no", "sí", "no",
+		"👍", "👌", "✅", "🙂", "😊",
+	}
+
+	for _, pattern := range nonOOOPatterns {
+		if strings.Contains(message, pattern) {
+			return true
+		}
+	}
+
+	// Skip messages that are just emojis or very short
+	if len(message) <= 10 && (strings.Count(message, "👍") > 0 || strings.Count(message, "😊") > 0 || strings.Count(message, "✅") > 0) {
+		return true
+	}
+
+	return false
 }
 
 func processBatchForDateExtraction(messages []MessageData, today string) []OOODeclaration {
@@ -523,7 +599,7 @@ func processBatchForDateExtraction(messages []MessageData, today string) []OOODe
 
 			dateExtraction := extractDatesWithLLM(msg, today)
 
-			// Since we know every message is OOO, create declaration if we got any dates
+			// Only create declaration if we actually extracted OOO dates
 			if len(dateExtraction.DeclaredOOODate) > 0 {
 				declaration := &OOODeclaration{
 					UserName:           msg.UserName,
@@ -534,15 +610,7 @@ func processBatchForDateExtraction(messages []MessageData, today string) []OOODe
 				}
 				resultChan <- declaration
 			} else {
-				// If LLM couldn't extract dates, use message date as fallback
-				declaration := &OOODeclaration{
-					UserName:           msg.UserName,
-					DeclaredOOODate:    []string{msg.MessageDate},
-					DateMessageWasSent: msg.MessageDate,
-					RawMessage:         msg.Message,
-					Reason:             "Could not extract OOO dates from message.",
-				}
-				resultChan <- declaration
+				log.Printf("No OOO dates extracted from message by %s: %s", msg.UserName, dateExtraction.Reason)
 			}
 		}(message)
 	}
@@ -564,11 +632,14 @@ func tryBatchDateExtraction(messages []MessageData, today string) []OOODeclarati
 	llmSemaphore <- struct{}{}
 	defer func() { <-llmSemaphore }()
 
-	// Create optimized prompt focused purely on date extraction
+	// Create optimized prompt focused on actual OOO declarations
 	var promptBuilder strings.Builder
-	promptBuilder.WriteString("Extract the out-of-office dates from these messages. Each message is an OOO declaration - focus on finding the specific dates they will be out and provide a brief reason.\n\n")
+	promptBuilder.WriteString("Extract out-of-office dates ONLY from messages that are actual OOO declarations (not greetings, casual chat, or general well-wishes).\n\n")
+	promptBuilder.WriteString("IMPORTANT: Distinguish between:\n")
+	promptBuilder.WriteString("- ✅ OOO Declaration: \"I'm out sick tomorrow\", \"Taking vacation July 25-26\", \"Doctor appointment on Friday\"\n")
+	promptBuilder.WriteString("- ❌ NOT OOO: \"Have a good weekend\", \"Enjoy your day\", \"Thanks\", general greetings\n\n")
 	promptBuilder.WriteString("Respond with valid JSON only:\n")
-	promptBuilder.WriteString(`{"results": [{"message_index": 0, "declared_ooo_date": ["2024-07-25", "2024-07-26"], "reason": "sick leave"}]}`)
+	promptBuilder.WriteString(`{"results": [{"message_index": 0, "declared_ooo_date": ["2024-07-25"], "reason": "vacation"}, {"message_index": 1, "declared_ooo_date": [], "reason": "not an OOO declaration - just a greeting"}]}`)
 	promptBuilder.WriteString("\n\nMessages to analyze:\n")
 
 	for i, msg := range messages {
@@ -578,7 +649,7 @@ func tryBatchDateExtraction(messages []MessageData, today string) []OOODeclarati
 	}
 
 	promptBuilder.WriteString(fmt.Sprintf("Today's date: %s\n", today))
-	promptBuilder.WriteString("Extract all declared OOO dates and provide a brief reason (e.g., 'vacation', 'sick day', 'appointment', 'family emergency'). Resolve relative dates like 'today', 'tomorrow', 'Monday' based on when each message was posted.")
+	promptBuilder.WriteString("Extract dates only from ACTUAL OOO declarations. For greetings, thanks, or casual messages, return empty dates array. Resolve relative dates based on when each message was posted.")
 
 	result := makeLLMRequest(promptBuilder.String())
 	if result == "" {
@@ -596,25 +667,27 @@ func tryBatchDateExtraction(messages []MessageData, today string) []OOODeclarati
 		if result.MessageIndex < len(messages) {
 			msg := messages[result.MessageIndex]
 
-			// Use extracted dates or fallback to message date
-			oooDate := result.DeclaredOOODate
-			if len(oooDate) == 0 {
-				oooDate = []string{msg.MessageDate}
-			}
+			// Only create declaration if we actually got dates
+			if len(result.DeclaredOOODate) > 0 {
+				// Validate dates are reasonable (not too far in past/future)
+				validDates := validateDates(result.DeclaredOOODate, msg.MessageDate)
+				if len(validDates) > 0 {
+					reason := result.Reason
+					if reason == "" {
+						reason = "Out of office"
+					}
 
-			// Use extracted reason or provide default
-			reason := result.Reason
-			if reason == "" {
-				reason = "Out of office"
+					declarations = append(declarations, OOODeclaration{
+						UserName:           msg.UserName,
+						DeclaredOOODate:    validDates,
+						DateMessageWasSent: msg.MessageDate,
+						RawMessage:         msg.Message,
+						Reason:             reason,
+					})
+				}
+			} else {
+				log.Printf("No OOO dates found for message from %s: %s", msg.UserName, result.Reason)
 			}
-
-			declarations = append(declarations, OOODeclaration{
-				UserName:           msg.UserName,
-				DeclaredOOODate:    oooDate,
-				DateMessageWasSent: msg.MessageDate,
-				RawMessage:         msg.Message,
-				Reason:             reason,
-			})
 		}
 	}
 
@@ -637,30 +710,45 @@ func extractDatesWithLLM(messageData MessageData, today string) DateExtraction {
 	llmSemaphore <- struct{}{}
 	defer func() { <-llmSemaphore }()
 
-	// Simplified prompt focused on date extraction with reason
-	prompt := fmt.Sprintf(`Extract OOO dates from this message and provide a brief reason. Respond with JSON only:
-{"declared_ooo_date": ["2024-07-25", "2024-07-26"], "reason": "sick day"}
+	// Improved prompt to distinguish OOO from casual messages
+	prompt := fmt.Sprintf(`Extract OOO dates ONLY if this is an actual out-of-office declaration, not just a greeting or casual message.
+
+IMPORTANT: Distinguish between:
+- ✅ OOO Declaration: stating they will be absent/unavailable with specific times
+- ❌ NOT OOO: greetings ("have a good weekend"), thanks, casual chat
+
+Respond with JSON only:
+{"declared_ooo_date": ["2024-07-25"], "reason": "sick day"} OR {"declared_ooo_date": [], "reason": "not an OOO declaration - just a greeting"}
 
 User: %s | Posted: %s | Today: %s
 Message: "%s"
 
-Extract all declared OOO dates and provide a brief reason (e.g., 'vacation', 'sick day', 'appointment', 'family emergency'). Convert relative dates like 'today', 'tomorrow', 'Monday' to YYYY-MM-DD format based on the posted date.`,
+If this is an actual OOO declaration, extract dates and provide reason. If it's just a greeting/casual message, return empty dates array.`,
 		messageData.UserName, messageData.MessageDate, today, messageData.Message)
 
 	content := makeLLMRequest(prompt)
 	if content == "" {
-		return DateExtraction{DeclaredOOODate: []string{}, Reason: ""}
+		return DateExtraction{DeclaredOOODate: []string{}, Reason: "LLM request failed"}
 	}
 
 	var extraction DateExtraction
 	if err := json.Unmarshal([]byte(content), &extraction); err != nil {
 		log.Printf("Failed to parse date extraction response: %v", err)
-		return DateExtraction{DeclaredOOODate: []string{}, Reason: ""}
+		return DateExtraction{DeclaredOOODate: []string{}, Reason: "Failed to parse response"}
+	}
+
+	// Validate extracted dates
+	if len(extraction.DeclaredOOODate) > 0 {
+		extraction.DeclaredOOODate = validateDates(extraction.DeclaredOOODate, messageData.MessageDate)
 	}
 
 	// Provide default reason if none extracted
 	if extraction.Reason == "" {
-		extraction.Reason = "Out of office"
+		if len(extraction.DeclaredOOODate) > 0 {
+			extraction.Reason = "Out of office"
+		} else {
+			extraction.Reason = "Not an OOO declaration"
+		}
 	}
 
 	// Cache the result
@@ -669,6 +757,37 @@ Extract all declared OOO dates and provide a brief reason (e.g., 'vacation', 'si
 	cacheMutex.Unlock()
 
 	return extraction
+}
+
+// Validate that extracted dates are reasonable
+func validateDates(dates []string, messageDate string) []string {
+	var validDates []string
+
+	// Parse message date for comparison
+	msgDate, err := time.Parse("2006-01-02", messageDate)
+	if err != nil {
+		log.Printf("Warning: Could not parse message date %s", messageDate)
+		return dates // Return as-is if we can't validate
+	}
+
+	for _, dateStr := range dates {
+		// Parse the extracted date
+		extractedDate, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			log.Printf("Warning: Invalid date format %s, skipping", dateStr)
+			continue
+		}
+
+		// Check if date is reasonable (not more than 2 years in past or 2 years in future from message date)
+		daysDiff := extractedDate.Sub(msgDate).Hours() / 24
+		if daysDiff >= -730 && daysDiff <= 730 { // Within 2 years
+			validDates = append(validDates, dateStr)
+		} else {
+			log.Printf("Warning: Date %s seems unreasonable (%d days from message date), skipping", dateStr, int(daysDiff))
+		}
+	}
+
+	return validDates
 }
 
 func makeLLMRequest(prompt string) string {
