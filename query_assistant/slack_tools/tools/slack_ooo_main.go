@@ -30,6 +30,7 @@ type MessageData struct {
 	UserID      string `json:"user_id"`
 	UserName    string `json:"user_name"`
 	MessageDate string `json:"message_date"`
+	DayOfWeek   string `json:"day_of_week"`
 }
 
 type OOOAnalysis struct {
@@ -80,8 +81,6 @@ var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
 	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
-	llmAvailable   = true                                   // Track if LLM is working
-	llmCheckMutex  = sync.RWMutex{}
 
 	// Progress tracking
 	progressStartTime time.Time
@@ -362,9 +361,12 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 				userInfo := getUserInfo(api, m.User)
 
 				messageDate := "Unknown Date"
+				dayOfWeek := "Unknown Day"
 				if m.Timestamp != "" {
 					if ts, err := strconv.ParseFloat(m.Timestamp, 64); err == nil {
-						messageDate = time.Unix(int64(ts), 0).Format("2006-01-02")
+						msgTime := time.Unix(int64(ts), 0)
+						messageDate = msgTime.Format("2006-01-02")
+						dayOfWeek = msgTime.Format("Monday")
 					}
 				}
 
@@ -374,6 +376,7 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 					UserID:      m.User,
 					UserName:    userInfo.DisplayName,
 					MessageDate: messageDate,
+					DayOfWeek:   dayOfWeek,
 				}
 
 				messageChan <- processedMsg
@@ -387,9 +390,12 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 						for _, reply := range replies[1:] {
 							replyUserInfo := getUserInfo(api, reply.User)
 							replyDate := "Unknown Date"
+							replyDayOfWeek := "Unknown Day"
 							if reply.Timestamp != "" {
 								if ts, err := strconv.ParseFloat(reply.Timestamp, 64); err == nil {
-									replyDate = time.Unix(int64(ts), 0).Format("2006-01-02")
+									replyTime := time.Unix(int64(ts), 0)
+									replyDate = replyTime.Format("2006-01-02")
+									replyDayOfWeek = replyTime.Format("Monday")
 								}
 							}
 
@@ -399,6 +405,7 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 								UserID:      reply.User,
 								UserName:    replyUserInfo.DisplayName,
 								MessageDate: replyDate,
+								DayOfWeek:   replyDayOfWeek,
 							}
 
 							messageChan <- replyMsg
@@ -527,62 +534,81 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 }
 
 func fastAnalyzeMessageBatchForOOO(messages []MessageData, today string) []OOOAnalysis {
-	// Check if LLM is available, if not, skip directly to pattern analysis
-	llmCheckMutex.RLock()
-	isLLMAvailable := llmAvailable
-	llmCheckMutex.RUnlock()
+	// Try LLM batch analysis with retries
+	llmResults, err := tryLLMAnalysisBatchWithRetry(messages, today, 3)
 
-	// If LLM has been failing, skip it entirely for performance
-	if !isLLMAvailable {
+	// If LLM failed completely, return empty results rather than incorrect pattern-based results
+	if err != nil || len(llmResults) == 0 {
+		// Return empty analysis results indicating failure
 		var results []OOOAnalysis
-		for _, msg := range messages {
-			results = append(results, patternBasedAnalysis(msg, today))
+		for range messages {
+			results = append(results, OOOAnalysis{
+				IsOOOMessage: false,
+				Reason:       fmt.Sprintf("LLM analysis failed: %v", err),
+				Confidence:   "none",
+			})
 		}
 		return results
 	}
 
-	// Try LLM batch analysis
-	llmResults := tryLLMAnalysisBatch(messages, today)
-
-	// If LLM failed, disable it and fallback to pattern analysis
-	if len(llmResults) == 0 || (len(llmResults) > 0 && strings.Contains(llmResults[0].Reason, "LLM API error")) {
-		llmCheckMutex.Lock()
-		llmAvailable = false
-		llmCheckMutex.Unlock()
-
-		var results []OOOAnalysis
-		for _, msg := range messages {
-			results = append(results, patternBasedAnalysis(msg, today))
-		}
-		return results
-	}
-
-	// If we got results but not enough, fill with pattern analysis
+	// If we got partial results, pad with failure indicators rather than pattern analysis
 	if len(llmResults) < len(messages) {
 		for i := len(llmResults); i < len(messages); i++ {
-			llmResults = append(llmResults, patternBasedAnalysis(messages[i], today))
+			llmResults = append(llmResults, OOOAnalysis{
+				IsOOOMessage: false,
+				Reason:       "LLM analysis incomplete",
+				Confidence:   "none",
+			})
 		}
 	}
 
 	return llmResults
 }
 
-func tryLLMAnalysisBatch(messages []MessageData, today string) []OOOAnalysis {
+func tryLLMAnalysisBatchWithRetry(messages []MessageData, today string, maxRetries int) ([]OOOAnalysis, error) {
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: wait 1s, then 2s, then 4s
+			waitTime := time.Duration(1<<uint(attempt-1)) * time.Second
+			log.Printf("LLM attempt %d failed, retrying in %v...\n", attempt, waitTime)
+			time.Sleep(waitTime)
+		}
+
+		llmResults, err := tryLLMAnalysisBatch(messages, today)
+		if err == nil && len(llmResults) > 0 {
+			return llmResults, nil
+		}
+
+		lastErr = err
+		log.Printf("LLM attempt %d failed: %v\n", attempt+1, err)
+	}
+
+	log.Printf("LLM analysis failed after %d attempts. Last error: %v\n", maxRetries, lastErr)
+	return []OOOAnalysis{}, lastErr
+}
+
+func tryLLMAnalysisBatch(messages []MessageData, today string) ([]OOOAnalysis, error) {
 	// Build the batch prompt
 	var messageInputs []string
 	for i, msg := range messages {
 		messageInput := fmt.Sprintf(`Message %d:
 User: %s
-Date message was sent: %s
-Message: "%s"`, i+1, msg.UserName, msg.MessageDate, msg.Message)
+Date message was sent: %s (%s)
+Message: "%s"`, i+1, msg.UserName, msg.MessageDate, msg.DayOfWeek, msg.Message)
 		messageInputs = append(messageInputs, messageInput)
 	}
 
 	prompt := fmt.Sprintf(`You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
 
-Given multiple messages with user names, dates they posted, and today's date, identify whether each user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out for each message.
+Given multiple messages with user names, dates they posted (with day of week), and today's date, identify whether each user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out for each message.
 
-Always resolve relative dates (like "tomorrow" or "next Friday") based on date_message_was_sent. Assume users are in the same year unless otherwise stated.
+Always resolve relative dates (like "tomorrow", "next Friday", "Thursday and Friday") based on the date_message_was_sent and its day of week. When someone mentions days of the week, calculate the actual dates based on when they sent the message. Assume users are in the same year unless otherwise stated.
+
+Examples:
+- If someone posts on Tuesday (2025-07-22) saying "I'm OOO Thursday and Friday", that means Thursday 2025-07-24 and Friday 2025-07-25
+- If someone posts on Thursday (2025-07-24) saying "Monday 28th - Friday 1st", that means Monday 2025-07-28 through Friday 2025-08-01
 
 Respond ONLY with valid JSON array in this exact format (no additional text):
 [
@@ -620,19 +646,19 @@ Today's date: %s
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 
 	baseURL := os.Getenv("LLM_BASE_URL")
 	apiKey := os.Getenv("LLM_API_KEY")
 
 	if baseURL == "" || apiKey == "" {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, fmt.Errorf("LLM_BASE_URL or LLM_API_KEY not set")
 	}
 
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -640,38 +666,36 @@ Today's date: %s
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return []OOOAnalysis{
-			{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"},
-		}
+		return []OOOAnalysis{}, fmt.Errorf("LLM API error: %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 
 	if len(llmResponse.Choices) == 0 {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, fmt.Errorf("LLM returned no choices")
 	}
 
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 
 	var analyses []OOOAnalysis
 	if err := json.Unmarshal([]byte(content), &analyses); err != nil {
-		return []OOOAnalysis{}
+		return []OOOAnalysis{}, err
 	}
 
-	return analyses
+	return analyses, nil
 }
 
 func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
@@ -680,80 +704,5 @@ func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis
 	if len(results) > 0 {
 		return results[0]
 	}
-	return patternBasedAnalysis(messageData, today)
-}
-
-func patternBasedAnalysis(messageData MessageData, today string) OOOAnalysis {
-	message := strings.ToLower(messageData.Message)
-
-	// Define OOO patterns
-	oooPatterns := []string{
-		"ooo", "out of office", "be off", "be out", "taking off", "day off",
-		"sick leave", "vacation", "be away", "offline", "afk", "away from",
-		"taking the day", "not feeling well", "stepping out", "be unavailable",
-		"holiday", "appointment", "doctor", "emergency", "family matter",
-	}
-
-	// Check if message contains OOO patterns
-	hasOOOPattern := false
-	for _, pattern := range oooPatterns {
-		if strings.Contains(message, pattern) {
-			hasOOOPattern = true
-			break
-		}
-	}
-
-	if !hasOOOPattern {
-		return OOOAnalysis{IsOOOMessage: false, Reason: "No OOO patterns detected", Confidence: "medium"}
-	}
-
-	// Simple date extraction - look for common date patterns
-	var detectedDates []string
-
-	// Look for "today", "tomorrow", etc.
-	if strings.Contains(message, "today") || strings.Contains(message, "rest of the day") {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
-	if strings.Contains(message, "tomorrow") {
-		// Add one day to message date
-		if msgDate, err := time.Parse("2006-01-02", messageData.MessageDate); err == nil {
-			tomorrow := msgDate.AddDate(0, 0, 1)
-			detectedDates = append(detectedDates, tomorrow.Format("2006-01-02"))
-		}
-	}
-
-	// Look for specific date patterns like "7/24", "07/25", etc.
-	dateRegex := regexp.MustCompile(`\b(\d{1,2})[/-](\d{1,2})\b`)
-	matches := dateRegex.FindAllStringSubmatch(message, -1)
-	for _, match := range matches {
-		if len(match) == 3 {
-			month := match[1]
-			day := match[2]
-			// Assume current year and pad with zeros
-			if len(month) == 1 {
-				month = "0" + month
-			}
-			if len(day) == 1 {
-				day = "0" + day
-			}
-			// Extract year from today's date
-			todayDate, _ := time.Parse("2006-01-02", today)
-			year := todayDate.Year()
-			dateStr := fmt.Sprintf("%d-%s-%s", year, month, day)
-			detectedDates = append(detectedDates, dateStr)
-		}
-	}
-
-	// If no specific dates found, use message date as fallback
-	if len(detectedDates) == 0 {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
-	return OOOAnalysis{
-		IsOOOMessage:    true,
-		DeclaredOOODate: detectedDates,
-		Reason:          "Pattern-based detection (LLM unavailable)",
-		Confidence:      "medium",
-	}
+	return OOOAnalysis{IsOOOMessage: false, Reason: "LLM analysis failed after retries", Confidence: "none"}
 }
