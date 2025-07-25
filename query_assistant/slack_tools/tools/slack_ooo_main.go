@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,11 +33,17 @@ type MessageData struct {
 	MessageDate string `json:"message_date"`
 }
 
-type OOOAnalysis struct {
-	IsOOOMessage    bool     `json:"is_ooo_message"`
+type DateExtraction struct {
 	DeclaredOOODate []string `json:"declared_ooo_date"`
 	Reason          string   `json:"reason"`
-	Confidence      string   `json:"confidence"`
+}
+
+type BatchDateExtraction struct {
+	Results []struct {
+		MessageIndex    int      `json:"message_index"`
+		DeclaredOOODate []string `json:"declared_ooo_date"`
+		Reason          string   `json:"reason"`
+	} `json:"results"`
 }
 
 type OOODeclaration struct {
@@ -44,6 +51,7 @@ type OOODeclaration struct {
 	DeclaredOOODate    []string `json:"declared_ooo_date"`
 	DateMessageWasSent string   `json:"date_message_was_sent"`
 	RawMessage         string   `json:"raw_message"`
+	Reason             string   `json:"reason"`
 }
 
 type OOOResult struct {
@@ -79,10 +87,35 @@ type LLMResponse struct {
 var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
-	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
-	llmAvailable   = true                                   // Track if LLM is working
-	llmCheckMutex  = sync.RWMutex{}
+	responseCache  = make(map[string]DateExtraction)
+	cacheMutex     = sync.RWMutex{}
+	httpClient     *http.Client
+	llmSemaphore   chan struct{}
 )
+
+func init() {
+	// Optimized HTTP client with connection pooling and keep-alive
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+		DisableKeepAlives:   false,
+	}
+
+	httpClient = &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second, // Increased for batch processing
+	}
+
+	// Limit concurrent LLM calls to prevent rate limiting
+	maxLLMConcurrency := 10
+	if envVal := os.Getenv("MAX_LLM_CONCURRENCY"); envVal != "" {
+		if val, err := strconv.Atoi(envVal); err == nil && val > 0 {
+			maxLLMConcurrency = val
+		}
+	}
+	llmSemaphore = make(chan struct{}, maxLLMConcurrency)
+}
 
 func main() {
 	token := os.Getenv("SLACK_API_TOKEN")
@@ -159,9 +192,9 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 		}
 	}
 
-	log.Printf("Found %d messages to analyze for OOO declarations", len(messages))
+	log.Printf("Found %d messages to analyze for OOO date extraction", len(messages))
 
-	declarations := analyzeMessagesForOOO(messages, today)
+	declarations := extractOOODatesFromMessages(messages, today)
 
 	log.Printf("Analysis complete. Found %d OOO declarations", len(declarations))
 
@@ -381,62 +414,56 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 	return allMessages, nil
 }
 
-func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
-	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
-	semaphore := make(chan struct{}, maxConcurrency)
-	resultChan := make(chan *OOODeclaration, len(messages))
+func extractOOODatesFromMessages(messages []MessageData, today string) []OOODeclaration {
+	// Process messages in optimized batches for LLM efficiency
+	const batchSize = 8 // Increased batch size since we're doing simpler date extraction
+
+	var allDeclarations []OOODeclaration
+	var declarationsMutex sync.Mutex
 	var wg sync.WaitGroup
 
-	// Add mutex for coordinated logging
-	var logMutex sync.Mutex
+	// Process messages in batches
+	for i := 0; i < len(messages); i += batchSize {
+		end := i + batchSize
+		if end > len(messages) {
+			end = len(messages)
+		}
 
-	for i, message := range messages {
-		if strings.TrimSpace(message.Message) == "" {
+		batch := messages[i:end]
+
+		// Filter out empty messages before sending to LLM
+		var validMessages []MessageData
+		for _, msg := range batch {
+			if strings.TrimSpace(msg.Message) != "" {
+				validMessages = append(validMessages, msg)
+			}
+		}
+
+		if len(validMessages) == 0 {
 			continue
 		}
 
 		wg.Add(1)
-		go func(msg MessageData, index int) {
+		go func(msgBatch []MessageData, batchIndex int) {
 			defer wg.Done()
 
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
+			log.Printf("Processing batch %d: %d messages", batchIndex+1, len(msgBatch))
 
-			// Coordinated logging to avoid garbled output
-			logMutex.Lock()
-			log.Printf("Analyzing message %d/%d from %s: %.60s...", index+1, len(messages), msg.UserName, msg.Message)
-			logMutex.Unlock()
+			// Extract dates from batch
+			batchDeclarations := processBatchForDateExtraction(msgBatch, today)
 
-			analysis := fastAnalyzeMessageForOOO(msg, today)
-
-			// Debug: Log the analysis result
-			if analysis.IsOOOMessage {
-				logMutex.Lock()
-				log.Printf("✓ OOO FOUND in message %d: %s declared OOO on %v", index+1, msg.UserName, analysis.DeclaredOOODate)
-				logMutex.Unlock()
-			}
-
-			if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
-				declaration := &OOODeclaration{
-					UserName:           msg.UserName,
-					DeclaredOOODate:    analysis.DeclaredOOODate,
-					DateMessageWasSent: msg.MessageDate,
-					RawMessage:         msg.Message,
-				}
-				resultChan <- declaration
-			}
-		}(message, i)
+			declarationsMutex.Lock()
+			allDeclarations = append(allDeclarations, batchDeclarations...)
+			declarationsMutex.Unlock()
+		}(validMessages, i/batchSize)
 	}
 
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
+	wg.Wait()
 
+	// Deduplicate declarations
 	declarationMap := make(map[string]*OOODeclaration)
-
-	for declaration := range resultChan {
-		key := fmt.Sprintf("%s_%s_%s", declaration.UserName, declaration.DateMessageWasSent, declaration.RawMessage)
+	for _, declaration := range allDeclarations {
+		key := fmt.Sprintf("%s_%s_%s_%s", declaration.UserName, declaration.DateMessageWasSent, declaration.RawMessage, declaration.Reason)
 		if existing, exists := declarationMap[key]; exists {
 			dateSet := make(map[string]bool)
 			for _, date := range existing.DeclaredOOODate {
@@ -453,7 +480,7 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 			sort.Strings(mergedDates)
 			existing.DeclaredOOODate = mergedDates
 		} else {
-			declarationMap[key] = declaration
+			declarationMap[key] = &declaration
 		}
 	}
 
@@ -469,63 +496,197 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	return finalDeclarations
 }
 
-func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
-	// Check if LLM is available, if not, skip directly to pattern analysis
-	llmCheckMutex.RLock()
-	isLLMAvailable := llmAvailable
-	llmCheckMutex.RUnlock()
+func processBatchForDateExtraction(messages []MessageData, today string) []OOODeclaration {
+	var declarations []OOODeclaration
 
-	// If LLM has been failing, skip it entirely for performance
-	if !isLLMAvailable {
-		return patternBasedAnalysis(messageData, today)
-	}
-
-	// Try LLM only once per execution - if it fails, disable it for all subsequent calls
-	llmResult := tryLLMAnalysisOnce(messageData, today)
-	if llmResult.IsOOOMessage || strings.Contains(llmResult.Reason, "LLM API error") {
-		// If LLM failed, disable it for all future calls in this execution
-		if strings.Contains(llmResult.Reason, "LLM API error") {
-			llmCheckMutex.Lock()
-			llmAvailable = false
-			log.Printf("LLM disabled for this execution due to repeated failures")
-			llmCheckMutex.Unlock()
-			return patternBasedAnalysis(messageData, today)
+	// Try batch processing first (more efficient)
+	if len(messages) > 1 {
+		if batchResults := tryBatchDateExtraction(messages, today); len(batchResults) > 0 {
+			return batchResults
 		}
-		return llmResult
+		log.Printf("Batch date extraction failed, falling back to individual analysis")
 	}
 
-	// If LLM returned false, use pattern-based fallback
-	return patternBasedAnalysis(messageData, today)
+	// Fallback to individual processing if batch fails
+	const maxConcurrency = 5 // Higher concurrency since we're doing simpler processing
+	semaphore := make(chan struct{}, maxConcurrency)
+	resultChan := make(chan *OOODeclaration, len(messages))
+	var wg sync.WaitGroup
+
+	for _, message := range messages {
+		wg.Add(1)
+		go func(msg MessageData) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}
+			defer func() { <-semaphore }()
+
+			dateExtraction := extractDatesWithLLM(msg, today)
+
+			// Since we know every message is OOO, create declaration if we got any dates
+			if len(dateExtraction.DeclaredOOODate) > 0 {
+				declaration := &OOODeclaration{
+					UserName:           msg.UserName,
+					DeclaredOOODate:    dateExtraction.DeclaredOOODate,
+					DateMessageWasSent: msg.MessageDate,
+					RawMessage:         msg.Message,
+					Reason:             dateExtraction.Reason,
+				}
+				resultChan <- declaration
+			} else {
+				// If LLM couldn't extract dates, use message date as fallback
+				declaration := &OOODeclaration{
+					UserName:           msg.UserName,
+					DeclaredOOODate:    []string{msg.MessageDate},
+					DateMessageWasSent: msg.MessageDate,
+					RawMessage:         msg.Message,
+					Reason:             "Could not extract OOO dates from message.",
+				}
+				resultChan <- declaration
+			}
+		}(message)
+	}
+
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	for declaration := range resultChan {
+		declarations = append(declarations, *declaration)
+	}
+
+	return declarations
 }
 
-func tryLLMAnalysisOnce(messageData MessageData, today string) OOOAnalysis {
-	prompt := fmt.Sprintf(`You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
+func tryBatchDateExtraction(messages []MessageData, today string) []OOODeclaration {
+	// Acquire semaphore for rate limiting
+	llmSemaphore <- struct{}{}
+	defer func() { <-llmSemaphore }()
 
-Given a message, the user's name, the date they posted it (date_message_was_sent), and today's date (today_date), identify whether the user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out.
+	// Create optimized prompt focused purely on date extraction
+	var promptBuilder strings.Builder
+	promptBuilder.WriteString("Extract the out-of-office dates from these messages. Each message is an OOO declaration - focus on finding the specific dates they will be out and provide a brief reason.\n\n")
+	promptBuilder.WriteString("Respond with valid JSON only:\n")
+	promptBuilder.WriteString(`{"results": [{"message_index": 0, "declared_ooo_date": ["2024-07-25", "2024-07-26"], "reason": "sick leave"}]}`)
+	promptBuilder.WriteString("\n\nMessages to analyze:\n")
 
-Always resolve relative dates (like "tomorrow" or "next Friday") based on date_message_was_sent. Assume users are in the same year unless otherwise stated.
+	for i, msg := range messages {
+		promptBuilder.WriteString(fmt.Sprintf("Message %d:\n", i))
+		promptBuilder.WriteString(fmt.Sprintf("User: %s | Posted: %s\n", msg.UserName, msg.MessageDate))
+		promptBuilder.WriteString(fmt.Sprintf("Message: \"%s\"\n\n", msg.Message))
+	}
 
-Respond ONLY with valid JSON in this exact format (no additional text):
-{
-  "is_ooo_message": true,
-  "declared_ooo_date": ["2024-07-25", "2024-07-26"],
-  "reason": "Brief explanation of why this is/isn't an OOO message",
-  "confidence": "high"
+	promptBuilder.WriteString(fmt.Sprintf("Today's date: %s\n", today))
+	promptBuilder.WriteString("Extract all declared OOO dates and provide a brief reason (e.g., 'vacation', 'sick day', 'appointment', 'family emergency'). Resolve relative dates like 'today', 'tomorrow', 'Monday' based on when each message was posted.")
+
+	result := makeLLMRequest(promptBuilder.String())
+	if result == "" {
+		return []OOODeclaration{}
+	}
+
+	var batchExtraction BatchDateExtraction
+	if err := json.Unmarshal([]byte(result), &batchExtraction); err != nil {
+		log.Printf("Failed to parse batch date extraction response: %v", err)
+		return []OOODeclaration{}
+	}
+
+	var declarations []OOODeclaration
+	for _, result := range batchExtraction.Results {
+		if result.MessageIndex < len(messages) {
+			msg := messages[result.MessageIndex]
+
+			// Use extracted dates or fallback to message date
+			oooDate := result.DeclaredOOODate
+			if len(oooDate) == 0 {
+				oooDate = []string{msg.MessageDate}
+			}
+
+			// Use extracted reason or provide default
+			reason := result.Reason
+			if reason == "" {
+				reason = "Out of office"
+			}
+
+			declarations = append(declarations, OOODeclaration{
+				UserName:           msg.UserName,
+				DeclaredOOODate:    oooDate,
+				DateMessageWasSent: msg.MessageDate,
+				RawMessage:         msg.Message,
+				Reason:             reason,
+			})
+		}
+	}
+
+	log.Printf("Batch date extraction processed %d messages, created %d declarations", len(messages), len(declarations))
+	return declarations
 }
 
-### Input:
-User: %s
-Date message was sent: %s
-Today's date: %s
-Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageData.Message)
+func extractDatesWithLLM(messageData MessageData, today string) DateExtraction {
+	// Check cache first - include username to prevent collisions
+	cacheKey := generateCacheKey(messageData.Message, messageData.MessageDate, today, messageData.UserName)
+
+	cacheMutex.RLock()
+	if cached, exists := responseCache[cacheKey]; exists {
+		cacheMutex.RUnlock()
+		return cached
+	}
+	cacheMutex.RUnlock()
+
+	// Acquire semaphore for rate limiting
+	llmSemaphore <- struct{}{}
+	defer func() { <-llmSemaphore }()
+
+	// Simplified prompt focused on date extraction with reason
+	prompt := fmt.Sprintf(`Extract OOO dates from this message and provide a brief reason. Respond with JSON only:
+{"declared_ooo_date": ["2024-07-25", "2024-07-26"], "reason": "sick day"}
+
+User: %s | Posted: %s | Today: %s
+Message: "%s"
+
+Extract all declared OOO dates and provide a brief reason (e.g., 'vacation', 'sick day', 'appointment', 'family emergency'). Convert relative dates like 'today', 'tomorrow', 'Monday' to YYYY-MM-DD format based on the posted date.`,
+		messageData.UserName, messageData.MessageDate, today, messageData.Message)
+
+	content := makeLLMRequest(prompt)
+	if content == "" {
+		return DateExtraction{DeclaredOOODate: []string{}, Reason: ""}
+	}
+
+	var extraction DateExtraction
+	if err := json.Unmarshal([]byte(content), &extraction); err != nil {
+		log.Printf("Failed to parse date extraction response: %v", err)
+		return DateExtraction{DeclaredOOODate: []string{}, Reason: ""}
+	}
+
+	// Provide default reason if none extracted
+	if extraction.Reason == "" {
+		extraction.Reason = "Out of office"
+	}
+
+	// Cache the result
+	cacheMutex.Lock()
+	responseCache[cacheKey] = extraction
+	cacheMutex.Unlock()
+
+	return extraction
+}
+
+func makeLLMRequest(prompt string) string {
+	baseURL := os.Getenv("LLM_BASE_URL")
+	apiKey := os.Getenv("LLM_API_KEY")
+
+	if baseURL == "" || apiKey == "" {
+		log.Printf("Missing LLM configuration - baseURL: %s, apiKey present: %v", baseURL, apiKey != "")
+		return ""
+	}
 
 	llmRequest := LLMRequest{
 		Messages: []LLMMessage{
-			{Role: "system", Content: "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON only."},
+			{Role: "system", Content: "You are a date extraction specialist. Extract out-of-office dates from messages. Always respond with valid JSON only."},
 			{Role: "user", Content: prompt},
 		},
 		Model:       "openai/Llama-4-Scout",
-		MaxTokens:   512,
+		MaxTokens:   250, // Increased slightly since we're extracting dates + reasons
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
@@ -534,22 +695,14 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal LLM request: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error marshaling request", Confidence: "low"}
-	}
-
-	baseURL := os.Getenv("LLM_BASE_URL")
-	apiKey := os.Getenv("LLM_API_KEY")
-
-	if baseURL == "" || apiKey == "" {
-		log.Printf("ERROR: Missing LLM configuration - baseURL: %s, apiKey present: %v", baseURL, apiKey != "")
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Missing LLM configuration", Confidence: "low"}
+		log.Printf("Failed to marshal LLM request: %v", err)
+		return ""
 	}
 
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("ERROR: Failed to create HTTP request: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error creating request", Confidence: "low"}
+		log.Printf("Failed to create HTTP request: %v", err)
+		return ""
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -557,120 +710,38 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("ERROR: HTTP request failed: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error making request", Confidence: "low"}
+		log.Printf("HTTP request failed: %v", err)
+		return ""
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("ERROR: LLM API returned status %d", resp.StatusCode)
-		return OOOAnalysis{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"}
+		log.Printf("LLM API returned status %d", resp.StatusCode)
+		return ""
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("ERROR: Failed to read response body: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error reading response", Confidence: "low"}
+		log.Printf("Failed to read response body: %v", err)
+		return ""
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
-		log.Printf("ERROR: Failed to parse LLM response JSON: %v", err)
-		log.Printf("Response body: %s", string(body))
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error parsing LLM response", Confidence: "low"}
+		log.Printf("Failed to parse LLM response JSON: %v", err)
+		return ""
 	}
 
 	if len(llmResponse.Choices) == 0 {
-		log.Printf("ERROR: No choices in LLM response")
-		return OOOAnalysis{IsOOOMessage: false, Reason: "No choices in LLM response", Confidence: "low"}
+		log.Printf("No choices in LLM response")
+		return ""
 	}
 
-	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
-
-	// Debug: Log the raw LLM response
-	log.Printf("DEBUG: LLM response for message from %s: %s", messageData.UserName, content)
-
-	var analysis OOOAnalysis
-	if err := json.Unmarshal([]byte(content), &analysis); err != nil {
-		log.Printf("ERROR: Failed to parse LLM JSON response: %v", err)
-		log.Printf("LLM Content: %s", content)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Failed to parse LLM response", Confidence: "low"}
-	}
-
-	return analysis
+	return strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 }
 
-func patternBasedAnalysis(messageData MessageData, today string) OOOAnalysis {
-	message := strings.ToLower(messageData.Message)
-
-	// Define OOO patterns
-	oooPatterns := []string{
-		"ooo", "out of office", "be off", "be out", "taking off", "day off",
-		"sick leave", "vacation", "be away", "offline", "afk", "away from",
-		"taking the day", "not feeling well", "stepping out", "be unavailable",
-		"holiday", "appointment", "doctor", "emergency", "family matter",
-	}
-
-	// Check if message contains OOO patterns
-	hasOOOPattern := false
-	for _, pattern := range oooPatterns {
-		if strings.Contains(message, pattern) {
-			hasOOOPattern = true
-			break
-		}
-	}
-
-	if !hasOOOPattern {
-		return OOOAnalysis{IsOOOMessage: false, Reason: "No OOO patterns detected", Confidence: "medium"}
-	}
-
-	// Simple date extraction - look for common date patterns
-	var detectedDates []string
-
-	// Look for "today", "tomorrow", etc.
-	if strings.Contains(message, "today") || strings.Contains(message, "rest of the day") {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
-	if strings.Contains(message, "tomorrow") {
-		// Add one day to message date
-		if msgDate, err := time.Parse("2006-01-02", messageData.MessageDate); err == nil {
-			tomorrow := msgDate.AddDate(0, 0, 1)
-			detectedDates = append(detectedDates, tomorrow.Format("2006-01-02"))
-		}
-	}
-
-	// Look for specific date patterns like "7/24", "07/25", etc.
-	dateRegex := regexp.MustCompile(`\b(\d{1,2})[/-](\d{1,2})\b`)
-	matches := dateRegex.FindAllStringSubmatch(message, -1)
-	for _, match := range matches {
-		if len(match) == 3 {
-			month := match[1]
-			day := match[2]
-			// Assume current year and pad with zeros
-			if len(month) == 1 {
-				month = "0" + month
-			}
-			if len(day) == 1 {
-				day = "0" + day
-			}
-			// Extract year from today's date
-			todayDate, _ := time.Parse("2006-01-02", today)
-			year := todayDate.Year()
-			dateStr := fmt.Sprintf("%d-%s-%s", year, month, day)
-			detectedDates = append(detectedDates, dateStr)
-		}
-	}
-
-	// If no specific dates found, use message date as fallback
-	if len(detectedDates) == 0 {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
-	return OOOAnalysis{
-		IsOOOMessage:    true,
-		DeclaredOOODate: detectedDates,
-		Reason:          "Pattern-based detection (LLM unavailable)",
-		Confidence:      "medium",
-	}
+func generateCacheKey(message, messageDate, today, userName string) string {
+	data := fmt.Sprintf("%s|%s|%s|%s", message, messageDate, today, userName)
+	hash := md5.Sum([]byte(data))
+	return fmt.Sprintf("%x", hash)
 }
