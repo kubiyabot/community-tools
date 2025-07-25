@@ -106,11 +106,13 @@ func main() {
 }
 
 func executeSlackAction(token string, args map[string]string) OOOResult {
+	// Use current date dynamically - never hardcode dates!
 	currentTime := time.Now()
 	today := currentTime.Format("2006-01-02")
 
 	log.Printf("Starting Slack OOO analysis at: %s", currentTime.Format("2006-01-02 15:04:05"))
 	fmt.Printf("Current date and time: %s\n", currentTime.Format("2006-01-02 15:04:05"))
+	fmt.Printf("Using today date for analysis: %s\n", today)
 
 	api := slack.New(token)
 
@@ -377,6 +379,9 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
 
+	// Add mutex for coordinated logging
+	var logMutex sync.Mutex
+
 	for i, message := range messages {
 		if strings.TrimSpace(message.Message) == "" {
 			continue
@@ -389,9 +394,29 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			log.Printf("Analyzing message %d/%d from %s", index+1, len(messages), msg.UserName)
+			// Coordinated logging to avoid garbled output
+			logMutex.Lock()
+			log.Printf("Analyzing message %d/%d from %s: %.60s...", index+1, len(messages), msg.UserName, msg.Message)
+			logMutex.Unlock()
 
 			analysis := analyzeMessageForOOO(msg, today)
+
+			// Debug: Log the analysis result
+			if analysis.IsOOOMessage {
+				logMutex.Lock()
+				log.Printf("✓ OOO FOUND in message %d: %s declared OOO on %v", index+1, msg.UserName, analysis.DeclaredOOODate)
+				logMutex.Unlock()
+			} else if strings.Contains(strings.ToLower(msg.Message), "ooo") ||
+				strings.Contains(strings.ToLower(msg.Message), "out of office") ||
+				strings.Contains(strings.ToLower(msg.Message), "vacation") ||
+				strings.Contains(strings.ToLower(msg.Message), "sick") {
+				// Log potential OOO messages that weren't detected
+				logMutex.Lock()
+				log.Printf("? Potential OOO message %d not detected by LLM: %s - %s (Reason: %s)",
+					index+1, msg.UserName, msg.Message, analysis.Reason)
+				logMutex.Unlock()
+			}
+
 			if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
 				declaration := &OOODeclaration{
 					UserName:           msg.UserName,
@@ -455,7 +480,7 @@ Always resolve relative dates (like "tomorrow" or "next Friday") based on date_m
 Respond ONLY with valid JSON in this exact format (no additional text):
 {
   "is_ooo_message": true,
-  "declared_ooo_date": ["2025-01-25", "2025-01-26"],
+  "declared_ooo_date": ["2025-07-25", "2025-07-26"],
   "reason": "Brief explanation of why this is/isn't an OOO message",
   "confidence": "high"
 }
@@ -481,14 +506,21 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
+		log.Printf("ERROR: Failed to marshal LLM request: %v", err)
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Error marshaling request", Confidence: "low"}
 	}
 
 	baseURL := os.Getenv("LLM_BASE_URL")
 	apiKey := os.Getenv("LLM_API_KEY")
 
+	if baseURL == "" || apiKey == "" {
+		log.Printf("ERROR: Missing LLM configuration - baseURL: %s, apiKey present: %v", baseURL, apiKey != "")
+		return OOOAnalysis{IsOOOMessage: false, Reason: "Missing LLM configuration", Confidence: "low"}
+	}
+
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("ERROR: Failed to create HTTP request: %v", err)
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Error creating request", Confidence: "low"}
 	}
 
@@ -497,28 +529,43 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Printf("ERROR: HTTP request failed: %v", err)
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Error making request", Confidence: "low"}
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != 200 {
+		log.Printf("ERROR: LLM API returned status %d", resp.StatusCode)
+		return OOOAnalysis{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"}
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("ERROR: Failed to read response body: %v", err)
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Error reading response", Confidence: "low"}
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
+		log.Printf("ERROR: Failed to parse LLM response JSON: %v", err)
+		log.Printf("Response body: %s", string(body))
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Error parsing LLM response", Confidence: "low"}
 	}
 
 	if len(llmResponse.Choices) == 0 {
+		log.Printf("ERROR: No choices in LLM response")
 		return OOOAnalysis{IsOOOMessage: false, Reason: "No choices in LLM response", Confidence: "low"}
 	}
 
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 
+	// Debug: Log the raw LLM response
+	log.Printf("DEBUG: LLM response for message from %s: %s", messageData.UserName, content)
+
 	var analysis OOOAnalysis
 	if err := json.Unmarshal([]byte(content), &analysis); err != nil {
+		log.Printf("ERROR: Failed to parse LLM JSON response: %v", err)
+		log.Printf("LLM Content: %s", content)
 		return OOOAnalysis{IsOOOMessage: false, Reason: "Failed to parse LLM response", Confidence: "low"}
 	}
 
