@@ -82,9 +82,20 @@ var (
 	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
 	llmAvailable   = true                                   // Track if LLM is working
 	llmCheckMutex  = sync.RWMutex{}
+
+	// Progress tracking
+	progressStartTime time.Time
+	progressTicker    *time.Ticker
+	progressDone      chan bool
+	progressMutex     sync.Mutex
+	totalMessages     int
+	processedBatches  int
 )
 
 func main() {
+	// Redirect log output to stderr so it doesn't interfere with JSON output
+	log.SetOutput(os.Stderr)
+
 	token := os.Getenv("SLACK_API_TOKEN")
 	if token == "" {
 		result := OOOResult{Success: false, Error: "SLACK_API_TOKEN is not set"}
@@ -107,20 +118,53 @@ func main() {
 	fmt.Println(string(output))
 }
 
+func startProgressIndicator(messageCount int) {
+	progressMutex.Lock()
+	progressStartTime = time.Now()
+	totalMessages = messageCount
+	processedBatches = 0
+	progressDone = make(chan bool)
+	progressTicker = time.NewTicker(20 * time.Second)
+	progressMutex.Unlock()
+
+	go func() {
+		defer progressTicker.Stop()
+		for {
+			select {
+			case <-progressTicker.C:
+				progressMutex.Lock()
+				elapsed := time.Since(progressStartTime)
+				fmt.Fprintf(os.Stderr, "⏳ Still processing... %d messages analyzed in %v\n", totalMessages, elapsed.Round(time.Second))
+				progressMutex.Unlock()
+			case <-progressDone:
+				return
+			}
+		}
+	}()
+}
+
+func stopProgressIndicator() {
+	progressMutex.Lock()
+	if progressDone != nil {
+		close(progressDone)
+		progressDone = nil
+	}
+	if progressTicker != nil {
+		progressTicker.Stop()
+		progressTicker = nil
+	}
+	progressMutex.Unlock()
+}
+
 func executeSlackAction(token string, args map[string]string) OOOResult {
 	// Use Eastern Time Zone for proper date calculation
 	loc, err := time.LoadLocation("America/New_York")
 	if err != nil {
-		log.Printf("Warning: Could not load Eastern timezone, using UTC: %v", err)
 		loc = time.UTC
 	}
 
 	currentTime := time.Now().In(loc)
 	today := currentTime.Format("2006-01-02")
-
-	log.Printf("Starting Slack OOO analysis at: %s", currentTime.Format("2006-01-02 15:04:05 MST"))
-	fmt.Printf("Current date and time (Eastern): %s\n", currentTime.Format("2006-01-02 15:04:05 MST"))
-	fmt.Printf("Using today date for analysis: %s\n", today)
 
 	api := slack.New(token)
 
@@ -144,8 +188,6 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 		return OOOResult{Success: false, Error: fmt.Sprintf("Invalid time filter: %s", err)}
 	}
 
-	log.Printf("Fetching messages from channel %s since %s", channelID, oldestTimestamp)
-
 	messages, err := getChannelMessages(api, channelID, oldestTimestamp)
 	if err != nil {
 		return OOOResult{Success: false, Error: fmt.Sprintf("Error fetching messages: %s", err)}
@@ -159,11 +201,15 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 		}
 	}
 
-	log.Printf("Found %d messages to analyze for OOO declarations", len(messages))
+	// Start progress indicator
+	fmt.Fprintf(os.Stderr, "🔍 Starting analysis of %d messages...\n", len(messages))
+	startProgressIndicator(len(messages))
 
 	declarations := analyzeMessagesForOOO(messages, today)
 
-	log.Printf("Analysis complete. Found %d OOO declarations", len(declarations))
+	// Stop progress indicator
+	stopProgressIndicator()
+	fmt.Fprintf(os.Stderr, "✅ Analysis complete. Found %d OOO declarations.\n", len(declarations))
 
 	return OOOResult{
 		Success:         true,
@@ -173,14 +219,11 @@ func executeSlackAction(token string, args map[string]string) OOOResult {
 }
 
 func findChannel(api *slack.Client, channelInput string) (string, error) {
-	log.Printf("Attempting to find channel: %s", channelInput)
-
 	if channelInput == "" {
 		return "", fmt.Errorf("channel input is empty")
 	}
 
 	if strings.HasPrefix(channelInput, "C") && len(channelInput) == 11 {
-		log.Printf("Using provided channel ID directly: %s", channelInput)
 		return channelInput, nil
 	}
 
@@ -195,7 +238,6 @@ func findChannel(api *slack.Client, channelInput string) (string, error) {
 
 	for _, channel := range channels {
 		if strings.EqualFold(channel.Name, channelInput) {
-			log.Printf("Exact match found: %s", channel.ID)
 			return channel.ID, nil
 		}
 	}
@@ -253,7 +295,6 @@ func getUserInfo(api *slack.Client, userID string) UserInfo {
 
 	user, err := api.GetUserInfo(userID)
 	if err != nil {
-		log.Printf("Could not retrieve user info for %s: %s", userID, err)
 		userInfo := UserInfo{Name: "Unknown User", RealName: "Unknown User", DisplayName: "Unknown User"}
 
 		userCacheMutex.Lock()
@@ -377,7 +418,6 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 		cursor = history.ResponseMetaData.NextCursor
 	}
 
-	log.Printf("Total messages retrieved: %d", len(allMessages))
 	return allMessages, nil
 }
 
@@ -409,9 +449,6 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
 
-	// Add mutex for coordinated logging
-	var logMutex sync.Mutex
-
 	for batchIndex, batch := range batches {
 		wg.Add(1)
 		go func(messageBatch []MessageData, bIndex int) {
@@ -419,11 +456,6 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
-
-			// Coordinated logging to avoid garbled output
-			logMutex.Lock()
-			log.Printf("Analyzing batch %d/%d with %d messages", bIndex+1, len(batches), len(messageBatch))
-			logMutex.Unlock()
 
 			analyses := fastAnalyzeMessageBatchForOOO(messageBatch, today)
 
@@ -434,13 +466,6 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 				}
 
 				msg := messageBatch[i]
-
-				// Debug: Log the analysis result
-				if analysis.IsOOOMessage {
-					logMutex.Lock()
-					log.Printf("✓ OOO FOUND in batch %d: %s declared OOO on %v", bIndex+1, msg.UserName, analysis.DeclaredOOODate)
-					logMutex.Unlock()
-				}
 
 				if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
 					declaration := &OOODeclaration{
@@ -518,7 +543,6 @@ func fastAnalyzeMessageBatchForOOO(messages []MessageData, today string) []OOOAn
 	if len(llmResults) == 0 || (len(llmResults) > 0 && strings.Contains(llmResults[0].Reason, "LLM API error")) {
 		llmCheckMutex.Lock()
 		llmAvailable = false
-		log.Printf("LLM disabled for this execution due to batch analysis failure")
 		llmCheckMutex.Unlock()
 
 		var results []OOOAnalysis
@@ -591,7 +615,6 @@ Today's date: %s
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal LLM batch request: %v", err)
 		return []OOOAnalysis{}
 	}
 
@@ -599,13 +622,11 @@ Today's date: %s
 	apiKey := os.Getenv("LLM_API_KEY")
 
 	if baseURL == "" || apiKey == "" {
-		log.Printf("ERROR: Missing LLM configuration - baseURL: %s, apiKey present: %v", baseURL, apiKey != "")
 		return []OOOAnalysis{}
 	}
 
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("ERROR: Failed to create HTTP batch request: %v", err)
 		return []OOOAnalysis{}
 	}
 
@@ -614,13 +635,11 @@ Today's date: %s
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("ERROR: HTTP batch request failed: %v", err)
 		return []OOOAnalysis{}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("ERROR: LLM API returned status %d for batch request", resp.StatusCode)
 		return []OOOAnalysis{
 			{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"},
 		}
@@ -628,31 +647,22 @@ Today's date: %s
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("ERROR: Failed to read batch response body: %v", err)
 		return []OOOAnalysis{}
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
-		log.Printf("ERROR: Failed to parse LLM batch response JSON: %v", err)
-		log.Printf("Response body: %s", string(body))
 		return []OOOAnalysis{}
 	}
 
 	if len(llmResponse.Choices) == 0 {
-		log.Printf("ERROR: No choices in LLM batch response")
 		return []OOOAnalysis{}
 	}
 
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 
-	// Debug: Log the raw LLM response
-	log.Printf("DEBUG: LLM batch response for %d messages: %s", len(messages), content)
-
 	var analyses []OOOAnalysis
 	if err := json.Unmarshal([]byte(content), &analyses); err != nil {
-		log.Printf("ERROR: Failed to parse LLM batch JSON response: %v", err)
-		log.Printf("LLM Content: %s", content)
 		return []OOOAnalysis{}
 	}
 
