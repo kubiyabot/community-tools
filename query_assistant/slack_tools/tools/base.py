@@ -1793,3 +1793,258 @@ if __name__ == "__main__":
                 )
             ],
         )
+
+class LiteLLMGoTestTool(Tool):
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL", *env]
+        secrets = ["LLM_API_KEY"]
+        
+        go_script_content = '''package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+)
+
+type LLMRequest struct {
+	Messages    []LLMMessage `json:"messages"`
+	Model       string       `json:"model"`
+	MaxTokens   int          `json:"max_tokens"`
+	Temperature float64      `json:"temperature"`
+	TopP        float64      `json:"top_p"`
+	User        string       `json:"user"`
+	Stream      bool         `json:"stream"`
+}
+
+type LLMMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+type LLMResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int `json:"prompt_tokens"`
+		CompletionTokens int `json:"completion_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	} `json:"usage"`
+	Model string `json:"model"`
+}
+
+type TestResult struct {
+	Success           bool   `json:"success"`
+	ResponseContent   string `json:"response_content,omitempty"`
+	ModelUsed         string `json:"model_used,omitempty"`
+	Usage             string `json:"usage,omitempty"`
+	BaseURLUsed       string `json:"base_url_used"`
+	APIKeySuffix      string `json:"api_key_suffix"`
+	TestTime          string `json:"test_time"`
+	Error             string `json:"error,omitempty"`
+	StatusCode        int    `json:"status_code,omitempty"`
+	ResponseHeaders   string `json:"response_headers,omitempty"`
+	RequestHeaders    string `json:"request_headers,omitempty"`
+	RequestBody       string `json:"request_body,omitempty"`
+	ResponseBody      string `json:"response_body,omitempty"`
+}
+
+func main() {
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
+	
+	// Get environment variables
+	baseURL := os.Getenv("LLM_BASE_URL")
+	apiKey := os.Getenv("LLM_API_KEY")
+	userEmail := os.Getenv("KUBIYA_USER_EMAIL")
+	
+	fmt.Fprintf(os.Stderr, "=== GO LITELLM TEST DEBUG ===\\n")
+	fmt.Fprintf(os.Stderr, "Current time: %s\\n", currentTime)
+	fmt.Fprintf(os.Stderr, "Base URL: %s\\n", baseURL)
+	
+	// Mask API key for logging
+	apiKeySuffix := "N/A"
+	if len(apiKey) > 4 {
+		apiKeySuffix = apiKey[len(apiKey)-4:]
+		fmt.Fprintf(os.Stderr, "API Key suffix: %s\\n", apiKeySuffix)
+	} else {
+		fmt.Fprintf(os.Stderr, "API Key: NOT_SET\\n")
+	}
+	
+	fmt.Fprintf(os.Stderr, "User Email: %s\\n", userEmail)
+	
+	result := TestResult{
+		BaseURLUsed:  baseURL,
+		APIKeySuffix: apiKeySuffix,
+		TestTime:     currentTime,
+	}
+	
+	if baseURL == "" || apiKey == "" {
+		result.Success = false
+		result.Error = "Missing required environment variables: LLM_BASE_URL and/or LLM_API_KEY"
+		outputJSON(result)
+		return
+	}
+	
+	// Prepare test request
+	llmRequest := LLMRequest{
+		Messages: []LLMMessage{
+			{Role: "system", Content: "You are a helpful assistant for testing API connectivity."},
+			{Role: "user", Content: "Hello! This is a test message from Go. Please respond with a simple greeting and confirm that you received this message successfully."},
+		},
+		Model:       "openai/Llama-4-Scout",
+		MaxTokens:   100,
+		Temperature: 0.7,
+		TopP:        0.9,
+		User:        userEmail,
+		Stream:      false,
+	}
+	
+	jsonData, err := json.Marshal(llmRequest)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error marshaling JSON: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	result.RequestBody = string(jsonData)
+	fmt.Fprintf(os.Stderr, "Request JSON: %s\\n", string(jsonData))
+	
+	// Create HTTP request
+	fullURL := baseURL + "/chat/completions"
+	fmt.Fprintf(os.Stderr, "Full URL: %s\\n", fullURL)
+	
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error creating request: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	// Set headers
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("User-Agent", "Go-http-client/1.1")
+	
+	// Log request headers
+	fmt.Fprintf(os.Stderr, "Request Headers:\\n")
+	requestHeaders := ""
+	for name, values := range req.Header {
+		for _, value := range values {
+			if name == "Authorization" {
+				logValue := "Bearer ***" + value[len(value)-4:]
+				fmt.Fprintf(os.Stderr, "  %s: %s\\n", name, logValue)
+				requestHeaders += fmt.Sprintf("%s: %s\\n", name, logValue)
+			} else {
+				fmt.Fprintf(os.Stderr, "  %s: %s\\n", name, value)
+				requestHeaders += fmt.Sprintf("%s: %s\\n", name, value)
+			}
+		}
+	}
+	result.RequestHeaders = requestHeaders
+	
+	// Make HTTP request
+	client := &http.Client{Timeout: 30 * time.Second}
+	fmt.Fprintf(os.Stderr, "Making HTTP request...\\n")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("HTTP request error: %v", err)
+		outputJSON(result)
+		return
+	}
+	defer resp.Body.Close()
+	
+	result.StatusCode = resp.StatusCode
+	fmt.Fprintf(os.Stderr, "Response Status: %d %s\\n", resp.StatusCode, resp.Status)
+	
+	// Log response headers
+	fmt.Fprintf(os.Stderr, "Response Headers:\\n")
+	responseHeaders := ""
+	for name, values := range resp.Header {
+		for _, value := range values {
+			fmt.Fprintf(os.Stderr, "  %s: %s\\n", name, value)
+			responseHeaders += fmt.Sprintf("%s: %s\\n", name, value)
+		}
+	}
+	result.ResponseHeaders = responseHeaders
+	
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error reading response body: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	result.ResponseBody = string(body)
+	fmt.Fprintf(os.Stderr, "Response Body: %s\\n", string(body))
+	
+	if resp.StatusCode != 200 {
+		result.Success = false
+		result.Error = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body))
+		outputJSON(result)
+		return
+	}
+	
+	// Parse successful response
+	var llmResponse LLMResponse
+	if err := json.Unmarshal(body, &llmResponse); err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error parsing response JSON: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	// Extract response data
+	if len(llmResponse.Choices) > 0 {
+		result.ResponseContent = llmResponse.Choices[0].Message.Content
+	}
+	result.ModelUsed = llmResponse.Model
+	result.Usage = fmt.Sprintf("prompt_tokens=%d, completion_tokens=%d, total_tokens=%d", 
+		llmResponse.Usage.PromptTokens, llmResponse.Usage.CompletionTokens, llmResponse.Usage.TotalTokens)
+	
+	result.Success = true
+	fmt.Fprintf(os.Stderr, "=== SUCCESS ===\\n")
+	fmt.Fprintf(os.Stderr, "Response content: %s\\n", result.ResponseContent)
+	fmt.Fprintf(os.Stderr, "Model used: %s\\n", result.ModelUsed)
+	fmt.Fprintf(os.Stderr, "Usage: %s\\n", result.Usage)
+	
+	outputJSON(result)
+}
+
+func outputJSON(result TestResult) {
+	jsonOutput, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(jsonOutput))
+}
+'''
+        
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="golang:1.21-alpine",
+            content="cd /app && go run main.go",
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+            with_files=[
+                FileSpec(
+                    destination="/app/main.go",
+                    content=go_script_content,
+                )
+            ],
+        )

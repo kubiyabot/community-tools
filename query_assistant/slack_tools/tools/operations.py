@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool, LiteLLMTestTool
+from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool, LiteLLMTestTool, LiteLLMGoTestTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Slack Send Message Tool
@@ -195,6 +195,14 @@ litellm_test = LiteLLMTestTool(
     args=[],  # No arguments needed for the test
 )
 
+# LiteLLM Go Test Tool
+litellm_go_test = LiteLLMGoTestTool(
+    name="litellm_go_test",
+    description="Test LiteLLM API connectivity using Go HTTP client with extensive debugging to compare with Python version",
+    action="test_call",
+    args=[],  # No arguments needed for the test
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -214,7 +222,8 @@ all_tools = [
     slack_search_messages,
     slack_summarize_thread,
     slack_analyze_ooo,
-    litellm_test
+    litellm_test,
+    litellm_go_test
 ]
 
 # Register all Slack tools

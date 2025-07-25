@@ -630,7 +630,7 @@ Today's date: %s
 		return []OOOAnalysis{}
 	}
 
-	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return []OOOAnalysis{}
 	}
