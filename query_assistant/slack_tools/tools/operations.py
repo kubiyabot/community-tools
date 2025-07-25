@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool, LiteLLMTestTool, LiteLLMGoTestTool
+from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool, LiteLLMTestTool, LiteLLMGoTestTool, LLMModelsTestTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Slack Send Message Tool
@@ -203,6 +203,14 @@ litellm_go_test = LiteLLMGoTestTool(
     args=[],  # No arguments needed for the test
 )
 
+# LLM Models Test Tool
+llm_models_test = LLMModelsTestTool(
+    name="llm_models_test",
+    description="Check what models are available for your API key by calling the /v1/models endpoint",
+    action="test_call",
+    args=[],  # No arguments needed for the test
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -223,7 +231,8 @@ all_tools = [
     slack_summarize_thread,
     slack_analyze_ooo,
     litellm_test,
-    litellm_go_test
+    litellm_go_test,
+    llm_models_test
 ]
 
 # Register all Slack tools

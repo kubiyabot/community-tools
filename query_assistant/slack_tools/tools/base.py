@@ -2048,3 +2048,175 @@ func outputJSON(result TestResult) {
                 )
             ],
         )
+
+class LLMModelsTestTool(Tool):
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL", *env]
+        secrets = ["LLM_API_KEY"]
+        
+        go_script_content = '''package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"time"
+)
+
+type ModelsResponse struct {
+	Data []struct {
+		ID     string `json:"id"`
+		Object string `json:"object"`
+		OwnedBy string `json:"owned_by"`
+	} `json:"data"`
+}
+
+type TestResult struct {
+	Success           bool     `json:"success"`
+	AvailableModels   []string `json:"available_models,omitempty"`
+	BaseURLUsed       string   `json:"base_url_used"`
+	APIKeySuffix      string   `json:"api_key_suffix"`
+	TestTime          string   `json:"test_time"`
+	Error             string   `json:"error,omitempty"`
+	StatusCode        int      `json:"status_code,omitempty"`
+	ResponseBody      string   `json:"response_body,omitempty"`
+}
+
+func main() {
+	currentTime := time.Now().Format("2006-01-02 15:04:05")
+	
+	// Get environment variables
+	baseURL := os.Getenv("LLM_BASE_URL")
+	apiKey := os.Getenv("LLM_API_KEY")
+	
+	fmt.Fprintf(os.Stderr, "=== CHECKING AVAILABLE MODELS ===\\n")
+	fmt.Fprintf(os.Stderr, "Current time: %s\\n", currentTime)
+	fmt.Fprintf(os.Stderr, "Base URL: %s\\n", baseURL)
+	
+	// Mask API key for logging
+	apiKeySuffix := "N/A"
+	if len(apiKey) > 4 {
+		apiKeySuffix = apiKey[len(apiKey)-4:]
+		fmt.Fprintf(os.Stderr, "API Key suffix: %s\\n", apiKeySuffix)
+	} else {
+		fmt.Fprintf(os.Stderr, "API Key: NOT_SET\\n")
+	}
+	
+	result := TestResult{
+		BaseURLUsed:  baseURL,
+		APIKeySuffix: apiKeySuffix,
+		TestTime:     currentTime,
+	}
+	
+	if baseURL == "" || apiKey == "" {
+		result.Success = false
+		result.Error = "Missing required environment variables: LLM_BASE_URL and/or LLM_API_KEY"
+		outputJSON(result)
+		return
+	}
+	
+	// Create HTTP request to /v1/models endpoint
+	fullURL := baseURL + "/v1/models"
+	fmt.Fprintf(os.Stderr, "Full URL: %s\\n", fullURL)
+	
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error creating request: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	// Set headers
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("User-Agent", "Go-http-client/1.1")
+	
+	// Make HTTP request
+	client := &http.Client{Timeout: 30 * time.Second}
+	fmt.Fprintf(os.Stderr, "Making HTTP request to models endpoint...\\n")
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("HTTP request error: %v", err)
+		outputJSON(result)
+		return
+	}
+	defer resp.Body.Close()
+	
+	result.StatusCode = resp.StatusCode
+	fmt.Fprintf(os.Stderr, "Response Status: %d %s\\n", resp.StatusCode, resp.Status)
+	
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error reading response body: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	result.ResponseBody = string(body)
+	fmt.Fprintf(os.Stderr, "Response Body: %s\\n", string(body))
+	
+	if resp.StatusCode != 200 {
+		result.Success = false
+		result.Error = fmt.Sprintf("HTTP %d: %s", resp.StatusCode, string(body))
+		outputJSON(result)
+		return
+	}
+	
+	// Parse models response
+	var modelsResponse ModelsResponse
+	if err := json.Unmarshal(body, &modelsResponse); err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Error parsing response JSON: %v", err)
+		outputJSON(result)
+		return
+	}
+	
+	// Extract model IDs
+	var modelIDs []string
+	for _, model := range modelsResponse.Data {
+		modelIDs = append(modelIDs, model.ID)
+	}
+	
+	result.Success = true
+	result.AvailableModels = modelIDs
+	
+	fmt.Fprintf(os.Stderr, "=== SUCCESS ===\\n")
+	fmt.Fprintf(os.Stderr, "Found %d available models:\\n", len(modelIDs))
+	for i, modelID := range modelIDs {
+		fmt.Fprintf(os.Stderr, "  %d. %s\\n", i+1, modelID)
+	}
+	
+	outputJSON(result)
+}
+
+func outputJSON(result TestResult) {
+	jsonOutput, _ := json.MarshalIndent(result, "", "  ")
+	fmt.Println(string(jsonOutput))
+}
+'''
+        
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="golang:1.21-alpine",
+            content="cd /app && go run main.go",
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+            with_files=[
+                FileSpec(
+                    destination="/app/main.go",
+                    content=go_script_content,
+                )
+            ],
+        )
