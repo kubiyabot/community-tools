@@ -1039,3 +1039,538 @@ if __name__ == "__main__":
                 )
             ],
         )
+
+class SlackOutOfOfficeTool(Tool):
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL", *env]
+        secrets = ["SLACK_API_TOKEN", "LLM_API_KEY"]
+        
+        arg_names_json = json.dumps([arg.name for arg in args])
+        
+        script_content = f"""
+import os
+import sys
+import json
+import logging
+from datetime import datetime
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import litellm
+from time import time, sleep
+import re
+from fuzzywuzzy import fuzz
+import random
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Cache for user info to avoid duplicate API calls
+user_cache = {{}}
+
+def get_user_info(client, user_id):
+    \"\"\"Get user information and cache it to avoid duplicate API calls\"\"\"
+    if not user_id:
+        return {{"name": "Unknown User", "real_name": "Unknown User", "display_name": "Unknown User"}}
+    
+    # Check cache first
+    if user_id in user_cache:
+        return user_cache[user_id]
+    
+    try:
+        response = client.users_info(user=user_id)
+        user_info = response["user"]
+        
+        # Extract name information
+        name = user_info.get("name", "Unknown User")
+        real_name = user_info.get("real_name", name)
+        display_name = user_info.get("profile", {{}}).get("display_name", "")
+        
+        # Use display name if available, otherwise real name, otherwise username
+        user_display_name = display_name if display_name else (real_name if real_name else name)
+        
+        user_data = {{
+            "name": name,
+            "real_name": real_name,
+            "display_name": user_display_name
+        }}
+        
+        # Cache the result
+        user_cache[user_id] = user_data
+        logger.info(f"Retrieved user info for {{user_id}}: {{user_display_name}}")
+        
+        return user_data
+        
+    except SlackApiError as e:
+        logger.warning(f"Could not retrieve user info for {{user_id}}: {{e}}")
+        # Cache the unknown user to avoid repeated failed calls
+        user_data = {{"name": "Unknown User", "real_name": "Unknown User", "display_name": "Unknown User"}}
+        user_cache[user_id] = user_data
+        return user_data
+
+def find_channel(client, channel_input):
+    logger.info(f"Attempting to find channel: {{channel_input}}")
+    
+    if not channel_input:
+        logger.error("Channel input is empty")
+        return None
+    
+    # If it's already a valid channel ID (starts with C and is 11 characters long), use it directly
+    if channel_input.startswith('C') and len(channel_input) == 11:
+        logger.info(f"Using provided channel ID directly: {{channel_input}}")
+        return channel_input
+    
+    # Remove '#' if present
+    channel_input = channel_input.lstrip('#')
+    
+    # Try to find the channel by name
+    try:
+        for response in client.conversations_list(types="public_channel,private_channel"):
+            for channel in response["channels"]:
+                # Try exact match first
+                if channel["name"].lower() == channel_input.lower():
+                    logger.info(f"Exact match found: {{channel['id']}}")
+                    return channel["id"]
+                # Fall back to fuzzy match if no exact match found
+                elif fuzz.ratio(channel["name"].lower(), channel_input.lower()) > 80:
+                    logger.info(f"Close match found: {{channel['name']}} (ID: {{channel['id']}})")
+                    return channel["id"]
+    except SlackApiError as e:
+        logger.error(f"Error listing channels: {{e}}")
+
+    logger.error(f"Channel not found: {{channel_input}}")
+    return None
+
+def process_time_filter(oldest_param):
+    if not oldest_param:
+        return None
+        
+    # Handle direct Unix timestamp
+    if oldest_param.replace('.', '').isdigit():
+        return oldest_param
+        
+    time_pattern = re.match(r'(\d+)([hdmw])', oldest_param.lower())
+    if time_pattern:
+        amount = int(time_pattern.group(1))
+        unit = time_pattern.group(2)
+        
+        # Calculate seconds based on unit
+        if unit == 'h':
+            seconds = 3600 * amount
+        elif unit == 'd':
+            seconds = 86400 * amount
+        elif unit == 'w':
+            seconds = 604800 * amount
+        elif unit == 'm':
+            seconds = 60 * amount
+        else:
+            return None
+            
+        # Get current time
+        current_time = time()
+        target_time = current_time - seconds
+        
+        # Format with 6 decimal places
+        return f"{{target_time:.6f}}"
+    
+    return None
+
+def retry_with_backoff(func, max_retries=5, initial_delay=2, max_delay=60):
+    retries = 0
+    delay = initial_delay
+    
+    while retries < max_retries:
+        try:
+            return func()
+        except SlackApiError as e:
+            error_message = str(e)
+            
+            # Check if rate limited
+            if "ratelimited" in error_message:
+                # Add jitter to avoid thundering herd problem
+                jitter = random.uniform(0, 0.1 * delay)
+                sleep_time = delay + jitter
+                
+                logger.warning(f"Rate limited. Retrying in {{sleep_time:.2f}} seconds (attempt {{retries+1}}/{{max_retries}})")
+                sleep(sleep_time)
+                
+                # Exponential backoff
+                delay = min(delay * 2, max_delay)
+                retries += 1
+            else:
+                # If not rate limited, re-raise the exception
+                raise
+    
+    # If we've exhausted retries, raise the last exception
+    raise Exception(f"Failed after {{max_retries}} retries due to rate limiting")
+
+def get_channel_messages(client, channel_id, oldest):
+    try:
+        messages = []
+        cursor = None
+        latest = None  # For time-based pagination
+        
+        # Use pagination to get all messages
+        while True:
+            params = {{
+                "channel": channel_id,
+                "oldest": oldest,
+                "limit": 250  # Recommended by Slack API
+            }}
+            
+            # Add cursor for pagination if we have one
+            if cursor:
+                params["cursor"] = cursor
+            
+            # Add latest timestamp for time-based pagination if we have one
+            if latest:
+                params["latest"] = latest
+            
+            # Use retry with backoff for API call
+            def api_call():
+                return client.conversations_history(**params)
+                
+            response = retry_with_backoff(api_call)
+            batch = response["messages"]
+            
+            if not batch:
+                logger.info("No messages returned in this batch")
+                break
+                
+            messages.extend(batch)
+            
+            # Check if there are more messages to fetch via cursor
+            if response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
+                cursor = response.get("response_metadata", {{}}).get("next_cursor")
+                latest = None  # Reset latest when using cursor
+            # If has_more is true but no cursor, use time-based pagination
+            elif response.get("has_more", False):
+                # Get the timestamp of the oldest message in this batch
+                if batch:
+                    latest = batch[-1].get("ts")
+                    cursor = None  # Reset cursor when using time-based pagination
+                else:
+                    break
+            else:
+                break
+                
+            # Safety limit to prevent excessive API calls
+            if len(messages) >= 50000:
+                logger.info(f"Reached maximum message limit (50000), stopping pagination")
+                break
+        
+        logger.info(f"Total messages retrieved: {{len(messages)}}")
+        
+        # Process messages for OOO analysis
+        processed_messages = []
+        
+        for msg in messages:
+            # Get user information
+            user_id = msg.get("user", "")
+            user_info = get_user_info(client, user_id)
+            
+            # Convert timestamp to readable date
+            message_ts = msg.get("ts", "")
+            message_date = "Unknown Date"
+            if message_ts:
+                try:
+                    message_datetime = datetime.fromtimestamp(float(message_ts))
+                    message_date = message_datetime.strftime("%Y-%m-%d")
+                except (ValueError, TypeError):
+                    logger.warning(f"Could not parse timestamp: {{message_ts}}")
+            
+            processed_msg = {{
+                "message": msg.get("text", ""),
+                "timestamp": message_ts,
+                "user_id": user_id,
+                "user_name": user_info["display_name"],
+                "message_date": message_date
+            }}
+
+            # Check if message has a thread and get replies
+            thread_ts = msg.get("thread_ts")
+            if thread_ts and thread_ts == msg.get("ts"):
+                replies = get_thread_replies(client, channel_id, thread_ts)
+                
+                # Process each reply as a separate message for OOO analysis
+                for reply in replies:
+                    reply_user_id = reply.get("user", "")
+                    reply_user_info = get_user_info(client, reply_user_id)
+                    
+                    # Convert reply timestamp to readable date
+                    reply_ts = reply.get("ts", "")
+                    reply_date = "Unknown Date"
+                    if reply_ts:
+                        try:
+                            reply_datetime = datetime.fromtimestamp(float(reply_ts))
+                            reply_date = reply_datetime.strftime("%Y-%m-%d")
+                        except (ValueError, TypeError):
+                            logger.warning(f"Could not parse reply timestamp: {{reply_ts}}")
+                    
+                    processed_messages.append({{
+                        "message": reply.get("text", ""),
+                        "timestamp": reply_ts,
+                        "user_id": reply_user_id,
+                        "user_name": reply_user_info["display_name"],
+                        "message_date": reply_date
+                    }})
+
+            processed_messages.append(processed_msg)
+            
+        return processed_messages
+        
+    except SlackApiError as e:
+        logger.error(f"Error fetching channel history: {{e}}")
+        return []
+
+def get_thread_replies(client, channel_id, thread_ts):
+    try:
+        replies = []
+        cursor = None
+        while True:
+            params = {{
+                "channel": channel_id,
+                "ts": thread_ts,
+                "limit": 200
+            }}
+            if cursor:
+                params["cursor"] = cursor
+            
+            # Use retry with backoff for API call
+            def api_call():
+                return client.conversations_replies(**params)
+                
+            response = retry_with_backoff(api_call)
+            thread_messages = response["messages"]
+            
+            # Skip the first message (it's the parent)
+            replies_batch = thread_messages[1:] if len(thread_messages) > 1 else []
+            replies.extend(replies_batch)
+            
+            if response.get("has_more", False) and response.get("response_metadata", {{}}).get("next_cursor"):
+                cursor = response.get("response_metadata", {{}}).get("next_cursor")
+            else:
+                break
+        
+        return replies
+
+    except Exception as e:
+        logger.error(f"Error fetching replies for thread {{thread_ts}}: {{e}}")
+        return []
+
+def analyze_message_for_ooo(message_data):
+    \"\"\"Analyze a single message for OOO declarations using LLM\"\"\"
+    try:
+        prompt = f\"\"\"You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
+
+Given a message, the user's name, the date they posted it (date_message_was_sent), and today's date (today_date), identify whether the user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out.
+
+Always resolve relative dates (like "tomorrow" or "next Friday") based on date_message_was_sent. Assume users are in the same year unless otherwise stated.
+
+Respond ONLY with valid JSON in this exact format (no additional text):
+{{
+  "is_ooo_message": true/false,
+  "declared_ooo_date": ["YYYY-MM-DD", "YYYY-MM-DD"],
+  "reason": "Brief explanation of why this is/isn't an OOO message",
+  "confidence": "high/medium/low"
+}}
+
+### Input:
+User: {{message_data['user_name']}}
+Date message was sent: {{message_data['message_date']}}
+Today's date: {{datetime.now().strftime("%Y-%m-%d")}}
+Message: "{{message_data['message']}}"
+\"\"\"
+
+        llm_messages = [
+            {{"role": "system", "content": "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON only."}},
+            {{"role": "user", "content": prompt}}
+        ]
+
+        base_url = os.environ.get("LLM_BASE_URL")
+
+        response = litellm.completion(
+            messages=llm_messages,
+            model="openai/Llama-4-Scout",
+            api_key=os.environ.get("LLM_API_KEY"),
+            base_url=base_url,
+            stream=False,
+            user=os.environ.get("KUBIYA_USER_EMAIL"),
+            max_tokens=512,
+            temperature=0.1,
+            top_p=0.1,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            timeout=15,
+        )
+
+        result_text = response.choices[0].message.content.strip()
+        
+        # Parse the JSON response
+        try:
+            result = json.loads(result_text)
+            return result
+        except json.JSONDecodeError as e:
+            logger.warning(f"Failed to parse LLM JSON response: {{result_text}}. Error: {{e}}")
+            return {{
+                "is_ooo_message": False,
+                "declared_ooo_date": [],
+                "reason": "Failed to parse LLM response",
+                "confidence": "low"
+            }}
+
+    except Exception as e:
+        logger.error(f"Error analyzing message for OOO: {{str(e)}}")
+        return {{
+            "is_ooo_message": False,
+            "declared_ooo_date": [],
+            "reason": f"Error during analysis: {{str(e)}}",
+            "confidence": "low"
+        }}
+
+def execute_slack_action(token, action, operation, **kwargs):
+    # Print current date and time at the beginning
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    logger.info(f"Starting Slack OOO analysis at: {{current_datetime}}")
+    print(f"Current date and time: {{current_datetime}}")
+    
+    client = WebClient(token=token)
+    logger.info(f"Executing Slack OOO analysis with params: {{kwargs}}")
+    
+    channel = kwargs.get('channel')
+    oldest = kwargs.get('oldest', '24h')  # Default to last 24 hours
+    
+    if not channel:
+        return {{"success": False, "error": "Channel parameter is required"}}
+    
+    channel_id = find_channel(client, channel)
+    if not channel_id:
+        return {{"success": False, "error": f"Channel not found: {{channel}}"}}
+    
+    # Process time filter
+    oldest_ts = process_time_filter(oldest)
+    if not oldest_ts:
+        return {{"success": False, "error": "Invalid time filter format. Use format like '1h', '2d', '1w', or '30m'"}}
+    
+    logger.info(f"Fetching messages from channel {{channel_id}} since {{oldest_ts}}")
+    
+    # Get messages
+    messages = get_channel_messages(client, channel_id, oldest_ts)
+    
+    if not messages:
+        return {{
+            "success": True,
+            "today": today_date,
+            "ooo_declarations": [],
+            "message": "No messages found in the specified time period"
+        }}
+    
+    logger.info(f"Found {{len(messages)}} messages to analyze for OOO declarations")
+    
+    # Analyze each message for OOO content
+    ooo_declarations = []
+    seen_declarations = set()  # For deduplication: (user_name, date)
+    
+    for i, message_data in enumerate(messages):
+        if not message_data.get('message', '').strip():
+            continue  # Skip empty messages
+            
+        logger.info(f"Analyzing message {{i+1}}/{{len(messages)}} from {{message_data.get('user_name', 'Unknown')}}")
+        
+        analysis_result = analyze_message_for_ooo(message_data)
+        
+        if analysis_result.get('is_ooo_message', False):
+            # Create OOO declaration entry
+            for ooo_date in analysis_result.get('declared_ooo_date', []):
+                # Check for duplicates
+                dedup_key = (message_data['user_name'], ooo_date)
+                if dedup_key not in seen_declarations:
+                    seen_declarations.add(dedup_key)
+                    
+                    ooo_entry = {{
+                        "user_name": message_data['user_name'],
+                        "declared_ooo_date": [ooo_date] if isinstance(ooo_date, str) else ooo_date,
+                        "date_message_was_sent": message_data['message_date'],
+                        "raw_message": message_data['message']
+                    }}
+                    ooo_declarations.append(ooo_entry)
+                    logger.info(f"Found OOO declaration: {{message_data['user_name']}} on {{ooo_date}}")
+    
+    # Group by user and combine date ranges where possible
+    user_declarations = {{}}
+    for declaration in ooo_declarations:
+        user = declaration['user_name']
+        if user not in user_declarations:
+            user_declarations[user] = []
+        user_declarations[user].append(declaration)
+    
+    # Merge declarations for the same message
+    final_declarations = []
+    for user, declarations in user_declarations.items():
+        # Group by message date and raw message
+        message_groups = {{}}
+        for decl in declarations:
+            key = (decl['date_message_was_sent'], decl['raw_message'])
+            if key not in message_groups:
+                message_groups[key] = {{
+                    "user_name": decl['user_name'],
+                    "declared_ooo_date": [],
+                    "date_message_was_sent": decl['date_message_was_sent'],
+                    "raw_message": decl['raw_message']
+                }}
+            message_groups[key]['declared_ooo_date'].extend(decl['declared_ooo_date'])
+        
+        # Remove duplicates from date lists
+        for group in message_groups.values():
+            group['declared_ooo_date'] = sorted(list(set(group['declared_ooo_date'])))
+            final_declarations.append(group)
+    
+    # Sort by date message was sent
+    final_declarations.sort(key=lambda x: x['date_message_was_sent'])
+    
+    logger.info(f"Analysis complete. Found {{len(final_declarations)}} OOO declarations")
+    
+    return {{
+        "success": True,
+        "today": today_date,
+        "ooo_declarations": final_declarations
+    }}
+
+if __name__ == "__main__":
+    token = os.environ.get("SLACK_API_TOKEN")
+    if not token:
+        logger.error("SLACK_API_TOKEN is not set")
+        print(json.dumps({{"success": False, "error": "SLACK_API_TOKEN is not set"}}))
+        sys.exit(1)
+
+    logger.info("Starting Slack OOO analysis...")
+    arg_names = {arg_names_json}
+    args = {{}}
+    for arg in arg_names:
+        if arg in os.environ:
+            args[arg] = os.environ[arg]
+    
+    result = execute_slack_action(token, "{action}", "{name}", **args)
+    logger.info("Slack OOO analysis completed")
+    print(json.dumps(result))
+"""
+        
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="python:3.11-slim",
+            content="pip install -q slack-sdk fuzzywuzzy python-Levenshtein litellm tenacity > /dev/null 2>&1 && python /tmp/script.py",
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+            with_files=[
+                FileSpec(
+                    destination="/tmp/script.py",
+                    content=script_content,
+                )
+            ],
+        )

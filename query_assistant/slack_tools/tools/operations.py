@@ -1,5 +1,5 @@
 from kubiya_sdk.tools import Arg
-from .base import SlackTool, SlackSearchTool, SlackSummaryTool
+from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool
 from kubiya_sdk.tools.registry import tool_registry
 
 # Slack Send Message Tool
@@ -176,6 +176,17 @@ slack_summarize_thread = SlackSummaryTool(
     args=[],  # No arguments needed
 )
 
+# Slack Analyze Out-of-Office Tool
+slack_analyze_ooo = SlackOutOfOfficeTool(
+    name="slack_analyze_ooo",
+    description="Analyze messages in a Slack channel to extract structured out-of-office (OOO) declarations made by users",
+    action="conversations_history",
+    args=[
+        Arg(name="channel", type="str", description="The channel name (with or without # prefix) or ID to analyze for OOO messages", required=True),
+        Arg(name="oldest", type="str", description="Time range to search for OOO messages. Use format like '1h' (1 hour), '2d' (2 days), '1w' (1 week), '30m' (30 minutes). Default is '24h'", required=False),
+    ],
+)
+
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -193,7 +204,8 @@ all_tools = [
     slack_send_message_to_predefined_channel,
     slack_get_thread_replies,
     slack_search_messages,
-    slack_summarize_thread
+    slack_summarize_thread,
+    slack_analyze_ooo
 ]
 
 # Register all Slack tools
