@@ -1898,7 +1898,7 @@ func main() {
 			{Role: "system", Content: "You are a helpful assistant for testing API connectivity."},
 			{Role: "user", Content: "Hello! This is a test message from Go. Please respond with a simple greeting and confirm that you received this message successfully."},
 		},
-		Model:       "openai/Llama-4-Scout",
+		Model:       "agent-models",  // Changed from "openai/Llama-4-Scout" to use the allowed model group
 		MaxTokens:   100,
 		Temperature: 0.7,
 		TopP:        0.9,
