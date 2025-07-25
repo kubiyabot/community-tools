@@ -79,7 +79,9 @@ type LLMResponse struct {
 var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
-	httpClient     = &http.Client{Timeout: 30 * time.Second}
+	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
+	llmAvailable   = true                                   // Track if LLM is working
+	llmCheckMutex  = sync.RWMutex{}
 )
 
 func main() {
@@ -380,7 +382,7 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 }
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
-	const maxConcurrency = 10
+	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
 	semaphore := make(chan struct{}, maxConcurrency)
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
@@ -405,21 +407,12 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 			log.Printf("Analyzing message %d/%d from %s: %.60s...", index+1, len(messages), msg.UserName, msg.Message)
 			logMutex.Unlock()
 
-			analysis := analyzeMessageForOOO(msg, today)
+			analysis := fastAnalyzeMessageForOOO(msg, today)
 
 			// Debug: Log the analysis result
 			if analysis.IsOOOMessage {
 				logMutex.Lock()
 				log.Printf("✓ OOO FOUND in message %d: %s declared OOO on %v", index+1, msg.UserName, analysis.DeclaredOOODate)
-				logMutex.Unlock()
-			} else if strings.Contains(strings.ToLower(msg.Message), "ooo") ||
-				strings.Contains(strings.ToLower(msg.Message), "out of office") ||
-				strings.Contains(strings.ToLower(msg.Message), "vacation") ||
-				strings.Contains(strings.ToLower(msg.Message), "sick") {
-				// Log potential OOO messages that weren't detected
-				logMutex.Lock()
-				log.Printf("? Potential OOO message %d not detected by LLM: %s - %s (Reason: %s)",
-					index+1, msg.UserName, msg.Message, analysis.Reason)
 				logMutex.Unlock()
 			}
 
@@ -476,18 +469,36 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	return finalDeclarations
 }
 
-func analyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
-	// First try LLM analysis
-	llmResult := tryLLMAnalysis(messageData, today)
-	if llmResult.IsOOOMessage {
+func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
+	// Check if LLM is available, if not, skip directly to pattern analysis
+	llmCheckMutex.RLock()
+	isLLMAvailable := llmAvailable
+	llmCheckMutex.RUnlock()
+
+	// If LLM has been failing, skip it entirely for performance
+	if !isLLMAvailable {
+		return patternBasedAnalysis(messageData, today)
+	}
+
+	// Try LLM only once per execution - if it fails, disable it for all subsequent calls
+	llmResult := tryLLMAnalysisOnce(messageData, today)
+	if llmResult.IsOOOMessage || strings.Contains(llmResult.Reason, "LLM API error") {
+		// If LLM failed, disable it for all future calls in this execution
+		if strings.Contains(llmResult.Reason, "LLM API error") {
+			llmCheckMutex.Lock()
+			llmAvailable = false
+			log.Printf("LLM disabled for this execution due to repeated failures")
+			llmCheckMutex.Unlock()
+			return patternBasedAnalysis(messageData, today)
+		}
 		return llmResult
 	}
 
-	// If LLM failed or returned false, use pattern-based fallback
+	// If LLM returned false, use pattern-based fallback
 	return patternBasedAnalysis(messageData, today)
 }
 
-func tryLLMAnalysis(messageData MessageData, today string) OOOAnalysis {
+func tryLLMAnalysisOnce(messageData MessageData, today string) OOOAnalysis {
 	prompt := fmt.Sprintf(`You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
 
 Given a message, the user's name, the date they posted it (date_message_was_sent), and today's date (today_date), identify whether the user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out.
