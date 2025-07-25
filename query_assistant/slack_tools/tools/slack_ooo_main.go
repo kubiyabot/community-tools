@@ -383,6 +383,28 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
 	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
+	const batchSize = 5       // Process 5 messages per LLM call
+
+	// Group messages into batches of 5
+	var batches [][]MessageData
+	for i := 0; i < len(messages); i += batchSize {
+		end := i + batchSize
+		if end > len(messages) {
+			end = len(messages)
+		}
+		batch := messages[i:end]
+		// Filter out empty messages
+		var validMessages []MessageData
+		for _, msg := range batch {
+			if strings.TrimSpace(msg.Message) != "" {
+				validMessages = append(validMessages, msg)
+			}
+		}
+		if len(validMessages) > 0 {
+			batches = append(batches, validMessages)
+		}
+	}
+
 	semaphore := make(chan struct{}, maxConcurrency)
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
@@ -390,13 +412,9 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	// Add mutex for coordinated logging
 	var logMutex sync.Mutex
 
-	for i, message := range messages {
-		if strings.TrimSpace(message.Message) == "" {
-			continue
-		}
-
+	for batchIndex, batch := range batches {
 		wg.Add(1)
-		go func(msg MessageData, index int) {
+		go func(messageBatch []MessageData, bIndex int) {
 			defer wg.Done()
 
 			semaphore <- struct{}{}
@@ -404,28 +422,37 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 
 			// Coordinated logging to avoid garbled output
 			logMutex.Lock()
-			log.Printf("Analyzing message %d/%d from %s: %.60s...", index+1, len(messages), msg.UserName, msg.Message)
+			log.Printf("Analyzing batch %d/%d with %d messages", bIndex+1, len(batches), len(messageBatch))
 			logMutex.Unlock()
 
-			analysis := fastAnalyzeMessageForOOO(msg, today)
+			analyses := fastAnalyzeMessageBatchForOOO(messageBatch, today)
 
-			// Debug: Log the analysis result
-			if analysis.IsOOOMessage {
-				logMutex.Lock()
-				log.Printf("✓ OOO FOUND in message %d: %s declared OOO on %v", index+1, msg.UserName, analysis.DeclaredOOODate)
-				logMutex.Unlock()
-			}
-
-			if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
-				declaration := &OOODeclaration{
-					UserName:           msg.UserName,
-					DeclaredOOODate:    analysis.DeclaredOOODate,
-					DateMessageWasSent: msg.MessageDate,
-					RawMessage:         msg.Message,
+			// Process each analysis result
+			for i, analysis := range analyses {
+				if i >= len(messageBatch) {
+					break // Safety check
 				}
-				resultChan <- declaration
+
+				msg := messageBatch[i]
+
+				// Debug: Log the analysis result
+				if analysis.IsOOOMessage {
+					logMutex.Lock()
+					log.Printf("✓ OOO FOUND in batch %d: %s declared OOO on %v", bIndex+1, msg.UserName, analysis.DeclaredOOODate)
+					logMutex.Unlock()
+				}
+
+				if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
+					declaration := &OOODeclaration{
+						UserName:           msg.UserName,
+						DeclaredOOODate:    analysis.DeclaredOOODate,
+						DateMessageWasSent: msg.MessageDate,
+						RawMessage:         msg.Message,
+					}
+					resultChan <- declaration
+				}
 			}
-		}(message, i)
+		}(batch, batchIndex)
 	}
 
 	go func() {
@@ -469,7 +496,7 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	return finalDeclarations
 }
 
-func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
+func fastAnalyzeMessageBatchForOOO(messages []MessageData, today string) []OOOAnalysis {
 	// Check if LLM is available, if not, skip directly to pattern analysis
 	llmCheckMutex.RLock()
 	isLLMAvailable := llmAvailable
@@ -477,55 +504,85 @@ func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis
 
 	// If LLM has been failing, skip it entirely for performance
 	if !isLLMAvailable {
-		return patternBasedAnalysis(messageData, today)
-	}
-
-	// Try LLM only once per execution - if it fails, disable it for all subsequent calls
-	llmResult := tryLLMAnalysisOnce(messageData, today)
-	if llmResult.IsOOOMessage || strings.Contains(llmResult.Reason, "LLM API error") {
-		// If LLM failed, disable it for all future calls in this execution
-		if strings.Contains(llmResult.Reason, "LLM API error") {
-			llmCheckMutex.Lock()
-			llmAvailable = false
-			log.Printf("LLM disabled for this execution due to repeated failures")
-			llmCheckMutex.Unlock()
-			return patternBasedAnalysis(messageData, today)
+		var results []OOOAnalysis
+		for _, msg := range messages {
+			results = append(results, patternBasedAnalysis(msg, today))
 		}
-		return llmResult
+		return results
 	}
 
-	// If LLM returned false, use pattern-based fallback
-	return patternBasedAnalysis(messageData, today)
+	// Try LLM batch analysis
+	llmResults := tryLLMAnalysisBatch(messages, today)
+
+	// If LLM failed, disable it and fallback to pattern analysis
+	if len(llmResults) == 0 || (len(llmResults) > 0 && strings.Contains(llmResults[0].Reason, "LLM API error")) {
+		llmCheckMutex.Lock()
+		llmAvailable = false
+		log.Printf("LLM disabled for this execution due to batch analysis failure")
+		llmCheckMutex.Unlock()
+
+		var results []OOOAnalysis
+		for _, msg := range messages {
+			results = append(results, patternBasedAnalysis(msg, today))
+		}
+		return results
+	}
+
+	// If we got results but not enough, fill with pattern analysis
+	if len(llmResults) < len(messages) {
+		for i := len(llmResults); i < len(messages); i++ {
+			llmResults = append(llmResults, patternBasedAnalysis(messages[i], today))
+		}
+	}
+
+	return llmResults
 }
 
-func tryLLMAnalysisOnce(messageData MessageData, today string) OOOAnalysis {
+func tryLLMAnalysisBatch(messages []MessageData, today string) []OOOAnalysis {
+	// Build the batch prompt
+	var messageInputs []string
+	for i, msg := range messages {
+		messageInput := fmt.Sprintf(`Message %d:
+User: %s
+Date message was sent: %s
+Message: "%s"`, i+1, msg.UserName, msg.MessageDate, msg.Message)
+		messageInputs = append(messageInputs, messageInput)
+	}
+
 	prompt := fmt.Sprintf(`You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
 
-Given a message, the user's name, the date they posted it (date_message_was_sent), and today's date (today_date), identify whether the user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out.
+Given multiple messages with user names, dates they posted, and today's date, identify whether each user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out for each message.
 
 Always resolve relative dates (like "tomorrow" or "next Friday") based on date_message_was_sent. Assume users are in the same year unless otherwise stated.
 
-Respond ONLY with valid JSON in this exact format (no additional text):
-{
-  "is_ooo_message": true,
-  "declared_ooo_date": ["2024-07-25", "2024-07-26"],
-  "reason": "Brief explanation of why this is/isn't an OOO message",
-  "confidence": "high"
-}
+Respond ONLY with valid JSON array in this exact format (no additional text):
+[
+  {
+    "is_ooo_message": true,
+    "declared_ooo_date": ["2024-07-25", "2024-07-26"],
+    "reason": "Brief explanation of why this is/isn't an OOO message",
+    "confidence": "high"
+  },
+  {
+    "is_ooo_message": false,
+    "declared_ooo_date": [],
+    "reason": "Brief explanation of why this is/isn't an OOO message", 
+    "confidence": "high"
+  }
+]
 
 ### Input:
-User: %s
-Date message was sent: %s
 Today's date: %s
-Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageData.Message)
+
+%s`, today, strings.Join(messageInputs, "\n\n"))
 
 	llmRequest := LLMRequest{
 		Messages: []LLMMessage{
-			{Role: "system", Content: "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON only."},
+			{Role: "system", Content: "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON array only."},
 			{Role: "user", Content: prompt},
 		},
 		Model:       "openai/Llama-4-Scout",
-		MaxTokens:   512,
+		MaxTokens:   2048, // Increased for batch processing
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
@@ -534,8 +591,8 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal LLM request: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error marshaling request", Confidence: "low"}
+		log.Printf("ERROR: Failed to marshal LLM batch request: %v", err)
+		return []OOOAnalysis{}
 	}
 
 	baseURL := os.Getenv("LLM_BASE_URL")
@@ -543,13 +600,13 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	if baseURL == "" || apiKey == "" {
 		log.Printf("ERROR: Missing LLM configuration - baseURL: %s, apiKey present: %v", baseURL, apiKey != "")
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Missing LLM configuration", Confidence: "low"}
+		return []OOOAnalysis{}
 	}
 
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("ERROR: Failed to create HTTP request: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error creating request", Confidence: "low"}
+		log.Printf("ERROR: Failed to create HTTP batch request: %v", err)
+		return []OOOAnalysis{}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -557,47 +614,58 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Printf("ERROR: HTTP request failed: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error making request", Confidence: "low"}
+		log.Printf("ERROR: HTTP batch request failed: %v", err)
+		return []OOOAnalysis{}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("ERROR: LLM API returned status %d", resp.StatusCode)
-		return OOOAnalysis{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"}
+		log.Printf("ERROR: LLM API returned status %d for batch request", resp.StatusCode)
+		return []OOOAnalysis{
+			{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"},
+		}
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("ERROR: Failed to read response body: %v", err)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error reading response", Confidence: "low"}
+		log.Printf("ERROR: Failed to read batch response body: %v", err)
+		return []OOOAnalysis{}
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
-		log.Printf("ERROR: Failed to parse LLM response JSON: %v", err)
+		log.Printf("ERROR: Failed to parse LLM batch response JSON: %v", err)
 		log.Printf("Response body: %s", string(body))
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Error parsing LLM response", Confidence: "low"}
+		return []OOOAnalysis{}
 	}
 
 	if len(llmResponse.Choices) == 0 {
-		log.Printf("ERROR: No choices in LLM response")
-		return OOOAnalysis{IsOOOMessage: false, Reason: "No choices in LLM response", Confidence: "low"}
+		log.Printf("ERROR: No choices in LLM batch response")
+		return []OOOAnalysis{}
 	}
 
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
 
 	// Debug: Log the raw LLM response
-	log.Printf("DEBUG: LLM response for message from %s: %s", messageData.UserName, content)
+	log.Printf("DEBUG: LLM batch response for %d messages: %s", len(messages), content)
 
-	var analysis OOOAnalysis
-	if err := json.Unmarshal([]byte(content), &analysis); err != nil {
-		log.Printf("ERROR: Failed to parse LLM JSON response: %v", err)
+	var analyses []OOOAnalysis
+	if err := json.Unmarshal([]byte(content), &analyses); err != nil {
+		log.Printf("ERROR: Failed to parse LLM batch JSON response: %v", err)
 		log.Printf("LLM Content: %s", content)
-		return OOOAnalysis{IsOOOMessage: false, Reason: "Failed to parse LLM response", Confidence: "low"}
+		return []OOOAnalysis{}
 	}
 
-	return analysis
+	return analyses
+}
+
+func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
+	// This function is kept for backward compatibility but now just calls the batch version
+	results := fastAnalyzeMessageBatchForOOO([]MessageData{messageData}, today)
+	if len(results) > 0 {
+		return results[0]
+	}
+	return patternBasedAnalysis(messageData, today)
 }
 
 func patternBasedAnalysis(messageData MessageData, today string) OOOAnalysis {
