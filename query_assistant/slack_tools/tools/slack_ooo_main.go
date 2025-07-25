@@ -428,9 +428,9 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
 	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
-	const batchSize = 5       // Process 5 messages per LLM call
+	const batchSize = 10      // Process 10 messages per LLM call (increased from 5)
 
-	// Group messages into batches of 5
+	// Group messages into batches of 10
 	var batches [][]MessageData
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -611,7 +611,7 @@ Today's date: %s
 			{Role: "user", Content: prompt},
 		},
 		Model:       "openai/Llama-4-Scout",
-		MaxTokens:   2048, // Increased for batch processing
+		MaxTokens:   3072, // Increased for larger batch processing (10 messages)
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
