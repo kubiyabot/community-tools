@@ -115,7 +115,12 @@ func main() {
 
 	result := executeSlackAction(token, args)
 	output, _ := json.Marshal(result)
+
+	// Sleep before output to prevent platform duplication bug
+	time.Sleep(1 * time.Second)
 	fmt.Println(string(output))
+	// Sleep after output to prevent platform duplication bug
+	time.Sleep(1 * time.Second)
 }
 
 func startProgressIndicator(messageCount int) {
