@@ -1615,3 +1615,181 @@ class SlackOutOfOfficeTool(Tool):
                 )
             ],
         )
+
+class LiteLLMTestTool(Tool):
+    def __init__(self, name, description, action, args, env=[], long_running=False, mermaid_diagram=None):
+        env = ["KUBIYA_USER_EMAIL", "LLM_BASE_URL", *env]
+        secrets = ["LLM_API_KEY"]
+        
+        arg_names_json = json.dumps([arg.name for arg in args])
+        
+        script_content = f"""
+import os
+import sys
+import json
+import logging
+import litellm
+from datetime import datetime
+import traceback
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def test_litellm_call():
+    \"\"\"Test litellm API call with extensive logging\"\"\"
+    
+    # Print current date and time
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    logger.info(f"Starting LiteLLM test at: {{current_datetime}}")
+    print(f"Current date and time: {{current_datetime}}")
+    
+    # Get environment variables
+    base_url = os.environ.get("LLM_BASE_URL")
+    api_key = os.environ.get("LLM_API_KEY")
+    user_email = os.environ.get("KUBIYA_USER_EMAIL")
+    
+    logger.info("=== ENVIRONMENT VARIABLES ===")
+    logger.info(f"LLM_BASE_URL: {{base_url}}")
+    logger.info(f"LLM_API_KEY: {{'*' * (len(api_key) - 4) + api_key[-4:] if api_key and len(api_key) > 4 else 'NOT_SET'}}")
+    logger.info(f"KUBIYA_USER_EMAIL: {{user_email}}")
+    
+    print(f"LLM_BASE_URL: {{base_url}}")
+    print(f"LLM_API_KEY: {{'*' * (len(api_key) - 4) + api_key[-4:] if api_key and len(api_key) > 4 else 'NOT_SET'}}")
+    print(f"KUBIYA_USER_EMAIL: {{user_email}}")
+    
+    if not base_url or not api_key:
+        error_msg = "Missing required environment variables: LLM_BASE_URL and/or LLM_API_KEY"
+        logger.error(error_msg)
+        return {{"success": False, "error": error_msg}}
+    
+    # Prepare test message
+    test_messages = [
+        {{"role": "system", "content": "You are a helpful assistant for testing API connectivity."}},
+        {{"role": "user", "content": "Hello! This is a test message. Please respond with a simple greeting and confirm that you received this message successfully."}}
+    ]
+    
+    logger.info("=== REQUEST DETAILS ===")
+    logger.info(f"Model: openai/Llama-4-Scout")
+    logger.info(f"Messages: {{test_messages}}")
+    logger.info(f"Max tokens: 100")
+    logger.info(f"Temperature: 0.7")
+    logger.info(f"User: {{user_email}}")
+    
+    print("=== REQUEST DETAILS ===")
+    print(f"Model: openai/Llama-4-Scout")
+    print(f"Messages: {{json.dumps(test_messages, indent=2)}}")
+    print(f"Max tokens: 100")
+    print(f"Temperature: 0.7")
+    print(f"User: {{user_email}}")
+    
+    try:
+        logger.info("=== MAKING LITELLM API CALL ===")
+        print("=== MAKING LITELLM API CALL ===")
+        
+        # Configure litellm
+        litellm.request_timeout = 30
+        litellm.num_retries = 1
+        
+        response = litellm.completion(
+            messages=test_messages,
+            model="openai/Llama-4-Scout",
+            api_key=api_key,
+            base_url=base_url,
+            stream=False,
+            user=user_email,
+            max_tokens=100,
+            temperature=0.7,
+            top_p=0.9,
+            presence_penalty=0.0,
+            frequency_penalty=0.0,
+            timeout=30,
+        )
+        
+        logger.info("=== API CALL SUCCESSFUL ===")
+        print("=== API CALL SUCCESSFUL ===")
+        
+        # Log response details
+        response_content = response.choices[0].message.content if response.choices else "No content"
+        usage = response.usage if hasattr(response, 'usage') else "No usage info"
+        model_used = response.model if hasattr(response, 'model') else "Unknown model"
+        
+        logger.info(f"Response content: {{response_content}}")
+        logger.info(f"Model used: {{model_used}}")
+        logger.info(f"Usage info: {{usage}}")
+        
+        print(f"Response content: {{response_content}}")
+        print(f"Model used: {{model_used}}")
+        print(f"Usage info: {{usage}}")
+        
+        # Return full response details
+        return {{
+            "success": True,
+            "response_content": response_content,
+            "model_used": model_used,
+            "usage": str(usage),
+            "base_url_used": base_url,
+            "api_key_suffix": api_key[-4:] if api_key and len(api_key) > 4 else "N/A",
+            "test_time": current_datetime
+        }}
+        
+    except Exception as e:
+        error_msg = str(e)
+        error_traceback = traceback.format_exc()
+        
+        logger.error("=== API CALL FAILED ===")
+        logger.error(f"Error: {{error_msg}}")
+        logger.error(f"Traceback: {{error_traceback}}")
+        
+        print("=== API CALL FAILED ===")
+        print(f"Error: {{error_msg}}")
+        print(f"Traceback: {{error_traceback}}")
+        
+        return {{
+            "success": False,
+            "error": error_msg,
+            "traceback": error_traceback,
+            "base_url_used": base_url,
+            "api_key_suffix": api_key[-4:] if api_key and len(api_key) > 4 else "N/A",
+            "test_time": current_datetime
+        }}
+
+def execute_test_action(action, operation, **kwargs):
+    logger.info(f"Executing test action: {{action}} for operation: {{operation}}")
+    logger.info(f"Action parameters: {{kwargs}}")
+    
+    return test_litellm_call()
+
+if __name__ == "__main__":
+    logger.info("Starting LiteLLM test execution...")
+    
+    # Get arguments from environment
+    arg_names = {arg_names_json}
+    args = {{}}
+    for arg in arg_names:
+        if arg in os.environ:
+            args[arg] = os.environ[arg]
+    
+    result = execute_test_action("{action}", "{name}", **args)
+    logger.info("LiteLLM test execution completed")
+    print(json.dumps(result, indent=2))
+"""
+        
+        super().__init__(
+            name=name,
+            description=description,
+            icon_url=SLACK_ICON_URL,
+            type="docker",
+            image="python:3.11-slim",
+            content="pip install -q litellm > /dev/null 2>&1 && python /tmp/script.py",
+            args=args,
+            env=env,
+            secrets=secrets,
+            long_running=long_running,
+            mermaid=mermaid_diagram,
+            with_files=[
+                FileSpec(
+                    destination="/tmp/script.py",
+                    content=script_content,
+                )
+            ],
+        )
