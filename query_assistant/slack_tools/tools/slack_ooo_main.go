@@ -106,12 +106,18 @@ func main() {
 }
 
 func executeSlackAction(token string, args map[string]string) OOOResult {
-	// Use current date dynamically - never hardcode dates!
-	currentTime := time.Now()
+	// Use Eastern Time Zone for proper date calculation
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		log.Printf("Warning: Could not load Eastern timezone, using UTC: %v", err)
+		loc = time.UTC
+	}
+
+	currentTime := time.Now().In(loc)
 	today := currentTime.Format("2006-01-02")
 
-	log.Printf("Starting Slack OOO analysis at: %s", currentTime.Format("2006-01-02 15:04:05"))
-	fmt.Printf("Current date and time: %s\n", currentTime.Format("2006-01-02 15:04:05"))
+	log.Printf("Starting Slack OOO analysis at: %s", currentTime.Format("2006-01-02 15:04:05 MST"))
+	fmt.Printf("Current date and time (Eastern): %s\n", currentTime.Format("2006-01-02 15:04:05 MST"))
 	fmt.Printf("Using today date for analysis: %s\n", today)
 
 	api := slack.New(token)
@@ -471,6 +477,17 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 }
 
 func analyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis {
+	// First try LLM analysis
+	llmResult := tryLLMAnalysis(messageData, today)
+	if llmResult.IsOOOMessage {
+		return llmResult
+	}
+
+	// If LLM failed or returned false, use pattern-based fallback
+	return patternBasedAnalysis(messageData, today)
+}
+
+func tryLLMAnalysis(messageData MessageData, today string) OOOAnalysis {
 	prompt := fmt.Sprintf(`You are an expert assistant for extracting out-of-office (OOO) information from Slack messages.
 
 Given a message, the user's name, the date they posted it (date_message_was_sent), and today's date (today_date), identify whether the user is indicating they will be out of office. If they are, return a list of the specific date(s) they are expected to be out.
@@ -480,7 +497,7 @@ Always resolve relative dates (like "tomorrow" or "next Friday") based on date_m
 Respond ONLY with valid JSON in this exact format (no additional text):
 {
   "is_ooo_message": true,
-  "declared_ooo_date": ["2025-07-25", "2025-07-26"],
+  "declared_ooo_date": ["2024-07-25", "2024-07-26"],
   "reason": "Brief explanation of why this is/isn't an OOO message",
   "confidence": "high"
 }
@@ -570,4 +587,79 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 	}
 
 	return analysis
+}
+
+func patternBasedAnalysis(messageData MessageData, today string) OOOAnalysis {
+	message := strings.ToLower(messageData.Message)
+
+	// Define OOO patterns
+	oooPatterns := []string{
+		"ooo", "out of office", "be off", "be out", "taking off", "day off",
+		"sick leave", "vacation", "be away", "offline", "afk", "away from",
+		"taking the day", "not feeling well", "stepping out", "be unavailable",
+		"holiday", "appointment", "doctor", "emergency", "family matter",
+	}
+
+	// Check if message contains OOO patterns
+	hasOOOPattern := false
+	for _, pattern := range oooPatterns {
+		if strings.Contains(message, pattern) {
+			hasOOOPattern = true
+			break
+		}
+	}
+
+	if !hasOOOPattern {
+		return OOOAnalysis{IsOOOMessage: false, Reason: "No OOO patterns detected", Confidence: "medium"}
+	}
+
+	// Simple date extraction - look for common date patterns
+	var detectedDates []string
+
+	// Look for "today", "tomorrow", etc.
+	if strings.Contains(message, "today") || strings.Contains(message, "rest of the day") {
+		detectedDates = append(detectedDates, messageData.MessageDate)
+	}
+
+	if strings.Contains(message, "tomorrow") {
+		// Add one day to message date
+		if msgDate, err := time.Parse("2006-01-02", messageData.MessageDate); err == nil {
+			tomorrow := msgDate.AddDate(0, 0, 1)
+			detectedDates = append(detectedDates, tomorrow.Format("2006-01-02"))
+		}
+	}
+
+	// Look for specific date patterns like "7/24", "07/25", etc.
+	dateRegex := regexp.MustCompile(`\b(\d{1,2})[/-](\d{1,2})\b`)
+	matches := dateRegex.FindAllStringSubmatch(message, -1)
+	for _, match := range matches {
+		if len(match) == 3 {
+			month := match[1]
+			day := match[2]
+			// Assume current year and pad with zeros
+			if len(month) == 1 {
+				month = "0" + month
+			}
+			if len(day) == 1 {
+				day = "0" + day
+			}
+			// Extract year from today's date
+			todayDate, _ := time.Parse("2006-01-02", today)
+			year := todayDate.Year()
+			dateStr := fmt.Sprintf("%d-%s-%s", year, month, day)
+			detectedDates = append(detectedDates, dateStr)
+		}
+	}
+
+	// If no specific dates found, use message date as fallback
+	if len(detectedDates) == 0 {
+		detectedDates = append(detectedDates, messageData.MessageDate)
+	}
+
+	return OOOAnalysis{
+		IsOOOMessage:    true,
+		DeclaredOOODate: detectedDates,
+		Reason:          "Pattern-based detection (LLM unavailable)",
+		Confidence:      "medium",
+	}
 }
