@@ -434,8 +434,8 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 }
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
-	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
-	const batchSize = 10      // Process 10 messages per LLM call (increased from 5)
+	const maxConcurrency = 1 // Increased from 10 to 25 for better performance
+	const batchSize = 10     // Process 10 messages per LLM call (increased from 5)
 
 	// Group messages into batches of 10
 	var batches [][]MessageData
