@@ -2125,7 +2125,7 @@ require github.com/gorilla/websocket v1.4.2 // indirect
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="golang:1.21-alpine",
-            content="cd /tmp && go mod tidy && go run main.go",
+            content="cd /app && go mod tidy && go run main.go",
             args=args,
             env=env,
             secrets=secrets,
@@ -2133,11 +2133,11 @@ require github.com/gorilla/websocket v1.4.2 // indirect
             mermaid=mermaid_diagram,
             with_files=[
                 FileSpec(
-                    destination="/tmp/go.mod",
+                    destination="/app/go.mod",
                     content=go_mod_content,
                 ),
                 FileSpec(
-                    destination="/tmp/main.go",
+                    destination="/app/main.go",
                     content=go_script_content,
                 )
             ],
