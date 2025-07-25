@@ -1582,8 +1582,7 @@ class SlackOutOfOfficeTool(Tool):
         
         arg_names_json = json.dumps([arg.name for arg in args])
         
-        go_script_content = f"""
-package main
+        go_script_content = f"""package main
 
 import (
 	"bytes"
@@ -1736,7 +1735,6 @@ func executeSlackAction(token string, args map[string]string) OOOResult {{
 
 	log.Printf("Found %d messages to analyze for OOO declarations", len(messages))
 
-	// Process messages concurrently
 	declarations := analyzeMessagesForOOO(messages, today)
 
 	log.Printf("Analysis complete. Found %d OOO declarations", len(declarations))
@@ -1755,16 +1753,13 @@ func findChannel(api *slack.Client, channelInput string) (string, error) {{
 		return "", fmt.Errorf("channel input is empty")
 	}}
 
-	// If it's already a valid channel ID, use it directly
 	if strings.HasPrefix(channelInput, "C") && len(channelInput) == 11 {{
 		log.Printf("Using provided channel ID directly: %s", channelInput)
 		return channelInput, nil
 	}}
 
-	// Remove '#' if present
 	channelInput = strings.TrimPrefix(channelInput, "#")
 
-	// List channels and find match
 	channels, _, err := api.GetConversations(&slack.GetConversationsParameters{{
 		Types: []string{{"public_channel", "private_channel"}},
 	}})
@@ -1787,12 +1782,10 @@ func processTimeFilter(oldestParam string) (string, error) {{
 		return "", fmt.Errorf("oldest parameter is empty")
 	}}
 
-	// Handle direct Unix timestamp
 	if matched, _ := regexp.MatchString(`^\\d+(\\.\\d+)?$`, oldestParam); matched {{
 		return oldestParam, nil
 	}}
 
-	// Handle relative time formats
 	re := regexp.MustCompile(`^(\\d+)([hdmw])$`)
 	matches := re.FindStringSubmatch(strings.ToLower(oldestParam))
 	if len(matches) != 3 {{
@@ -1825,7 +1818,6 @@ func getUserInfo(api *slack.Client, userID string) UserInfo {{
 		return UserInfo{{Name: "Unknown User", RealName: "Unknown User", DisplayName: "Unknown User"}}
 	}}
 
-	// Check cache first
 	userCacheMutex.RLock()
 	if cached, exists := userCache[userID]; exists {{
 		userCacheMutex.RUnlock()
@@ -1833,7 +1825,6 @@ func getUserInfo(api *slack.Client, userID string) UserInfo {{
 	}}
 	userCacheMutex.RUnlock()
 
-	// Fetch user info
 	user, err := api.GetUserInfo(userID)
 	if err != nil {{
 		log.Printf("Could not retrieve user info for %s: %s", userID, err)
@@ -1860,12 +1851,10 @@ func getUserInfo(api *slack.Client, userID string) UserInfo {{
 		DisplayName: displayName,
 	}}
 
-	// Cache the result
 	userCacheMutex.Lock()
 	userCache[userID] = userInfo
 	userCacheMutex.Unlock()
 
-	log.Printf("Retrieved user info for %s: %s", userID, displayName)
 	return userInfo
 }}
 
@@ -1890,8 +1879,7 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 			break
 		}}
 
-		// Process messages concurrently for user info
-		messageChan := make(chan MessageData, len(history.Messages))
+		messageChan := make(chan MessageData, len(history.Messages)*2)
 		var wg sync.WaitGroup
 
 		for _, msg := range history.Messages {{
@@ -1918,14 +1906,12 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 
 				messageChan <- processedMsg
 
-				// Process thread replies if they exist
 				if m.ThreadTimestamp != "" && m.ThreadTimestamp == m.Timestamp {{
 					replies, _, _, err := api.GetConversationReplies(&slack.GetConversationRepliesParameters{{
 						ChannelID: channelID,
 						Timestamp: m.ThreadTimestamp,
 					}})
 					if err == nil && len(replies) > 1 {{
-						// Skip first message (parent), process replies
 						for _, reply := range replies[1:] {{
 							replyUserInfo := getUserInfo(api, reply.User)
 							replyDate := "Unknown Date"
@@ -1970,13 +1956,11 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 }}
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {{
-	// Create buffered channels for concurrent processing
 	const maxConcurrency = 10
 	semaphore := make(chan struct{{}}, maxConcurrency)
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
 
-	// Process messages concurrently
 	for i, message := range messages {{
 		if strings.TrimSpace(message.Message) == "" {{
 			continue
@@ -1986,7 +1970,6 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 		go func(msg MessageData, index int) {{
 			defer wg.Done()
 			
-			// Acquire semaphore
 			semaphore <- struct{{}}{{}}
 			defer func() {{ <-semaphore }}()
 
@@ -2005,19 +1988,16 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 		}}(message, i)
 	}}
 
-	// Close result channel when all goroutines complete
 	go func() {{
 		wg.Wait()
 		close(resultChan)
 	}}()
 
-	// Collect results and deduplicate
 	declarationMap := make(map[string]*OOODeclaration)
 	
 	for declaration := range resultChan {{
 		key := fmt.Sprintf("%s_%s_%s", declaration.UserName, declaration.DateMessageWasSent, declaration.RawMessage)
 		if existing, exists := declarationMap[key]; exists {{
-			// Merge dates
 			dateSet := make(map[string]bool)
 			for _, date := range existing.DeclaredOOODate {{
 				dateSet[date] = true
@@ -2037,7 +2017,6 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 		}}
 	}}
 
-	// Convert map to slice and sort
 	var finalDeclarations []OOODeclaration
 	for _, declaration := range declarationMap {{
 		finalDeclarations = append(finalDeclarations, *declaration)
@@ -2059,10 +2038,10 @@ Always resolve relative dates (like "tomorrow" or "next Friday") based on date_m
 
 Respond ONLY with valid JSON in this exact format (no additional text):
 {{
-  "is_ooo_message": true/false,
-  "declared_ooo_date": ["YYYY-MM-DD", "YYYY-MM-DD"],
+  "is_ooo_message": true,
+  "declared_ooo_date": ["2025-01-25", "2025-01-26"],
   "reason": "Brief explanation of why this is/isn't an OOO message",
-  "confidence": "high/medium/low"
+  "confidence": "high"
 }}
 
 ### Input:
@@ -2086,7 +2065,6 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {{
-		log.Printf("Error marshaling LLM request: %s", err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Error marshaling request", Confidence: "low"}}
 	}}
 
@@ -2095,7 +2073,6 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {{
-		log.Printf("Error creating HTTP request: %s", err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Error creating request", Confidence: "low"}}
 	}}
 
@@ -2104,20 +2081,17 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 
 	resp, err := httpClient.Do(req)
 	if err != nil {{
-		log.Printf("Error making HTTP request: %s", err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Error making request", Confidence: "low"}}
 	}}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {{
-		log.Printf("Error reading response body: %s", err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Error reading response", Confidence: "low"}}
 	}}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {{
-		log.Printf("Error unmarshaling LLM response: %s", err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Error parsing LLM response", Confidence: "low"}}
 	}}
 
@@ -2129,7 +2103,6 @@ Message: "%s"`, messageData.UserName, messageData.MessageDate, today, messageDat
 	
 	var analysis OOOAnalysis
 	if err := json.Unmarshal([]byte(content), &analysis); err != nil {{
-		log.Printf("Error parsing LLM JSON response: %s. Error: %s", content, err)
 		return OOOAnalysis{{IsOOOMessage: false, Reason: "Failed to parse LLM response", Confidence: "low"}}
 	}}
 
@@ -2152,14 +2125,7 @@ require github.com/gorilla/websocket v1.4.2 // indirect
             icon_url=SLACK_ICON_URL,
             type="docker",
             image="golang:1.21-alpine",
-            content="""
-apk add --no-cache git ca-certificates && \
-cd /tmp && \
-echo '$GO_MOD_CONTENT' > go.mod && \
-echo '$GO_SCRIPT_CONTENT' > main.go && \
-go mod tidy && \
-go run main.go
-""".replace('$GO_MOD_CONTENT', go_mod_content).replace('$GO_SCRIPT_CONTENT', go_script_content),
+            content="cd /tmp && go mod tidy && go run main.go",
             args=args,
             env=env,
             secrets=secrets,
