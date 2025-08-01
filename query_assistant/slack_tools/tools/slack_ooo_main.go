@@ -81,8 +81,6 @@ var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
 	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
-	llmAvailable   = true                                   // Track if LLM is working
-	llmCheckMutex  = sync.RWMutex{}
 
 	// Progress tracking
 	progressStartTime time.Time
@@ -537,40 +535,31 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 }
 
 func fastAnalyzeMessageBatchForOOO(messages []MessageData, today string) []OOOAnalysis {
-	// Check if LLM is available, if not, skip directly to pattern analysis
-	llmCheckMutex.RLock()
-	isLLMAvailable := llmAvailable
-	llmCheckMutex.RUnlock()
-
-	// If LLM has been failing, skip it entirely for performance
-	if !isLLMAvailable {
-		var results []OOOAnalysis
-		for _, msg := range messages {
-			results = append(results, patternBasedAnalysis(msg, today))
-		}
-		return results
-	}
-
-	// Try LLM batch analysis
+	// Always try LLM analysis - no fallback to pattern analysis
 	llmResults := tryLLMAnalysisBatch(messages, today)
 
-	// If LLM failed, disable it and fallback to pattern analysis
-	if len(llmResults) == 0 || (len(llmResults) > 0 && strings.Contains(llmResults[0].Reason, "LLM API error")) {
-		llmCheckMutex.Lock()
-		llmAvailable = false
-		llmCheckMutex.Unlock()
-
+	// If LLM failed completely, return empty results rather than falling back
+	if len(llmResults) == 0 {
+		// Return empty analysis for all messages
 		var results []OOOAnalysis
-		for _, msg := range messages {
-			results = append(results, patternBasedAnalysis(msg, today))
+		for range messages {
+			results = append(results, OOOAnalysis{
+				IsOOOMessage: false,
+				Reason:       "LLM analysis failed",
+				Confidence:   "low",
+			})
 		}
 		return results
 	}
 
-	// If we got results but not enough, fill with pattern analysis
+	// If we got results but not enough, pad with empty analysis
 	if len(llmResults) < len(messages) {
 		for i := len(llmResults); i < len(messages); i++ {
-			llmResults = append(llmResults, patternBasedAnalysis(messages[i], today))
+			llmResults = append(llmResults, OOOAnalysis{
+				IsOOOMessage: false,
+				Reason:       "LLM analysis incomplete",
+				Confidence:   "low",
+			})
 		}
 	}
 
@@ -655,9 +644,7 @@ Today's date: %s
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return []OOOAnalysis{
-			{IsOOOMessage: false, Reason: fmt.Sprintf("LLM API error: %d", resp.StatusCode), Confidence: "low"},
-		}
+		return []OOOAnalysis{}
 	}
 
 	body, err := io.ReadAll(resp.Body)
@@ -690,80 +677,10 @@ func fastAnalyzeMessageForOOO(messageData MessageData, today string) OOOAnalysis
 	if len(results) > 0 {
 		return results[0]
 	}
-	return patternBasedAnalysis(messageData, today)
-}
-
-func patternBasedAnalysis(messageData MessageData, today string) OOOAnalysis {
-	message := strings.ToLower(messageData.Message)
-
-	// Define OOO patterns
-	oooPatterns := []string{
-		"ooo", "out of office", "be off", "be out", "taking off", "day off",
-		"sick leave", "vacation", "be away", "offline", "afk", "away from",
-		"taking the day", "not feeling well", "stepping out", "be unavailable",
-		"holiday", "appointment", "doctor", "emergency", "family matter",
-	}
-
-	// Check if message contains OOO patterns
-	hasOOOPattern := false
-	for _, pattern := range oooPatterns {
-		if strings.Contains(message, pattern) {
-			hasOOOPattern = true
-			break
-		}
-	}
-
-	if !hasOOOPattern {
-		return OOOAnalysis{IsOOOMessage: false, Reason: "No OOO patterns detected", Confidence: "medium"}
-	}
-
-	// Simple date extraction - look for common date patterns
-	var detectedDates []string
-
-	// Look for "today", "tomorrow", etc.
-	if strings.Contains(message, "today") || strings.Contains(message, "rest of the day") {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
-	if strings.Contains(message, "tomorrow") {
-		// Add one day to message date
-		if msgDate, err := time.Parse("2006-01-02", messageData.MessageDate); err == nil {
-			tomorrow := msgDate.AddDate(0, 0, 1)
-			detectedDates = append(detectedDates, tomorrow.Format("2006-01-02"))
-		}
-	}
-
-	// Look for specific date patterns like "7/24", "07/25", etc.
-	dateRegex := regexp.MustCompile(`\b(\d{1,2})[/-](\d{1,2})\b`)
-	matches := dateRegex.FindAllStringSubmatch(message, -1)
-	for _, match := range matches {
-		if len(match) == 3 {
-			month := match[1]
-			day := match[2]
-			// Assume current year and pad with zeros
-			if len(month) == 1 {
-				month = "0" + month
-			}
-			if len(day) == 1 {
-				day = "0" + day
-			}
-			// Extract year from today's date
-			todayDate, _ := time.Parse("2006-01-02", today)
-			year := todayDate.Year()
-			dateStr := fmt.Sprintf("%d-%s-%s", year, month, day)
-			detectedDates = append(detectedDates, dateStr)
-		}
-	}
-
-	// If no specific dates found, use message date as fallback
-	if len(detectedDates) == 0 {
-		detectedDates = append(detectedDates, messageData.MessageDate)
-	}
-
+	// If batch analysis fails, return empty result instead of pattern fallback
 	return OOOAnalysis{
-		IsOOOMessage:    true,
-		DeclaredOOODate: detectedDates,
-		Reason:          "Pattern-based detection (LLM unavailable)",
-		Confidence:      "medium",
+		IsOOOMessage: false,
+		Reason:       "LLM analysis failed",
+		Confidence:   "low",
 	}
 }
