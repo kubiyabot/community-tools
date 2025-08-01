@@ -444,9 +444,9 @@ func testLLMConnectivity() error {
 	log.Printf("   BASE_URL: '%s'", baseURL)
 	time.Sleep(100 * time.Millisecond)
 	log.Printf("   API_KEY present: %v (length: %d)", apiKey != "", len(apiKey))
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10000 * time.Millisecond)
 	log.Printf("   API_KEY (DEBUG): '%s'", apiKey) // FULL KEY FOR DEBUGGING - REMOVE LATER
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(10000 * time.Millisecond)
 	log.Printf("   USER_EMAIL: '%s'", userEmail)
 	time.Sleep(200 * time.Millisecond)
 
