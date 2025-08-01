@@ -433,7 +433,66 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 	return allMessages, nil
 }
 
+// Add LLM connectivity test function
+func testLLMConnectivity() error {
+	baseURL := os.Getenv("LLM_BASE_URL")
+	apiKey := os.Getenv("LLM_API_KEY")
+
+	if baseURL == "" || apiKey == "" {
+		return fmt.Errorf("LLM environment variables missing: BASE_URL=%s, API_KEY present=%v", baseURL, apiKey != "")
+	}
+
+	// Simple test request
+	testRequest := LLMRequest{
+		Messages: []LLMMessage{
+			{Role: "system", Content: "You are a test assistant."},
+			{Role: "user", Content: "Reply with just 'OK'"},
+		},
+		Model:       "openai/Llama-4-Scout",
+		MaxTokens:   10,
+		Temperature: 0.1,
+		TopP:        0.1,
+		User:        os.Getenv("KUBIYA_USER_EMAIL"),
+		Stream:      false,
+	}
+
+	jsonData, err := json.Marshal(testRequest)
+	if err != nil {
+		return fmt.Errorf("JSON marshal error: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("HTTP request creation error: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	log.Printf("🔍 Testing LLM connectivity to %s...", baseURL)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP request error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("LLM API returned status %d", resp.StatusCode)
+	}
+
+	log.Printf("✅ LLM connectivity test successful")
+	return nil
+}
+
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
+	// Test LLM connectivity first before processing messages
+	if err := testLLMConnectivity(); err != nil {
+		log.Printf("❌ LLM connectivity test failed: %v", err)
+		log.Printf("⚠️  Skipping OOO analysis - LLM is unavailable")
+		return []OOODeclaration{}
+	}
+
 	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
 	const batchSize = 10      // Process 10 messages per LLM call (increased from 5)
 
