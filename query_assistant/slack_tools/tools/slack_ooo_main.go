@@ -619,6 +619,7 @@ Today's date: %s
 
 	jsonData, err := json.Marshal(llmRequest)
 	if err != nil {
+		log.Printf("❌ JSON marshal error: %v", err)
 		return []OOOAnalysis{}
 	}
 
@@ -626,11 +627,15 @@ Today's date: %s
 	apiKey := os.Getenv("LLM_API_KEY")
 
 	if baseURL == "" || apiKey == "" {
+		log.Printf("❌ LLM environment variables missing: BASE_URL=%s, API_KEY present=%v", baseURL, apiKey != "")
 		return []OOOAnalysis{}
 	}
 
+	log.Printf("🤖 Making LLM request to %s with %d messages", baseURL, len(messages))
+
 	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
+		log.Printf("❌ HTTP request creation error: %v", err)
 		return []OOOAnalysis{}
 	}
 
@@ -639,34 +644,52 @@ Today's date: %s
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Printf("❌ HTTP request error: %v", err)
 		return []OOOAnalysis{}
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
+		log.Printf("❌ LLM API returned status %d", resp.StatusCode)
 		return []OOOAnalysis{}
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("❌ Error reading response body: %v", err)
 		return []OOOAnalysis{}
 	}
 
 	var llmResponse LLMResponse
 	if err := json.Unmarshal(body, &llmResponse); err != nil {
+		log.Printf("❌ Error unmarshaling LLM response: %v", err)
+		log.Printf("📄 Raw response: %s", string(body))
 		return []OOOAnalysis{}
 	}
 
 	if len(llmResponse.Choices) == 0 {
+		log.Printf("❌ LLM response has no choices")
 		return []OOOAnalysis{}
 	}
 
 	content := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
+	log.Printf("🤖 LLM response content: %s", content)
 
 	var analyses []OOOAnalysis
 	if err := json.Unmarshal([]byte(content), &analyses); err != nil {
+		log.Printf("❌ Error parsing LLM JSON response: %v", err)
+		log.Printf("📄 Content that failed to parse: %s", content)
 		return []OOOAnalysis{}
 	}
+
+	log.Printf("✅ Successfully parsed %d analyses from LLM", len(analyses))
+	oooCount := 0
+	for _, analysis := range analyses {
+		if analysis.IsOOOMessage {
+			oooCount++
+		}
+	}
+	log.Printf("📊 Found %d OOO messages out of %d total", oooCount, len(analyses))
 
 	return analyses
 }
