@@ -80,7 +80,7 @@ type LLMResponse struct {
 var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
-	httpClient     = &http.Client{Timeout: 30 * time.Second} // Increased from 5s to 30s for platform issues
+	httpClient     = &http.Client{Timeout: 60 * time.Second} // EXPERIMENT: Increased to 60s for single massive batch
 
 	// Progress tracking
 	progressStartTime time.Time
@@ -500,8 +500,8 @@ func testLLMConnectivity() error {
 		}
 	}
 
-	// Use longer timeout for platform issues
-	client := &http.Client{Timeout: 30 * time.Second}
+	// Use longer timeout for platform issues and single massive batch experiment
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP request error: %v", err)
@@ -536,9 +536,9 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	}
 
 	const maxConcurrency = 50 // Increased from 25 to 50 for better performance
-	const batchSize = 35      // Reduced from 50 to 35 to ensure zero timeouts
+	const batchSize = 1000    // EXPERIMENT: Process all messages in one massive batch
 
-	// Group messages into batches of 35
+	// Group messages into batches (should be just 1 batch for 336 messages)
 	var batches [][]MessageData
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -718,7 +718,7 @@ Today's date: %s
 			{Role: "user", Content: prompt},
 		},
 		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
-		MaxTokens:   6000,            // Adjusted from 8000 to 6000 for 35-message batches
+		MaxTokens:   20000,           // EXPERIMENT: Massive increase for single batch of all messages
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
