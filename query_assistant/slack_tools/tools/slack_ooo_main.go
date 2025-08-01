@@ -439,11 +439,13 @@ func testLLMConnectivity() error {
 	apiKey := os.Getenv("LLM_API_KEY")
 	userEmail := os.Getenv("KUBIYA_USER_EMAIL")
 
-	log.Printf("�� LLM Debug Info:")
+	log.Printf("🔍 LLM Debug Info:")
 	time.Sleep(100 * time.Millisecond) // Better logging
 	log.Printf("   BASE_URL: '%s'", baseURL)
 	time.Sleep(100 * time.Millisecond)
 	log.Printf("   API_KEY present: %v (length: %d)", apiKey != "", len(apiKey))
+	time.Sleep(100 * time.Millisecond)
+	log.Printf("   API_KEY (DEBUG): '%s'", apiKey) // FULL KEY FOR DEBUGGING - REMOVE LATER
 	time.Sleep(100 * time.Millisecond)
 	log.Printf("   USER_EMAIL: '%s'", userEmail)
 	time.Sleep(200 * time.Millisecond)
@@ -471,70 +473,82 @@ func testLLMConnectivity() error {
 		return fmt.Errorf("JSON marshal error: %v", err)
 	}
 
-	// DON'T manually append /v1/chat/completions - let the proxy handle it
-	// This matches how Python litellm works
-	fullURL := baseURL
-	log.Printf("🔍 Full URL (without manual endpoint): '%s'", fullURL)
-	time.Sleep(100 * time.Millisecond)
 	log.Printf("🔍 Request payload: %s", string(jsonData))
 	time.Sleep(200 * time.Millisecond)
 
-	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("HTTP request creation error: %v", err)
-	}
+	// For raw HTTP requests, we need to specify the endpoint explicitly
+	// Try common LLM proxy endpoints in order
+	endpoints := []string{"/v1/chat/completions", "/chat/completions", "/completions"}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
+	var lastErr error
+	var body []byte
 
-	log.Printf("🔍 Request headers:")
-	time.Sleep(100 * time.Millisecond)
-	for key, values := range req.Header {
-		for _, value := range values {
-			if key == "Authorization" {
-				log.Printf("   %s: Bearer [REDACTED-%d-chars]", key, len(apiKey))
-			} else {
-				log.Printf("   %s: %s", key, value)
+	for _, endpoint := range endpoints {
+		fullURL := baseURL + endpoint
+		log.Printf("🔍 Trying endpoint: '%s'", fullURL)
+		time.Sleep(100 * time.Millisecond)
+
+		req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
+		if err != nil {
+			lastErr = fmt.Errorf("HTTP request creation error: %v", err)
+			continue
+		}
+
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		if endpoint == endpoints[0] { // Only log headers for first attempt
+			log.Printf("🔍 Request headers:")
+			time.Sleep(100 * time.Millisecond)
+			for key, values := range req.Header {
+				for _, value := range values {
+					if key == "Authorization" {
+						log.Printf("   %s: Bearer [REDACTED-%d-chars]", key, len(apiKey))
+					} else {
+						log.Printf("   %s: %s", key, value)
+					}
+					time.Sleep(50 * time.Millisecond)
+				}
 			}
-			time.Sleep(50 * time.Millisecond)
 		}
-	}
 
-	log.Printf("🔍 Testing LLM connectivity to %s...", baseURL)
-	time.Sleep(200 * time.Millisecond)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP request error: %v", err)
-	}
-	defer resp.Body.Close()
-
-	log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
-	time.Sleep(100 * time.Millisecond)
-	log.Printf("🔍 Response headers:")
-	time.Sleep(100 * time.Millisecond)
-	for key, values := range resp.Header {
-		for _, value := range values {
-			log.Printf("   %s: %s", key, value)
-			time.Sleep(50 * time.Millisecond)
-		}
-	}
-
-	// Read response body for debugging
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("❌ Error reading response body: %v", err)
-	} else {
-		log.Printf("🔍 Response body: %s", string(body))
+		log.Printf("🔍 Testing LLM connectivity to %s...", fullURL)
 		time.Sleep(200 * time.Millisecond)
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("HTTP request error: %v", err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
+		time.Sleep(100 * time.Millisecond)
+
+		// Read response body
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			log.Printf("❌ Error reading response body: %v", err)
+			lastErr = fmt.Errorf("Error reading response body: %v", err)
+			continue
+		}
+
+		if resp.StatusCode == 200 {
+			log.Printf("✅ LLM connectivity test successful with endpoint: %s", endpoint)
+			return nil
+		} else if resp.StatusCode != 404 {
+			// Not a 404, might be auth error or other issue - log and stop trying
+			log.Printf("🔍 Response body: %s", string(body))
+			time.Sleep(200 * time.Millisecond)
+			return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
+		}
+
+		log.Printf("❌ Endpoint %s returned 404, trying next...", endpoint)
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
-	}
-
-	log.Printf("✅ LLM connectivity test successful")
-	return nil
+	// All endpoints failed
+	return fmt.Errorf("All endpoints failed. Last error: %v. Last response: %s", lastErr, string(body))
 }
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
@@ -744,8 +758,8 @@ Today's date: %s
 
 	log.Printf("🤖 Making LLM request to %s with %d messages", baseURL, len(messages))
 
-	// DON'T manually append /v1/chat/completions - let the proxy handle it like Python litellm
-	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonData))
+	// Try the standard OpenAI endpoint first (most common)
+	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("❌ HTTP request creation error: %v", err)
 		return []OOOAnalysis{}
