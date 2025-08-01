@@ -583,7 +583,8 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 
 				msg := messageBatch[i]
 
-				if analysis.IsOOOMessage && len(analysis.DeclaredOOODate) > 0 {
+				// In a time-off channel, focus on date extraction, not OOO classification
+				if len(analysis.DeclaredOOODate) > 0 {
 					declaration := &OOODeclaration{
 						UserName:           msg.UserName,
 						DeclaredOOODate:    analysis.DeclaredOOODate,
