@@ -80,7 +80,7 @@ type LLMResponse struct {
 var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
-	httpClient     = &http.Client{Timeout: 5 * time.Second} // Reduced from 30s to 5s
+	httpClient     = &http.Client{Timeout: 30 * time.Second} // Increased from 5s to 30s for platform issues
 
 	// Progress tracking
 	progressStartTime time.Time
@@ -474,79 +474,57 @@ func testLLMConnectivity() error {
 	log.Printf("🔍 Request payload: %s", string(jsonData))
 	time.Sleep(200 * time.Millisecond)
 
-	// For raw HTTP requests, we need to specify the endpoint explicitly
-	// Try common LLM proxy endpoints in order
-	endpoints := []string{"/chat/completions", "/completions", "/v1/completions"}
+	// Use the endpoint we confirmed works locally
+	fullURL := baseURL + "/chat/completions"
+	log.Printf("🔍 Testing LLM connectivity to %s...", fullURL)
+	time.Sleep(200 * time.Millisecond)
 
-	var lastErr error
-	var body []byte
-
-	for _, endpoint := range endpoints {
-		fullURL := baseURL + endpoint
-		log.Printf("🔍 Trying endpoint: '%s'", fullURL)
-		time.Sleep(100 * time.Millisecond)
-
-		req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
-		if err != nil {
-			lastErr = fmt.Errorf("HTTP request creation error: %v", err)
-			continue
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-
-		if endpoint == endpoints[0] { // Only log headers for first attempt
-			log.Printf("🔍 Request headers:")
-			time.Sleep(100 * time.Millisecond)
-			for key, values := range req.Header {
-				for _, value := range values {
-					if key == "Authorization" {
-						log.Printf("   %s: Bearer [REDACTED-%d-chars]", key, len(apiKey))
-					} else {
-						log.Printf("   %s: %s", key, value)
-					}
-					time.Sleep(50 * time.Millisecond)
-				}
-			}
-		}
-
-		log.Printf("🔍 Testing LLM connectivity to %s...", fullURL)
-		time.Sleep(200 * time.Millisecond)
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("HTTP request error: %v", err)
-			continue
-		}
-		defer resp.Body.Close()
-
-		log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
-		time.Sleep(100 * time.Millisecond)
-
-		// Read response body
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("❌ Error reading response body: %v", err)
-			lastErr = fmt.Errorf("Error reading response body: %v", err)
-			continue
-		}
-
-		if resp.StatusCode == 200 {
-			log.Printf("✅ LLM connectivity test successful with endpoint: %s", endpoint)
-			return nil
-		} else if resp.StatusCode != 404 {
-			// Not a 404, might be auth error or other issue - log and stop trying
-			log.Printf("🔍 Response body: %s", string(body))
-			time.Sleep(200 * time.Millisecond)
-			return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
-		}
-
-		log.Printf("❌ Endpoint %s returned 404, trying next...", endpoint)
-		time.Sleep(100 * time.Millisecond)
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("HTTP request creation error: %v", err)
 	}
 
-	// All endpoints failed
-	return fmt.Errorf("All endpoints failed. Last error: %v. Last response: %s", lastErr, string(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	log.Printf("🔍 Request headers:")
+	time.Sleep(100 * time.Millisecond)
+	for key, values := range req.Header {
+		for _, value := range values {
+			if key == "Authorization" {
+				log.Printf("   %s: Bearer [REDACTED-%d-chars]", key, len(apiKey))
+			} else {
+				log.Printf("   %s: %s", key, value)
+			}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+
+	// Use longer timeout for platform issues
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("HTTP request error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
+	time.Sleep(100 * time.Millisecond)
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("Error reading response body: %v", err)
+	}
+
+	if resp.StatusCode == 200 {
+		log.Printf("✅ LLM connectivity test successful!")
+		return nil
+	} else {
+		log.Printf("🔍 Response body: %s", string(body))
+		time.Sleep(200 * time.Millisecond)
+		return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
+	}
 }
 
 func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaration {
