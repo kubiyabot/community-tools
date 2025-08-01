@@ -10,7 +10,7 @@ import shutil
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
-from kubiya_sdk.tools.models import FileSpec
+from kubiya_workflow_sdk.tools.models import FileSpec
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 

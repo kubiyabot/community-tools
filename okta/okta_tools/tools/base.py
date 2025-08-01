@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools.models import Tool, Arg, FileSpec
 import json
 
 OKTA_ICON_URL = "https://www.okta.com/sites/default/files/Okta_Logo_BrightBlue_Medium.png"

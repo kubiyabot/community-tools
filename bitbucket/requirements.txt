@@ -1,2 +1,2 @@
-kubiya-sdk
+kubiya_workflow_sdk[tools]
 atlassian-python-api

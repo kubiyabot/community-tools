@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from .base import AWSCliTool
-from kubiya_sdk.tools.registry import tool_registry
 
 rds_create_instance = AWSCliTool(
     name="rds_create_instance",

@@ -1,1 +1,1 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg

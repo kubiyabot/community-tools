@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import Tool
+from kubiya_workflow_sdk.tools.models import Tool
 from .constants import (
     AWS_SECRETS,
     AZURE_SECRETS,

@@ -1,5 +1,5 @@
-from kubiya_sdk.tools import Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from databricks_tools.tools.api.base import DatabricksApiTool
 
 # Unity Catalog Operations

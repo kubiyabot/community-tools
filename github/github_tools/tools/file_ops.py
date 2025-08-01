@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg, Volume
+from kubiya_workflow_sdk.tools import Arg, Volume
 from .base import GitHubCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 # Define the volume for git operations
 GIT_VOLUME = Volume(

@@ -1,5 +1,5 @@
-from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from .terraform_module_tool import TerraformModuleTool

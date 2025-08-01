@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, FileSpec
 
 DATADOG_ICON_URL = "https://cdn.worldvectorlogo.com/logos/datadog.svg"
 

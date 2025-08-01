@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, FileSpec
 from pydantic import BaseModel
 
 PAGERDUTY_ICON_URL = "https://user-images.githubusercontent.com/113339427/211711571-a01471d5-5405-4876-a129-af0ce48dd2c4.svg"

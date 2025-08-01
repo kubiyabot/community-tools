@@ -5,7 +5,7 @@ This package provides tools for managing Crossplane installations and resources.
 import os
 import sys
 import logging
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 # Configure logging
 logging.basicConfig(

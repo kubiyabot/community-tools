@@ -1,7 +1,7 @@
 """Base tool for Python execution."""
 
-from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 import tempfile
 import os
 import subprocess

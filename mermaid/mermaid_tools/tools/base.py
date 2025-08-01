@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg,ServiceSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, ServiceSpec
 
 MERMAID_ICON_URL = "https://seeklogo.com/images/M/mermaid-logo-31DD0B8905-seeklogo.com.png"
 

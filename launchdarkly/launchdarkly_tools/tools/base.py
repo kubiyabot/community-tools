@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, FileSpec
 
 LAUNCHDARKLY_ICON_URL = "https://launchdarkly.com/favicon.ico"
 
