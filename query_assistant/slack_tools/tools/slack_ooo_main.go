@@ -437,6 +437,12 @@ func getChannelMessages(api *slack.Client, channelID, oldest string) ([]MessageD
 func testLLMConnectivity() error {
 	baseURL := os.Getenv("LLM_BASE_URL")
 	apiKey := os.Getenv("LLM_API_KEY")
+	userEmail := os.Getenv("KUBIYA_USER_EMAIL")
+
+	log.Printf("🔍 LLM Debug Info:")
+	log.Printf("   BASE_URL: '%s'", baseURL)
+	log.Printf("   API_KEY present: %v (length: %d)", apiKey != "", len(apiKey))
+	log.Printf("   USER_EMAIL: '%s'", userEmail)
 
 	if baseURL == "" || apiKey == "" {
 		return fmt.Errorf("LLM environment variables missing: BASE_URL=%s, API_KEY present=%v", baseURL, apiKey != "")
@@ -452,7 +458,7 @@ func testLLMConnectivity() error {
 		MaxTokens:   10,
 		Temperature: 0.1,
 		TopP:        0.1,
-		User:        os.Getenv("KUBIYA_USER_EMAIL"),
+		User:        userEmail,
 		Stream:      false,
 	}
 
@@ -461,13 +467,28 @@ func testLLMConnectivity() error {
 		return fmt.Errorf("JSON marshal error: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
+	fullURL := baseURL + "/v1/chat/completions"
+	log.Printf("🔍 Full URL: '%s'", fullURL)
+	log.Printf("🔍 Request payload: %s", string(jsonData))
+
+	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("HTTP request creation error: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	log.Printf("🔍 Request headers:")
+	for key, values := range req.Header {
+		for _, value := range values {
+			if key == "Authorization" {
+				log.Printf("   %s: Bearer [REDACTED-%d-chars]", key, len(apiKey))
+			} else {
+				log.Printf("   %s: %s", key, value)
+			}
+		}
+	}
 
 	log.Printf("🔍 Testing LLM connectivity to %s...", baseURL)
 
@@ -477,8 +498,24 @@ func testLLMConnectivity() error {
 	}
 	defer resp.Body.Close()
 
+	log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
+	log.Printf("🔍 Response headers:")
+	for key, values := range resp.Header {
+		for _, value := range values {
+			log.Printf("   %s: %s", key, value)
+		}
+	}
+
+	// Read response body for debugging
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("❌ Error reading response body: %v", err)
+	} else {
+		log.Printf("🔍 Response body: %s", string(body))
+	}
+
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("LLM API returned status %d", resp.StatusCode)
+		return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
 	}
 
 	log.Printf("✅ LLM connectivity test successful")
