@@ -444,9 +444,7 @@ func testLLMConnectivity() error {
 	log.Printf("   BASE_URL: '%s'", baseURL)
 	time.Sleep(100 * time.Millisecond)
 	log.Printf("   API_KEY present: %v (length: %d)", apiKey != "", len(apiKey))
-	time.Sleep(10000 * time.Millisecond)
-	log.Printf("   API_KEY (DEBUG): '%s'", apiKey) // FULL KEY FOR DEBUGGING - REMOVE LATER
-	time.Sleep(10000 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	log.Printf("   USER_EMAIL: '%s'", userEmail)
 	time.Sleep(200 * time.Millisecond)
 
@@ -460,7 +458,7 @@ func testLLMConnectivity() error {
 			{Role: "system", Content: "You are a test assistant."},
 			{Role: "user", Content: "Reply with just 'OK'"},
 		},
-		Model:       "openai/Llama-4-Scout", // Match Python exactly
+		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
 		MaxTokens:   10,
 		Temperature: 0.3, // Match Python temperature
 		TopP:        0.1,
@@ -478,7 +476,7 @@ func testLLMConnectivity() error {
 
 	// For raw HTTP requests, we need to specify the endpoint explicitly
 	// Try common LLM proxy endpoints in order
-	endpoints := []string{"/v1/chat/completions", "/chat/completions", "/completions"}
+	endpoints := []string{"/chat/completions", "/completions", "/v1/completions"}
 
 	var lastErr error
 	var body []byte
@@ -734,8 +732,8 @@ Today's date: %s
 			{Role: "system", Content: "You are a specialized assistant for extracting out-of-office information from Slack messages. Always respond with valid JSON array only."},
 			{Role: "user", Content: prompt},
 		},
-		Model:       "openai/Llama-4-Scout",
-		MaxTokens:   3072, // Increased for larger batch processing (10 messages)
+		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
+		MaxTokens:   3072,            // Increased for larger batch processing (10 messages)
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
@@ -758,8 +756,8 @@ Today's date: %s
 
 	log.Printf("🤖 Making LLM request to %s with %d messages", baseURL, len(messages))
 
-	// Try the standard OpenAI endpoint first (most common)
-	req, err := http.NewRequest("POST", baseURL+"/v1/chat/completions", bytes.NewBuffer(jsonData))
+	// Use the working endpoint we discovered
+	req, err := http.NewRequest("POST", baseURL+"/chat/completions", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Printf("❌ HTTP request creation error: %v", err)
 		return []OOOAnalysis{}
