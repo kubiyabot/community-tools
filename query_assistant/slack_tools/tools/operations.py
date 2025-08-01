@@ -1,7 +1,6 @@
 from kubiya_sdk.tools import Arg
 from .base import SlackTool, SlackSearchTool, SlackSummaryTool, SlackOutOfOfficeTool
 from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import Tool, FileSpec
 
 # Slack Send Message Tool
 slack_send_message = SlackTool(
@@ -188,60 +187,6 @@ slack_analyze_ooo = SlackOutOfOfficeTool(
     ],
 )
 
-# Simple Date Tool - Get today's date in EST timezone
-get_date_est = Tool(
-    name="get_date_est",
-    description="Get today's date in EST (Eastern Standard Time) timezone",
-    icon_url="https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png",
-    type="docker",
-    image="python:3.11-slim",
-    content="pip install -q pytz > /dev/null 2>&1 && python /tmp/get_date.py",
-    args=[],
-    env=[],
-    secrets=[],
-    with_files=[
-        FileSpec(
-            destination="/tmp/get_date.py",
-            content="""
-import os
-import json
-from datetime import datetime
-import pytz
-
-def get_est_date():
-    try:
-        # Get EST timezone
-        est = pytz.timezone('US/Eastern')
-        
-        # Get current time in EST
-        now_est = datetime.now(est)
-        
-        # Format the date
-        formatted_date = now_est.strftime('%Y-%m-%d')
-        formatted_datetime = now_est.strftime('%Y-%m-%d %H:%M:%S %Z')
-        formatted_day = now_est.strftime('%A, %B %d, %Y')
-        
-        return {
-            "success": True,
-            "date": formatted_date,
-            "datetime": formatted_datetime,
-            "day": formatted_day,
-            "timezone": "US/Eastern"
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-if __name__ == "__main__":
-    result = get_est_date()
-    print(json.dumps(result))
-""",
-        )
-    ],
-)
-
 # Update the all_tools list
 all_tools = [
     slack_send_message,
@@ -260,8 +205,7 @@ all_tools = [
     slack_get_thread_replies,
     slack_search_messages,
     slack_summarize_thread,
-    slack_analyze_ooo,
-    get_date_est
+    slack_analyze_ooo
 ]
 
 # Register all Slack tools
