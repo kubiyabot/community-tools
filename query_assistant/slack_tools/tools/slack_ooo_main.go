@@ -536,9 +536,9 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	}
 
 	const maxConcurrency = 50 // Increased from 25 to 50 for better performance
-	const batchSize = 50      // Increased from 10 to 50 messages per LLM call
+	const batchSize = 35      // Reduced from 50 to 35 to ensure zero timeouts
 
-	// Group messages into batches of 50
+	// Group messages into batches of 35
 	var batches [][]MessageData
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -718,7 +718,7 @@ Today's date: %s
 			{Role: "user", Content: prompt},
 		},
 		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
-		MaxTokens:   8000,            // Increased from 3072 to 8000 for larger batches (50 messages)
+		MaxTokens:   6000,            // Adjusted from 8000 to 6000 for 35-message batches
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
