@@ -80,7 +80,7 @@ type LLMResponse struct {
 var (
 	userCache      = make(map[string]UserInfo)
 	userCacheMutex = sync.RWMutex{}
-	httpClient     = &http.Client{Timeout: 60 * time.Second} // EXPERIMENT: Increased to 60s for single massive batch
+	httpClient     = &http.Client{Timeout: 30 * time.Second} // REVERTED: Back to 30s (35-message batches work fine)
 
 	// Progress tracking
 	progressStartTime time.Time
@@ -440,13 +440,11 @@ func testLLMConnectivity() error {
 	userEmail := os.Getenv("KUBIYA_USER_EMAIL")
 
 	log.Printf("🔍 LLM Debug Info:")
-	time.Sleep(100 * time.Millisecond) // Better logging
+	// Better logging
 	log.Printf("   BASE_URL: '%s'", baseURL)
-	time.Sleep(100 * time.Millisecond)
+
 	log.Printf("   API_KEY present: %v (length: %d)", apiKey != "", len(apiKey))
-	time.Sleep(100 * time.Millisecond)
 	log.Printf("   USER_EMAIL: '%s'", userEmail)
-	time.Sleep(200 * time.Millisecond)
 
 	if baseURL == "" || apiKey == "" {
 		return fmt.Errorf("LLM environment variables missing: BASE_URL=%s, API_KEY present=%v", baseURL, apiKey != "")
@@ -472,12 +470,10 @@ func testLLMConnectivity() error {
 	}
 
 	log.Printf("🔍 Request payload: %s", string(jsonData))
-	time.Sleep(200 * time.Millisecond)
 
 	// Use the endpoint we confirmed works locally
 	fullURL := baseURL + "/chat/completions"
 	log.Printf("🔍 Testing LLM connectivity to %s...", fullURL)
-	time.Sleep(200 * time.Millisecond)
 
 	req, err := http.NewRequest("POST", fullURL, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -488,7 +484,7 @@ func testLLMConnectivity() error {
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	log.Printf("🔍 Request headers:")
-	time.Sleep(100 * time.Millisecond)
+
 	for key, values := range req.Header {
 		for _, value := range values {
 			if key == "Authorization" {
@@ -496,12 +492,11 @@ func testLLMConnectivity() error {
 			} else {
 				log.Printf("   %s: %s", key, value)
 			}
-			time.Sleep(50 * time.Millisecond)
 		}
 	}
 
-	// Use longer timeout for platform issues and single massive batch experiment
-	client := &http.Client{Timeout: 60 * time.Second}
+	// Use 30s timeout for reliable processing
+	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("HTTP request error: %v", err)
@@ -509,7 +504,6 @@ func testLLMConnectivity() error {
 	defer resp.Body.Close()
 
 	log.Printf("🔍 Response status: %d %s", resp.StatusCode, resp.Status)
-	time.Sleep(100 * time.Millisecond)
 
 	// Read response body
 	body, err := io.ReadAll(resp.Body)
@@ -522,7 +516,7 @@ func testLLMConnectivity() error {
 		return nil
 	} else {
 		log.Printf("🔍 Response body: %s", string(body))
-		time.Sleep(200 * time.Millisecond)
+
 		return fmt.Errorf("LLM API returned status %d - Response: %s", resp.StatusCode, string(body))
 	}
 }
@@ -536,9 +530,9 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 	}
 
 	const maxConcurrency = 50 // Increased from 25 to 50 for better performance
-	const batchSize = 1000    // EXPERIMENT: Process all messages in one massive batch
+	const batchSize = 35      // REVERTED: Back to 35 messages per batch (single massive batch failed)
 
-	// Group messages into batches (should be just 1 batch for 336 messages)
+	// Group messages into batches of 35 for reliable processing
 	var batches [][]MessageData
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -718,7 +712,7 @@ Today's date: %s
 			{Role: "user", Content: prompt},
 		},
 		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
-		MaxTokens:   20000,           // EXPERIMENT: Massive increase for single batch of all messages
+		MaxTokens:   6000,            // REVERTED: Back to 6000 for 35-message batches (20k failed)
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
