@@ -535,10 +535,10 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 		return []OOODeclaration{}
 	}
 
-	const maxConcurrency = 25 // Increased from 10 to 25 for better performance
-	const batchSize = 10      // Process 10 messages per LLM call (increased from 5)
+	const maxConcurrency = 50 // Increased from 25 to 50 for better performance
+	const batchSize = 50      // Increased from 10 to 50 messages per LLM call
 
-	// Group messages into batches of 10
+	// Group messages into batches of 50
 	var batches [][]MessageData
 	for i := 0; i < len(messages); i += batchSize {
 		end := i + batchSize
@@ -558,6 +558,8 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 		}
 	}
 
+	log.Printf("📊 Processing %d messages in %d batches of up to %d messages each", len(messages), len(batches), batchSize)
+
 	semaphore := make(chan struct{}, maxConcurrency)
 	resultChan := make(chan *OOODeclaration, len(messages))
 	var wg sync.WaitGroup
@@ -570,6 +572,7 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
+			log.Printf("🔄 Processing batch %d/%d (%d messages)", bIndex+1, len(batches), len(messageBatch))
 			analyses := fastAnalyzeMessageBatchForOOO(messageBatch, today)
 
 			// Process each analysis result
@@ -591,6 +594,7 @@ func analyzeMessagesForOOO(messages []MessageData, today string) []OOODeclaratio
 					resultChan <- declaration
 				}
 			}
+			log.Printf("✅ Completed batch %d/%d", bIndex+1, len(batches))
 		}(batch, batchIndex)
 	}
 
@@ -684,7 +688,7 @@ Given multiple messages with user names, dates they posted, and today's date, id
 
 Always resolve relative dates (like "tomorrow" or "next Friday") based on date_message_was_sent. Assume users are in the same year unless otherwise stated.
 
-Respond ONLY with valid JSON array in this exact format (no additional text):
+Process all messages efficiently and respond ONLY with valid JSON array in this exact format (no additional text):
 [
   {
     "is_ooo_message": true,
@@ -700,6 +704,8 @@ Respond ONLY with valid JSON array in this exact format (no additional text):
   }
 ]
 
+Return one JSON object for each message in the same order they were provided.
+
 ### Input:
 Today's date: %s
 
@@ -711,7 +717,7 @@ Today's date: %s
 			{Role: "user", Content: prompt},
 		},
 		Model:       "Llama-4-Scout", // Fixed: Remove openai/ prefix
-		MaxTokens:   3072,            // Increased for larger batch processing (10 messages)
+		MaxTokens:   8000,            // Increased from 3072 to 8000 for larger batches (50 messages)
 		Temperature: 0.1,
 		TopP:        0.1,
 		User:        os.Getenv("KUBIYA_USER_EMAIL"),
