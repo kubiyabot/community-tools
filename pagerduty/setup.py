@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
-        "kubiya-sdk>=0.1.0",
+        "kubiya_workflow_sdk[tools]>=0.1.0",
         "requests>=2.31.0",
         "slack-sdk>=3.26.0",
     ],

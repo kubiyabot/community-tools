@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, FileSpec
+from kubiya_workflow_sdk.tools import Tool, FileSpec
 
 TERRAFORM_ICON_URL = "https://www.terraform.io/assets/images/logo-terraform-main.svg"
 

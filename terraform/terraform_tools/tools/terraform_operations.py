@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from terraform_tools.tools.base import TerraformTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 terraform_clone_module = TerraformTool(
     name="terraform_clone_module",

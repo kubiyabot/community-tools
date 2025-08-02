@@ -1,5 +1,5 @@
 from .base import BitbucketCliTool, register_bitbucket_tool
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 
 pr_create = BitbucketCliTool(
     name="pr_create",

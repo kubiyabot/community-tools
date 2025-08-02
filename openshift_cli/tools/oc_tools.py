@@ -1,5 +1,5 @@
-from kubiya_sdk.tools.models import Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.models import Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from tools.base import BaseOCTool
 
 # Project Tools

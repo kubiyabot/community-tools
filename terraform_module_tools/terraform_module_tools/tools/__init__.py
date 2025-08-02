@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict, Any
-from kubiya_sdk.tools import Tool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools
 from .terraform_module_tool import TerraformModuleTool
 from .module_tools import create_terraform_module_tool, initialize_module_tools

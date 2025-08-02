@@ -1,7 +1,7 @@
 from typing import List
 import sys
 from .base import LaunchDarklyTool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 class FlagAnalyzer:
     """Analyze LaunchDarkly feature flags."""

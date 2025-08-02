@@ -1,6 +1,6 @@
 from typing import Optional
 
-from kubiya_sdk.tools.models import Arg, Tool
+from kubiya_workflow_sdk.tools.models import Arg, Tool
 from pydantic import HttpUrl
 
 OPENSHIFT_LOGO = HttpUrl(

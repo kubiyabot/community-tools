@@ -1,5 +1,5 @@
-from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import FileSpec, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.models import FileSpec, Arg
 from pathlib import Path
 from .base import AWSJITTool
 from ..scripts.config_loader import get_access_configs, get_s3_configs

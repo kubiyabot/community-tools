@@ -3,7 +3,7 @@ import sys
 import json
 import logging
 import sentry_sdk
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from ..utils.script_runner import run_script, ScriptExecutionError
 from ..utils.kubewatch_config import KubeWatchConfig
 from ..utils.sentry_client import initialize_sentry

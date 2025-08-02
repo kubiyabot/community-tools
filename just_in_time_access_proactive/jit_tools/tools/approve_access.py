@@ -7,8 +7,8 @@ project_root = str(Path(__file__).resolve().parents[2])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from kubiya_sdk.tools.models import Arg, FileSpec, Volume
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.models import Arg, FileSpec, Volume
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 from .base import JustInTimeAccessTool
 

@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional
-from kubiya_sdk.tools import Tool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool
+from kubiya_workflow_sdk.tools.registry import tool_registry
 import logging
 from pathlib import Path
 from .terraformer_tool import TerraformerTool, _initialize_provider_tools

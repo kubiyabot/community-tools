@@ -1,6 +1,6 @@
 from mermaid_tools.base import MermaidTool
-from kubiya_sdk.tools import Arg, FileSpec
-from kubiya_sdk.tools import tool_registry
+from kubiya_workflow_sdk.tools import Arg, FileSpec
+from kubiya_workflow_sdk.tools import tool_registry
 import os
 
 # Read the script content

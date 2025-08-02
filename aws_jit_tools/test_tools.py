@@ -17,7 +17,7 @@ def main():
     import aws_jit_tools
     
     # Check registered tools
-    from kubiya_sdk.tools.registry import tool_registry
+    from kubiya_workflow_sdk.tools.registry import tool_registry
     
     # Get all registered tools
     all_tools = tool_registry.get_tools("aws_jit")

@@ -1,8 +1,8 @@
 import logging
 import time
 from typing import Dict, Any, Optional
-from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.models import FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools.models import FileSpec
 from pydantic import Field
 from pathlib import Path
 import json

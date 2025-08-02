@@ -1,5 +1,5 @@
-from kubiya_sdk.tools.models import Tool
-from typing import Dict, Any, List
+from typing import Any, List
+from kubiya_workflow_sdk.tools.models import Tool
 
 AWS_IAM_ICON = "https://d2908q01vomqb2.cloudfront.net/22d200f8670dbdb3e253a90eee5098477c95c23d/2018/09/24/aws-icon-service-IAM_PERMISSIONS.png"
 

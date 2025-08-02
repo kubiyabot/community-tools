@@ -1,5 +1,5 @@
 from typing import List, Optional, Dict, Any
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, FileSpec
 from pydantic import BaseModel
 
 GITLAB_ICON_URL = "https://about.gitlab.com/images/press/logo/svg/gitlab-icon-rgb.svg"

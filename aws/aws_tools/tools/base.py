@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import Tool
+from kubiya_workflow_sdk.tools.models import Tool
 from .common import COMMON_FILES, COMMON_ENV
 
 AWS_ICON_URL = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/93/Amazon_Web_Services_Logo.svg/2560px-Amazon_Web_Services_Logo.svg.png"

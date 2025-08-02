@@ -1,7 +1,7 @@
 # New file for analytics-focused tools
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from .base import GitHubCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 workflow_analytics = GitHubCliTool(
     name="github_workflow_analytics", 

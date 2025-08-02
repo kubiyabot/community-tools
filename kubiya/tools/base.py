@@ -1,5 +1,5 @@
-from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 KUBIYA_ICON = "https://www.finsmes.com/wp-content/uploads/2022/10/Kubiya-logo-mark-color.png"
 CLI_VERSION = "v0.0.6"
