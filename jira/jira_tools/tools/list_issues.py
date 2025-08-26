@@ -1,4 +1,5 @@
 from typing import List
+import json
 
 from basic_funcs import (
     get_jira_cloud_id,
@@ -34,7 +35,7 @@ def list_issues_in_project(
     params = {
         "jql": jql_query,
         "maxResults": num_issues,
-        "fields": "summary,created,labels",
+        "fields": "summary,created,labels,assignee,reporter,status,updated,issuetype,project",
     }
     try:
         search_url = (
@@ -51,7 +52,13 @@ def list_issues_in_project(
                 "key": issue["key"],
                 "summary": issue["fields"]["summary"],
                 "created": issue["fields"]["created"],
+                "updated": issue["fields"]["updated"],
                 "labels": issue["fields"].get("labels", []),
+                "assignee": issue["fields"]["assignee"]["displayName"] if issue["fields"].get("assignee") else None,
+                "reporter": issue["fields"]["reporter"]["displayName"] if issue["fields"].get("reporter") else None,
+                "status": issue["fields"]["status"]["name"] if issue["fields"].get("status") else None,
+                "issuetype": issue["fields"]["issuetype"]["name"] if issue["fields"].get("issuetype") else None,
+                "project": issue["fields"]["project"]["name"] if issue["fields"].get("project") else None,
             }
             for issue in issues
         ]
@@ -99,10 +106,7 @@ def main():
             label,
         )
         for issue in latest_issues:
-            labels_str = f" - Labels: {', '.join(issue['labels'])}" if issue['labels'] else ""
-            print(
-                f"{issue['key']}: {issue['summary']} - Created on {issue['created']}{labels_str}"
-            )
+            print(json.dumps(issue, indent=4))
 
     except ValueError as e:
         print(f"Invalid number format for issues_number: {e}")
