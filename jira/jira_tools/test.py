@@ -56,5 +56,4 @@ python /tmp/my_tickets_script.py --status_filter "$status_filter" --max_results 
 
 
 # Register the tool when the module is imported
-if __name__ == "__main__":
-    MyTicketsTool() 
+MyTicketsTool() 
