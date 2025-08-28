@@ -6,7 +6,7 @@ from kubiya_sdk.tools.registry import tool_registry
 from kubiya_sdk.tools import FileSpec
 
 # Import the full script
-from . import my_tickets_script
+#from . import my_tickets_script
 
 
 class MyTicketsTool:
@@ -36,7 +36,7 @@ python /tmp/my_tickets_script.py --status_filter "$status_filter" --max_results 
             with_files=[
                 FileSpec(
                     destination="/tmp/my_tickets_script.py",
-                    content=inspect.getsource(my_tickets_script),
+                    content="",
                 ),
             ],
             args=[
