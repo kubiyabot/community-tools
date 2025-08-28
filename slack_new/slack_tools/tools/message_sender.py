@@ -29,6 +29,7 @@ from typing import Optional
 class SlackSendMessage:
     def __init__(self):
         self.kubiya_token = None
+        self.slack_app_token = None
         self.bot_user_id = None
     
     def get_kubiya_slack_token(self) -> Optional[str]:
@@ -52,6 +53,13 @@ class SlackSendMessage:
         except Exception as e:
             print(f"❌ Error getting Slack token: {e}")
             return None
+    
+    def get_slack_app_token(self) -> Optional[str]:
+        token = os.getenv('slack_app_token')
+        if token and token != 'null':
+            self.slack_app_token = token
+            return token
+        return None
     
     def get_bot_user_id(self) -> Optional[str]:
         if not self.kubiya_token:
@@ -148,9 +156,18 @@ class SlackSendMessage:
         if bot_user_id:
             self.join_channel(channel)
         
-        if not channel.startswith(('C', 'D', 'G')):
-            print(f"❌ Invalid channel ID format. Use slack_find_channel_by_name to get channel ID")
-            return False
+        # Check if this looks like a channel name instead of ID
+        if channel.startswith('#') or not channel.startswith(('C', 'D', 'G')):
+            if channel.startswith('#') or any(char in channel for char in ['-', '_', ' ']) or channel.islower():
+                print(f"❌ This tool accepts only channel IDs (starting with C, D, or G), not channel names.")
+                print(f"📋 Channel provided: '{channel}'")
+                print(f"🔍 Please use 'slack_find_channel_by_name' first to get the channel ID, then use that ID here.")
+                print(f"💡 Example: slack_find_channel_by_name channel_name=\"{channel.lstrip('#')}\"")
+                return False
+            else:
+                print(f"❌ Invalid channel ID format: '{channel}'")
+                print(f"🔍 Channel IDs should start with C (public), D (DM), or G (private). Use slack_find_channel_by_name to get the correct ID.")
+                return False
         
         post_data = {
             "channel": channel,

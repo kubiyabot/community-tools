@@ -25,11 +25,72 @@ import os
 import sys
 import time
 import requests
-from typing import Optional
+from typing import Optional, List, Tuple
+import re
 
 class SlackChannelFinder:
     def __init__(self):
         self.slack_app_token = None
+    
+    def normalize_channel_name(self, name: str) -> str:
+        """Normalize channel name by removing special chars and converting to lowercase"""
+        # First remove # prefix if present
+        clean_name = name.lstrip('#')
+        # Then remove all non-alphanumeric chars and convert to lowercase
+        return re.sub(r'[^a-z0-9]', '', clean_name.lower())
+    
+    def calculate_fuzzy_score(self, target: str, candidate: str) -> float:
+        """Calculate fuzzy match score between target and candidate channel names"""
+        target_norm = self.normalize_channel_name(target)
+        candidate_norm = self.normalize_channel_name(candidate)
+        
+        # Exact match (normalized)
+        if target_norm == candidate_norm:
+            return 1.0
+        
+        # Check if target is substring of candidate
+        if target_norm in candidate_norm:
+            return 0.9
+        
+        # Check if candidate is substring of target
+        if candidate_norm in target_norm:
+            return 0.85
+        
+        # Calculate character overlap score
+        target_chars = set(target_norm)
+        candidate_chars = set(candidate_norm)
+        
+        if not target_chars or not candidate_chars:
+            return 0.0
+        
+        intersection = len(target_chars.intersection(candidate_chars))
+        union = len(target_chars.union(candidate_chars))
+        
+        jaccard_score = intersection / union if union > 0 else 0.0
+        
+        # Bonus for similar length
+        length_diff = abs(len(target_norm) - len(candidate_norm))
+        max_length = max(len(target_norm), len(candidate_norm))
+        length_bonus = (max_length - length_diff) / max_length if max_length > 0 else 0.0
+        
+        return (jaccard_score * 0.7) + (length_bonus * 0.3)
+    
+    def find_best_matches(self, target_name: str, channels: List[dict], threshold: float = 0.5) -> List[Tuple[dict, float]]:
+        """Find best matching channels using fuzzy matching"""
+        matches = []
+        
+        for channel in channels:
+            channel_name = channel.get('name', '')
+            if not channel_name:
+                continue
+            
+            score = self.calculate_fuzzy_score(target_name, channel_name)
+            if score >= threshold:
+                matches.append((channel, score))
+        
+        # Sort by score descending
+        matches.sort(key=lambda x: x[1], reverse=True)
+        return matches
     
     def get_slack_app_token(self) -> Optional[str]:
         token = os.getenv('slack_app_token')
@@ -83,17 +144,56 @@ class SlackChannelFinder:
             "im,mpim"
         ]
         
+        all_channels = []
+        
+        # First, collect all channels for fuzzy matching
         for types in channel_types:
-            channel_id = self._search_channels_by_type(app_token, types, clean_name)
-            if channel_id:
-                print(f"Channel ID: {channel_id}")
-                return channel_id
+            channels = self._get_channels_by_type(app_token, types)
+            all_channels.extend(channels)
             time.sleep(1)
         
-        print(f"❌ Channel '{clean_name}' not found")
+        if not all_channels:
+            print(f"❌ No channels found")
+            return None
+        
+        # Try exact match first (both original and normalized)
+        for channel in all_channels:
+            channel_name = channel.get('name', '')
+            # Check exact match with original clean name
+            if channel_name == clean_name:
+                channel_id = channel.get('id')
+                print(f"✅ Exact match found - Channel: #{channel_name} - ID: {channel_id}")
+                return channel_id
+            # Check normalized match (handles #channel-name vs channel_name etc)
+            if self.normalize_channel_name(channel_name) == self.normalize_channel_name(clean_name):
+                channel_id = channel.get('id')
+                print(f"✅ Normalized exact match found - Channel: #{channel_name} - ID: {channel_id}")
+                return channel_id
+        
+        # Use fuzzy matching if no exact match
+        matches = self.find_best_matches(clean_name, all_channels, threshold=0.5)
+        
+        if matches:
+            best_match, score = matches[0]
+            channel_id = best_match.get('id')
+            channel_name = best_match.get('name')
+            print(f"✅ Fuzzy match found - Channel: #{channel_name} (Score: {score:.2f}) - ID: {channel_id}")
+            
+            # Show additional matches if available
+            if len(matches) > 1:
+                print("Other possible matches:")
+                for channel, match_score in matches[1:4]:  # Show top 3 alternatives
+                    alt_name = channel.get('name')
+                    print(f"  - #{alt_name} (Score: {match_score:.2f})")
+            
+            return channel_id
+        
+        print(f"❌ No matching channel found for '{clean_name}'")
         return None
     
-    def _search_channels_by_type(self, token: str, channel_types: str, target_name: str) -> Optional[str]:
+    def _get_channels_by_type(self, token: str, channel_types: str) -> List[dict]:
+        """Get all channels of specified types"""
+        channels = []
         cursor = ""
         
         while True:
@@ -105,11 +205,8 @@ class SlackChannelFinder:
             if not result:
                 break
             
-            channels = result.get('channels', [])
-            
-            for channel in channels:
-                if channel.get('name') == target_name:
-                    return channel.get('id')
+            page_channels = result.get('channels', [])
+            channels.extend(page_channels)
             
             cursor = result.get('response_metadata', {}).get('next_cursor')
             if not cursor:
@@ -117,7 +214,7 @@ class SlackChannelFinder:
                 
             time.sleep(1)
         
-        return None
+        return channels
 
 if __name__ == "__main__":
     channel_name = os.getenv('channel_name')
