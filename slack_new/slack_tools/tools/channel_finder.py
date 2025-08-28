@@ -76,23 +76,18 @@ class SlackChannelFinder:
             return None
         
         clean_name = channel_name.lstrip('#')
-        print(f"🔍 Searching for channel: '{clean_name}'")
-        
         channel_types = [
-            ("public_channel,private_channel", "public and private channels"),
-            ("public_channel", "public channels only"),
-            ("private_channel", "private channels only"), 
-            ("im,mpim", "direct messages and group DMs")
+            "public_channel,private_channel",
+            "public_channel",
+            "private_channel", 
+            "im,mpim"
         ]
         
-        for types, description in channel_types:
-            print(f"🔍 Searching {description}...")
-            
+        for types in channel_types:
             channel_id = self._search_channels_by_type(app_token, types, clean_name)
             if channel_id:
-                print(f"✅ Found channel ID: {channel_id}")
+                print(f"Channel ID: {channel_id}")
                 return channel_id
-            
             time.sleep(1)
         
         print(f"❌ Channel '{clean_name}' not found")
@@ -111,7 +106,6 @@ class SlackChannelFinder:
                 break
             
             channels = result.get('channels', [])
-            print(f"📋 Checking {len(channels)} channels...")
             
             for channel in channels:
                 if channel.get('name') == target_name:
