@@ -1,7 +1,7 @@
 import os
 import sys
 import inspect
-from .base import JiraTool, Arg
+from base import JiraTool, Arg
 from kubiya_sdk.tools.registry import tool_registry
 from kubiya_sdk.tools import FileSpec
 
