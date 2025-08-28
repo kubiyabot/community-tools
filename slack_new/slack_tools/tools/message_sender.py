@@ -62,7 +62,6 @@ class SlackSendMessage:
             return None
     
     def get_bot_user_id(self) -> Optional[str]:
-        """Get the bot user ID using the Kubiya Slack token"""
         if not self.kubiya_token:
             print("❌ No Kubiya token available for bot ID lookup")
             return None
@@ -96,7 +95,6 @@ class SlackSendMessage:
             return None
     
     def join_channel(self, channel: str) -> bool:
-        """Join the channel if the bot isn't already a member"""
         if not self.kubiya_token or not self.bot_user_id:
             print("❌ Missing token or bot user ID for channel join")
             return False
@@ -104,7 +102,6 @@ class SlackSendMessage:
         try:
             print(f"🔍 Checking if bot is already in channel {channel}...")
             
-            # Check if bot is already in the channel
             response = requests.get(
                 f"https://slack.com/api/conversations.members?channel={channel}",
                 headers={"Authorization": f"Bearer {self.kubiya_token}"},
@@ -123,7 +120,6 @@ class SlackSendMessage:
                 else:
                     print(f"⚠️ Could not check channel membership: {data.get('error')}")
             
-            # Try to join the channel by inviting the bot
             print(f"🚪 Inviting bot to channel {channel}...")
             invite_response = requests.post(
                 "https://slack.com/api/conversations.invite",
@@ -147,22 +143,16 @@ class SlackSendMessage:
                     elif error == 'channel_not_found':
                         print("❌ Channel not found")
                         return False
-                    elif error == 'not_in_channel':
-                        print("⚠️ Cannot invite - inviter not in channel (continuing anyway)")
-                        return True  # Continue anyway, might still be able to post
-                    elif error == 'missing_scope':
-                        print("⚠️ Missing permissions to join channel (continuing anyway)")
-                        return True  # Continue anyway, might still be able to post
                     else:
                         print(f"⚠️ Failed to join channel: {error} (continuing anyway)")
-                        return True  # Continue anyway
+                        return True
             else:
                 print(f"❌ HTTP error {invite_response.status_code}: {invite_response.text}")
-                return True  # Continue anyway
+                return True
                 
         except Exception as e:
             print(f"💥 Error joining channel: {e} (continuing anyway)")
-            return True  # Continue anyway, don't fail the whole operation
+            return True
     
     def make_slack_request(self, endpoint: str, token: str, data: dict) -> Optional[dict]:
         url = f"https://slack.com/api/{endpoint}"
@@ -207,12 +197,10 @@ class SlackSendMessage:
             print("❌ Failed to get Kubiya Slack token for message posting")
             return False
         
-        # Get bot user ID for channel joining
         bot_user_id = self.get_bot_user_id()
         if not bot_user_id:
             print("⚠️ Could not get bot user ID, proceeding without channel join")
         
-        # Try to join the channel before sending message
         if bot_user_id:
             join_success = self.join_channel(channel)
             if not join_success:
@@ -266,11 +254,11 @@ if __name__ == "__main__":
         print("❌ Missing message parameter")
         sys.exit(1)
         
-    print("\n🔄 Initializing Slack message sender...")
+    print("\\n🔄 Initializing Slack message sender...")
     sender = SlackSendMessage()
     success = sender.send_message(channel, message, thread_ts)
 
-    print("\n" + "=" * 60)
+    print("\\n" + "=" * 60)
     if success:
         print("✅ OPERATION COMPLETED SUCCESSFULLY")
     else:
