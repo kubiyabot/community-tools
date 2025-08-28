@@ -6,21 +6,8 @@ from kubiya_sdk.tools.registry import tool_registry
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
-# Find Channel Tool
-find_channel_tool = Tool(
-    name="slack_find_channel_by_name", 
-    description="Find Slack channel ID by name using high-tier token. Searches across public, private channels and DMs",
-    type="docker",
-    image="python:3.11-slim",
-    icon_url=SLACK_ICON_URL,
-    content="""
-pip install --no-cache-dir --quiet requests
-python3 /tmp/find_channel.py
-""",
-    with_files=[
-        FileSpec(
-            destination="/tmp/find_channel.py",
-            content="""
+# Python script content as a separate variable to avoid nested triple quotes
+FIND_CHANNEL_SCRIPT = '''
 import os
 import sys
 import time
@@ -230,7 +217,23 @@ if __name__ == "__main__":
     else:
         print("Channel not found")
         sys.exit(1)
-"""
+'''
+
+# Find Channel Tool
+find_channel_tool = Tool(
+    name="slack_find_channel_by_name", 
+    description="Find Slack channel ID by name using high-tier token. Searches across public, private channels and DMs",
+    type="docker",
+    image="python:3.11-slim",
+    icon_url=SLACK_ICON_URL,
+    content="""
+pip install --no-cache-dir --quiet requests
+python3 /tmp/find_channel.py
+""",
+    with_files=[
+        FileSpec(
+            destination="/tmp/find_channel.py",
+            content=FIND_CHANNEL_SCRIPT
         )
     ],
     args=[
