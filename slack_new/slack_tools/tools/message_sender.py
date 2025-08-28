@@ -171,8 +171,7 @@ class SlackSendMessage:
         
         post_data = {
             "channel": channel,
-            "text": message,
-            "mrkdwn": True
+            "text": message
         }
         
         if thread_ts:
