@@ -157,17 +157,17 @@ class SlackSendMessage:
             self.join_channel(channel)
         
         # Check if this looks like a channel name instead of ID
-        if channel.startswith('#') or not channel.startswith(('C', 'D', 'G')):
-            if channel.startswith('#') or any(char in channel for char in ['-', '_', ' ']) or channel.islower():
-                print(f"❌ This tool accepts only channel IDs (starting with C, D, or G), not channel names.")
-                print(f"📋 Channel provided: '{channel}'")
-                print(f"🔍 Please use 'slack_find_channel_by_name' first to get the channel ID, then use that ID here.")
-                print(f"💡 Example: slack_find_channel_by_name channel_name=\"{channel.lstrip('#')}\"")
-                return False
-            else:
-                print(f"❌ Invalid channel ID format: '{channel}'")
-                print(f"🔍 Channel IDs should start with C (public), D (DM), or G (private). Use slack_find_channel_by_name to get the correct ID.")
-                return False
+        if not channel.startswith(('C', 'D', 'G')):
+            print(f"❌ Invalid channel ID format: '{channel}'")
+            print(f"🔍 Channel IDs should start with C (public), D (DM), or G (private). Use slack_find_channel_by_name to get the correct ID.")
+            return False
+        elif channel.startswith('#') or any(char in channel for char in ['-', '_', ' ']) or (len(channel) > 3 and channel[1:].islower()):
+            # This looks like a channel name, not an ID
+            print(f"❌ This tool accepts only channel IDs (starting with C, D, or G), not channel names.")
+            print(f"📋 Channel provided: '{channel}'")
+            print(f"🔍 Please use 'slack_find_channel_by_name' first to get the channel ID, then use that ID here.")
+            print(f"💡 Example: slack_find_channel_by_name channel_name=\"{channel.lstrip('#')}\"")
+            return False
         
         post_data = {
             "channel": channel,
