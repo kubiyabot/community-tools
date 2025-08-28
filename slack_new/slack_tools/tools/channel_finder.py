@@ -32,25 +32,12 @@ class SlackChannelFinder:
         self.slack_app_token = None
     
     def get_slack_app_token(self) -> Optional[str]:
-        try:
-            response = requests.get(
-                "https://api.kubiya.ai/api/v1/secret/get_secret_value/slack_app_token",
-                headers={"Authorization": f"Bearer {os.getenv('KUBIYA_API_TOKEN')}"},
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                token = data.get('value') or data.get('secret_value') or data.get('token')
-                if token and token != 'null':
-                    self.slack_app_token = token
-                    return token
-            
-            print(f"Failed to get Slack app token: {response.status_code}")
-            return None
-            
-        except Exception as e:
-            print(f"Error getting Slack app token: {e}")
+        token = os.getenv('slack_app_token')
+        if token and token != 'null':
+            self.slack_app_token = token
+            return token
+        else:
+            print("❌ Missing slack_app_token environment variable")
             return None
     
     def make_slack_request(self, endpoint: str, token: str) -> Optional[dict]:
@@ -158,7 +145,7 @@ if __name__ == "__main__":
     args=[
         Arg(name="channel_name", type="str", description="Channel name to search for (with or without # prefix)", required=True),
     ],
-    env=["KUBIYA_API_TOKEN"]
+    secrets=["slack_app_token"]
 )
 
 # Register the tool

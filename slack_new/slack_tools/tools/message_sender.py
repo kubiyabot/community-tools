@@ -34,7 +34,7 @@ class SlackSendMessage:
         try:
             response = requests.get(
                 "https://api.kubiya.ai/api/v1/integration/slack/token/1",
-                headers={"Authorization": f"Bearer {os.getenv('KUBIYA_API_TOKEN')}"},
+                headers={"Authorization": f"Bearer {os.getenv('KUBIYA_API_KEY')}"},
                 timeout=30
             )
             
@@ -132,7 +132,7 @@ if __name__ == "__main__":
         Arg(name="message", type="str", description="Message text to send (supports Slack markdown)", required=True),
         Arg(name="thread_ts", type="str", description="Thread timestamp for replies (optional)", required=False),
     ],
-    env=["KUBIYA_API_TOKEN"]
+    secrets=["KUBIYA_API_KEY"]
 )
 
 # Register the tool
