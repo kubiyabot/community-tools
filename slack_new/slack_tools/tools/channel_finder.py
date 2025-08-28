@@ -32,12 +32,12 @@ class SlackChannelFinder:
         self.slack_app_token = None
     
     def get_slack_app_token(self) -> Optional[str]:
-        token = os.getenv('slack_app_token')
+        token = os.getenv('slack_api_token')
         if token and token != 'null':
             self.slack_app_token = token
             return token
         else:
-            print("❌ Missing slack_app_token environment variable")
+            print("❌ Missing slack_api_token environment variable")
             return None
     
     def make_slack_request(self, endpoint: str, token: str) -> Optional[dict]:
@@ -145,7 +145,7 @@ if __name__ == "__main__":
     args=[
         Arg(name="channel_name", type="str", description="Channel name to search for (with or without # prefix)", required=True),
     ],
-    secrets=["slack_app_token"]
+    secrets=["slack_api_token"]
 )
 
 # Register the tool
