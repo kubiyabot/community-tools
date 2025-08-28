@@ -295,7 +295,7 @@ for tool in [
     find_channel_tool,
     send_message_tool,
 ]:
-    tool_registry.register("slack_new", tool)
+    tool_registry.register("slack", tool)
 
 # Export tools for import
 __all__ = [
