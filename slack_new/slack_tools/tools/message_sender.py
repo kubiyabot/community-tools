@@ -29,6 +29,7 @@ from typing import Optional
 class SlackSendMessage:
     def __init__(self):
         self.kubiya_token = None
+        self.bot_user_id = None
     
     def get_kubiya_slack_token(self) -> Optional[str]:
         try:
@@ -59,6 +60,109 @@ class SlackSendMessage:
         except Exception as e:
             print(f"💥 Error getting Kubiya Slack token: {e}")
             return None
+    
+    def get_bot_user_id(self) -> Optional[str]:
+        """Get the bot user ID using the Kubiya Slack token"""
+        if not self.kubiya_token:
+            print("❌ No Kubiya token available for bot ID lookup")
+            return None
+        
+        try:
+            print("🤖 Getting bot user ID...")
+            response = requests.get(
+                "https://slack.com/api/auth.test",
+                headers={"Authorization": f"Bearer {self.kubiya_token}"},
+                timeout=30
+            )
+            
+            print(f"📡 Auth test response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('ok'):
+                    self.bot_user_id = data.get('user_id')
+                    bot_name = data.get('user', 'Unknown')
+                    print(f"✅ Bot user ID: {self.bot_user_id} ({bot_name})")
+                    return self.bot_user_id
+                else:
+                    print(f"❌ Auth test failed: {data.get('error')}")
+                    return None
+            else:
+                print(f"❌ HTTP error {response.status_code}: {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"💥 Error getting bot user ID: {e}")
+            return None
+    
+    def join_channel(self, channel: str) -> bool:
+        """Join the channel if the bot isn't already a member"""
+        if not self.kubiya_token or not self.bot_user_id:
+            print("❌ Missing token or bot user ID for channel join")
+            return False
+        
+        try:
+            print(f"🔍 Checking if bot is already in channel {channel}...")
+            
+            # Check if bot is already in the channel
+            response = requests.get(
+                f"https://slack.com/api/conversations.members?channel={channel}",
+                headers={"Authorization": f"Bearer {self.kubiya_token}"},
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('ok'):
+                    members = data.get('members', [])
+                    if self.bot_user_id in members:
+                        print("✅ Bot is already a member of the channel")
+                        return True
+                    else:
+                        print("➕ Bot not in channel, attempting to join...")
+                else:
+                    print(f"⚠️ Could not check channel membership: {data.get('error')}")
+            
+            # Try to join the channel by inviting the bot
+            print(f"🚪 Inviting bot to channel {channel}...")
+            invite_response = requests.post(
+                "https://slack.com/api/conversations.invite",
+                headers={"Authorization": f"Bearer {self.kubiya_token}"},
+                json={"channel": channel, "users": self.bot_user_id},
+                timeout=30
+            )
+            
+            print(f"📡 Invite response status: {invite_response.status_code}")
+            
+            if invite_response.status_code == 200:
+                invite_data = invite_response.json()
+                if invite_data.get('ok'):
+                    print("✅ Successfully joined channel")
+                    return True
+                else:
+                    error = invite_data.get('error', 'unknown')
+                    if error == 'already_in_channel':
+                        print("✅ Bot is already in the channel")
+                        return True
+                    elif error == 'channel_not_found':
+                        print("❌ Channel not found")
+                        return False
+                    elif error == 'not_in_channel':
+                        print("⚠️ Cannot invite - inviter not in channel (continuing anyway)")
+                        return True  # Continue anyway, might still be able to post
+                    elif error == 'missing_scope':
+                        print("⚠️ Missing permissions to join channel (continuing anyway)")
+                        return True  # Continue anyway, might still be able to post
+                    else:
+                        print(f"⚠️ Failed to join channel: {error} (continuing anyway)")
+                        return True  # Continue anyway
+            else:
+                print(f"❌ HTTP error {invite_response.status_code}: {invite_response.text}")
+                return True  # Continue anyway
+                
+        except Exception as e:
+            print(f"💥 Error joining channel: {e} (continuing anyway)")
+            return True  # Continue anyway, don't fail the whole operation
     
     def make_slack_request(self, endpoint: str, token: str, data: dict) -> Optional[dict]:
         url = f"https://slack.com/api/{endpoint}"
@@ -102,6 +206,17 @@ class SlackSendMessage:
         if not kubiya_token:
             print("❌ Failed to get Kubiya Slack token for message posting")
             return False
+        
+        # Get bot user ID for channel joining
+        bot_user_id = self.get_bot_user_id()
+        if not bot_user_id:
+            print("⚠️ Could not get bot user ID, proceeding without channel join")
+        
+        # Try to join the channel before sending message
+        if bot_user_id:
+            join_success = self.join_channel(channel)
+            if not join_success:
+                print("⚠️ Failed to join channel, but will attempt to send message anyway")
         
         if not channel.startswith(('C', 'D', 'G')):
             print(f"❌ Channel '{channel}' doesn't look like a valid channel ID.")
