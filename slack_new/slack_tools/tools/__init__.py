@@ -1,18 +1,26 @@
 """
 Slack Tools Module - Tool Definitions for Dual Token Slack Integration
 """
-from kubiya_sdk.tools import Arg
+from kubiya_sdk.tools import Arg, Tool, FileSpec
 from kubiya_sdk.tools.registry import tool_registry
-from .base import SlackBase
 
-# Python-based tools using Kubiya SDK
-from kubiya_sdk.tools import PythonTool
+SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"
 
 # Find Channel Tool
-find_channel_tool = PythonTool(
-    name="slack_find_channel_by_name",
+find_channel_tool = Tool(
+    name="slack_find_channel_by_name", 
     description="Find Slack channel ID by name using high-tier token. Searches across public, private channels and DMs",
+    type="docker",
+    image="python:3.11-slim",
+    icon_url=SLACK_ICON_URL,
     content="""
+pip install --no-cache-dir --quiet requests
+python3 /tmp/find_channel.py
+""",
+    with_files=[
+        FileSpec(
+            destination="/tmp/find_channel.py",
+            content="""
 import os
 import sys
 import time
@@ -77,11 +85,11 @@ class SlackChannelFinder:
     def find_channel_by_name(self, channel_name: str) -> Optional[str]:
         app_token = self.get_slack_app_token()
         if not app_token:
-            print("L Failed to get Slack app token for channel discovery")
+            print("❌ Failed to get Slack app token for channel discovery")
             return None
         
         clean_name = channel_name.lstrip('#')
-        print(f"= Searching for channel: '{clean_name}'")
+        print(f"🔍 Searching for channel: '{clean_name}'")
         
         channel_types = [
             ("public_channel,private_channel", "public and private channels"),
@@ -91,16 +99,16 @@ class SlackChannelFinder:
         ]
         
         for types, description in channel_types:
-            print(f"= Searching {description}...")
+            print(f"🔍 Searching {description}...")
             
             channel_id = self._search_channels_by_type(app_token, types, clean_name)
             if channel_id:
-                print(f" Found channel ID: {channel_id}")
+                print(f"✅ Found channel ID: {channel_id}")
                 return channel_id
             
             time.sleep(1)
         
-        print(f"L Channel '{clean_name}' not found")
+        print(f"❌ Channel '{clean_name}' not found")
         return None
     
     def _search_channels_by_type(self, token: str, channel_types: str, target_name: str) -> Optional[str]:
@@ -116,7 +124,7 @@ class SlackChannelFinder:
                 break
             
             channels = result.get('channels', [])
-            print(f"=� Checking {len(channels)} channels...")
+            print(f"📋 Checking {len(channels)} channels...")
             
             for channel in channels:
                 if channel.get('name') == target_name:
@@ -130,26 +138,44 @@ class SlackChannelFinder:
         
         return None
 
-finder = SlackChannelFinder()
-result = finder.find_channel_by_name(channel_name)
+if __name__ == "__main__":
+    channel_name = os.getenv('channel_name')
+    if not channel_name:
+        print("❌ Missing channel_name parameter")
+        sys.exit(1)
+        
+    finder = SlackChannelFinder()
+    result = finder.find_channel_by_name(channel_name)
 
-if result:
-    print(f"Channel ID: {result}")
-else:
-    print("Channel not found")
-    sys.exit(1)
-""",
+    if result:
+        print(f"Channel ID: {result}")
+    else:
+        print("Channel not found")
+        sys.exit(1)
+"""
+        )
+    ],
     args=[
         Arg(name="channel_name", type="str", description="Channel name to search for (with or without # prefix)", required=True),
     ],
-    requirements=["requests>=2.31.0"]
+    env=["KUBIYA_API_TOKEN"]
 )
 
 # Send Message Tool
-send_message_tool = PythonTool(
-    name="slack_send_message",
+send_message_tool = Tool(
+    name="slack_send_message", 
     description="Send message to Slack channel using channel ID. Use slack_find_channel_by_name first to get the channel ID",
+    type="docker",
+    image="python:3.11-slim",
+    icon_url=SLACK_ICON_URL,
     content="""
+pip install --no-cache-dir --quiet requests
+python3 /tmp/send_message.py
+""",
+    with_files=[
+        FileSpec(
+            destination="/tmp/send_message.py",
+            content="""
 import os
 import sys
 import requests
@@ -209,12 +235,12 @@ class SlackSendMessage:
     def send_message(self, channel: str, message: str, thread_ts: Optional[str] = None) -> bool:
         kubiya_token = self.get_kubiya_slack_token()
         if not kubiya_token:
-            print("L Failed to get Kubiya Slack token for message posting")
+            print("❌ Failed to get Kubiya Slack token for message posting")
             return False
         
         if not channel.startswith(('C', 'D', 'G')):
-            print(f"L Channel '{channel}' doesn't look like a valid channel ID.")
-            print("=� Use slack_find_channel_by_name tool first to get the channel ID:")
+            print(f"❌ Channel '{channel}' doesn't look like a valid channel ID.")
+            print("💡 Use slack_find_channel_by_name tool first to get the channel ID:")
             print(f"   Example: slack_find_channel_by_name --channel_name '{channel.lstrip('#')}'")
             return False
         
@@ -226,28 +252,42 @@ class SlackSendMessage:
         if thread_ts:
             post_data["thread_ts"] = thread_ts
         
-        print(f"=� Sending message to channel {channel}...")
+        print(f"📤 Sending message to channel {channel}...")
         result = self.make_slack_request("chat.postMessage", kubiya_token, post_data)
         
         if result:
-            print(" Message sent successfully!")
+            print("✅ Message sent successfully!")
             return True
         else:
-            print("L Failed to send message")
+            print("❌ Failed to send message")
             return False
 
-sender = SlackSendMessage()
-success = sender.send_message(channel, message, thread_ts)
+if __name__ == "__main__":
+    channel = os.getenv('channel')
+    message = os.getenv('message')
+    thread_ts = os.getenv('thread_ts')
+    
+    if not channel:
+        print("❌ Missing channel parameter")
+        sys.exit(1)
+    if not message:
+        print("❌ Missing message parameter")
+        sys.exit(1)
+        
+    sender = SlackSendMessage()
+    success = sender.send_message(channel, message, thread_ts)
 
-if not success:
-    sys.exit(1)
-""",
+    if not success:
+        sys.exit(1)
+"""
+        )
+    ],
     args=[
         Arg(name="channel", type="str", description="Channel ID (use slack_find_channel_by_name to get ID first)", required=True),
         Arg(name="message", type="str", description="Message text to send (supports Slack markdown)", required=True),
         Arg(name="thread_ts", type="str", description="Thread timestamp for replies (optional)", required=False),
     ],
-    requirements=["requests>=2.31.0"]
+    env=["KUBIYA_API_TOKEN"]
 )
 
 # Register all tools
@@ -256,3 +296,9 @@ for tool in [
     send_message_tool,
 ]:
     tool_registry.register("slack_new", tool)
+
+# Export tools for import
+__all__ = [
+    'find_channel_tool',
+    'send_message_tool',
+]
