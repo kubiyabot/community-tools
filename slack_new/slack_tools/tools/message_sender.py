@@ -49,8 +49,9 @@ def send_slack_message():
         if not token:
             print("❌ No token")
             return False
-    except:
-        print("❌ Token failed")
+        print(f"🔑 Token: {token[:10]}...")
+    except Exception as e:
+        print(f"❌ Token failed: {e}")
         return False
     
     # Try to join channel (non-blocking)
@@ -69,6 +70,8 @@ def send_slack_message():
     if thread_ts:
         payload["thread_ts"] = thread_ts
     
+    print(f"📤 Sending to channel: {channel}")
+    
     try:
         resp = requests.post(
             "https://slack.com/api/chat.postMessage",
@@ -77,8 +80,10 @@ def send_slack_message():
             timeout=10
         )
         result = resp.json() if resp.status_code == 200 else {}
+        print(f"📋 Full response: {result}")
         if result.get('ok'):
-            print("✅ Sent")
+            ts = result.get('ts', 'unknown')
+            print(f"✅ Sent - Message timestamp: {ts}")
             return True
         else:
             print(f"❌ {result.get('error', 'failed')}")
