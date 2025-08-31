@@ -35,34 +35,121 @@ class SlackChannelFinder:
         if target_norm == candidate_norm:
             return 1.0
         
-        # Check if target is substring of candidate
-        if target_norm in candidate_norm:
-            return 0.9
-        
-        # Check if candidate is substring of target
-        if candidate_norm in target_norm:
-            return 0.85
-        
-        # Calculate character overlap score
-        target_chars = set(target_norm)
-        candidate_chars = set(candidate_norm)
-        
-        if not target_chars or not candidate_chars:
+        # Check if either is empty
+        if not target_norm or not candidate_norm:
+            return 0.0
+            
+        # Early exit for very different lengths (likely false positive)
+        length_ratio = min(len(target_norm), len(candidate_norm)) / max(len(target_norm), len(candidate_norm))
+        if length_ratio < 0.3:  # If one string is less than 30% of the other's length
             return 0.0
         
+        # Substring matching with better scoring
+        if target_norm in candidate_norm:
+            # Perfect substring match gets high score, but not perfect
+            # Longer matches in shorter strings get higher scores
+            score = 0.85 + (len(target_norm) / len(candidate_norm)) * 0.1
+            return min(score, 0.95)  # Cap at 0.95 to keep below exact match
+        
+        if candidate_norm in target_norm:
+            # Reverse substring match, slightly lower score
+            score = 0.8 + (len(candidate_norm) / len(target_norm)) * 0.1
+            return min(score, 0.9)
+        
+        # Calculate sequential character matching (better than just set intersection)
+        lcs_score = self._longest_common_subsequence_ratio(target_norm, candidate_norm)
+        
+        # Calculate character overlap score as fallback
+        target_chars = set(target_norm)
+        candidate_chars = set(candidate_norm)
         intersection = len(target_chars.intersection(candidate_chars))
         union = len(target_chars.union(candidate_chars))
-        
         jaccard_score = intersection / union if union > 0 else 0.0
         
-        # Bonus for similar length
-        length_diff = abs(len(target_norm) - len(candidate_norm))
-        max_length = max(len(target_norm), len(candidate_norm))
-        length_bonus = (max_length - length_diff) / max_length if max_length > 0 else 0.0
+        # Position-aware matching: check if words/tokens align
+        position_score = self._calculate_position_score(target_norm, candidate_norm)
         
-        return (jaccard_score * 0.7) + (length_bonus * 0.3)
+        # Length similarity bonus
+        length_similarity = 1 - (abs(len(target_norm) - len(candidate_norm)) / max(len(target_norm), len(candidate_norm)))
+        
+        # Combine scores with weights favoring sequential matching
+        final_score = (
+            lcs_score * 0.4 +           # Sequential character matching
+            jaccard_score * 0.25 +      # Character overlap  
+            position_score * 0.25 +     # Word/token position alignment
+            length_similarity * 0.1     # Length similarity
+        )
+        
+        # Apply minimum threshold - with 4k+ channels, we need high confidence
+        # Anything below 0.75 is likely a false positive in large channel sets
+        if final_score < 0.75:
+            return 0.0
+        
+        # Additional strictness: if the strings are very similar but not exact,
+        # apply penalty to avoid false positives on typos
+        if final_score > 0.9 and target_norm != candidate_norm:
+            char_diff = abs(len(target_norm) - len(candidate_norm))
+            # If only 1-2 characters different and high similarity, might be typo
+            if char_diff <= 2 and lcs_score > 0.9:
+                final_score = min(final_score, 0.89)  # Cap just below threshold
+            
+        return final_score
     
-    def find_best_matches(self, target_name: str, channels: List[dict], threshold: float = 0.5) -> List[Tuple[dict, float]]:
+    def _longest_common_subsequence_ratio(self, s1: str, s2: str) -> float:
+        """Calculate ratio of longest common subsequence to average string length"""
+        def lcs_length(x, y):
+            m, n = len(x), len(y)
+            if m == 0 or n == 0:
+                return 0
+            
+            # Create DP table
+            dp = [[0] * (n + 1) for _ in range(m + 1)]
+            
+            for i in range(1, m + 1):
+                for j in range(1, n + 1):
+                    if x[i-1] == y[j-1]:
+                        dp[i][j] = dp[i-1][j-1] + 1
+                    else:
+                        dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+            
+            return dp[m][n]
+        
+        lcs_len = lcs_length(s1, s2)
+        avg_len = (len(s1) + len(s2)) / 2
+        return lcs_len / avg_len if avg_len > 0 else 0.0
+    
+    def _calculate_position_score(self, target: str, candidate: str) -> float:
+        """Calculate score based on word/token position alignment"""
+        # Split on common separators and compare token positions
+        target_tokens = re.split(r'[_\-\s]+', target.lower())
+        candidate_tokens = re.split(r'[_\-\s]+', candidate.lower())
+        
+        if not target_tokens or not candidate_tokens:
+            return 0.0
+        
+        # Remove empty tokens
+        target_tokens = [t for t in target_tokens if t]
+        candidate_tokens = [t for t in candidate_tokens if t]
+        
+        if not target_tokens or not candidate_tokens:
+            return 0.0
+        
+        # Calculate how many target tokens appear in candidate tokens
+        matches = 0
+        for target_token in target_tokens:
+            for candidate_token in candidate_tokens:
+                # Exact token match
+                if target_token == candidate_token:
+                    matches += 1
+                    break
+                # Substring match within token
+                elif target_token in candidate_token or candidate_token in target_token:
+                    matches += 0.7
+                    break
+        
+        return matches / len(target_tokens)
+    
+    def find_best_matches(self, target_name: str, channels: List[dict], threshold: float = 0.5, max_matches: int = 5) -> List[Tuple[dict, float]]:
         """Find best matching channels using fuzzy matching"""
         matches = []
         
@@ -75,9 +162,9 @@ class SlackChannelFinder:
             if score >= threshold:
                 matches.append((channel, score))
         
-        # Sort by score descending
+        # Sort by score descending and limit results for large channel sets
         matches.sort(key=lambda x: x[1], reverse=True)
-        return matches
+        return matches[:max_matches]
     
     def get_slack_app_token(self) -> Optional[str]:
         token = os.getenv('slack_app_token')
@@ -157,11 +244,19 @@ class SlackChannelFinder:
                 print(f"✅ Normalized exact match found - Channel: #{channel_name} - ID: {channel_id}")
                 return channel_id
         
-        # Use fuzzy matching if no exact match
-        matches = self.find_best_matches(clean_name, all_channels, threshold=0.5)
+        # Use fuzzy matching if no exact match - strict threshold for large channel sets
+        matches = self.find_best_matches(clean_name, all_channels, threshold=0.9, max_matches=3)
         
         if matches:
             best_match, score = matches[0]
+            
+            # Additional safety check - only return if score is very high confidence
+            # This prevents false positives in large channel sets (4k+ channels)
+            if score < 0.85:
+                print(f"❌ Best match '{best_match.get('name')}' has low confidence (Score: {score:.2f})")
+                print("Try a more specific channel name to improve matching accuracy")
+                return None
+            
             channel_id = best_match.get('id')
             channel_name = best_match.get('name')
             print(f"✅ Fuzzy match found - Channel: #{channel_name} (Score: {score:.2f}) - ID: {channel_id}")
@@ -169,7 +264,7 @@ class SlackChannelFinder:
             # Show additional matches if available
             if len(matches) > 1:
                 print("Other possible matches:")
-                for channel, match_score in matches[1:4]:  # Show top 3 alternatives
+                for channel, match_score in matches[1:]:  # Show remaining alternatives
                     alt_name = channel.get('name')
                     print(f"  - #{alt_name} (Score: {match_score:.2f})")
             
