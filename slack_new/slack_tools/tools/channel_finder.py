@@ -41,7 +41,7 @@ class SlackChannelFinder:
             
         # Early exit for very different lengths (likely false positive)
         length_ratio = min(len(target_norm), len(candidate_norm)) / max(len(target_norm), len(candidate_norm))
-        if length_ratio < 0.3:  # If one string is less than 30% of the other's length
+        if length_ratio < 0.2:  # Reduced from 0.3 to allow more flexibility
             return 0.0
         
         # Substring matching with better scoring
@@ -55,6 +55,9 @@ class SlackChannelFinder:
             # Reverse substring match, slightly lower score
             score = 0.8 + (len(candidate_norm) / len(target_norm)) * 0.1
             return min(score, 0.9)
+        
+        # Enhanced token-based matching for complex names
+        token_score = self._calculate_enhanced_token_score(target, candidate)
         
         # Calculate sequential character matching (better than just set intersection)
         lcs_score = self._longest_common_subsequence_ratio(target_norm, candidate_norm)
@@ -72,26 +75,23 @@ class SlackChannelFinder:
         # Length similarity bonus
         length_similarity = 1 - (abs(len(target_norm) - len(candidate_norm)) / max(len(target_norm), len(candidate_norm)))
         
-        # Combine scores with weights favoring sequential matching
+        # Combine scores with enhanced token matching
         final_score = (
-            lcs_score * 0.4 +           # Sequential character matching
-            jaccard_score * 0.25 +      # Character overlap  
-            position_score * 0.25 +     # Word/token position alignment
-            length_similarity * 0.1     # Length similarity
+            token_score * 0.35 +        # Enhanced token matching (higher weight)
+            lcs_score * 0.3 +           # Sequential character matching  
+            position_score * 0.2 +      # Word/token position alignment
+            jaccard_score * 0.1 +       # Character overlap
+            length_similarity * 0.05    # Length similarity (reduced weight)
         )
         
-        # Apply minimum threshold - with 4k+ channels, we need high confidence
-        # Anything below 0.75 is likely a false positive in large channel sets
-        if final_score < 0.75:
+        # More flexible threshold for complex channel names
+        # Lower threshold but with additional validation
+        if final_score < 0.65:
             return 0.0
         
-        # Additional strictness: if the strings are very similar but not exact,
-        # apply penalty to avoid false positives on typos
-        if final_score > 0.9 and target_norm != candidate_norm:
-            char_diff = abs(len(target_norm) - len(candidate_norm))
-            # If only 1-2 characters different and high similarity, might be typo
-            if char_diff <= 2 and lcs_score > 0.9:
-                final_score = min(final_score, 0.89)  # Cap just below threshold
+        # For high-confidence matches on token alignment, boost the score
+        if token_score > 0.8 and final_score > 0.7:
+            final_score = min(final_score * 1.1, 0.95)  # 10% boost, capped
             
         return final_score
     
@@ -148,6 +148,81 @@ class SlackChannelFinder:
                     break
         
         return matches / len(target_tokens)
+    
+    def _calculate_enhanced_token_score(self, target: str, candidate: str) -> float:
+        """Enhanced token-based scoring for complex channel names"""
+        # Extract tokens from both strings using multiple separators
+        target_tokens = re.split(r'[_\-\s.]+', target.lower().strip('#'))
+        candidate_tokens = re.split(r'[_\-\s.]+', candidate.lower().strip('#'))
+        
+        # Remove empty tokens
+        target_tokens = [t for t in target_tokens if t and len(t) > 0]
+        candidate_tokens = [t for t in candidate_tokens if t and len(t) > 0]
+        
+        if not target_tokens or not candidate_tokens:
+            return 0.0
+        
+        # Calculate exact token matches
+        exact_matches = 0
+        partial_matches = 0
+        
+        for target_token in target_tokens:
+            best_match_score = 0
+            for candidate_token in candidate_tokens:
+                if target_token == candidate_token:
+                    exact_matches += 1
+                    best_match_score = 1.0
+                    break
+                elif target_token in candidate_token or candidate_token in target_token:
+                    # Partial match - score based on length ratio
+                    if len(target_token) >= 3 and len(candidate_token) >= 3:  # Only for meaningful tokens
+                        overlap_ratio = min(len(target_token), len(candidate_token)) / max(len(target_token), len(candidate_token))
+                        best_match_score = max(best_match_score, overlap_ratio * 0.8)
+                elif self._tokens_similar(target_token, candidate_token):
+                    # Similar tokens (edit distance)
+                    best_match_score = max(best_match_score, 0.6)
+            
+            if best_match_score > 0.5:
+                partial_matches += best_match_score
+        
+        # Calculate score based on match ratio
+        total_score = (exact_matches + partial_matches) / len(target_tokens)
+        
+        # Bonus for high coverage of candidate tokens (bidirectional matching)
+        reverse_matches = 0
+        for candidate_token in candidate_tokens:
+            for target_token in target_tokens:
+                if candidate_token == target_token or candidate_token in target_token or target_token in candidate_token:
+                    reverse_matches += 1
+                    break
+        
+        coverage_score = reverse_matches / len(candidate_tokens) if candidate_tokens else 0
+        
+        # Combine forward and reverse matching
+        final_score = (total_score * 0.7) + (coverage_score * 0.3)
+        
+        return min(final_score, 1.0)
+    
+    def _tokens_similar(self, token1: str, token2: str) -> bool:
+        """Check if two tokens are similar using simple edit distance"""
+        if len(token1) < 3 or len(token2) < 3:
+            return False
+        
+        # Simple edit distance check
+        max_len = max(len(token1), len(token2))
+        min_len = min(len(token1), len(token2))
+        
+        if max_len - min_len > 2:  # Too different in length
+            return False
+        
+        differences = 0
+        for i in range(min_len):
+            if token1[i] != token2[i]:
+                differences += 1
+                if differences > 1:  # Allow only 1 character difference
+                    return False
+        
+        return differences <= 1
     
     def find_best_matches(self, target_name: str, channels: List[dict], threshold: float = 0.5, max_matches: int = 5) -> List[Tuple[dict, float]]:
         """Find best matching channels using fuzzy matching"""
@@ -244,15 +319,15 @@ class SlackChannelFinder:
                 print(f"✅ Normalized exact match found - Channel: #{channel_name} - ID: {channel_id}")
                 return channel_id
         
-        # Use fuzzy matching if no exact match - strict threshold for large channel sets
-        matches = self.find_best_matches(clean_name, all_channels, threshold=0.9, max_matches=3)
+        # Use fuzzy matching if no exact match - balanced threshold for complex channel names
+        matches = self.find_best_matches(clean_name, all_channels, threshold=0.7, max_matches=3)
         
         if matches:
             best_match, score = matches[0]
             
-            # Additional safety check - only return if score is very high confidence
-            # This prevents false positives in large channel sets (4k+ channels)
-            if score < 0.85:
+            # Adjusted safety check for complex channel names
+            # Allow lower confidence for complex names but still prevent false positives
+            if score < 0.75:
                 print(f"❌ Best match '{best_match.get('name')}' has low confidence (Score: {score:.2f})")
                 print("Try a more specific channel name to improve matching accuracy")
                 return None
