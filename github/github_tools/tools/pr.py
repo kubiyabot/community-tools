@@ -99,11 +99,22 @@ if [ -n "$org" ] && [ -z "$repo" ]; then
     echo "🏢 Organization: https://github.com/$org"
 fi
 
+# Build the state flag based on the value
+STATE_FLAG=""
+if [ -n "$state" ]; then
+    if [ "$state" = "merged" ]; then
+        STATE_FLAG="--merged"
+    elif [ "$state" = "open" ] || [ "$state" = "closed" ]; then
+        STATE_FLAG="--state $state"
+    fi
+    # If state is anything else, no flag is added
+fi
+
 # If both repo and org are provided, prioritize repo over org
 if [ -n "$repo" ]; then
-    RESULT=$(gh search prs --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
+    RESULT=$(gh search prs --repo $repo $STATE_FLAG $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
 else
-    RESULT=$(gh search prs $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
+    RESULT=$(gh search prs $STATE_FLAG $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
 fi
 
 echo "✨ Found pull requests:"
