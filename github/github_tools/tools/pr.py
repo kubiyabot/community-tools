@@ -99,10 +99,18 @@ if [ -n "$org" ] && [ -z "$repo" ]; then
     echo "🏢 Organization: https://github.com/$org"
 fi
 
+echo "State: $state"
+echo "Author: $author"
+echo "limit: $limit" 
+echo "Organization: $org" 
+echo "Assignee: $assignee"
+
 # If both repo and org are provided, prioritize repo over org
 if [ -n "$repo" ]; then
+    gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
     RESULT=$(gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
 else
+    gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
     RESULT=$(gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
 fi
 
