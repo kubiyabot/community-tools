@@ -106,7 +106,10 @@ echo "Organization: $org"
 echo "Assignee: $assignee"
 
 echo "✨ Found pull requests:"
-gh pr list $([[ -n "$repo" ]] && echo "--repo $repo") $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
+gh --help
+gh pr --help
+gh pr list --help
+
 
 """,
     args=[
