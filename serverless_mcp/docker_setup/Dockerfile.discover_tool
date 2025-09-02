@@ -1,0 +1,29 @@
+# Dockerfile for the DiscoverAndDefineMCPTools meta-tool
+FROM python:3.11-slim
+
+# Install git and ca-certificates (for https git clones)
+RUN apt-get update && \
+    apt-get install -y git ca-certificates --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Kubiya SDK (assuming it's on PyPI or a custom index)
+# Also install fastmcp, pydantic for discovery logic
+# httpx is a dependency for fastmcp client features, uvicorn for running servers (though not strictly needed for client/discovery)
+RUN pip install --no-cache-dir "kubiya-sdk>=0.1.0" "fastmcp>=2.3.0" pydantic httpx kubernetes
+
+# Set up the working directory
+WORKDIR /kubiya_tool_app
+
+# Copy the entire serverless_mcp package content into the image.
+# This includes discovery.py, base_tool.py, loader.py (for its script logic), 
+# and the config/servers_to_sync.json
+COPY ./serverless_mcp ./serverless_mcp
+
+# Copy the script that will be the main content of the DiscoverAndDefineMCPTools
+COPY ./discover_exec_script.py .
+RUN chmod +x discover_exec_script.py
+
+# The entrypoint will be this script.
+# Kubiya will provide arguments as environment variables if defined in the Tool's Args.
+# For this meta-tool, it might not need Kubiya Args if config is self-contained.
+ENTRYPOINT ["python", "/kubiya_tool_app/discover_exec_script.py"] 
