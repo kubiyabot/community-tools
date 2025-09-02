@@ -107,15 +107,13 @@ echo "Assignee: $assignee"
 
 # If both repo and org are provided, prioritize repo over org
 if [ -n "$repo" ]; then
-    gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee")
-    RESULT=$(gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
+    echo "✨ Found pull requests:"
+    gh pr list --repo $repo --state $state --limit $limit --author $author$ --assignee $assignee 
 else
-    gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
-    RESULT=$(gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
+    echo "✨ Found pull requests:"
+    gh pr list --state $state --limit $limit --author $author$ --assignee $assignee --owner $org
 fi
 
-echo "✨ Found pull requests:"
-echo "$RESULT"
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
