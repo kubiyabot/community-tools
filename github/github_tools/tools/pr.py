@@ -105,14 +105,8 @@ echo "limit: $limit"
 echo "Organization: $org" 
 echo "Assignee: $assignee"
 
-# If both repo and org are provided, prioritize repo over org
-if [ -n "$repo" ]; then
-    echo "✨ Found pull requests:"
-    gh pr list --repo $repo $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") 
-else
-    echo "✨ Found pull requests:"
-    gh pr list $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
-fi
+echo "✨ Found pull requests:"
+gh pr list $([[ -n "$repo" ]] && echo "--repo $repo") $([[ -n "$state" ]] && echo "--state $state") $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org")
 
 """,
     args=[
