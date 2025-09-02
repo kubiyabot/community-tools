@@ -287,10 +287,7 @@ class SlackChannelFinder:
         
         clean_name = channel_name.lstrip('#')
         channel_types = [
-            "public_channel,private_channel",
             "public_channel",
-            "private_channel", 
-            "im,mpim"
         ]
         
         all_channels = []
@@ -354,7 +351,7 @@ class SlackChannelFinder:
         cursor = ""
         
         while True:
-            endpoint = f"conversations.list?types={channel_types}&limit=1000"
+            endpoint = f"conversations.list?types={channel_types}&limit=1000&exclude_archived=true"
             if cursor:
                 endpoint += f"&cursor={cursor}"
             
