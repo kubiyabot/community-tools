@@ -106,7 +106,7 @@ echo "Organization: $org"
 echo "Assignee: $assignee"
 
 echo "✨ Found pull requests:"
-gh pr list --repo $repo --state $state --limit $limit --json number,title,state,author,createdAt,url | cat
+gh pr list --repo $repo --state $state --limit $limit --json number,title,state,author,createdAt,url
 
 """,
     args=[
