@@ -251,5 +251,15 @@ done
     long_running=True
 )
 
+gh_cli = GitHubRepolessCliTool(
+    name="github_cli",
+    description="Run GitHub CLI commands.",
+    args=[Arg(name="command", type="str", description="GitHub CLI command to run.", required=True)],
+    content="""
+    $command
+    """
+)
+
 # Register the stream_workflow_logs tool
 tool_registry.register("github", stream_workflow_logs)
+tool_registry.register("gh", gh_cli)
