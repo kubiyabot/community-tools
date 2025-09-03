@@ -189,7 +189,7 @@ check_and_set_org() {{
         fi
     fi
 }}
-check_and_set_org
+
 
 {content}
 """
