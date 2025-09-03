@@ -261,5 +261,5 @@ gh_cli = GitHubRepolessCliTool(
 )
 
 # Register the stream_workflow_logs tool
-tool_registry.register("github", stream_workflow_logs)
+# tool_registry.register("github", stream_workflow_logs)
 tool_registry.register("gh", gh_cli)
