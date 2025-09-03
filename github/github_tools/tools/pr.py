@@ -82,6 +82,7 @@ pr_list = GitHubRepolessCliTool(
     name="github_pr_list", 
     description="List pull requests in a GitHub repository.",
     content="""
+gh pr list --repo $repo --state $state --limit $limit | cat
 echo "🔍 Searching for pull requests..."
 if [ -n "$repo" ]; then
     echo "📁 Repository: https://github.com/$repo"
@@ -106,7 +107,7 @@ echo "Organization: $org"
 echo "Assignee: $assignee"
 
 echo "✨ Found pull requests:"
-gh pr list --repo $repo --state $state --limit $limit --json number,title,state,author,createdAt,url
+gh pr list --repo $repo --state $state --limit $limit | cat
 
 """,
     args=[
