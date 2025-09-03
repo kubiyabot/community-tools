@@ -220,7 +220,7 @@ gh_cli = GitHubRepolessCliTool(
     description="Run GitHub CLI commands.",
     args=[Arg(name="command", type="str", description="GitHub CLI command to run.", required=True)],
     content="""
-    $command
+    gh $command
     """
 )
 
