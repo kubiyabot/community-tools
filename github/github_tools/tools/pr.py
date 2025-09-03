@@ -78,7 +78,7 @@ echo "📋 Details: $PR_URL"
     ],
 )
 
-pr_list = GitHubRepolessCliTool(
+pr_list = GitHubCliTool(
     name="github_pr_list", 
     description="List pull requests in a GitHub repository.",
     content="""
