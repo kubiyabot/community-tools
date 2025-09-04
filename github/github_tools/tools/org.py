@@ -12,8 +12,8 @@ get_org_members = GitHubRepolessCliTool(
 )
 
 # Register all org tools
-for tool in [get_org_members]:
-    tool_registry.register("github", tool)
+# for tool in [get_org_members]:
+#     tool_registry.register("github", tool)
 
 # Export all org tools
-__all__ = ['get_org_members']
+# __all__ = ['get_org_members']
