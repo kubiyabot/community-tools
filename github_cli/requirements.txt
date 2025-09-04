@@ -1,2 +1,0 @@
-kubiya-sdk
-jinja2
