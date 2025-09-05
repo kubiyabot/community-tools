@@ -234,6 +234,6 @@ echo "✨ Search Complete! ✨"
 )
 
 # Register tools
-tool_registry.register("github", github_search)
-tool_registry.register("github", code_search)
-tool_registry.register("github", advanced_code_search) 
+# tool_registry.register("github", github_search)
+# tool_registry.register("github", code_search)
+# tool_registry.register("github", advanced_code_search)

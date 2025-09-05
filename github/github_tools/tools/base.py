@@ -31,11 +31,12 @@ KUBIYA_DISCLAIMER_TEXT = '''
 • Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 '''
 
+
 class GitHubCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, with_volumes=None, with_files=None):
         if with_volumes is None:
             with_volumes = []
-        
+
         if with_files is None:
             with_files = []
 
@@ -55,7 +56,7 @@ fi
 add_disclaimer() {{
     local format="$1"
     local message="$2"
-    
+
     if [ "$format" = "markdown" ]; then
         echo "{KUBIYA_DISCLAIMER_MARKDOWN}" | envsubst
     else
@@ -68,7 +69,7 @@ add_disclaimer() {{
 
         # Generate operation-specific mermaid diagram
         mermaid_diagram = self._generate_mermaid_diagram(name, args)
-            
+
         super().__init__(
             name=name,
             description=description,
@@ -92,7 +93,7 @@ add_disclaimer() {{
     def _generate_mermaid_diagram(self, name, args):
         """Generate a GitHub operation-specific mermaid diagram."""
         diagram = ["graph TD"]
-        
+
         if "workflow" in name:
             # Workflow-specific diagram
             diagram.extend([
@@ -164,7 +165,7 @@ class GitHubRepolessCliTool(Tool):
     def __init__(self, name, description, content, args, long_running=False, with_volumes=None):
         if with_volumes is None:
             with_volumes = []
-            
+
         enhanced_content = f"""
 #!/bin/sh
 set -e
@@ -189,14 +190,16 @@ check_and_set_org() {{
         fi
     fi
 }}
-check_and_set_org
+
 
 {content}
 """
 
         updated_args = [arg for arg in args if arg.name not in ["org", "repo"]]
         updated_args.extend([
-            Arg(name="org", type="str", description="GitHub organization name. If you're a member of only one org, it will be used automatically.", required=False),
+            Arg(name="org", type="str",
+                description="GitHub organization name. If you're a member of only one org, it will be used automatically.",
+                required=False),
         ])
 
         super().__init__(
@@ -214,42 +217,14 @@ check_and_set_org
             with_volumes=with_volumes
         )
 
-# Define stream_workflow_logs tool
-stream_workflow_logs = GitHubCliTool(
-    name="github_stream_workflow_logs",
-    description="Stream logs from a GitHub Actions workflow run in real-time. DO NOT USE THIS TOOL IF THE WORKFLOW IS ALREADY FAILED. (eg. received notification that the workflow failed)",
+
+gh_cli = GitHubRepolessCliTool(
+    name="github_cli",
+    description="Run GitHub CLI commands.",
+    args=[Arg(name="command", type="str", description="GitHub CLI command to run.", required=True)],
     content="""
-#!/bin/sh
-set -e
-
-if [ -z "$run_id" ]; then
-    echo "No run ID provided. Fetching the latest workflow run..."
-    run_id=$(gh run list --repo $repo --limit 1 --json databaseId --jq '.[0].databaseId')
-    if [ -z "$run_id" ]; then
-        echo "No workflow runs found for the repository."
-        exit 1
-    fi
-    echo "Using the latest run ID: $run_id"
-fi
-
-echo "Streaming logs for workflow run $run_id in repository $repo..."
-gh run view $run_id --repo $repo --log --exit-status
-
-while true; do
-    status=$(gh run view $run_id --repo $repo --json status --jq '.status')
-    if [ "$status" != "in_progress" ]; then
-        echo "Workflow run $run_id has finished with status: $status"
-        break
-    fi
-    sleep 10
-done
-""",
-    args=[
-        Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=True),
-        Arg(name="run_id", type="str", description="Workflow run ID. If not provided, the latest run will be used.", required=False),
-    ],
-    long_running=True
+    gh $command
+    """
 )
 
-# Register the stream_workflow_logs tool
-tool_registry.register("github", stream_workflow_logs)
+tool_registry.register("gh", gh_cli)

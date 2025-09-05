@@ -344,21 +344,21 @@ echo "✨ File listing complete!"
 )
 
 # Update the tools list
-tools = [
-    get_file,
-    remote_search,
-    list_files
-]
-
-for tool in tools:
-    tool_registry.register("github", tool)
-
-__all__ = [
-    'get_file',
-    'remote_search',
-    'stateful_create_pr',
-    'list_files'
-]
+# tools = [
+#     get_file,
+#     remote_search,
+#     list_files
+# ]
+#
+# for tool in tools:
+#     tool_registry.register("github", tool)
+#
+# __all__ = [
+#     'get_file',
+#     'remote_search',
+#     'stateful_create_pr',
+#     'list_files'
+# ]
 
 # Script for direct file content editing
 FILE_EDIT_SCRIPT = '''
@@ -467,5 +467,5 @@ edit_file = GitHubCliTool(
 )
 
 # Register tool
-tool_registry.register("github", edit_file)
-__all__.append('edit_file')
+# tool_registry.register("github", edit_file)
+# __all__.append('edit_file')

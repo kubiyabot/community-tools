@@ -253,13 +253,13 @@ rm -rf "$TEMP_DIR"
 )
 
 # Register all analytics tools
-ANALYTICS_TOOLS = [
-    workflow_analytics,
-    security_scan,
-    dependency_analytics,
-]
-
-for tool in ANALYTICS_TOOLS:
-    tool_registry.register("github", tool)
-
-__all__ = ['workflow_analytics', 'security_scan', 'dependency_analytics'] 
+# ANALYTICS_TOOLS = [
+#     workflow_analytics,
+#     security_scan,
+#     dependency_analytics,
+# ]
+#
+# for tool in ANALYTICS_TOOLS:
+#     tool_registry.register("github", tool)
+#
+# __all__ = ['workflow_analytics', 'security_scan', 'dependency_analytics']

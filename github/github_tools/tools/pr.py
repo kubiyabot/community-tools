@@ -82,6 +82,7 @@ pr_list = GitHubRepolessCliTool(
     name="github_pr_list", 
     description="List pull requests in a GitHub repository.",
     content="""
+gh pr list --repo $repo --state $state --limit $limit | cat
 echo "🔍 Searching for pull requests..."
 if [ -n "$repo" ]; then
     echo "📁 Repository: https://github.com/$repo"
@@ -99,26 +100,15 @@ if [ -n "$org" ] && [ -z "$repo" ]; then
     echo "🏢 Organization: https://github.com/$org"
 fi
 
-# Build the state flag based on the value
-STATE_FLAG=""
-if [ -n "$state" ]; then
-    if [ "$state" = "merged" ]; then
-        STATE_FLAG="--merged"
-    elif [ "$state" = "open" ] || [ "$state" = "closed" ]; then
-        STATE_FLAG="--state $state"
-    fi
-    # If state is anything else, no flag is added
-fi
-
-# If both repo and org are provided, prioritize repo over org
-if [ -n "$repo" ]; then
-    RESULT=$(gh search prs --repo $repo $STATE_FLAG $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee"))
-else
-    RESULT=$(gh search prs $STATE_FLAG $([[ -n "$limit" ]] && echo "--limit $limit") $([[ -n "$author" ]] && echo "--author $author") $([[ -n "$assignee" ]] && echo "--assignee $assignee") $([[ -n "$org" ]] && echo "--owner $org"))
-fi
+echo "State: $state"
+echo "Author: $author"
+echo "limit: $limit" 
+echo "Organization: $org" 
+echo "Assignee: $assignee"
 
 echo "✨ Found pull requests:"
-echo "$RESULT"
+gh pr list --repo $repo --state $state --limit $limit | cat
+
 """,
     args=[
         Arg(name="repo", type="str", description="Repository name in 'owner/repo' format. Example: 'octocat/Hello-World'", required=False),
@@ -611,8 +601,8 @@ echo "✅ Reviewer added successfully!"
 )
 
 # Register all PR tools
-for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_comment_and_edit_if_exists, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
-    tool_registry.register("github", tool)
+# for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_comment_and_edit_if_exists, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
+#     tool_registry.register("github", tool)
 
 # Export all PR tools
-__all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_comment_and_edit_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
+# __all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_comment_and_edit_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
