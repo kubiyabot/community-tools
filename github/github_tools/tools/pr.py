@@ -498,6 +498,7 @@ else
 fi
 
 FULL_BODY="$body${KUBIYA_DISCLAIMER}"
+echo "$(gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\""))"
 gh pr review --repo $repo $number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 echo "✅ Review submitted successfully!"
 """,
