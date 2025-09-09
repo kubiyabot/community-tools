@@ -498,7 +498,6 @@ else
 fi
 
 FULL_BODY="$body${KUBIYA_DISCLAIMER}"
-GH_DEBUG=api gh pr review https://github.com/$repo/pull/$number -$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 GH_DEBUG=api gh pr review https://github.com/$repo/pull/$number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 echo "✅ Review submitted successfully!"
 """,
