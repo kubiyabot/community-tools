@@ -498,7 +498,7 @@ else
 fi
 
 FULL_BODY="$body${KUBIYA_DISCLAIMER}"
-GH_DEBUG=api gh pr review https://github.com/$repo/pull/$number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
+gh pr review https://github.com/$repo/pull/$number --$review_type $([[ -n "$body" ]] && echo "--body \\"$FULL_BODY\\"")
 echo "✅ Review submitted successfully!"
 """,
     args=[
@@ -602,9 +602,9 @@ echo "✅ Reviewer added successfully!"
 
 # Register all PR tools
 # for tool in [pr_create, pr_list, pr_view, pr_merge, pr_close, pr_comment, pr_comment_and_edit_if_exists, github_pr_comment_workflow_failure, pr_review, pr_diff, pr_ready, pr_checks, pr_files, pr_assign, pr_add_reviewer]:
-for tool in [pr_comment, pr_comment_and_edit_if_exists, pr_review]:
+for tool in [pr_comment, pr_comment_and_edit_if_exists]:
     tool_registry.register("github", tool)
 
 # Export all PR tools
 # __all__ = ['pr_create', 'pr_list', 'pr_view', 'pr_merge', 'pr_close', 'pr_comment', 'pr_comment_and_edit_if_exists', 'github_pr_comment_workflow_failure', 'pr_review', 'pr_diff', 'pr_ready', 'pr_checks', 'pr_files', 'pr_assign', 'pr_add_reviewer']
-__all__ = ['pr_comment', 'pr_comment_and_edit_if_exists', 'pr_review']
+__all__ = ['pr_comment', 'pr_comment_and_edit_if_exists']
