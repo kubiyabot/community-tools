@@ -1,6 +1,6 @@
 from kubiya_sdk.tools.models import Arg
 from kubiya_sdk.tools.registry import tool_registry
-from tools.base import BaseOCTool
+from .base import BaseOCTool
 import sys
 
 # Universal OpenShift CLI tool
