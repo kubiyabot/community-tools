@@ -6,7 +6,7 @@ A unified OpenShift CLI tool that provides seamless access to any `oc` command w
 
 - **Universal CLI Access**: Execute any OpenShift CLI command through a single tool
 - **Automatic Context**: Handles in-cluster authentication and context setup automatically
-- **Smart Output**: Truncates large outputs and provides helpful guidance
+- **Smart Output**: Truncates large outputs and provides helpful guidance  
 - **LLM-Friendly**: Comprehensive examples and usage patterns for AI assistants
 
 ## Tool
@@ -20,7 +20,7 @@ Executes any OpenShift CLI command with automatic in-cluster context handling.
 
 **Examples:**
 - `get pod my-pod-name -n my-project`
-- `get pods -l app=my-app -n prod`
+- `get pods -l app=my-app -n prod` 
 - `get projects`
 - `get routes -n my-project`
 - `logs deployment/my-app -n my-project`
