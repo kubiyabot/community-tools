@@ -801,19 +801,19 @@ fi
 )
 
 # Register tools
-# ANALYTICS_TOOLS = [
-#     repo_stats,
-#     security_analysis,
-#     commit_history,
-#     workflow_analytics,
-#     workflow_job_analytics,
-#     repo_insights,
-#     dependency_insights,
-#     commit_search,
-#     commit_details,
-# ]
-#
-# for tool in ANALYTICS_TOOLS:
-#     tool_registry.register("github", tool)
-#
-# __all__ = ['repo_stats', 'security_analysis', 'commit_history', 'workflow_analytics', 'workflow_job_analytics', 'repo_insights', 'dependency_insights', 'commit_search', 'commit_details']
+ANALYTICS_TOOLS = [
+    repo_stats,
+    security_analysis,
+    commit_history,
+    workflow_analytics,
+    workflow_job_analytics,
+    repo_insights,
+    dependency_insights,
+    commit_search,
+    commit_details,
+]
+
+for tool in ANALYTICS_TOOLS:
+    tool_registry.register("github", tool)
+
+__all__ = ['repo_stats', 'security_analysis', 'commit_history', 'workflow_analytics', 'workflow_job_analytics', 'repo_insights', 'dependency_insights', 'commit_search', 'commit_details']
