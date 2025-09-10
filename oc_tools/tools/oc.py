@@ -27,21 +27,7 @@ oc_tool = OpenShiftTool(
         Arg(
             name="command", 
             type="str", 
-            description="Precise OpenShift CLI command to execute. Keep it focused and specific. Examples:\\n" +
-                       "- 'get pod my-pod-name -n my-project'        # target specific pod in project\\n" +
-                       "- 'get pods -n default | grep my-app'        # filter pods by name in project\\n" +
-                       "- 'get pods -l app=my-app -n prod'           # use labels for precise filtering\\n" +
-                       "- 'get nodes --selector=node-role=worker'    # target specific node types\\n" +
-                       "- 'get projects'                             # list all projects\\n" +
-                       "- 'get routes -n my-project'                 # get routes in specific project\\n" +
-                       "- 'get deploymentconfigs -n my-project'     # get deployment configs\\n" +
-                       "- 'get builds -n my-project'                 # get builds in project\\n" +
-                       "- 'get imagestreams -n my-project'          # get image streams\\n" +
-                       "- 'get services -n my-project'              # get services in project\\n" +
-                       "- 'logs deployment/my-app -n my-project'    # get logs from deployment\\n" +
-                       "- 'status -n my-project'                    # get project status\\n" +
-                       "- 'describe pod my-pod -n my-project'       # describe specific resource\\n\\n" +
-                       "Try to use grep to filter output and more specific selectors for better results.",
+            description="OpenShift CLI command to execute (without 'oc' prefix). Examples: 'get projects', 'get pods -n myproject', 'get routes -n myproject', 'logs deployment/myapp -n myproject', 'status -n myproject'. Use grep and selectors for focused results.",
             required=True
         ),
     ],
