@@ -1,1 +1,3 @@
-# Empty file to make the directory a Python package
+# OpenShift CLI tools package
+
+from .oc_tools import oc_tool
