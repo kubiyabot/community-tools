@@ -191,7 +191,7 @@ check_and_set_org() {{
     fi
 }}
 
-
+check_and_set_org
 {content}
 """
 
@@ -220,7 +220,38 @@ check_and_set_org() {{
 
 gh_cli = GitHubRepolessCliTool(
     name="github_cli",
-    description="Run GitHub CLI commands.",
+    description="""Run GitHub CLI commands to interact with GitHub repositories, issues, pull requests, and other GitHub resources. This tool executes GitHub CLI commands only - do NOT use 'git' commands.
+
+IMPORTANT: Always use GitHub CLI commands. This is NOT for git operations but specifically for GitHub CLI operations.
+
+Common operations include:
+- Repository management: `repo clone`, `repo fork`, `repo create`
+- Issues and PRs: `issue list`, `pr create`, `pr view`
+- GitHub API access: `api` for direct API calls
+- Authentication: `auth login`, `auth status`
+- Workflow management: `workflow list`, `run list`
+
+Use these example commands for rapid assessment:
+- Git logs: `api repos/$owner/$repo/commits?per_page=$number`
+- List issues: `issue list --repo $owner/$repo`
+- View PR details: `pr view $pr_number --repo $owner/$repo`
+- Get repo info: `api repos/$owner/$repo`
+- List workflows: `api repos/$owner/$repo/actions/workflows`
+
+Examples for getting commit logs and history:
+- View repo activity: `repo view $owner/$repo`
+- List recent releases: `release list --repo $owner/$repo`
+- PR commit history: `pr view $pr_number --repo $owner/$repo --json commits`
+- Search commits: `search commits --repo=$owner/$repo --query="author:$username"`
+- Search commits by message: `search commits --repo=$owner/$repo --query="message:fix"`
+- Browse commits in web: `browse --repo $owner/$repo/commits`
+- Run history: `run list --repo $owner/$repo --limit 10`
+- Workflow run logs: `run view $run_id --repo $owner/$repo --log`
+- API for commits: `api repos/$owner/$repo/commits?per_page=10`
+- API commits by author: `api repos/$owner/$repo/commits?author=$username`
+- API commits since date: `api repos/$owner/$repo/commits?since=2024-01-01T00:00:00Z`
+
+Remember: Use GitHub CLI commands only. For commit history, use 'search commits', 'pr view', or 'api repos/.../commits' instead of 'git log'.""",
     args=[Arg(name="command", type="str", description="GitHub CLI command to run.", required=True)],
     content="""
     gh $command
