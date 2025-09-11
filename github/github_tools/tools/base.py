@@ -191,7 +191,7 @@ check_and_set_org() {{
     fi
 }}
 
-
+check_and_set_org
 {content}
 """
 
@@ -220,7 +220,7 @@ check_and_set_org() {{
 
 gh_cli = GitHubRepolessCliTool(
     name="github_cli",
-    description="Run GitHub CLI commands.",
+    description="Run GitHub CLI commands for repos, PRs, issues, and workflows. NEVER use 'git' commands - use GitHub CLI only. Examples: `repo view owner/repo`, `pr list`, `issue create`, `api repos/owner/repo/commits?per_page=10` for logs, `search commits --repo=owner/repo --query='author:user'`, `run list --repo owner/repo`. Use 'api repos/owner/repo/commits' instead of 'git log'.",
     args=[Arg(name="command", type="str", description="GitHub CLI command to run.", required=True)],
     content="""
     gh $command
