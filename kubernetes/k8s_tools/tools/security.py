@@ -10,7 +10,13 @@ check_privileged_pods_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "🔍 Scanning for security risks in pods..."
     echo "========================================="
@@ -55,7 +61,13 @@ check_resource_limits_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "📊 Scanning for missing resource limits..."
     echo "========================================"
@@ -101,15 +113,21 @@ check_network_policies_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "🌐 Scanning network policies..."
     echo "=============================="
 
     echo "\n📡 Namespaces without network policies:"
-    if [ -n "$namespace" ]; then
+    if [ "$check_all_namespaces" = false ]; then
         # Check only the specified namespace
-        if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
+        if [ $(kubectl get netpol $namespace_flag -o json | jq '.items | length') -eq 0 ]; then
             echo "  ⚠️  $namespace"
         fi
     else
@@ -122,7 +140,7 @@ check_network_policies_tool = KubernetesTool(
             ) |
             .metadata.name' | 
         while read ns; do
-            if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
+            if [ $(kubectl get netpol -n "$ns" -o json | jq '.items | length') -eq 0 ]; then
                 echo "  ⚠️  $ns"
             fi
         done
@@ -152,7 +170,13 @@ check_exposed_services_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "🌍 Scanning for exposed services..."
     echo "================================="
@@ -161,7 +185,7 @@ check_exposed_services_tool = KubernetesTool(
     kubectl get services $namespace_flag -o json | jq -r '
         .items[] | 
         select(.spec.type == "LoadBalancer" or .spec.type == "NodePort") |
-        "  ⚠��  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
+        "  ⚠️  Namespace: \(.metadata.namespace)\n     Service: \(.metadata.name)\n     Type: \(.spec.type)\n     Ports: \(
             [.spec.ports[] | 
             "\(if .nodePort then "NodePort: \(.nodePort)" else "" end) → \(.port)"] | 
             join(", ")
@@ -188,7 +212,13 @@ check_pod_security_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "🛡️ Running comprehensive pod security scan..."
     echo "=========================================="
@@ -248,7 +278,13 @@ full_security_scan_tool = KubernetesTool(
     set -e
 
     # Set namespace flag based on input
-    namespace_flag=$( [ -n "$namespace" ] && echo "-n $namespace" || echo "--all-namespaces" )
+    if [ -n "${namespace:-}" ]; then
+        namespace_flag="-n $namespace"
+        check_all_namespaces=false
+    else
+        namespace_flag="--all-namespaces"
+        check_all_namespaces=true
+    fi
 
     echo "🔒 Starting comprehensive security scan..."
     echo "========================================"
@@ -275,17 +311,27 @@ full_security_scan_tool = KubernetesTool(
 
     # Check network policies
     echo "\n3️⃣ Checking network policies..."
-    kubectl get ns -o json | jq -r '
-        .items[] | 
-        select(.metadata.name as $ns | 
-            not(any(["kube-system", "kube-public", "kube-node-lease"]; . == $ns))
-        ) |
-        .metadata.name' | 
-    while read ns; do
-        if [ $(kubectl get netpol -n $ns -o json | jq '.items | length') -eq 0 ]; then
-            echo "  ⚠️  Namespace without network policies: $ns"
+    if [ -n "${namespace:-}" ]; then
+        # Check only the specified namespace
+        if [ $(kubectl get netpol -n "$namespace" -o json | jq '.items | length') -eq 0 ]; then
+            echo "  ⚠️  Namespace without network policies: $namespace"
         fi
-    done
+    else
+        # Check all namespaces except system ones
+        kubectl get ns -o json | jq -r '
+            .items[] | 
+            select(
+                .metadata.name != "kube-system" and
+                .metadata.name != "kube-public" and
+                .metadata.name != "kube-node-lease"
+            ) |
+            .metadata.name' | 
+        while read -r ns; do
+            if [ $(kubectl get netpol -n "$ns" -o json | jq '.items | length') -eq 0 ]; then
+                echo "  ⚠️  Namespace without network policies: $ns"
+            fi
+        done
+    fi
 
     # Check exposed services
     echo "\n4️⃣ Checking exposed services..."
@@ -300,7 +346,7 @@ full_security_scan_tool = KubernetesTool(
     kubectl get pods $namespace_flag -o json | jq -r '
         .items[] | 
         select(
-            .spec.containers[].securityContext.capabilities.add != null or
+            (.spec.containers[].securityContext.capabilities.add != null) or
             .spec.hostNetwork == true or
             .spec.hostPID == true or
             .spec.hostIPC == true
