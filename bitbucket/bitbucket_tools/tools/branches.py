@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from .base import BitbucketCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 branch_list = BitbucketCliTool(
     name="bitbucket_branch_list",

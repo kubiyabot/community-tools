@@ -1,5 +1,5 @@
-from kubiya_sdk.tools import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 # This module uses a custom docker image that has the jira-cli installed
 # This custom image was designed to work with Kubiya
@@ -33,7 +33,7 @@ class JiraPythonTool(Tool):
             image="python:3.12-slim",
             on_build="""
 pip install requests > /dev/null
-pip install kubiya-sdk > /dev/null
+pip install kubiya_workflow_sdk[tools] > /dev/null
             """,
             content=content,
             args=args,

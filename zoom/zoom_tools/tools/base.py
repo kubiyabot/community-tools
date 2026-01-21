@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, FileSpec
+from kubiya_workflow_sdk.tools import Tool, FileSpec
 import os
 from pathlib import Path
 

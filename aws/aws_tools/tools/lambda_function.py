@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from .base import AWSCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 lambda_list_functions = AWSCliTool(
     name="lambda_list_functions",

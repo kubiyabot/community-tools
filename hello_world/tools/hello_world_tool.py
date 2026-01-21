@@ -1,5 +1,5 @@
-from kubiya_sdk.tools.models import Tool, Arg
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.models import Tool, Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 say_hello_tool = Tool(
     name="say_hello",

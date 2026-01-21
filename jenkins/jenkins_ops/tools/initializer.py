@@ -1,6 +1,6 @@
 __all__ = ['initialize_tools']
 
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 import logging
 import json
 from pathlib import Path

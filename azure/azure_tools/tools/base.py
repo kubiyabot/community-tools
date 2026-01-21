@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_workflow_sdk.tools import Tool
 
 AZURE_ICON_URL = "https://azure.microsoft.com/svghandler/azure-logo/?width=300&height=300"
 
@@ -18,5 +18,5 @@ class AzureTool(Tool):
         )
 
 def register_azure_tool(tool):
-    from kubiya_sdk.tools.registry import tool_registry
+    from kubiya_workflow_sdk.tools.registry import tool_registry
     tool_registry.register("azure", tool)

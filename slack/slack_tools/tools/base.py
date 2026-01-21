@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools.models import Tool, Arg, FileSpec
 import json
 
 SLACK_ICON_URL = "https://a.slack-edge.com/80588/marketing/img/icons/icon_slack_hash_colored.png"

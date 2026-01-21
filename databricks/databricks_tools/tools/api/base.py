@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_workflow_sdk.tools import Tool
 
 DATABRICKS_ICON_URL = "https://www.databricks.com/wp-content/themes/databricks/assets/images/databricks-logo.svg"
 

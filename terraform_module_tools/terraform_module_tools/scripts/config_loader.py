@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any, Optional, List, Tuple, Union
 import json
 import os
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 logger = logging.getLogger(__name__)
 

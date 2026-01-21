@@ -1,8 +1,7 @@
 import inspect
 from typing import List
-from kubiya_sdk.tools import Arg
-from kubiya_sdk.tools.registry import tool_registry
-from kubiya_sdk.tools.models import FileSpec
+from kubiya_workflow_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.models import FileSpec
 
 from .base import AWSIAMAccessTool
 from .config import IAMAccessConfig

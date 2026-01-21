@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import FileSpec
+from kubiya_workflow_sdk.tools.models import FileSpec
 
 # Common environment variables used across all tools
 COMMON_ENV = [

@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg
+from kubiya_workflow_sdk.tools import Tool, Arg
 from typing import Dict, Any, List, Optional
 from pydantic import root_validator
 import logging

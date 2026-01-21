@@ -2,7 +2,7 @@ import subprocess
 import os
 import sys
 from typing import Optional, Dict
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 class ScriptExecutionError(Exception):
     """Custom exception for script execution failures."""

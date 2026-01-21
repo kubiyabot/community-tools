@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_workflow_sdk.tools import Tool
 
 GCP_ICON_URL = "https://cloud.google.com/_static/cloud/images/social-icon-google-cloud-1200-630.png"
 
@@ -18,5 +18,5 @@ class GCPTool(Tool):
         )
 
 def register_gcp_tool(tool):
-    from kubiya_sdk.tools.registry import tool_registry
+    from kubiya_workflow_sdk.tools.registry import tool_registry
     tool_registry.register("gcp", tool)

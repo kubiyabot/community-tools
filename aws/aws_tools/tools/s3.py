@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from .base import AWSCliTool, AWSSdkTool
-from kubiya_sdk.tools.registry import tool_registry
 
 s3_list_buckets = AWSCliTool(
     name="s3_list_buckets",

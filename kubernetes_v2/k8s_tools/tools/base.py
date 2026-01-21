@@ -1,5 +1,5 @@
 # k8s_tools/tools/base.py
-from kubiya_sdk.tools import Tool, Arg, FileSpec
+from kubiya_workflow_sdk.tools import Tool, Arg, FileSpec
 
 KUBERNETES_ICON_URL = "https://kubernetes.io/icons/icon-128x128.png"
 

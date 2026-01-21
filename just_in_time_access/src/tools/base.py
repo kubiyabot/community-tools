@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_workflow_sdk.tools import Tool
 
 JIT_ICON_URL = "https://kubiya-public-20221113173935726800000003.s3.us-east-1.amazonaws.com/Knite.png"
 

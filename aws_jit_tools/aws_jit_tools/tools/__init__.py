@@ -1,5 +1,5 @@
 import logging
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 from .base import AWSJITTool
 from . import jit_access
 

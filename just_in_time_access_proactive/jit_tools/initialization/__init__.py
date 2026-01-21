@@ -4,7 +4,7 @@ import os
 import sys
 import base64
 from typing import Dict, Any, Optional
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 
 def get_opa_policy_template(config: Dict[str, Any]) -> str:

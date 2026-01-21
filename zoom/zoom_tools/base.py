@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool
+from kubiya_workflow_sdk.tools import Tool
 
 ZOOM_ICON_URL = "https://w7.pngwing.com/pngs/1023/88/png-transparent-zoom-social-media-meeting-logo-apps-social-media-icon-thumbnail.png"
 

@@ -1,6 +1,6 @@
 import inspect
-from kubiya_sdk import tool_registry
-from kubiya_sdk.tools.models import Tool, FileSpec
+from kubiya_workflow_sdk import tool_registry
+from kubiya_workflow_sdk.tools.models import Tool, FileSpec
 
 from . import knowledge
 

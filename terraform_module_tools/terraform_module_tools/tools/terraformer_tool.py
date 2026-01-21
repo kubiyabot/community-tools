@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Tool, Arg, Volume
+from kubiya_workflow_sdk.tools import Tool, Arg, Volume
 from typing import List, Dict, Any, Optional, ClassVar
 from typing_extensions import TypedDict
 from pydantic import BaseModel, Field

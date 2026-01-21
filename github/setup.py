@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     packages=find_packages(exclude=["tests"]),
     install_requires=[
-        "kubiya-sdk",
+        "kubiya_workflow_sdk[tools]",
     ],
     author="Your Name",
     author_email="your.email@example.com",

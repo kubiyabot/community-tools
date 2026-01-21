@@ -1,4 +1,4 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from .base import GCPTool, register_gcp_tool
 
 gce_list_instances = GCPTool(

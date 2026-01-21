@@ -1,6 +1,6 @@
-from kubiya_sdk.tools import Arg
+from kubiya_workflow_sdk.tools import Arg
 from .base import GitHubCliTool
-from kubiya_sdk.tools.registry import tool_registry
+from kubiya_workflow_sdk.tools.registry import tool_registry
 
 # First, let's add these shell functions at the beginning of the content for tools that need log processing
 LOG_PROCESSING_FUNCTIONS = '''

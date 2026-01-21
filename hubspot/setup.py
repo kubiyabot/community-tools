@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "hubspot-api-client>=8.1.0",
-        "kubiya_sdk",
+        "kubiya_workflow_sdk[tools]",
         "pydantic>=2.0.0"
     ],
     author="Kubiya",

@@ -1,6 +1,6 @@
 import inspect
 from typing import List
-from kubiya_sdk.tools import Arg, FileSpec
+from kubiya_workflow_sdk.tools import Arg, FileSpec
 from ..base import JiraPythonTool, register_jira_tool
 from . import create_issue, basic_funcs, view_issue, list_issues, create_issue_comment, update_issue_status, assign_issue, sprint_ops
 

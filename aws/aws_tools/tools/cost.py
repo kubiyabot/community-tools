@@ -1,7 +1,8 @@
-from kubiya_sdk.tools import Arg
-from .base import AWSCliTool, AWSSdkTool
-from kubiya_sdk.tools.registry import tool_registry
 from datetime import datetime, timedelta
+from kubiya_workflow_sdk.tools import Arg
+from kubiya_workflow_sdk.tools.registry import tool_registry
+from .base import AWSCliTool, AWSSdkTool
+
 
 def parse_time_ago(time_ago):
     now = datetime.now()

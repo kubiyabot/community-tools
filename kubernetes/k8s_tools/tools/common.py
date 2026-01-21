@@ -1,5 +1,5 @@
 # k8s_tools/tools/common.py
-from kubiya_sdk.tools import FileSpec
+from kubiya_workflow_sdk.tools import FileSpec
 
 # Common environment variables for Kubernetes in-cluster context
 COMMON_ENVIRONMENT_VARIABLES = []

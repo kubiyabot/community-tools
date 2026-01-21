@@ -1,4 +1,4 @@
-from kubiya_sdk.tools.models import Tool, FileSpec
+from kubiya_workflow_sdk.tools.models import Tool, FileSpec
 
 AWS_JIT_ICON = "https://img.icons8.com/color/200/amazon-web-services.png"
 
