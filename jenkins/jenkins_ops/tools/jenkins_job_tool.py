@@ -13,7 +13,7 @@ class JenkinsJobTool(Tool):
     """Tool for executing and monitoring Jenkins jobs."""
     
     job_config: Dict[str, Any]
-    long_running: bool = True
+    long_running: bool = False
     poll_interval: int = Field(default=30, description="Interval in seconds to poll job status")
     stream_logs: bool = Field(default=True, description="Stream job logs while running")
     
@@ -71,9 +71,6 @@ if [ -z "$JENKINS_API_TOKEN" ]; then
     exit 1
 fi
 
-# Install dependencies
-pip install -q python-jenkins requests
-
 # Run job
 python3 /opt/scripts/jenkins_job_runner.py
 """
@@ -123,7 +120,7 @@ python3 /opt/scripts/jenkins_job_runner.py
             # Set up script content
             self.content = self._generate_script_content()
 
-            self.image = "python:3.12"
+            self.image = "kubiya/jenkins-python-tool:latest"
 
             # Read the script content from the file
             script_path = Path(__file__).parent.parent / 'scripts' / 'jenkins_job_runner.py'
